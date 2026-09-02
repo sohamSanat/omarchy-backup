@@ -148,6 +148,22 @@ fi
 if [[ -f "${SCRIPT_DIR}/configs/fastfetch/config.jsonc" ]]; then
   cp -a "${SCRIPT_DIR}/configs/fastfetch/config.jsonc" "${USER_HOME}/.config/fastfetch/config.jsonc"
 fi
+if [[ -d "${SCRIPT_DIR}/configs/systemd/user" ]]; then
+  mkdir -p "${USER_HOME}/.config/systemd/user"
+  cp -a "${SCRIPT_DIR}/configs/systemd/user/." "${USER_HOME}/.config/systemd/user/"
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user daemon-reload 2>/dev/null || true
+  fi
+  echo "  [OK] Systemd user services restored."
+fi
+if [[ -d "${SCRIPT_DIR}/configs/Omacom" ]]; then
+  mkdir -p "${USER_HOME}/.config/Omacom"
+  cp -a "${SCRIPT_DIR}/configs/Omacom/." "${USER_HOME}/.config/Omacom/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/fcitx5" ]]; then
+  mkdir -p "${USER_HOME}/.config/fcitx5"
+  cp -a "${SCRIPT_DIR}/configs/fcitx5/." "${USER_HOME}/.config/fcitx5/"
+fi
 if [[ -f "${SCRIPT_DIR}/configs/shell/bashrc" ]]; then
   backup_if_exists "${USER_HOME}/.bashrc"
   cp -a "${SCRIPT_DIR}/configs/shell/bashrc" "${USER_HOME}/.bashrc"

@@ -78,7 +78,10 @@ This repository contains the full snapshot of user customizations:
 - `aetheria`, `artzen`, `harbor`, `harbordark`, `moodpeak`, `purple-moon`, `quattrocento-light`, `aether`.
 
 ### E. Shell Plugins (`plugins/` -> `~/.config/omarchy/plugins/`)
-15 plugins included with complete source code:
+18 plugins included with complete source code:
+- **`io.github.adamcbrewer.voxtype-aura`**: Native audio recording OSD for Voxtype dictation.
+- **`io.github.weedwhitesandwine.obsiduous`**: Obsidian status & indexing bar widget (includes custom vault path resolution patch).
+- **`x692137x.powerwave`**: PowerWave audio wave animation indicator.
 - **`jrmmhm.pocket`**: Collapsible drawer plugin that groups tray and status widgets together.
 - **`soham.power`**: Fully custom battery limiter & power panel plugin written by Soham.
 - **`charlieras262.floating-bar`**: Custom floating status bar container.

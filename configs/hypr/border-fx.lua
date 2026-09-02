@@ -8,8 +8,15 @@ local SHINY_SO = "/home/soham/.local/lib/hypr/hypr-shiny-border.so"
 local SHINY_LOAD = true
 
 local function shinyLoaded()
-  for _, p in ipairs(hl.get_loaded_plugins()) do
-    if p.name == "hypr-shiny-border" then
+  if type(hl.get_loaded_plugins) ~= "function" then
+    return false
+  end
+  local ok, plugins = pcall(hl.get_loaded_plugins)
+  if not ok or type(plugins) ~= "table" then
+    return false
+  end
+  for _, p in ipairs(plugins) do
+    if type(p) == "table" and p.name == "hypr-shiny-border" then
       return true
     end
   end

@@ -1,0 +1,10 @@
+[Unit]
+Description=Remove leftover WhatsApp bridge files if the plugin is gone
+After=default.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/soham/.local/lib/omarchy-whatsapp/sweep
+
+[Install]
+WantedBy=default.target

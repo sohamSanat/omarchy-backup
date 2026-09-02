@@ -9,7 +9,7 @@ This repository ensures your desktop setup is completely reproducible, disaster-
 ## 🌟 Customization Highlights
 
 - **Active Theme**: `Sakura Mochi` (with custom live-rendered templates and wallpapers).
-- **Status Bar**: Top floating bar (`charlieras262.floating-bar`) loaded with 15 modular plugins.
+- **Status Bar**: Top floating bar (`charlieras262.floating-bar`) loaded with 18 modular plugins.
 - **Custom Plugins**: Includes `soham.power` (custom battery limiter & power panel developed by Soham), `chispes.agent-gemini`, `io.github.calebhat.themebook`, `io.github.diegopluna.argus`, `io.github.nilszeilon.omarchy-sensei`, `io.github.ricky.whatsapp`, `mryll.meteobar`, `omamail`, and more.
 - **Theme Sync Engine**: Automated hooks (`theme-set.d`) that instantly propagate active theme colors and transparency into:
   - **Zen Browser** (`omarchy-sync-zen` + dynamic `zen.css.tpl`)
@@ -94,6 +94,9 @@ omarchy-backup/
 | `omaconnect` | KDE Connect device sync |
 | `omamail` | Email notifications widget |
 | `jrmmhm.pocket` | Collapsible widget drawer for grouping tray items |
+| `io.github.adamcbrewer.voxtype-aura` | Voice dictation (Voxtype) OSD audio indicator |
+| `io.github.weedwhitesandwine.obsiduous` | Obsidian notes & vault quick-capture indicator |
+| `x692137x.powerwave` | PowerWave audio visualizer & pulse indicator |
 
 ---
 

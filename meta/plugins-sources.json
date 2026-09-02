@@ -14,6 +14,12 @@
       " M bin/omarchy-agent-usage-gemini"
     ]
   },
+  "io.github.adamcbrewer.voxtype-aura": {
+    "remote": "https://github.com/adamcbrewer/voxtype-aura.git",
+    "commit": "3bd8745bb0f1405ffce402ead973120e87db1065",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
   "io.github.calebhat.themebook": {
     "remote": "https://github.com/calebhat/omarchy-themebook.git",
     "commit": "ec66686b900473be3d49fa7b542b510eb475a561",
@@ -63,6 +69,15 @@
     "has_local_changes": false,
     "dirty_files": []
   },
+  "io.github.weedwhitesandwine.obsiduous": {
+    "remote": "https://github.com/weedwhitesandwine/obsiduous.git",
+    "commit": "df17d884da1de205911d1990f2383561df819399",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M ObsiduousState.qml",
+      "M obsiduous-indexd.py"
+    ]
+  },
   "jkoestinger.vpn": {
     "remote": "https://github.com/jkoestinger/omarchy-vpn.git",
     "commit": "c94454d857f28a6421212ecc121317f7171db5a4",
@@ -102,5 +117,11 @@
   "soham.power": {
     "remote": null,
     "custom": true
+  },
+  "x692137x.powerwave": {
+    "remote": "https://github.com/sjgng/omarchy-powerwave-plugin.git",
+    "commit": "7d50efe23230e07603792d83827585cb8f918908",
+    "has_local_changes": false,
+    "dirty_files": []
   }
 }

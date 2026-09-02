@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "x692137x.powerwave",
+  "name": "Powerwave",
+  "version": "0.13.0",
+  "author": "x692137x",
+  "description": "Premium charging wave with subtle blurred perimeter aura",
+  "kinds": [
+    "service"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "PowerWave.qml"
+  }
+}

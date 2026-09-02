@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch Omarchy actions and keybindings for Sensei
+
+[Path]
+PathChanged=/usr/share/omarchy/default/omarchy/omarchy-menu.jsonc
+PathChanged=%h/.config/omarchy/extensions/omarchy-menu.jsonc
+PathChanged=%h/.config/hypr/bindings.lua
+Unit=omarchy-sensei-refresh.service
+
+[Install]
+WantedBy=default.target

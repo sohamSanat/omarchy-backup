@@ -1,0 +1,66 @@
+diff --git i/ObsiduousState.qml w/ObsiduousState.qml
+index a4c7b15..c76863e 100644
+--- i/ObsiduousState.qml
++++ w/ObsiduousState.qml
+@@ -328,6 +328,9 @@ QtObject {
+     if (kind === "status") {
+       root.vault = root.asText(message.vault, 4096)
+       root.vaultName = root.asText(message.vaultName, 200)
++      if (root.vaultPath === "" && root.vault !== "") {
++        root.vaultPath = root.vault
++      }
+       root.noteCount = (typeof message.notes === "number") ? message.notes : 0
+       root.indexed = message.indexed === true
+       root.truncated = message.truncated === true
+@@ -358,6 +361,14 @@ QtObject {
+ 
+     } else if (kind === "vaults") {
+       root.vaults = root.asArray(message.items, root.maxVaults)
++      if (root.vaultPath === "" && root.vaults.length > 0) {
++        for (var vi = 0; vi < root.vaults.length; vi++) {
++          if (root.vaults[vi] && root.vaults[vi].exists && root.vaults[vi].path) {
++            root.vaultPath = root.vaults[vi].path
++            break
++          }
++        }
++      }
+ 
+     } else if (kind === "captured") {
+       if (message.ok === true) {
+diff --git i/obsiduous-indexd.py w/obsiduous-indexd.py
+index 574b325..f9c949c 100644
+--- i/obsiduous-indexd.py
++++ w/obsiduous-indexd.py
+@@ -581,8 +581,17 @@ class Index(object):
+ 
+     # ------------------------------------------------------------- scan
+     def set_vault(self, path):
+-        path = os.path.abspath(os.path.expanduser(path or ""))
+-        self.vault = path if os.path.isdir(path) else ""
++        cleaned = (path or "").strip()
++        if not cleaned:
++            for entry in obsidian_vaults():
++                if entry.get("exists") and entry.get("path"):
++                    cleaned = entry["path"]
++                    break
++        if cleaned:
++            resolved = os.path.abspath(os.path.expanduser(cleaned))
++            self.vault = resolved if os.path.isdir(resolved) else ""
++        else:
++            self.vault = ""
+         self.vault_name = os.path.basename(self.vault.rstrip("/")) if self.vault else ""
+         if self.vault:
+             for entry in obsidian_vaults():
+@@ -1064,9 +1073,9 @@ def status(index, mode):
+ def main():
+     index = Index()
+     mode = "idle"
+-    if len(sys.argv) > 1:
+-        index.set_vault(sys.argv[1])
+-        index.scan()
++    initial_vault = sys.argv[1] if len(sys.argv) > 1 else ""
++    index.set_vault(initial_vault)
++    index.scan()
+     emit(status(index, mode))
+ 
+     import select

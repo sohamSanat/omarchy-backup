@@ -25,7 +25,7 @@
 
 -- Logitech MX Keys examples:
 -- o.bind("SUPER + SHIFT + S", nil, "omarchy-capture-screenshot")
--- o.bind("SUPER + H", nil, "voxtype record toggle")
+o.bind("SUPER + H", "Toggle dictation", "voxtype record toggle")
 -- o.bind("SUPER + PERIOD", nil, "omarchy-shell shell toggle omarchy.emojis")
 
 -- Use Strata instead of Nautilus for Omarchy's file-manager shortcuts.

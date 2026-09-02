@@ -1,0 +1,16 @@
+[Unit]
+Description=OmniRoute AI Gateway Background Service
+Documentation=https://github.com/diegosouzapw/OmniRoute
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/soham/.local/share/omniroute/app/resources/app
+ExecStart=/home/soham/.local/share/mise/installs/node/26.7.0/bin/node /home/soham/.local/share/omniroute/app/resources/app/server.js
+Restart=on-failure
+RestartSec=5
+Environment=PORT=20128
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=default.target
