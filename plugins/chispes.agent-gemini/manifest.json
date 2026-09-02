@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "chispes.agent-gemini",
+  "name": "Gemini Agent Collector",
+  "version": "1.2.0",
+  "author": "Chispes",
+  "license": "MIT",
+  "description": "Google Gemini CLI & Antigravity token usage and rate limits collector for the Omarchy Agents panel.",
+  "kinds": [
+    "service"
+  ],
+  "entryPoints": {
+    "service": "Service.qml"
+  },
+  "service": {
+    "displayName": "Gemini Agent Collector",
+    "description": "Runs the bundled collector every 15 minutes and writes the Gemini usage record the Agents panel reads.",
+    "category": "Developer Tools"
+  }
+}

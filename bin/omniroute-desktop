@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Launcher for OmniRoute Desktop on Omarchy / Hyprland
+
+APP_DIR="/home/soham/.local/share/omniroute/app"
+EXE="${APP_DIR}/omniroute-desktop"
+
+# Run Electron with Wayland flags compatible with Hyprland
+if [ -n "$WAYLAND_DISPLAY" ]; then
+    exec "${EXE}" --ozone-platform-hint=auto --disable-features=Vulkan --enable-features=WaylandWindowDecorations "$@"
+else
+    exec "${EXE}" "$@"
+fi

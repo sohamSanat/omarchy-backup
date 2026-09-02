@@ -1,0 +1,132 @@
+#!/bin/bash
+set -euo pipefail
+
+# ==============================================================================
+# Omarchy -> Zen Browser Color Palette Sync Script
+# Dynamically synchronizes Zen Browser with the active Omarchy system theme.
+# ==============================================================================
+
+CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+ZEN_CSS_SOURCE="$CURRENT_THEME_DIR/zen.css"
+
+# If theme directory or zen.css is missing, trigger omarchy template generation
+if [[ ! -f "$ZEN_CSS_SOURCE" ]]; then
+  if command -v omarchy-theme-set-templates >/dev/null 2>&1; then
+    omarchy-theme-set-templates 2>/dev/null || true
+  fi
+fi
+
+if [[ ! -f "$ZEN_CSS_SOURCE" ]]; then
+  exit 0
+fi
+
+# Candidate directories where Zen Browser profiles may live
+ZEN_BASE_DIRS=(
+  "$HOME/.config/zen"
+  "$HOME/.zen"
+  "$HOME/.mozilla/zen"
+  "$HOME/.var/app/app.zen_browser.zen/.config/zen"
+  "$HOME/.var/app/io.github.zen_browser.zen/.config/zen"
+)
+
+PROFILES=()
+
+for base_dir in "${ZEN_BASE_DIRS[@]}"; do
+  [[ -d "$base_dir" ]] || continue
+
+  # 1. Parse profiles.ini if available
+  if [[ -f "$base_dir/profiles.ini" ]]; then
+    while IFS= read -r rel_path; do
+      if [[ -d "$base_dir/$rel_path" ]]; then
+        PROFILES+=("$base_dir/$rel_path")
+      fi
+    done < <(grep -E '^Path=' "$base_dir/profiles.ini" | cut -d= -f2- || true)
+  fi
+
+  # 2. Fallback / supplementary: find any profile directories with prefs.js or times.json
+  for candidate in "$base_dir"/*; do
+    if [[ -d "$candidate" ]] && [[ -f "$candidate/prefs.js" || -f "$candidate/times.json" || -f "$candidate/compatibility.ini" ]]; then
+      # Avoid duplicates
+      already_added=0
+      for p in "${PROFILES[@]}"; do
+        if [[ "$p" == "$candidate" ]]; then
+          already_added=1
+          break
+        fi
+      done
+      if [[ $already_added -eq 0 ]]; then
+        PROFILES+=("$candidate")
+      fi
+    fi
+  done
+done
+
+# Sync theme to all discovered Zen profiles
+for profile_dir in "${PROFILES[@]}"; do
+  [[ -d "$profile_dir" ]] || continue
+
+  chrome_dir="$profile_dir/chrome"
+  mkdir -p "$chrome_dir"
+
+  # 1. Enable stylesheet customizations and transparency in user.js
+  user_js="$profile_dir/user.js"
+  prefs=(
+    'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);'
+    'user_pref("zen.widget.linux.transparency", true);'
+    'user_pref("browser.tabs.allow_transparent_browser", true);'
+    'user_pref("zen.theme.gradient.show-custom-colors", true);'
+    'user_pref("widget.transparent-windows", true);'
+  )
+  touch "$user_js"
+  for pref in "${prefs[@]}"; do
+    pref_key=$(echo "$pref" | cut -d'"' -f2)
+    if grep -q "$pref_key" "$user_js"; then
+      sed -i "s/user_pref(\"$pref_key\".*/$pref/" "$user_js"
+    else
+      echo "$pref" >> "$user_js"
+    fi
+  done
+
+  # 2. Symlink/copy omarchy-theme.css into chrome/
+  dest_css="$chrome_dir/omarchy-theme.css"
+  ln -nsf "$ZEN_CSS_SOURCE" "$dest_css"
+
+  # 3. Ensure userChrome.css imports omarchy-theme.css
+  user_chrome="$chrome_dir/userChrome.css"
+  import_statement='@import "omarchy-theme.css";'
+
+  if [[ ! -f "$user_chrome" ]]; then
+    echo "$import_statement" > "$user_chrome"
+  elif ! grep -q "omarchy-theme.css" "$user_chrome"; then
+    tmp_file=$(mktemp)
+    echo "$import_statement" > "$tmp_file"
+    cat "$user_chrome" >> "$tmp_file"
+    mv "$tmp_file" "$user_chrome"
+  fi
+
+  # 4. Ensure userContent.css imports omarchy-theme.css and transparent rules
+  user_content="$chrome_dir/userContent.css"
+  content_rules='@import "omarchy-theme.css";
+
+/* Transparent glass default / new tab pages */
+@-moz-document url("about:blank"), url("about:newtab"), url("about:home"), url("about:zen-welcome"), url("about:privatebrowsing"), url("chrome://browser/content/blanktab.html") {
+  :root,
+  html,
+  body,
+  #newtab-window,
+  .outer-wrapper,
+  .body-wrapper,
+  main {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+}'
+  if [[ ! -f "$user_content" ]] || ! grep -q "about:blank" "$user_content"; then
+    echo "$content_rules" > "$user_content"
+  fi
+done
+
+# If pywalfox is available, update it as well
+if command -v pywalfox >/dev/null 2>&1; then
+  pywalfox update 2>/dev/null || true
+fi

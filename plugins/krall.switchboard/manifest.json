@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "krall.switchboard",
+  "name": "Switchboard",
+  "version": "0.1.1",
+  "author": "Ben Krall",
+  "license": "MIT",
+  "description": "Grid-style Omarchy launcher with live search, arrow navigation, and global shortcut hints.",
+  "kinds": ["menu", "bar-widget"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "menu": "Switchboard.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Switchboard",
+    "description": "Opens the Switchboard launcher",
+    "category": "Compositor",
+    "allowMultiple": false
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.menu"
+  }
+}

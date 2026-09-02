@@ -1,0 +1,9 @@
+#!/bin/bash
+# Cheap facts for the launcher header: current theme and Omarchy version.
+# Update availability is checked separately (see scripts/updates) because it
+# can take a few seconds.
+set -uo pipefail
+theme=$(omarchy-theme-current 2>/dev/null || true)
+version=$(cat "${OMARCHY_PATH:-/usr/share/omarchy}/version" 2>/dev/null || true)
+printf 'theme\t%s\nversion\t%s\n' "$theme" "$version"
+exit 0

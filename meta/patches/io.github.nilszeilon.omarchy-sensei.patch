@@ -1,0 +1,337 @@
+diff --git i/sensei.py w/sensei.py
+index bcd6fb3..9c7015a 100644
+--- i/sensei.py
++++ w/sensei.py
+@@ -160,6 +160,7 @@ class SenseiState:
+     tasks: list[Task] = dataclasses.field(default_factory=list)
+     last_shortcut_at: int = 0
+     recent_shortcut_at: dict[str, int] = dataclasses.field(default_factory=dict)
++    practiced_actions: list[str] = dataclasses.field(default_factory=list)
+ 
+     @classmethod
+     def from_json(cls, value: dict[str, Any]) -> "SenseiState":
+@@ -175,6 +176,7 @@ class SenseiState:
+             tasks=[Task.from_json(item) for item in value.get("tasks", [])],
+             last_shortcut_at=int(value.get("lastShortcutAt", 0)),
+             recent_shortcut_at={str(k): int(v) for k, v in value.get("recentShortcutAt", {}).items()},
++            practiced_actions=[str(x) for x in value.get("practicedActions", [])],
+         )
+ 
+     def to_json(self) -> dict[str, Any]:
+@@ -187,6 +189,8 @@ class SenseiState:
+             value["lastShortcutAt"] = self.last_shortcut_at
+         if self.recent_shortcut_at:
+             value["recentShortcutAt"] = self.recent_shortcut_at
++        if self.practiced_actions:
++            value["practicedActions"] = self.practiced_actions
+         return value
+ 
+ 
+@@ -320,6 +324,139 @@ def migrate_legacy_file(path: Path) -> SenseiState:
+     return state
+ 
+ 
++TARGET_PRACTICE_TASKS = 5
++
++CORE_SHORTCUT_PRIORITIES: list[str] = [
++    "terminal",
++    "omarchy-menu",
++    "file-manager",
++    "browser",
++    "close-window",
++    "full-screen",
++    "workspace-switching",
++    "apps-menu",
++    "keybindings",
++    "clipboard-manager",
++    "lock-system",
++    "screenshot",
++    "editor",
++    "calculator",
++    "audio",
++    "bluetooth",
++    "network",
++    "calendar",
++    "bar-panels",
++    "focus-on-left-window",
++    "focus-on-right-window",
++    "focus-on-above-window",
++    "focus-on-below-window",
++    "toggle-window-floating-tiling",
++    "toggle-nightlight",
++    "transcode",
++    "extract-text-ocr-from-screenshot",
++    "screenrecording",
++    "set-reminder",
++    "show-reminders",
++    "clear-reminders",
++    "music",
++    "activity",
++    "background-switcher",
++    "theme-menu",
++]
++
++
++def load_shortcut_pool(paths: Paths) -> list[Task]:
++    bindings: list[Binding] = []
++    if paths.binding_cache.exists():
++        try:
++            bindings = load_binding_cache(paths.binding_cache)
++        except (OSError, json.JSONDecodeError):
++            bindings = []
++    if not bindings:
++        try:
++            snapshot = resolved_keybinding_snapshot()
++            bindings = annotate_binding_concepts(bindings_from_records(snapshot.data))
++        except Exception:
++            bindings = []
++    if not bindings:
++        return []
++
++    pool_dict: dict[str, Task] = {}
++    now = now_utc()
++    for b in bindings:
++        action = binding_action(b)
++        title = binding_title(b)
++        kb_shortcuts = [
++            s for s in b.shortcuts
++            if not ("MOUSE BUTTON" in s.upper() or s.lower() in {"mouse_up", "mouse_down"})
++        ]
++        if not kb_shortcuts or not action or not title:
++            continue
++        if action not in pool_dict:
++            pool_dict[action] = Task(action, title, list(kb_shortcuts), now, 0)
++        else:
++            pool_dict[action].shortcuts = merge_shortcuts(pool_dict[action].shortcuts, *kb_shortcuts)
++
++    if "workspace-switching" in pool_dict:
++        pool_dict["workspace-switching"].shortcuts = ["SUPER + TAB"]
++
++    priority_map = {action: index for index, action in enumerate(CORE_SHORTCUT_PRIORITIES)}
++
++    def pool_sort_key(task: Task) -> tuple[int, str]:
++        prio = priority_map.get(task.action, len(CORE_SHORTCUT_PRIORITIES))
++        return (prio, task.title.lower())
++
++    return sorted(pool_dict.values(), key=pool_sort_key)
++
++
++def replenish_practice_tasks(
++    paths: Paths,
++    state: SenseiState,
++    target_count: int = TARGET_PRACTICE_TASKS,
++) -> bool:
++    if len(state.tasks) >= target_count:
++        return False
++    pool = load_shortcut_pool(paths)
++    if not pool:
++        return False
++
++    current_actions = {task.action for task in state.tasks}
++    practiced_set = set(state.practiced_actions)
++
++    available = [
++        item for item in pool
++        if item.action not in current_actions and item.action not in practiced_set
++    ]
++
++    if not available:
++        state.practiced_actions = []
++        practiced_set = set()
++        available = [
++            item for item in pool
++            if item.action not in current_actions
++        ]
++
++    if not available:
++        return False
++
++    now = now_utc()
++    changed = False
++    for candidate in available:
++        if len(state.tasks) >= target_count:
++            break
++        task = Task(
++            action=candidate.action,
++            title=candidate.title,
++            shortcuts=list(candidate.shortcuts),
++            opened_at=now,
++            slow_uses=0,
++        )
++        state.tasks.append(task)
++        changed = True
++
++    return changed
++
++
+ class StateStore:
+     def __init__(self, paths: Paths):
+         self.paths = paths
+@@ -342,6 +479,9 @@ class StateStore:
+                 changed = prune_transient_state(state, when)
+                 if update is not None:
+                     changed = bool(update(state)) or changed
++                if not is_paused(self.paths) and (ensure_file or exists):
++                    replenished = replenish_practice_tasks(self.paths, state)
++                    changed = replenished or changed
+                 if ensure_file and not exists:
+                     changed = True
+                 if migrated or changed:
+@@ -402,6 +542,7 @@ def update_coaching_state(paths: Paths, observation: Observation) -> None:
+ 
+     def update(state: SenseiState) -> bool:
+         apply_observation(state, observation)
++        replenish_practice_tasks(paths, state)
+         return True
+ 
+     store.read_modify(observation.observed_at, update, ensure_file=True)
+@@ -424,6 +565,8 @@ def apply_observation(state: SenseiState, observation: Observation) -> None:
+             state.total_shortcuts += 1
+         state.last_shortcut_at = now_ms
+         state.recent_shortcut_at[observation.action] = now_ms
++        if observation.action not in state.practiced_actions:
++            state.practiced_actions.append(observation.action)
+         state.tasks = [task for task in state.tasks if task.action != observation.action]
+         return
+     if observation.trigger == "menu" and observation.action in state.recent_shortcut_at:
+@@ -1501,14 +1644,15 @@ def install_menu_integration(paths: Paths, catalog: Catalog) -> None:
+     block = menu_override_block(catalog.matches)
+     before = clean[:close_index].rstrip()
+     after = clean[close_index:].lstrip()
+-    active_body = "\n".join(
+-        line for line in clean[open_index + 1:close_index].splitlines()
+-        if not line.strip().startswith("//")
+-    ).strip()
+-    separator = ""
+-    if active_body and not active_body.endswith(","):
+-        separator = "\n  ,"
+-    updated = before + separator + "\n\n  " + MENU_START + "\n" + block + "  " + MENU_END + "\n" + after
++    before_trimmed = before
++    while before_trimmed.rstrip().endswith(","):
++        before_trimmed = before_trimmed.rstrip()[:-1].rstrip()
++    body_has_items = any(
++        line.strip() and not line.strip().startswith("//")
++        for line in before_trimmed[open_index + 1:].splitlines()
++    )
++    separator = ",\n" if body_has_items and block else "\n"
++    updated = before_trimmed + separator + "\n  " + MENU_START + "\n" + block + "  " + MENU_END + "\n" + after
+     backup_and_write(paths.menu_extension, updated.encode(), 0o644)
+ 
+ 
+diff --git i/tests/test_sensei.py w/tests/test_sensei.py
+index 2987dd1..944a115 100644
+--- i/tests/test_sensei.py
++++ w/tests/test_sensei.py
+@@ -57,12 +57,12 @@ class SenseiTests(unittest.TestCase):
+         at = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
+         self.observe("open-menu", "Open Menu", "mouse", at, "SUPER + SPACE", ["SUPER + SPACE"])
+         state = sensei.StateStore(self.paths).read_modify(at)
+-        self.assertEqual(len(state.tasks), 1)
++        self.assertEqual(state.tasks[0].action, "open-menu")
+         self.assertEqual(state.tasks[0].slow_uses, 1)
+ 
+         self.observe("open-menu", "Open Menu", "shortcut", at + dt.timedelta(seconds=1))
+         state = sensei.StateStore(self.paths).read_modify(at + dt.timedelta(seconds=1))
+-        self.assertEqual(state.tasks, [])
++        self.assertNotIn("open-menu", [task.action for task in state.tasks])
+         self.assertEqual(state.total_shortcuts, 1)
+ 
+     def test_duplicate_shortcut_is_not_counted(self):
+@@ -78,7 +78,8 @@ class SenseiTests(unittest.TestCase):
+         self.observe("switch-to-workspace-5", "Switch to workspace 5", "mouse", at + dt.timedelta(seconds=1), "SUPER + 5")
+         self.observe("bar-panel-2", "Bar panel 2", "mouse", at + dt.timedelta(seconds=2), "SUPER CTRL + 2")
+         state = sensei.StateStore(self.paths).read_modify(at + dt.timedelta(seconds=2))
+-        self.assertEqual({task.action for task in state.tasks}, {"workspace-switching", "bar-panels"})
++        mouse_task_actions = {task.action for task in state.tasks if task.slow_uses > 0}
++        self.assertEqual(mouse_task_actions, {"workspace-switching", "bar-panels"})
+         workspace = next(task for task in state.tasks if task.action == "workspace-switching")
+         self.assertEqual(workspace.shortcuts, ["SUPER + TAB"])
+ 
+@@ -343,11 +344,12 @@ class SenseiTests(unittest.TestCase):
+             ["SUPER SHIFT CTRL + SPACE"],
+         )
+         state = sensei.StateStore(self.paths).read_modify(at)
+-        self.assertEqual([task.action for task in state.tasks], ["theme-menu"])
++        self.assertEqual(state.tasks[0].action, "theme-menu")
++        self.assertEqual(state.tasks[0].slow_uses, 1)
+ 
+         self.observe(action, "Theme menu", "shortcut", at + dt.timedelta(seconds=2))
+         state = sensei.StateStore(self.paths).read_modify(at + dt.timedelta(seconds=2))
+-        self.assertEqual(state.tasks, [])
++        self.assertNotIn("theme-menu", [task.action for task in state.tasks])
+         self.assertEqual(state.total_shortcuts, 1)
+ 
+     def test_identical_commands_share_one_concept_and_all_shortcuts(self):
+@@ -536,6 +538,72 @@ class SenseiTests(unittest.TestCase):
+             sensei.main(["clear"])
+             self.assertFalse(self.paths.state.exists())
+ 
++    def test_shortcut_pool_loads_all_concepts_and_filters_mouse_only(self):
++        bindings = [
++            sensei.Binding("Terminal", ["SUPER + RETURN"], "exec", "terminal", "terminal", "Terminal"),
++            sensei.Binding("Move window", ["SUPER + LEFT MOUSE BUTTON"], "lua", "drag", "move-window", "Move window"),
++            sensei.Binding("Browser", ["SUPER + B", "SUPER + RETURN"], "exec", "browser", "browser", "Browser"),
++        ]
++        self.paths.state_dir.mkdir(parents=True, exist_ok=True)
++        self.paths.binding_cache.write_text(json.dumps([b.to_json() for b in bindings]))
++
++        pool = sensei.load_shortcut_pool(self.paths)
++        pool_actions = [task.action for task in pool]
++        self.assertIn("terminal", pool_actions)
++        self.assertIn("browser", pool_actions)
++        self.assertNotIn("move-window", pool_actions)
++
++    def test_never_ending_practice_replenishment_and_cycling(self):
++        bindings = [
++            sensei.Binding(f"Action {i}", [f"SUPER + {i}"], "exec", f"cmd{i}", f"action-{i}", f"Action {i}")
++            for i in range(1, 8)
++        ]
++        self.paths.state_dir.mkdir(parents=True, exist_ok=True)
++        self.paths.binding_cache.write_text(json.dumps([b.to_json() for b in bindings]))
++
++        state = sensei.SenseiState()
++        sensei.replenish_practice_tasks(self.paths, state, target_count=5)
++        self.assertEqual(len(state.tasks), 5)
++        initial_actions = [t.action for t in state.tasks]
++        self.assertEqual(initial_actions, ["action-1", "action-2", "action-3", "action-4", "action-5"])
++
++        # Complete first task
++        at = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
++        self.observe("action-1", "Action 1", "shortcut", at)
++        state = sensei.StateStore(self.paths).read_modify(at)
++        self.assertEqual(len(state.tasks), 5)
++        self.assertNotIn("action-1", [t.action for t in state.tasks])
++        self.assertIn("action-6", [t.action for t in state.tasks])
++
++        # Complete remaining tasks to cycle through full pool
++        for i in range(2, 8):
++            at += dt.timedelta(seconds=1)
++            self.observe(f"action-{i}", f"Action {i}", "shortcut", at)
++
++        state = sensei.StateStore(self.paths).read_modify(at)
++        # Never ending: tasks are continuously replenished!
++        self.assertEqual(len(state.tasks), 5)
++        self.assertEqual(state.total_shortcuts, 7)
++
++    def test_mouse_habits_prioritized_over_practice_tasks(self):
++        bindings = [
++            sensei.Binding("Terminal", ["SUPER + RETURN"], "exec", "terminal", "terminal", "Terminal"),
++            sensei.Binding("Browser", ["SUPER + B"], "exec", "browser", "browser", "Browser"),
++            sensei.Binding("Files", ["SUPER + F"], "exec", "files", "file-manager", "File manager"),
++        ]
++        self.paths.state_dir.mkdir(parents=True, exist_ok=True)
++        self.paths.binding_cache.write_text(json.dumps([b.to_json() for b in bindings]))
++
++        at = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
++        # Mouse click on Files
++        self.observe("file-manager", "File manager", "mouse", at, "SUPER + F", ["SUPER + F"])
++        state = sensei.StateStore(self.paths).read_modify(at)
++        snapshot = sensei.snapshot_from_state(state, paused=False)
++
++        # File manager has slow_uses = 1 so it must be first in the snapshot/list
++        self.assertEqual(snapshot["tasks"][0]["action"], "file-manager")
++        self.assertEqual(snapshot["tasks"][0]["slowUses"], 1)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

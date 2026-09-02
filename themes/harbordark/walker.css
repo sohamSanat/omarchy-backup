@@ -1,0 +1,100 @@
+@define-color selected-text #df7e76;
+@define-color text #929292;
+@define-color search-text #929292;
+@define-color caret #929292;
+@define-color base #1B1B1B;
+@define-color border #a99b7a;
+@define-color foreground #929292;
+@define-color background #1B1B1B;
+
+@keyframes open {
+    from {
+        opacity: 0;
+        transform: scaleY(0.3);
+    }
+    to {
+        opacity: 1;
+        transform: scaleY(1);
+    }
+}
+
+window * {
+    all: unset;
+    color: @text;
+    background: none;
+    border: none;
+    margin: 0;
+    padding: 0;
+    font-size: 17px;
+}
+
+window .normal-icons,
+window .large-icons,
+window .item-image,
+window .symbols {
+    -gtk-icon-size: 0px;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+}
+
+window .box-wrapper {
+    background: alpha(@base, 1);
+    border: 2px solid alpha(@border, 0.9);
+    border-radius: 5px;
+    padding: 10px;
+    margin: 0;
+    min-width: 230px;
+    animation: open 200ms cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+    transform-origin: top center;
+    box-shadow: 0 2px 12px alpha(black, 0.85);
+}
+
+window .search-container {
+    padding: 0px 8px;
+    margin-bottom: 0px;
+    background: transparent;
+}
+
+window .keybind-hints {
+    background: transparent;
+}
+
+window .input {
+    background: transparent;
+    color: @search-text;
+    caret-color: @caret;
+}
+
+window .input text,
+window .input placeholder {
+    color: @search-text;
+    opacity: 0.7;
+}
+
+window .item-text-box {
+    padding: 7px 0;
+}
+
+window .item-box {
+    padding: 0 8px;
+}
+
+window .preview {
+    border: 2px solid alpha(@border, 0.4);
+    border-radius: 4px;
+    background: alpha(@base, 0.5);
+    color: @text;
+    padding: 10px;
+    margin: 10px 0;
+}
+
+window child:selected .item-box {
+    background: @base;
+}
+
+window child:selected .item-box * {
+    color: @selected-text;
+    transition: color 150ms ease;
+}

@@ -1,0 +1,23 @@
+#!/bin/bash
+# Print a file for the launcher to parse, or nothing.
+#
+#   read-file <path> <max-bytes>
+#
+# Only a regular file that is not a symlink and is no larger than max-bytes
+# is printed. The open itself uses O_NOFOLLOW (dd iflag=nofollow) so a link
+# swapped in between the check and the read is refused too, and the read is
+# cut at max-bytes + 1 so a file that grows mid-read is also rejected.
+set -uo pipefail
+export LC_ALL=C
+
+path=${1:-}
+max=${2:-}
+[[ -n $path && $max =~ ^[0-9]+$ ]] || exit 2
+[[ -L $path ]] && exit 1
+[[ -f $path ]] || exit 1
+size=$(stat -c %s -- "$path" 2>/dev/null) || exit 1
+(( size <= max )) || exit 1
+
+content=$(dd if="$path" iflag=nofollow bs=4096 status=none 2>/dev/null | head -c $(( max + 1 ))) || exit 1
+(( ${#content} <= max )) || exit 1
+printf '%s' "$content"

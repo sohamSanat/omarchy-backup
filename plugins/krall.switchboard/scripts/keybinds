@@ -1,0 +1,89 @@
+#!/bin/bash
+# Emit the Hyprland keybindings Switchboard shows next to launcher tiles.
+#
+# Output, one record per line, tab separated:
+#   bind\t<combo>\t<description>\t<dispatcher>\t<arg>
+#   default\t<terminal|browser|editor>\t<value>
+#
+# The bind records come from the cache that `omarchy-menu-keybindings` keeps
+# (it already resolves Lua binds and XKB keycodes and is keyed on the live
+# `hyprctl binds` output, so it is always current). If that cache cannot be
+# produced we fall back to parsing `hyprctl binds` directly.
+
+set -uo pipefail
+export LC_ALL=C
+
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/omarchy"
+max_bytes=$(( 1024 * 1024 ))   # refuse a cache file larger than this
+max_records=4000               # and never emit more lines than this
+
+# Newest regular, non-symlink cache file, or nothing. The final open uses
+# O_NOFOLLOW (dd iflag=nofollow) so a link swapped in after the check is
+# refused as well.
+newest_cache_file() {
+  local candidate
+  for candidate in $(ls -t "$cache_dir"/keybindings-*.records 2>/dev/null); do
+    [[ -L $candidate ]] && continue
+    [[ -f $candidate ]] || continue
+    printf '%s\n' "$candidate"
+    return 0
+  done
+  return 1
+}
+
+emit_from_cache() {
+  local records size
+  omarchy-menu-keybindings --print >/dev/null 2>&1 || true
+  records=$(newest_cache_file) || return 1
+  size=$(stat -c %s -- "$records" 2>/dev/null) || return 1
+  (( size > 0 && size <= max_bytes )) || return 1
+  dd if="$records" iflag=nofollow bs=4096 status=none 2>/dev/null | head -c "$max_bytes" | awk -F'\t' '
+    {
+      display = $1
+      split_at = index(display, " → ")
+      if (split_at == 0) next
+      combo = substr(display, 1, split_at - 1)
+      desc = substr(display, split_at + length(" → "))
+      sub(/[ \t]+$/, "", combo)
+      arg = ""
+      for (i = 3; i <= NF; i++) arg = arg (i > 3 ? "\t" : "") $i
+      printf "bind\t%s\t%s\t%s\t%s\n", combo, desc, $2, arg
+    }' | head -n "$max_records"
+}
+
+modmask_to_text() {
+  local mask=$1 out=()
+  (( mask & 64 )) && out+=(SUPER)
+  (( mask & 1 )) && out+=(SHIFT)
+  (( mask & 4 )) && out+=(CTRL)
+  (( mask & 8 )) && out+=(ALT)
+  printf '%s' "${out[*]}"
+}
+
+emit_from_hyprctl() {
+  hyprctl binds 2>/dev/null | awk '
+    function emit() {
+      if (!seen) return
+      seen = 0
+      printf "%s\x1f%s\x1f%s\x1f%s\x1f%s\n", f["modmask"], f["key"], f["description"], f["dispatcher"], f["arg"]
+    }
+    /^bind/ { emit(); seen = 1; delete f; next }
+    seen && match($0, /^\t[a-z]+: /) { f[substr($0, 2, RLENGTH - 3)] = substr($0, RLENGTH + 1) }
+    END { emit() }
+  ' | while IFS=$'\x1f' read -r modmask key description dispatcher arg; do
+    [[ -z $key ]] && continue
+    key="${key##* + }"
+    mods=$(modmask_to_text "$modmask")
+    combo="$key"
+    [[ -n $mods ]] && combo="$mods + $key"
+    printf 'bind\t%s\t%s\t%s\t%s\n' "$combo" "$description" "$dispatcher" "$arg"
+  done
+}
+
+emit_from_cache || emit_from_hyprctl | head -n "$max_records"
+
+for kind in terminal browser editor; do
+  value=$("omarchy-default-$kind" 2>/dev/null || true)
+  [[ -n $value ]] && printf 'default\t%s\t%s\n' "$kind" "$value"
+done
+exit 0

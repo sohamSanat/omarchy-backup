@@ -1,0 +1,87 @@
+#!/bin/bash
+set -euo pipefail
+
+# ==============================================================================
+# Omarchy -> Obsidian Color Palette Sync Script
+# Ensures all Obsidian vaults are synced with the current Omarchy system theme.
+# ==============================================================================
+
+CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+
+# If theme directory or obsidian.css is missing, trigger omarchy template generation
+if [[ ! -f "$CURRENT_THEME_DIR/obsidian.css" ]]; then
+  if command -v omarchy-theme-set-templates >/dev/null 2>&1; then
+    omarchy-theme-set-templates 2>/dev/null || true
+  fi
+fi
+
+if [[ ! -f "$CURRENT_THEME_DIR/obsidian.css" ]]; then
+  exit 0
+fi
+
+# Collect all Obsidian vaults
+VAULT_PATHS=()
+
+# 1. Read from obsidian.json
+if [[ -f "$HOME/.config/obsidian/obsidian.json" ]]; then
+  while IFS= read -r path; do
+    [[ -n "$path" && -d "$path/.obsidian" ]] && VAULT_PATHS+=("$path")
+  done < <(jq -r '.vaults | values[].path' "$HOME/.config/obsidian/obsidian.json" 2>/dev/null || true)
+fi
+
+# 2. Check standard vault directories if not already added
+for candidate in "$HOME/Obsidian"/*; do
+  if [[ -d "$candidate/.obsidian" ]]; then
+    already_found=0
+    for v in "${VAULT_PATHS[@]}"; do
+      if [[ "$v" == "$candidate" ]]; then
+        already_found=1
+        break
+      fi
+    done
+    if [[ $already_found -eq 0 ]]; then
+      VAULT_PATHS+=("$candidate")
+    fi
+  fi
+done
+
+# Sync theme to all discovered vaults
+for vault_path in "${VAULT_PATHS[@]}"; do
+  [[ -d "$vault_path/.obsidian" ]] || continue
+
+  theme_dir="$vault_path/.obsidian/themes/Omarchy"
+  snippets_dir="$vault_path/.obsidian/snippets"
+  mkdir -p "$theme_dir" "$snippets_dir"
+
+  # Write Omarchy theme manifest if not present
+  if [[ ! -f "$theme_dir/manifest.json" ]]; then
+    cat >"$theme_dir/manifest.json" <<'EOF'
+{
+  "name": "Omarchy",
+  "version": "1.0.0",
+  "minAppVersion": "0.16.0",
+  "description": "Automatically syncs with your current Omarchy system theme colors and fonts",
+  "author": "Omarchy",
+  "authorUrl": "https://omarchy.org"
+}
+EOF
+  fi
+
+  # Copy current Omarchy theme CSS to the Omarchy community theme
+  cp "$CURRENT_THEME_DIR/obsidian.css" "$theme_dir/theme.css"
+
+  # Also write to snippets as omarchy-theme.css for flexibility
+  cp "$CURRENT_THEME_DIR/obsidian.css" "$snippets_dir/omarchy-theme.css"
+
+  # Update appearance.json to activate the Omarchy theme
+  appearance_file="$vault_path/.obsidian/appearance.json"
+  if [[ -f "$appearance_file" ]]; then
+    # Use jq to update cssTheme to "Omarchy" while preserving all user snippets and settings
+    tmp_json=$(mktemp)
+    if jq '.cssTheme = "Omarchy"' "$appearance_file" > "$tmp_json" 2>/dev/null; then
+      mv "$tmp_json" "$appearance_file"
+    else
+      rm -f "$tmp_json"
+    fi
+  fi
+done

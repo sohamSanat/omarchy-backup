@@ -1,0 +1,89 @@
+@define-color selected-text #384f54;
+@define-color text #1c2d28;
+@define-color base #dfe4c4;
+@define-color border #7d8794;
+@define-color foreground #1c2d28;
+@define-color background #dfe4c4;
+@define-color border2 #253631;
+
+@keyframes open {
+    from {
+        opacity: 0;
+        transform: scaleY(0.3);
+    }
+    to {
+        opacity: 1;
+        transform: scaleY(1);
+    }
+}
+
+window * {
+    all: unset;
+    color: @text;
+    background: none;
+    border: none;
+    margin: 0;
+    padding: 0;
+    font-size: 16px;
+}
+
+/* flat translucent panel (no gradient masking the alpha); !important beats omarchy-default style.css */
+window .box-wrapper {
+    background: alpha(@base, 0.80) !important;
+    background-image: none !important;
+    border-radius: 5px;
+    padding: 10px;
+    margin: 0;
+    min-width: 230px;
+    max-width: 230px;
+    border: 2px solid alpha(@border2, 0.65);
+    animation: open 200ms cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+    transform-origin: top center;
+    box-shadow: 0 2px 12px alpha(black, 0.85);
+}
+
+window .search-container {
+    border: 2px solid alpha(@border2, 0.4);
+    border-radius: 4px;
+    padding: 5px 8px;
+    margin-bottom: 4px;
+    background: transparent !important;
+}
+
+window .keybind-hints {
+    background: transparent !important;
+}
+
+window .input {
+    background: transparent;
+    color: @text;
+}
+
+window .item-text-box {
+    padding: 7px 0;
+}
+
+window .item-box {
+    padding: 0 8px;
+    border-radius: 5px;
+    transition: background 150ms ease;
+}
+
+window .item-image {
+    -gtk-icon-size: 18px;
+    margin-right: 10px;
+}
+
+window .normal-icons { -gtk-icon-size: 18px; }
+window .large-icons  { -gtk-icon-size: 18px; }
+
+window child:selected {
+    border: 2px solid alpha(@border2, 0.4);
+    border-radius: 4px;
+    background: mix(#556753, @background, 0.85);
+}
+
+window child:selected .item-box * {
+    color: @selected-text;
+    transition: color 150ms ease;
+}

@@ -1,0 +1,11 @@
+{
+  // Add to ~/.config/omarchy/extensions/omarchy-menu.jsonc.
+  // Puts a Switchboard on/off toggle under Trigger › Toggle in both the
+  // classic Omarchy menu and Switchboard itself.
+  "trigger.toggle.switchboard": {
+    "icon": "󰕰",
+    "label": "Switchboard Launcher",
+    "checked": "$HOME/.config/omarchy/plugins/krall.switchboard/scripts/enabled",
+    "action": "$HOME/.config/omarchy/plugins/krall.switchboard/scripts/toggle"
+  },
+}

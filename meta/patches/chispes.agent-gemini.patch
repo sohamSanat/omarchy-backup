@@ -1,0 +1,229 @@
+diff --git i/Service.qml w/Service.qml
+index 7ccab8d..c038935 100644
+--- i/Service.qml
++++ w/Service.qml
+@@ -38,11 +38,9 @@ Item {
+     return ""
+   }
+ 
+-  // Matches the agents panel's own default refresh interval. The collector
+-  // caches its scan for 20s, so overlapping with a system-wide install costs
+-  // a process, not a rescan.
++  // Refreshes usage in the background so the agents panel always has up-to-date data.
+   Timer {
+-    interval: 900000
++    interval: 60000
+     running: true
+     repeat: true
+     triggeredOnStart: true
+diff --git i/bin/omarchy-agent-usage-gemini w/bin/omarchy-agent-usage-gemini
+index aaf69a1..bcdea31 100755
+--- i/bin/omarchy-agent-usage-gemini
++++ w/bin/omarchy-agent-usage-gemini
+@@ -38,6 +38,7 @@ AUTH_HELP = "Run `gemini`, sign in to Antigravity CLI with `agy`, or use Gemini
+ SCAN_REUSE_SECONDS = 20
+ LIMITS_ONLY_REUSE_SECONDS = 900
+ LIMITS_CACHE_SECONDS = 30
++PROBE_MIN_INTERVAL_SECONDS = 15
+ 
+ # Strict hard bounds to prevent unbounded CPU/memory consumption on large local histories
+ HISTORY_CUTOFF_DAYS = 30
+@@ -361,29 +362,127 @@ def detect_account_info() -> tuple[str, str]:
+ # ----------------------------------------------------------- rate limits / quotas
+ 
+ 
+-def probe_agy_limits(force: bool = False) -> list[dict[str, Any]]:
++def normalize_reset_at(value: Any) -> str:
++  if value is None:
++    return ""
++  raw = str(value).strip()
++  if raw == "":
++    return ""
++  if raw.isdigit():
++    ts = int(raw)
++    if ts < 1e12:
++      ts *= 1000
++    try:
++      return dt.datetime.fromtimestamp(ts / 1000, dt.timezone.utc).isoformat()
++    except Exception:
++      return raw
++  try:
++    parsed = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
++    return parsed.isoformat()
++  except Exception:
++    return raw
++
++
++def limit_window_open(entry: dict[str, Any], now: dt.datetime) -> bool:
++  raw = str(entry.get("resetsAt") or "")
++  if raw == "":
++    return True
++  try:
++    resets_at = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
++  except Exception:
++    return True
++  if resets_at.tzinfo is None:
++    resets_at = resets_at.replace(tzinfo=dt.timezone.utc)
++  return resets_at > now
++
++
++def sanitize_limit_window(entry: dict[str, Any], now: dt.datetime) -> dict[str, Any]:
++  if limit_window_open(entry, now):
++    return entry
++  return {
++    **entry,
++    "percent": 0.0,
++    "resetsAt": "",
++  }
++
++
++def usable_cached_limits(cached: dict[str, Any]) -> list[dict[str, Any]]:
++  entries = cached.get("limits")
++  if not isinstance(entries, list):
++    return []
++  now = dt.datetime.now(dt.timezone.utc)
++  return [sanitize_limit_window(entry, now) for entry in entries if isinstance(entry, dict)]
++
++
++def all_limit_windows_open(entries: list[dict[str, Any]], now: dt.datetime) -> bool:
++  if not entries:
++    return False
++  return all(limit_window_open(e, now) for e in entries if isinstance(e, dict))
++
++
++def find_agy_bin() -> str | None:
++  candidates = [
++    shutil.which("agy"),
++    str(Path.home() / ".local" / "bin" / "agy"),
++    str(Path.home() / ".gemini" / "antigravity-cli" / "bin" / "agy"),
++    "/usr/local/bin/agy",
++    "/usr/bin/agy",
++  ]
++  for candidate in candidates:
++    if candidate:
++      p = Path(candidate).expanduser().resolve()
++      if p.is_file() and os.access(p, os.X_OK):
++        return str(p)
++  return None
++
++
++def probe_agy_limits(force: bool = False, limits_only: bool = False) -> list[dict[str, Any]]:
+   cache_file = cache_root() / "gemini-limits.json"
+-  if not force:
++  now = dt.datetime.now(dt.timezone.utc)
++
++  if not force and not limits_only:
+     cached = read_fresh_json(cache_file, LIMITS_CACHE_SECONDS)
+     if cached is not None and isinstance(cached.get("limits"), list):
+-      return cached["limits"]
++      limits = cached["limits"]
++      if all_limit_windows_open(limits, now):
++        return limits
+ 
+-  # Antigravity only. `/usage` is an Antigravity command; the Gemini CLI has no
+-  # such slash command, and an unrecognized one in `-p` mode falls through to
+-  # being sent to the model as a prompt -- so probing through `gemini` would
+-  # spend the user's quota on every refresh to learn nothing.
+-  agy_bin = shutil.which("agy")
++  if limits_only and not force:
++    cached = read_fresh_json(cache_file, PROBE_MIN_INTERVAL_SECONDS)
++    if cached is not None and isinstance(cached.get("limits"), list):
++      limits = cached["limits"]
++      if all_limit_windows_open(limits, now):
++        return limits
++
++  agy_bin = find_agy_bin()
+   if not agy_bin:
++    cached = read_fresh_json(cache_file, 86400)
++    if cached is not None:
++      return usable_cached_limits(cached)
+     return []
+ 
++  env = dict(os.environ)
++  extra_paths = [
++    str(Path.home() / ".local" / "bin"),
++    str(Path.home() / ".gemini" / "antigravity-cli" / "bin"),
++    "/usr/local/bin",
++    "/usr/bin",
++  ]
++  cur_path = env.get("PATH", "")
++  env["PATH"] = ":".join([p for p in extra_paths if p not in cur_path] + ([cur_path] if cur_path else []))
++
+   try:
+     proc = subprocess.run(
+       [agy_bin, "-p", "/usage", "--output-format", "json"],
+       capture_output=True,
+       text=True,
+-      timeout=6,
++      timeout=25,
++      env=env,
+     )
+     if proc.returncode != 0:
++      cached = read_fresh_json(cache_file, 86400)
++      if cached is not None:
++        return usable_cached_limits(cached)
+       return []
+ 
+     data = json.loads(proc.stdout)
+@@ -400,19 +499,20 @@ def probe_agy_limits(force: bool = False) -> list[dict[str, Any]]:
+       for b in buckets:
+         rem = float(b.get("remaining_fraction", 1.0))
+         used = max(0.0, min(1.0, 1.0 - rem))
+-        reset = str(b.get("reset_time") or "")
++        reset = normalize_reset_at(b.get("reset_time") or "")
+         window = str(b.get("window") or "").lower()
+         name = str(b.get("name") or "").lower()
++        b_id = str(b.get("id") or "").lower()
+ 
+         if "gemini" in g_name.lower():
+-          if window == "5h" or "5-hour" in name or "five" in name:
++          if window == "5h" or "5-hour" in name or "five" in name or "5h" in b_id or "5_hour" in b_id or "5 hour" in name:
+             session_limit = {
+               "label": "Session (5-hour)",
+               "title": "Session (5-hour)",
+               "percent": round(used, 4),
+               "resetsAt": reset,
+             }
+-          elif window == "weekly" or "week" in name:
++          elif window == "weekly" or "week" in name or "weekly" in b_id or "7-day" in name or "7d" in b_id:
+             weekly_limit = {
+               "label": "Weekly (7-day)",
+               "title": "Weekly (7-day)",
+@@ -437,6 +537,9 @@ def probe_agy_limits(force: bool = False) -> list[dict[str, Any]]:
+     write_json(cache_file, {"limits": limits, "updatedAt": dt.datetime.now(dt.timezone.utc).isoformat()})
+     return limits
+   except Exception:
++    cached = read_fresh_json(cache_file, 86400)
++    if cached is not None:
++      return usable_cached_limits(cached)
+     return []
+ 
+ 
+@@ -1016,13 +1119,14 @@ def merge_stats(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
+     sorted(usage.items(), key=lambda x: sum(x[1].values()), reverse=True)[:MAX_MODELS_RECORDED]
+   )
+ 
+-  by_date: dict[str, int] = {}
++  recent_dates = recent_date_strings()
++  by_date: dict[str, int] = {d: 0 for d in recent_dates}
+   for source in (base.get("recentDays") or [], extra.get("recentDays") or []):
+     for day in source:
+       date = str((day or {}).get("date") or "")
+-      if date:
+-        by_date[date] = by_date.get(date, 0) + number((day or {}).get("messageCount"))
+-  merged["recentDays"] = [{"date": date, "messageCount": by_date[date]} for date in sorted(by_date)]
++      if date in by_date:
++        by_date[date] += number((day or {}).get("messageCount"))
++  merged["recentDays"] = [{"date": date, "messageCount": by_date[date]} for date in recent_dates]
+ 
+   dates = set(base.get("activeDates") or []) | set(extra.get("activeDates") or [])
+   bounded_dates = sorted([d for d in dates if d >= cutoff_date_string()])
+@@ -1085,7 +1189,7 @@ def main() -> None:
+     stats = collect_local_stats()
+ 
+   _, tier_label = detect_account_info()
+-  limits = probe_agy_limits(force=args.force)
++  limits = probe_agy_limits(force=args.force, limits_only=args.limits_only)
+ 
+   record: dict[str, Any] = {
+     "schemaVersion": 1,

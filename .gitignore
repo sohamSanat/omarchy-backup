@@ -1,0 +1,27 @@
+# Temporary and backup files
+*.bak
+*.bak.*
+*.sensei-backup-*
+*.tmp
+*.swp
+*.swo
+*~
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Node dependencies
+node_modules/
+
+# OS and cache files
+.DS_Store
+*.log
+.cache/
+
+# Sensitive data protection (defensive rule)
+*credentials*.json
+*token*.json
+*secret*
+keyrings/

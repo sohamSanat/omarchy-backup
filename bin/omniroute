@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# OmniRoute CLI & App Launcher for Omarchy / Hyprland
+
+set -e
+
+APP_DIR="/home/soham/.local/share/omniroute/app"
+SERVER_JS="${APP_DIR}/resources/app/server.js"
+NODE_BIN="/home/soham/.local/share/mise/installs/node/26.7.0/bin/node"
+
+check_running() {
+    code=$(curl -s -o /dev/null -w "%{http_code}" -m 2 http://localhost:20128/ 2>/dev/null || echo "000")
+    if [ "$code" != "000" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+case "$1" in
+    gui|app|desktop)
+        shift
+        exec /home/soham/.local/bin/omniroute-desktop "$@"
+        ;;
+    server|start)
+        shift
+        echo "🚀 Starting OmniRoute AI Gateway on port ${PORT:-20128}..."
+        exec "${NODE_BIN}" "${SERVER_JS}" "$@"
+        ;;
+    service)
+        action="$2"
+        case "$action" in
+            start)
+                systemctl --user start omniroute
+                echo "✅ OmniRoute background service started (http://localhost:20128)"
+                ;;
+            stop)
+                systemctl --user stop omniroute
+                echo "🛑 OmniRoute background service stopped"
+                ;;
+            restart)
+                systemctl --user restart omniroute
+                echo "🔄 OmniRoute background service restarted"
+                ;;
+            status)
+                systemctl --user status omniroute
+                ;;
+            enable)
+                systemctl --user enable omniroute
+                echo "⚡ OmniRoute service enabled to start on login"
+                ;;
+            disable)
+                systemctl --user disable omniroute
+                echo "⏸️ OmniRoute service disabled from starting on login"
+                ;;
+            logs)
+                journalctl --user -u omniroute -f
+                ;;
+            *)
+                echo "Usage: omniroute service {start|stop|restart|status|enable|disable|logs}"
+                exit 1
+                ;;
+        esac
+        ;;
+    web|dashboard|open)
+        echo "🌐 Opening OmniRoute Web Dashboard..."
+        xdg-open "http://localhost:20128" >/dev/null 2>&1 &
+        ;;
+    status)
+        if check_running; then
+            echo "🟢 OmniRoute is running at http://localhost:20128"
+        else
+            echo "🔴 OmniRoute is not currently running"
+        fi
+        ;;
+    help|--help|-h)
+        echo "🚀 OmniRoute — The Free AI Gateway"
+        echo ""
+        echo "Usage:"
+        echo "  omniroute [gui]              Launch the OmniRoute Desktop GUI application"
+        echo "  omniroute server             Run the OmniRoute gateway server in foreground"
+        echo "  omniroute service start      Start the OmniRoute background daemon"
+        echo "  omniroute service stop       Stop the OmniRoute background daemon"
+        echo "  omniroute service restart    Restart the OmniRoute background daemon"
+        echo "  omniroute service status     Check background service status"
+        echo "  omniroute service enable     Enable background service to start on boot/login"
+        echo "  omniroute service disable    Disable background service from autostart"
+        echo "  omniroute service logs       View live background service logs"
+        echo "  omniroute dashboard          Open web dashboard in browser (http://localhost:20128)"
+        echo "  omniroute status             Check if gateway is reachable"
+        echo "  omniroute --help             Show this help message"
+        echo ""
+        echo "Endpoint: http://localhost:20128/v1"
+        ;;
+    "")
+        exec /home/soham/.local/bin/omniroute-desktop
+        ;;
+    *)
+        exec /home/soham/.local/bin/omniroute-desktop "$@"
+        ;;
+esac

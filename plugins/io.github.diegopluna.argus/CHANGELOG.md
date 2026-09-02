@@ -1,0 +1,493 @@
+# Changelog
+
+All notable changes to Argus are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions
+follow [Semantic Versioning](https://semver.org/).
+
+## [1.2.2] — 2026-08-30
+
+### Fixed
+- **The recommended MangoHud setup was dangerous and is now scoped.**
+  The docs and GAME tab previously suggested session-global
+  `MANGOHUD=1`, which loads the Vulkan layer into every Vulkan process
+  — including the Omarchy shell, where libMangoHud segfaulted inside
+  quickshell's `vkCreateDevice` and crash-looped the whole desktop.
+  The corrected model: session-global env carries only the config path
+  plus a hard-off (`MANGOHUD=0` — the loader's enable check requires
+  exactly "1", verified empirically — and `MANGOHUD_CONFIGFILE=...`,
+  via `hl.env` in hyprland.lua; the old `env =` conf syntax does
+  nothing on current Omarchy and fails silently); activation is
+  strictly per game (`MANGOHUD=1 %command%` in Steam launch options). The GAME tab's status
+  line and setup instructions teach the scoped model, and its
+  readiness check now tracks the config path.
+
+## [1.2.1] — 2026-08-29
+
+### Fixed
+- Renamed `screenshots/tab-setup.png` to `tab-settings.png`. The
+  marketplace's security baseline force-scans any file whose name
+  contains "setup" as a potential install script, and a binary asset
+  with such a name fails the scan closed — this one screenshot was the
+  entire cause of the `security-baseline-scan-limit` verification
+  failures. Diagnosed by running the marketplace's own scanner against
+  the release commit.
+
+## [1.2.0] — 2026-08-29
+
+### Added
+- **GAME tab: the in-game HUD's control room.** Argus is now a GUI for
+  MangoHud — pick which metrics the overlay shows (FPS, frametime
+  graph, CPU/GPU load/temp/power/clocks, VRAM, RAM, engine/Wine,
+  per-core loads…), give CPU and GPU custom labels, set position, font
+  size, background opacity, compact mode, start-hidden, and the toggle
+  hotkey. With "Match Omarchy theme colors" on, the in-game overlay
+  follows the shell theme — re-theming the desktop restyles the HUD in
+  a running game. Every change writes Argus's own managed config
+  (`~/.local/state/argus/mangohud.conf`; the user's MangoHud.conf is
+  never touched) and fires `mangohudctl reload-cfg`, so edits apply
+  live mid-game. The tab detects whether MangoHud is installed and
+  whether the global-injection env (`MANGOHUD=1` +
+  `MANGOHUD_CONFIGFILE`) is active, and shows the exact one-time setup
+  lines when it isn't; disabling the master toggle renders a config
+  that hides the HUD, so that too takes effect live.
+- **Test window**: a button in the GAME tab spawns a looping Vulkan
+  test pattern (mpv) with the HUD injected — tweak any knob and watch
+  the overlay restyle live, no game required. One instance at a time;
+  close the window when done.
+- Richer HUD customization: FPS limit (off/30/60/90/120/144/165/240),
+  FPS color thresholds (red-below / green-above), horizontal layout,
+  round corners, table columns, and X/Y offsets — plus four more metric
+  rows (throttling status, FPS histogram, clock, battery).
+- The tab strip tightened its spacing so all twelve tabs keep to one
+  row.
+- The marketplace preview became a product banner — wordmark, tagline,
+  feature chips, and layered live screenshots — instead of a raw panel
+  capture. Its SVG source lives in `screenshots/banner.svg` for future
+  edits; the manifest's widget description caught up with the panel's
+  current feature set.
+
+## [1.1.0] — 2026-08-29
+
+### Changed
+- Profiling found the sampler's real cost: not the Super I/O chip the
+  docs blamed (13 sensors in 3ms), but a single NVMe drive taking ~75ms
+  to answer its temperature — an admin command that also keeps the
+  drive awake. Temperatures and fans now sample every third tick, with
+  the last readings replayed between; a fast tick is ~6ms of wall time
+  instead of ~135ms (measured), and panel opens or manual refreshes
+  always sample everything.
+- The static half of the sample (models, GPU names, topology) is parsed
+  once at startup instead of being re-parsed inside every tick, and
+  static-derived state no longer reassigns per tick — the CPU core grid
+  and friends stop rebuilding for data that cannot change.
+- Sparklines stopped churning the scene graph: a fixed-count Repeater
+  updates 60 bars in place instead of destroying and recreating them on
+  every tick (the HOME tab alone was cycling ~400 items every 2s).
+  Tab, tile, and alert row models now hang off stable booleans, so
+  per-tick data arrays no longer rebuild their delegates.
+- The full process table ships only while the PROC tab is watched
+  (fetched immediately on switching to it); other panel ticks carry the
+  CPU-sorted top 60. Interface identity (IP/SSID) refreshes every fifth
+  panel tick instead of every tick.
+- Net effect, measured on the reference machine: idle sampling cost
+  dropped from ~135ms to ~40ms average wall per tick, and the polled
+  NVMe gets to sleep between full ticks.
+
+## [1.0.1] — 2026-08-29
+
+### Security
+- Every Text rendering dynamic strings is pinned to
+  `textFormat: Text.PlainText` — the 1.0.0 additions (alert rows, home
+  tiles, tab strip, topology captions, process cells, sensor-alert
+  limits) had left some on Qt's default AutoText, and device/sensor
+  strings originate in sysfs model strings a USB device chooses.
+  Flagged by the marketplace's automated security baseline; the audit
+  now covers all 22 previously unpinned dynamic Text items.
+
+## [1.0.0] — 2026-08-29
+
+### Added
+- **The flight recorder.** The 1-hour peak ring gained a sibling: a
+  24-hour ring (one 24-minute peak per bar), and both — plus the alert
+  log — persist to `~/.local/state/argus/history.json` once a minute
+  (and on every fired alert), reloading when the shell starts with
+  downtime rendered as empty slots. "Was the machine hot overnight?"
+  survives restarts, reboots, and crashes. Chart captions now cycle
+  2m → 1h → 24h; `span 24h` works over IPC.
+- **Alert context snapshots.** Every logged alert records what the
+  system looked like the moment it fired — CPU/RAM/temperature/GPU
+  values and the busiest processes. Click an alert in the ALERTS tab to
+  expand it. The log grew to twenty entries and persists with the
+  recorder.
+- **PWR tab**: measured power draw per source — CPU package and
+  friends via RAPL energy counters (wrap-safe watts from µJ deltas),
+  every GPU, battery discharge — plus session energy totals in Wh.
+  CPU-package watts, GPU watts, and CPU temperature ride the flight
+  recorder too: their charts (PWR draw charts, the CPU tab's
+  temperature chart) zoom to 1h and 24h and survive restarts, so
+  "did power or thermals spike overnight" is answerable in watts and
+  degrees, not just usage. Pre-1.0 history files load with the new
+  series empty.
+  Kernels that keep RAPL root-only (the default since the PLATYPUS
+  mitigation) get an honest hint and a documented one-line udev unlock
+  instead of silence; Argus never asks for privileges itself.
+- The PROC tab became a real process table: the sampler ships the full
+  table (with user and thread count) instead of two top-10 lists, and
+  the panel filters it live (`/` focuses the field; name, user, or pid),
+  sorts by any column (click headers; direction flips on re-click),
+  walks rows with j/k, expands a row (click or Enter) to the full
+  command line, owner, and thread count, and offers Terminate and
+  Kill −9 — both behind the usual confirmation, with `x` as the
+  keyboard shortcut for Terminate on the cursor row.
+- The CPU tab's thread grid is laid out like the silicon: SMT siblings
+  fuse into one core cell, cores group under their L3 domain (CCDs on
+  multi-die parts, with per-CCD live clocks), and hybrid chips draw
+  efficiency cores shorter (rated-ceiling spread, no hardcoded models).
+  Machines without exposed topology keep the flat grid.
+- The MEM tab shows where the memory actually is — an in use / cache /
+  free split bar with free(1)'s accounting and a note that cache is
+  reclaimable — plus a dirty-pages row, and the swap row names its
+  backing ("zram (compressed RAM)", "zram + disk").
+- NET interfaces carry their identity: kind icon (Wi-Fi / Ethernet /
+  virtual), the Wi-Fi SSID, and the IPv4 address, from a panel-only
+  sample (`ip`, `iw` when present).
+
+- **HOME tab**: the panel opens on a configurable overview — a grid of
+  glance tiles (CPU, memory, GPU, network, disk I/O, disk, battery),
+  each with its live value, a subline, and a sparkline or meter that
+  follows the 2m/1h/24h span. Click a tile to open its tab; pick tiles
+  in the BAR tab. The last fired alert shows beneath, linking to
+  ALERTS.
+- The ALERTS tab lists the per-sensor alerts armed from the TEMP tab —
+  with live readings, thresholds, and one-click removal — so it is the
+  single complete view of everything armed.
+- PWR tab draw charts: CPU-package and GPU power sparklines with
+  session peaks.
+- The BAR tab became **SETUP** — the one place for all panel
+  configuration: bar metrics, Home tiles, temperature unit (°C/°F,
+  display-only; Fahrenheit readings carry an explicit °F suffix —
+  measurement, storage, and thresholds stay Celsius), and the refresh
+  interval. `tab BAR` over IPC still works as an alias.
+- Integrated GPUs get plain names — die codenames ("Phoenix1", "Granite
+  Ridge", "Raptor Lake-P") mean nothing to most people: AMD APUs
+  display as "AMD Integrated Graphics", and Intel iGPUs whose lspci
+  string carries no product name display as "Intel Integrated
+  Graphics" (real names like "UHD Graphics 770" or "Arc A770" pass
+  through).
+- Reopening the panel lands on the tab you left (session-scoped); an
+  urgent metric still overrides and lands on its tab.
+- "Open log in nvim" beside the alert log: the flight recorder's raw
+  file, pretty-printed (jq) and read-only, in a terminal via
+  omarchy-launch-or-focus-tui — rings, alerts, and context snapshots
+  in full.
+- The scroll indicator got its own gutter — it no longer overlaps
+  toggles and steppers at the panel's right edge.
+
+### Changed
+- The tab selector became a one-row underline strip: plain text tabs
+  with an accent underline on the active one, hover brightening, and
+  wheel-scroll cycling — eleven tabs in a single calm row where the old
+  bordered chips needed two, handing ~45px back to content.
+- `tests/make-fixture.sh` scrubs the new sections too: the full process
+  table (usernames, command lines) and NETINFO (IP addresses, SSID) are
+  dropped from contributed fixtures.
+- The README leads with what makes Argus different (flight recorder,
+  self-explaining alerts, honesty), ships Hyprland keybind recipes, and
+  every screenshot is refreshed to the 1.0 UI.
+- Intel GPU *usage* stays honestly unavailable: reading it needs
+  `intel_gpu_top` with CAP_PERFMON, and Argus doesn't ask for
+  privileges. Deliberately deferred until an Intel fixture and a tested
+  unprivileged path exist.
+
+## [0.9.1] — 2026-08-29
+
+### Fixed
+- GPUs whose lspci name carries only a vendor bracket ("Advanced Micro
+  Devices, Inc. [AMD/ATI] Phoenix1") displayed as "AMD/ATI"; the vendor
+  tag is now stripped so the chip name shows.
+- The APU memory rows now state both halves of the pool with their used
+  figures — "VRAM (reserved carve-out) 483 MB of 512 MB" and "GTT
+  (shared system RAM) 587 MB of 16 GB" — instead of totals only, so the
+  pooled meter reconciles against what radeontop and sysfs report. The
+  meter itself still covers the pool: a near-full carve-out is normal on
+  an APU (the driver spills to GTT transparently), and only pool
+  pressure is real memory pressure.
+
+## [0.9.0] — 2026-08-29
+
+### Changed
+- **Alerts are now per-metric opt-in and off by default**, configured in
+  a new ALERTS panel tab listing every alert — CPU usage, CPU
+  temperature, RAM, GPU usage/temperature, VRAM, disk usage, drive
+  temperature, battery low, drive health — each with its own toggle and
+  an inline −/+ threshold stepper, above the fired-alert log (which
+  moved there from the BAR tab). The enabled set persists to shell.json
+  as `alertsOn` (empty by default), so a fresh install never notifies
+  until the user asks it to. Thresholds still color bar segments and
+  panel rows urgent whether or not the alert is on — the toggle gates
+  notifications only. Rows for hardware the machine lacks (GPU, battery,
+  drive sensors) don't appear.
+- An AMD iGPU's memory now reports its real pool — BIOS carve-out plus
+  GTT (shared system RAM) — instead of the carve-out alone, which
+  understated an APU's ceiling by an order of magnitude (512 MB where
+  ~16 GB is allocatable). Applies to the GPU tab meter (with the
+  reserved + GTT split shown underneath), the bar's VRAM metric, and the
+  VRAM alert. APUs are detected by the kernel exposing `mem_busy_percent`
+  only for dedicated VRAM; primary-GPU ranking deliberately stays on
+  dedicated VRAM so an iGPU's RAM-sized GTT never outranks a real dGPU.
+- The previously hardcoded alert values became settings: battery low
+  (`urgentBatPct`, default 15%) and the drive-health wear alarm
+  (`urgentWearPct`, default 90%; a critical warning or media errors
+  still trip it at any wear level). GPU usage and VRAM split off from
+  the CPU/RAM thresholds they shared (`urgentGpuPct`, `urgentVramPct`);
+  the old shared values keep covering them until their own are set.
+- Threshold editing moved out of the plugin settings form and into the
+  ALERTS tab; the form keeps the master alerts switch and the alert
+  hook. Previously stored `urgent*` values are still honored.
+- Each alert row shows the live reading it watches ("now 43% · ≥ 90%"),
+  so thresholds are set against reality instead of blind; an armed
+  alert's threshold renders in the accent color, and the rows group
+  under USAGE / TEMPERATURE / HEALTH headers.
+- The tab selector wraps instead of overflowing the panel — ten tabs no
+  longer fit one row — and hairline separators divide the GPU, DISK,
+  and BAT tabs' per-device blocks, which previously ran together.
+- The GPU tab lists the primary card first — the card whose stats the
+  bar follows shouldn't hide below an idle iGPU.
+
+## [0.8.1] — 2026-08-21
+
+### Security
+- Every Text rendering system-controlled strings (process command lines,
+  sensor and device names, drive models, alert log entries) is pinned to
+  `textFormat: Text.PlainText` — Qt's default AutoText can interpret
+  such strings as StyledText markup, and process argv is
+  attacker-influenceable. The kill-confirmation dialog's process name is
+  additionally stripped of markup-significant characters, since it flows
+  into a shell component the plugin cannot pin.
+
+### Changed
+- Refreshed every screenshot and the Okomart `preview.png` to the 0.8.0
+  UI (watch row, grouped TEMP, per-process GPU, flat BAR tab), and
+  reorganized the README: alert behavior — firing rules, attribution,
+  per-sensor thresholds, the hook — now lives in one Alerts section, and
+  sampling cost sits with the sampling internals.
+
+## [0.8.0] — 2026-08-21
+
+### Changed
+- The sampler's CPU cost dropped ~8× (≈81ms → ≈10ms per tick): the
+  per-value `cat` calls in the sensor/GPU/battery loops — a fork each,
+  ~95% of the sampler's CPU — became zero-fork bash builtin reads, and
+  the per-chip `sed` trims became parameter expansion. Output is
+  byte-for-byte structurally identical. Most remaining wall time is the
+  hwmon sensor bus itself (Super I/O chips take milliseconds per reading
+  in the kernel), which no sampler can skip.
+- The panel hero now carries the eye of Argus (blinking, same as the
+  bar placeholder) instead of a generic CPU glyph, and its meta line
+  keeps only the 1-minute load — the full triple lives in the CPU tab.
+- TEMP tab groups sensors by physical device — one header per device,
+  just the sensor label per row — instead of repeating "Motherboard ·
+  nct6799 · …" on every line. A group whose sensors are all hidden hides
+  its header too.
+- Bar segment values are no-break-space padded to a stable width, so
+  "9%" → "10%" no longer shifts every neighboring bar widget.
+- Sparklines draw a solid baseline and idle samples render nothing —
+  no more dashed row of minimum-height stubs when a series is quiet;
+  the per-thread grid likewise leaves idle cells empty.
+- Rate sparklines (NET, DISK I/O) scale to the session peak and mark it
+  with a faint ceiling line, so the y-axis stays put instead of
+  rescaling every time a spike scrolls out of the window.
+- BAR tab rows are flat (label + switch) instead of bordered cards, with
+  a fixed icon column; network and battery — whose bar segments compose
+  their own glyphs — get static list icons so no row is iconless.
+- Tab labels underline their first letter, advertising the letter-jump
+  hotkey; NET rows use the same "·" separator style as DISK.
+
+### Added
+- The watch row: a quiet strip of vitals (CPU, RAM, CPU/GPU temperature,
+  disk, battery) under the host name, visible on every tab — Argus never
+  goes blind to the rest of the system while you read one tab. A vital
+  turns urgent with its metric, the current tab's vital reads in the
+  foreground color, and clicking one jumps to the tab that explains it.
+- Alert hook: an `alertCommand` setting runs a shell command on every
+  fired alert with `ARGUS_ALERT_KEY`/`TEXT`/`CRITICAL`/`AT` in the
+  environment — one setting turns alerts into automation (ntfy, logs,
+  webhooks). Drive-health alerts flow through the same path.
+- Self-accounting: the BAR tab shows what sampling actually costs (wall
+  clock per tick, measured), also exposed as `samplerMs` in the
+  `metrics` IPC snapshot.
+- Fixture corpus: `tests/fixtures/` holds scrubbed `sample.sh` captures
+  from real machines, each fully re-parsed and rendered through every
+  derived-value path on every CI run. `tests/make-fixture.sh` generates
+  a contributable (hostname- and process-scrubbed) capture; seeded with
+  this Ryzen 9700X + Radeon 9070 box.
+- Per-process GPU usage: each GPU's panel section lists its busiest
+  processes with usage percent and VRAM, from DRM fdinfo usage stats
+  (amdgpu, i915/xe, nouveau — one ~15ms gawk pass, panel-only; the
+  proprietary NVIDIA driver exposes no fdinfo stats and lists nothing).
+- Drive health: the DISK tab shows each drive's wear, power-on time, and
+  status from SMART via udisks2's D-Bus API — the one SMART source that
+  needs no root. A drive reporting a critical warning, ≥90% wear, or
+  media errors renders urgent and fires one notification per session.
+  Sampled at startup and panel open; also in the `metrics` IPC snapshot
+  (`driveHealth`).
+- Tiered history: behind every sparkline's ~2-minute per-tick ring sits a
+  1-hour ring keeping each minute's peak (peaks, not averages — zooming
+  out must not erase the spike you're looking for). Click any chart
+  caption to flip every chart between the two spans; alert markers move
+  with the span, and `span 2m|1h` does the same over IPC.
+- Alert attribution: CPU and memory alerts name their likely culprit —
+  "CPU usage at 100% (threshold 90%) — chromium 61%". While no panel is
+  open, a one-shot `sample.sh ps` fetches the process snapshot at the
+  moment the alert fires (with a 2s timeout falling back to an
+  unattributed alert).
+- Alert markers: the CPU, MEM, and GPU sparklines cap the bar where an
+  alert fired with a foreground-colored tick, so the alert log and the
+  history tell one story.
+- The `metrics` IPC snapshot now includes the alert log (`alerts`).
+- A thin scroll indicator on the panel, so long tabs signal the content
+  below the fold.
+- The hero's refresh glyph spins on every refresh (button, `r`, middle
+  click) — refreshing previously gave no visible acknowledgment.
+
+## [0.7.1] — 2026-08-19
+
+### Changed
+- PSI rows renamed to "Stall pressure" and now show the 10s/1m/5m windows
+  like a load average, with an in-panel note that 0 means nothing had to
+  wait — the single 10-second value read as permanently broken-at-zero on
+  healthy machines (verified against induced contention: the pipeline
+  reports exactly what the kernel does).
+- The `metrics` IPC snapshot now includes the PSI values.
+
+## [0.7.0] — 2026-08-19
+
+### Added
+- Terminate button on PROC rows: SIGTERM after a confirmation dialog
+  (Esc cancels the dialog before it closes the panel).
+- Recent-alerts log: the last ten fired alerts with timestamps, shown at
+  the bottom of the BAR tab.
+- Hide noisy sensors: an eye button per TEMP row persists a
+  `hiddenSensors` list; a footer row reveals them again. Hidden sensors'
+  thresholds keep alerting.
+- Tab hotkeys: `1`–`9` and first-letter jumps (repeats cycle BAR/BAT);
+  opening the panel while a metric is urgent lands on the relevant tab.
+- `metrics` IPC method returning the current snapshot as JSON, for
+  scripting: `omarchy-shell io.github.diegopluna.argus metrics`.
+- Sparklines everywhere state their timespan ("last 2m"), and the DISK
+  tab gains read/write sparklines.
+- One or two things are better discovered than documented.
+
+### Changed
+- PROC shows full command lines (argv0 path stripped) instead of the
+  kernel's 15-character `comm` truncation.
+- Refreshed screenshots and the Okomart `preview.png`, which still showed
+  the 0.2.x panel.
+
+## [0.6.0] — 2026-08-19
+
+### Added
+- Per-sensor alert thresholds, set from the TEMP tab UI: each sensor row
+  has a 󰂚 button opening an inline −/+/off stepper. A sensor over its
+  limit renders urgent and fires a critical notification (same 3-tick
+  hold and 5-minute cooldown as the built-in alerts). Persisted in
+  shell.json as a `sensorThresholds` map keyed by `chip|device|label`,
+  stable across reboots and hwmon renumbering. Independent of — and in
+  addition to — the CPU/GPU/drive component thresholds.
+
+## [0.5.0] — 2026-08-19
+
+### Added
+- Per-component temperature thresholds: `urgentCpuTempC` (85),
+  `urgentGpuTempC` (90), and `urgentDriveTempC` (70) replace the single
+  `urgentTempC`, which remains honored as a CPU/GPU fallback.
+- Drive-temperature alert: watches the hottest NVMe/SATA sensor
+  (alert-only, no bar segment; critical urgency).
+- Intel GPU support (i915/xe): name, temperature, and power via hwmon;
+  usage is marked unavailable rather than shown as zero, since Intel
+  exposes no unprivileged busy counter.
+- PSI pressure rows (`/proc/pressure`, 10-second averages) in the CPU,
+  MEM, and DISK tabs.
+- TEMP-tab hint on desktop machines whose motherboard Super I/O sensor
+  driver is not loaded, pointing at the README's Fans section.
+- Battery charge-limit row (`charge_control_end_threshold`), so a battery
+  parked at 80% doesn't look like a bug.
+- Kernel version in the CPU tab; battery status in the bar tooltip.
+
+### Changed
+- Virtual network interfaces (VPN tunnels, bridges, veth) are excluded
+  from the bar's throughput totals — VPN traffic previously counted twice
+  — and flagged in the NET tab. All-virtual environments still count
+  everything.
+- `df` and `lsblk` run under `timeout`: a stale NFS/sshfs mount now costs
+  one degraded tick instead of freezing the widget permanently.
+
+## [0.4.0] — 2026-08-19
+
+### Added
+- Threshold alerts: a desktop notification when a metric stays past its
+  urgent threshold for 3 consecutive ticks (5-minute per-metric cooldown;
+  `alerts` setting, default On). Temperatures and battery use critical
+  urgency.
+- GPU tab: usage sparkline for the primary card, power draw per card
+  (amdgpu `power1_average` / nvidia-smi `power.draw`), and session-peak
+  temperature.
+- Session peaks: CPU temperature, network down/up, and disk I/O peaks
+  since shell start, shown in their tabs.
+- Fan rows fall back to `fan1`/`fan2`/… names when a chip exposes
+  unlabeled headers (Super I/O chips expose several), and the README
+  documents loading `nct6775`/`it87` for motherboard fans.
+- CI: GitHub Actions runs the model tests on every push.
+
+### Changed
+- One sampler now runs for the whole shell instead of one per bar surface
+  (the service became a Quickshell singleton) — multi-monitor setups halve
+  their sampling work.
+- Top processes are sampled only while a panel is open.
+- Implausible Super I/O temperature readings (below −40° or above 250°)
+  are dropped.
+- Refreshed all README screenshots; added the PROC tab.
+
+## [0.3.0] — 2026-08-19
+
+### Added
+- Sparkline history in the panel: CPU and RAM usage plus network
+  download/upload, over the last 60 samples.
+- Urgent-threshold highlighting: bar segments switch to the theme's urgent
+  color past configurable thresholds (`urgentCpuPct`, `urgentMemPct`,
+  `urgentTempC`, `urgentDiskPct`); load average keys off the thread count
+  and battery off ≤15% while discharging.
+- Disk I/O rates (read/write per physical disk, from `/proc/diskstats`) in
+  the DISK tab and as a selectable `io` bar metric.
+- Fan speeds (hwmon `fan*_input`) in the TEMP tab.
+- PROC tab: top processes by CPU and by memory.
+- Battery support: a BAT tab (charge, status, power draw, health, time
+  estimate) and a `bat` bar metric with level/charging glyphs — both appear
+  only on machines with a system battery; peripheral batteries (mice,
+  keyboards) are filtered out via the sysfs `scope` attribute.
+- Bar metrics are reorderable: the stored `show` order is now the display
+  order, with move up/down arrows in the BAR tab.
+
+### Changed
+- The sampler is split into `static` (hostname, CPU model, disk models,
+  GPU names — run once at shell start) and `dynamic` (everything else) —
+  `lsblk` and `lspci` no longer run on every tick.
+- `nvidia-smi` is never invoked while every NVIDIA card is
+  runtime-suspended, so polling cannot keep an Optimus dGPU awake; the
+  card is shown as asleep with its last-known identity until it wakes.
+
+## [0.2.1] — 2026-08-18
+
+- Placeholder icon (the eye of Argus, optically centered) when no metric
+  renders, so the panel stays reachable from the bar.
+
+## [0.2.0] — 2026-08-18
+
+- NVIDIA GPU support via nvidia-smi, alongside amdgpu; hybrid systems list
+  both, with the bar following the card with the most VRAM.
+
+## [0.1.0] — 2026-08-18
+
+- Initial release: selectable bar metrics persisted to shell.json and a
+  tabbed panel (CPU, MEM, GPU, DISK, NET, TEMP, BAR) with keyboard
+  navigation and IPC.

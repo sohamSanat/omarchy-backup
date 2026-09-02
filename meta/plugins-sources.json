@@ -1,0 +1,100 @@
+{
+  "charlieras262.floating-bar": {
+    "remote": "https://github.com/Charlieras262/omarchy-floating-bar.git",
+    "commit": "5e7dc23421f1f774e5c329cc2397b5825900b75e",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "chispes.agent-gemini": {
+    "remote": "https://github.com/Chispes/omarchy-agent-gemini.git",
+    "commit": "63933ff14cc81d4fa7435791127eaa4b886f4d67",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M Service.qml",
+      " M bin/omarchy-agent-usage-gemini"
+    ]
+  },
+  "io.github.calebhat.themebook": {
+    "remote": "https://github.com/calebhat/omarchy-themebook.git",
+    "commit": "ec66686b900473be3d49fa7b542b510eb475a561",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M Model.js",
+      " M README.md",
+      " M Service.qml",
+      " M ThemeBook.qml",
+      " M scripts/catalog",
+      " M test/model.test.js"
+    ]
+  },
+  "io.github.diegopluna.argus": {
+    "remote": "https://github.com/diegopluna/omarchy-argus.git",
+    "commit": "653ef9a8e73200f1a1b3eb2ad94f15176d36fe31",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M BarWidget.qml",
+      "?? BarWidget.qml.bak.1788189441"
+    ]
+  },
+  "io.github.elevate08.qs-bitwarden-cli": {
+    "remote": "https://github.com/Elevate08/qs-bitwarden-cli.git",
+    "commit": "3b1348cbd2531f5c2ecb48e28612abef83b0fe07",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "io.github.nilszeilon.omarchy-sensei": {
+    "remote": "https://github.com/nilszeilon/omarchy-sensei.git",
+    "commit": "f8817e9a84478304eb4409103983d11f05c419e4",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M sensei.py",
+      " M tests/test_sensei.py"
+    ]
+  },
+  "io.github.r-witz.nothing-ear": {
+    "remote": "https://github.com/r-witz/omarchy-nothing-ear",
+    "commit": "6372853e81a7947b0bbfb0bd0962428cba4271ce",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "io.github.ricky.whatsapp": {
+    "remote": "https://github.com/srineshr1/omarchy-whatsapp.git",
+    "commit": "0a9b19cbc7c6e376ecf4dc3d3229543620caecca",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "jkoestinger.vpn": {
+    "remote": "https://github.com/jkoestinger/omarchy-vpn.git",
+    "commit": "c94454d857f28a6421212ecc121317f7171db5a4",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "krall.switchboard": {
+    "remote": "https://github.com/krall12/omarchy-switchboard.git",
+    "commit": "fa9b45af82658306148dbd2240c970dafcb5d252",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "mryll.meteobar": {
+    "remote": "https://github.com/mryll/meteobar.git",
+    "commit": "c9d3c814156a610d4bd79f53b73fb8d0f35f162d",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "omaconnect": {
+    "remote": "https://github.com/jitendradara12/omaconnect.git",
+    "commit": "f44454e710876d9578822c1ad2039c59d0d9ca0e",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "omamail": {
+    "remote": "https://github.com/huacnlee/omamail.git",
+    "commit": "f69df2dfc8fb15810f8b9edd163d8b6599869738",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "soham.power": {
+    "remote": null,
+    "custom": true
+  }
+}

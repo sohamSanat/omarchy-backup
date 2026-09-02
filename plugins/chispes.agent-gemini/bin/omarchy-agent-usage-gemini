@@ -1,0 +1,1223 @@
+#!/usr/bin/env python3
+# omarchy:summary=Print the Gemini / Antigravity usage record as JSON
+# omarchy:args=[--force] [--limits-only]
+# omarchy:hidden=true
+"""Collect Gemini / Google Antigravity usage into one display-ready JSON record.
+
+Local stats come from Antigravity CLI session files, transcripts, conversation
+summaries, and history, plus opencode/pi/omp sessions using Gemini/Google models;
+rate limits and quotas come from Antigravity's usage probe.
+The Omarchy agents panel only ever reads the JSON this prints.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import fcntl
+import fnmatch
+import hashlib
+import heapq
+import json
+import os
+import re
+import shutil
+import sqlite3
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+from typing import Any
+
+AGENT_ID = "gemini"
+AGENT_NAME = "Gemini"
+AUTH_HELP = "Run `gemini`, sign in to Antigravity CLI with `agy`, or use Gemini in OpenCode."
+
+SCAN_REUSE_SECONDS = 20
+LIMITS_ONLY_REUSE_SECONDS = 900
+LIMITS_CACHE_SECONDS = 30
+PROBE_MIN_INTERVAL_SECONDS = 15
+
+# Strict hard bounds to prevent unbounded CPU/memory consumption on large local histories
+HISTORY_CUTOFF_DAYS = 30
+MAX_TAIL_BYTES = 256 * 1024           # 256 KB max for history tail buffer
+MAX_TRANSCRIPT_FILES = 100            # Max recent files to inspect
+MAX_DIRS_TO_SCAN = 300                # Max directories visited during traversal
+MAX_FILE_SIZE_BYTES = 4 * 1024 * 1024 # 4 MB max per transcript file
+MAX_SESSIONS_RECORDED = 500
+MAX_MODELS_RECORDED = 15
+MAX_DIR_ENTRIES_SCANNED = 200000      # Global directory-entry budget for one traversal
+MAX_ENTRIES_PER_DIR = 4000            # Per-directory share of that budget
+MAX_PENDING_DIRS = 1000               # Max directories retained in the pending stack
+MAX_LINE_BYTES = 256 * 1024           # 256 KB max retained for a single line
+READ_CHUNK_BYTES = 64 * 1024          # Read granularity for bounded line iteration
+
+
+def expand_path(value: str) -> Path:
+  return Path(os.path.expandvars(os.path.expanduser(value))).resolve()
+
+
+def cache_root() -> Path:
+  root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "omarchy" / "agent-usage"
+  root.mkdir(parents=True, exist_ok=True)
+  return root
+
+
+def date_string(value: dt.date) -> str:
+  return value.strftime("%Y-%m-%d")
+
+
+def recent_date_strings() -> list[str]:
+  today = dt.datetime.now().date()
+  return [date_string(today - dt.timedelta(days=offset)) for offset in range(6, -1, -1)]
+
+
+def local_date_string() -> str:
+  return date_string(dt.datetime.now().date())
+
+
+def cutoff_date_string() -> str:
+  cutoff = dt.datetime.now().date() - dt.timedelta(days=HISTORY_CUTOFF_DAYS)
+  return date_string(cutoff)
+
+
+def local_date_from_timestamp(value: Any) -> str:
+  if value is None:
+    return local_date_string()
+
+  if isinstance(value, (int, float)):
+    try:
+      seconds = float(value) / 1000.0 if float(value) > 10_000_000_000 else float(value)
+      return date_string(dt.datetime.fromtimestamp(seconds).date())
+    except Exception:
+      return local_date_string()
+
+  raw = str(value).strip()
+  if not raw:
+    return local_date_string()
+
+  try:
+    parsed = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    if parsed.tzinfo is not None:
+      parsed = parsed.astimezone()
+    return date_string(parsed.date())
+  except Exception:
+    return local_date_string()
+
+
+def number(value: Any) -> int:
+  try:
+    n = float(value or 0)
+    return round(n) if n == n else 0
+  except Exception:
+    return 0
+
+
+def empty_bucket() -> dict[str, int]:
+  return {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "cacheCreationInputTokens": 0,
+  }
+
+
+def scan_cache_paths() -> tuple[Path, Path]:
+  gemini_home = Path.home() / ".gemini"
+  opencode_db = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
+  digest = hashlib.sha1((str(gemini_home) + "\n" + str(opencode_db)).encode("utf-8")).hexdigest()[:16]
+  root = cache_root()
+  return root / f"gemini-scan-{digest}.json", root / f"gemini-scan-{digest}.lock"
+
+
+def read_fresh_json(path: Path, max_age_seconds: float) -> dict[str, Any] | None:
+  if max_age_seconds <= 0:
+    return None
+  opened = open_regular(path, max_bytes=MAX_FILE_SIZE_BYTES)
+  if opened is None:
+    return None
+  handle, st = opened
+  with handle:
+    try:
+      # Freshness comes from the fstat of the descriptor being read, so the
+      # age decision and the content are taken from the same object.
+      age = time.time() - st.st_mtime
+      if 0 <= age <= max_age_seconds:
+        return json.loads(handle.read(MAX_FILE_SIZE_BYTES).decode("utf-8", errors="replace"))
+    except Exception:
+      return None
+  return None
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+  handle_fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+  tmp = Path(tmp_name)
+  try:
+    with os.fdopen(handle_fd, "w", encoding="utf-8") as handle:
+      handle.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
+    tmp.chmod(0o644)
+    tmp.replace(path)
+  except BaseException:
+    tmp.unlink(missing_ok=True)
+    raise
+
+
+# ----------------------------------------------------------------- bounded helpers
+
+
+def open_regular(file_path: Path, max_bytes: int | None = None) -> tuple[Any, os.stat_result] | None:
+  """Open a regular file read-only, returning it with the fstat of that same descriptor.
+
+  The size check is deliberately bound to the descriptor we go on to read from
+  rather than to the path. A stat() on a path and a later open() of that path
+  are two different objects, so a file swapped or grown in between escapes a
+  path-based cap; os.fstat() on the already-open descriptor cannot be raced
+  that way, and O_NOFOLLOW stops a symlink from redirecting the read.
+  """
+  try:
+    fd = os.open(file_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+  except OSError:
+    return None
+  try:
+    st = os.fstat(fd)
+    if not stat.S_ISREG(st.st_mode):
+      raise OSError("not a regular file")
+    if max_bytes is not None and st.st_size > max_bytes:
+      raise OSError("file exceeds size budget")
+    handle = os.fdopen(fd, "rb")
+  except OSError:
+    try:
+      os.close(fd)
+    except OSError:
+      pass
+    return None
+  return handle, st
+
+
+def iter_bounded_lines(
+  handle: Any,
+  max_bytes: int = MAX_FILE_SIZE_BYTES,
+  max_line_bytes: int = MAX_LINE_BYTES,
+):
+  """Yield decoded lines from a binary handle under a hard byte budget.
+
+  Reading fixed-size chunks is what keeps a file with no newlines from arriving
+  as one enormous line: an over-long line is dropped and the reader resyncs at
+  the next newline, so peak memory stays O(max_line_bytes) no matter how the
+  file grew after it was opened.
+  """
+  remaining = max_bytes
+  buf = b""
+  skipping = False
+  while remaining > 0:
+    try:
+      chunk = handle.read(min(READ_CHUNK_BYTES, remaining))
+    except OSError:
+      return
+    if not chunk:
+      break
+    remaining -= len(chunk)
+    buf += chunk
+    while True:
+      newline = buf.find(b"\n")
+      if newline < 0:
+        break
+      line, buf = buf[:newline], buf[newline + 1:]
+      if skipping:
+        skipping = False
+        continue
+      if line.strip():
+        yield line.decode("utf-8", errors="replace")
+    if len(buf) > max_line_bytes:
+      # Oversized line: drop what we hold and resync at the next newline
+      # instead of letting the buffer grow with it.
+      buf = b""
+      skipping = True
+  if buf and not skipping and len(buf) <= max_line_bytes and buf.strip():
+    yield buf.decode("utf-8", errors="replace")
+
+
+def read_tail_lines(file_path: Path, max_bytes: int = MAX_TAIL_BYTES) -> list[str]:
+  """Read only the tail of a file without loading the entire file into memory."""
+  opened = open_regular(file_path)
+  if opened is None:
+    return []
+  handle, st = opened
+  with handle:
+    try:
+      if st.st_size <= 0:
+        return []
+      if st.st_size > max_bytes:
+        handle.seek(st.st_size - max_bytes)
+        handle.readline(max_bytes)  # discard partial first line, bounded
+      chunk = handle.read(max_bytes).decode("utf-8", errors="replace")
+    except OSError:
+      return []
+  return [line for line in chunk.splitlines() if line.strip()]
+
+
+def find_recent_files(
+  root: Path,
+  pattern: str,
+  cutoff_time: float,
+  max_files: int = MAX_TRANSCRIPT_FILES,
+  max_dirs: int = MAX_DIRS_TO_SCAN,
+  max_entries: int = MAX_DIR_ENTRIES_SCANNED,
+) -> list[Path]:
+  """Find recent files matching pattern with bounded traversal and early exit.
+
+  The walk is bounded on five independent axes -- directories visited, pending
+  directories retained, entries examined per directory, entries examined in
+  total, and matches kept -- so no single directory can dominate the scan.
+
+  Two details keep those bounds from quietly costing coverage. The per-directory
+  share stops the first pathological directory from spending the whole global
+  budget, which would bound the CPU but blind the collector to the siblings
+  where the transcripts actually live. And directories come off the queue newest
+  first, because a budget is only as good as where it gets spent: session
+  directories are written as they are used, so mtime order puts the live ones
+  ahead of whatever else shares the tree. What a truncated walk drops is then
+  the least recently touched material, which is also what the 30-day cutoff was
+  going to discard anyway.
+  """
+  if not root.is_dir():
+    return []
+
+  matched: list[tuple[float, Path]] = []
+  keep_limit = max_files * 2
+  entries_left = max_entries
+  dirs_visited = 0
+  # (-mtime, tiebreak, path): heapq is a min-heap, so negating gives newest-first.
+  order = 0
+  pending: list[tuple[float, int, Path]] = [(0.0, 0, root)]
+
+  while pending and dirs_visited < max_dirs and entries_left > 0 and len(matched) < keep_limit:
+    _, _, current = heapq.heappop(pending)
+    dirs_visited += 1
+    dir_budget = min(MAX_ENTRIES_PER_DIR, entries_left)
+    try:
+      with os.scandir(current) as it:
+        for entry in it:
+          # Charged per entry examined and tested inside the loop, so a
+          # directory holding millions of non-matching files stops the walk
+          # mid-iteration rather than running to completion first.
+          dir_budget -= 1
+          entries_left -= 1
+          if dir_budget <= 0 or len(matched) >= keep_limit:
+            break
+          try:
+            if entry.is_dir(follow_symlinks=False):
+              # Hidden dirs are skipped, bar Antigravity's .system_generated.
+              # The queue is capped too, so a wide tree cannot retain an
+              # unbounded list of pending paths.
+              if entry.name.startswith(".") and entry.name != ".system_generated":
+                continue
+              if len(pending) < MAX_PENDING_DIRS:
+                order += 1
+                heapq.heappush(
+                  pending, (-entry.stat(follow_symlinks=False).st_mtime, order, Path(entry.path))
+                )
+            elif entry.is_file(follow_symlinks=False):
+              if fnmatch.fnmatch(entry.name, pattern):
+                st = entry.stat(follow_symlinks=False)
+                if st.st_mtime >= cutoff_time and st.st_size <= MAX_FILE_SIZE_BYTES:
+                  matched.append((st.st_mtime, Path(entry.path)))
+          except OSError:
+            continue
+    except OSError:
+      continue
+
+  # Sort newest first and cap to max_files
+  matched.sort(key=lambda x: x[0], reverse=True)
+  return [p for _, p in matched[:max_files]]
+
+
+# ---------------------------------------------------------------- account discovery
+
+
+def detect_account_info() -> tuple[str, str]:
+  email = ""
+  tier = "Google Account"
+
+  accounts_file = Path.home() / ".gemini" / "google_accounts.json"
+  opened = open_regular(accounts_file, max_bytes=MAX_FILE_SIZE_BYTES)
+  if opened is not None:
+    handle, _ = opened
+    with handle:
+      try:
+        data = json.loads(handle.read(MAX_FILE_SIZE_BYTES).decode("utf-8", errors="replace"))
+        active = str(data.get("active") or "").strip()
+        if active:
+          email = active
+      except Exception:
+        pass
+
+  if email:
+    tier = email
+  return email, tier
+
+
+# ----------------------------------------------------------- rate limits / quotas
+
+
+def normalize_reset_at(value: Any) -> str:
+  if value is None:
+    return ""
+  raw = str(value).strip()
+  if raw == "":
+    return ""
+  if raw.isdigit():
+    ts = int(raw)
+    if ts < 1e12:
+      ts *= 1000
+    try:
+      return dt.datetime.fromtimestamp(ts / 1000, dt.timezone.utc).isoformat()
+    except Exception:
+      return raw
+  try:
+    parsed = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    return parsed.isoformat()
+  except Exception:
+    return raw
+
+
+def limit_window_open(entry: dict[str, Any], now: dt.datetime) -> bool:
+  raw = str(entry.get("resetsAt") or "")
+  if raw == "":
+    return True
+  try:
+    resets_at = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+  except Exception:
+    return True
+  if resets_at.tzinfo is None:
+    resets_at = resets_at.replace(tzinfo=dt.timezone.utc)
+  return resets_at > now
+
+
+def sanitize_limit_window(entry: dict[str, Any], now: dt.datetime) -> dict[str, Any]:
+  if limit_window_open(entry, now):
+    return entry
+  return {
+    **entry,
+    "percent": 0.0,
+    "resetsAt": "",
+  }
+
+
+def usable_cached_limits(cached: dict[str, Any]) -> list[dict[str, Any]]:
+  entries = cached.get("limits")
+  if not isinstance(entries, list):
+    return []
+  now = dt.datetime.now(dt.timezone.utc)
+  return [sanitize_limit_window(entry, now) for entry in entries if isinstance(entry, dict)]
+
+
+def all_limit_windows_open(entries: list[dict[str, Any]], now: dt.datetime) -> bool:
+  if not entries:
+    return False
+  return all(limit_window_open(e, now) for e in entries if isinstance(e, dict))
+
+
+def find_agy_bin() -> str | None:
+  candidates = [
+    shutil.which("agy"),
+    str(Path.home() / ".local" / "bin" / "agy"),
+    str(Path.home() / ".gemini" / "antigravity-cli" / "bin" / "agy"),
+    "/usr/local/bin/agy",
+    "/usr/bin/agy",
+  ]
+  for candidate in candidates:
+    if candidate:
+      p = Path(candidate).expanduser().resolve()
+      if p.is_file() and os.access(p, os.X_OK):
+        return str(p)
+  return None
+
+
+def probe_agy_limits(force: bool = False, limits_only: bool = False) -> list[dict[str, Any]]:
+  cache_file = cache_root() / "gemini-limits.json"
+  now = dt.datetime.now(dt.timezone.utc)
+
+  if not force and not limits_only:
+    cached = read_fresh_json(cache_file, LIMITS_CACHE_SECONDS)
+    if cached is not None and isinstance(cached.get("limits"), list):
+      limits = cached["limits"]
+      if all_limit_windows_open(limits, now):
+        return limits
+
+  if limits_only and not force:
+    cached = read_fresh_json(cache_file, PROBE_MIN_INTERVAL_SECONDS)
+    if cached is not None and isinstance(cached.get("limits"), list):
+      limits = cached["limits"]
+      if all_limit_windows_open(limits, now):
+        return limits
+
+  agy_bin = find_agy_bin()
+  if not agy_bin:
+    cached = read_fresh_json(cache_file, 86400)
+    if cached is not None:
+      return usable_cached_limits(cached)
+    return []
+
+  env = dict(os.environ)
+  extra_paths = [
+    str(Path.home() / ".local" / "bin"),
+    str(Path.home() / ".gemini" / "antigravity-cli" / "bin"),
+    "/usr/local/bin",
+    "/usr/bin",
+  ]
+  cur_path = env.get("PATH", "")
+  env["PATH"] = ":".join([p for p in extra_paths if p not in cur_path] + ([cur_path] if cur_path else []))
+
+  try:
+    proc = subprocess.run(
+      [agy_bin, "-p", "/usage", "--output-format", "json"],
+      capture_output=True,
+      text=True,
+      timeout=25,
+      env=env,
+    )
+    if proc.returncode != 0:
+      cached = read_fresh_json(cache_file, 86400)
+      if cached is not None:
+        return usable_cached_limits(cached)
+      return []
+
+    data = json.loads(proc.stdout)
+    groups = data.get("command", {}).get("data", {}).get("groups", [])
+    limits: list[dict[str, Any]] = []
+
+    session_limit: dict[str, Any] | None = None
+    weekly_limit: dict[str, Any] | None = None
+    extra_limits: list[dict[str, Any]] = []
+
+    for group in groups:
+      g_name = str(group.get("name") or "")
+      buckets = group.get("buckets") or []
+      for b in buckets:
+        rem = float(b.get("remaining_fraction", 1.0))
+        used = max(0.0, min(1.0, 1.0 - rem))
+        reset = normalize_reset_at(b.get("reset_time") or "")
+        window = str(b.get("window") or "").lower()
+        name = str(b.get("name") or "").lower()
+        b_id = str(b.get("id") or "").lower()
+
+        if "gemini" in g_name.lower():
+          if window == "5h" or "5-hour" in name or "five" in name or "5h" in b_id or "5_hour" in b_id or "5 hour" in name:
+            session_limit = {
+              "label": "Session (5-hour)",
+              "title": "Session (5-hour)",
+              "percent": round(used, 4),
+              "resetsAt": reset,
+            }
+          elif window == "weekly" or "week" in name or "weekly" in b_id or "7-day" in name or "7d" in b_id:
+            weekly_limit = {
+              "label": "Weekly (7-day)",
+              "title": "Weekly (7-day)",
+              "percent": round(used, 4),
+              "resetsAt": reset,
+            }
+        elif used > 0.001:
+          title = f"{g_name} {window.capitalize() if window else 'Limit'}"
+          extra_limits.append({
+            "label": title,
+            "title": title,
+            "percent": round(used, 4),
+            "resetsAt": reset,
+          })
+
+    if session_limit:
+      limits.append(session_limit)
+    if weekly_limit:
+      limits.append(weekly_limit)
+    limits.extend(extra_limits)
+
+    write_json(cache_file, {"limits": limits, "updatedAt": dt.datetime.now(dt.timezone.utc).isoformat()})
+    return limits
+  except Exception:
+    cached = read_fresh_json(cache_file, 86400)
+    if cached is not None:
+      return usable_cached_limits(cached)
+    return []
+
+
+# ----------------------------------------------------------- antigravity scans
+
+
+def scan_antigravity_history() -> tuple[int, set[str], set[str], dict[str, int]]:
+  """Scan tail of history.jsonl from Antigravity CLI in reverse with cutoff."""
+  history_file = Path.home() / ".gemini" / "antigravity-cli" / "history.jsonl"
+  lines = read_tail_lines(history_file, MAX_TAIL_BYTES)
+  if not lines:
+    return 0, set(), set(), {}
+
+  today = local_date_string()
+  min_cutoff_date = cutoff_date_string()
+  cutoff_ts = (time.time() - HISTORY_CUTOFF_DAYS * 86400) * 1000
+
+  today_prompts = 0
+  today_sessions: set[str] = set()
+  all_sessions: set[str] = set()
+  active_days: dict[str, int] = {}
+
+  for line in reversed(lines):
+    try:
+      entry = json.loads(line)
+    except Exception:
+      continue
+
+    ts = entry.get("timestamp")
+    if isinstance(ts, (int, float)) and ts < cutoff_ts:
+      break
+
+    day = local_date_from_timestamp(ts)
+    if day < min_cutoff_date:
+      break
+
+    conv_id = str(entry.get("conversationId") or entry.get("workspace") or "default")
+    if len(all_sessions) < MAX_SESSIONS_RECORDED:
+      all_sessions.add(conv_id)
+    active_days[day] = active_days.get(day, 0) + 1
+
+    if day == today:
+      today_prompts += 1
+      if len(today_sessions) < MAX_SESSIONS_RECORDED:
+        today_sessions.add(conv_id)
+
+  return today_prompts, today_sessions, all_sessions, active_days
+
+
+def scan_antigravity_transcripts() -> dict[str, Any]:
+  """Scan recent transcripts in ~/.gemini/antigravity-cli/brain/ with bounded traversal."""
+  today = local_date_string()
+  recent_dates = recent_date_strings()
+  min_cutoff_date = cutoff_date_string()
+  cutoff_time = time.time() - HISTORY_CUTOFF_DAYS * 86400
+
+  recent = {day: {"date": day, "messageCount": 0} for day in recent_dates}
+  sessions: set[str] = set()
+  active_days: set[str] = set()
+  today_sessions: set[str] = set()
+  today_tokens: dict[str, int] = {}
+  usage_by_model: dict[str, dict[str, int]] = {}
+  prompts = 0
+  today_prompt_count = 0
+  today_token_total = 0
+
+  brain_dir = Path.home() / ".gemini" / "antigravity-cli" / "brain"
+  selected_files = find_recent_files(brain_dir, "transcript*.jsonl", cutoff_time, MAX_TRANSCRIPT_FILES, MAX_DIRS_TO_SCAN)
+
+  for path in selected_files:
+    session_id = path.parent.parent.name
+    if len(sessions) < MAX_SESSIONS_RECORDED:
+      sessions.add(session_id)
+    try:
+      opened = open_regular(path, max_bytes=MAX_FILE_SIZE_BYTES)
+      if opened is None:
+        continue
+      handle, _ = opened
+      with handle:
+        for line in iter_bounded_lines(handle):
+          # Cheap pre-filter before JSON decode
+          if '"USER_INPUT"' not in line and '"PLANNER_RESPONSE"' not in line and '"GENERIC"' not in line and '"usage"' not in line:
+            continue
+          try:
+            entry = json.loads(line)
+          except Exception:
+            continue
+
+          created_at = entry.get("created_at")
+          day = local_date_from_timestamp(created_at)
+          if day < min_cutoff_date:
+            continue
+
+          active_days.add(day)
+          entry_type = entry.get("type")
+          source = entry.get("source")
+
+          model = "gemini-3.7-flash"
+          input_tokens = 0
+          output_tokens = 0
+          cache_read = 0
+          cache_write = 0
+
+          if "usage" in entry and isinstance(entry["usage"], dict):
+            u = entry["usage"]
+            input_tokens = number(u.get("prompt_tokens") or u.get("input_tokens") or u.get("inputTokens"))
+            output_tokens = number(u.get("completion_tokens") or u.get("output_tokens") or u.get("outputTokens"))
+            cache_read = number(u.get("cached_tokens") or u.get("cacheReadInputTokens"))
+          elif entry_type == "USER_INPUT":
+            prompts += 1
+            content = str(entry.get("content") or "")
+            input_tokens = max(1, len(content) // 4)
+            if day == today:
+              today_prompt_count += 1
+              if len(today_sessions) < MAX_SESSIONS_RECORDED:
+                today_sessions.add(session_id)
+          elif entry_type in ("PLANNER_RESPONSE", "GENERIC") and source == "MODEL":
+            content = str(entry.get("content") or "")
+            thinking = str(entry.get("thinking") or "")
+            output_tokens = max(1, (len(content) + len(thinking)) // 4)
+          else:
+            continue
+
+          total = input_tokens + output_tokens + cache_read + cache_write
+          if total <= 0:
+            continue
+
+          bucket = usage_by_model.setdefault(model, empty_bucket())
+          bucket["inputTokens"] += input_tokens
+          bucket["outputTokens"] += output_tokens
+          bucket["cacheReadInputTokens"] += cache_read
+          bucket["cacheCreationInputTokens"] += cache_write
+
+          if day in recent:
+            recent[day]["messageCount"] += total
+
+          if day == today:
+            today_token_total += total
+            today_tokens[model] = today_tokens.get(model, 0) + total
+    except Exception:
+      continue
+
+  # Read summaries db for additional sessions (bounded query)
+  db_path = Path.home() / ".gemini" / "antigravity-cli" / "conversation_summaries.db"
+  if db_path.is_file():
+    try:
+      conn = sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
+      conn.execute("PRAGMA query_only = ON")
+      for row in conn.execute(
+        "SELECT conversation_id, last_modified_time FROM conversation_summaries"
+        " ORDER BY last_modified_time DESC LIMIT 200"
+      ):
+        cid = str(row[0] or "")
+        day = local_date_from_timestamp(row[1])
+        if day >= min_cutoff_date:
+          active_days.add(day)
+          if cid and len(sessions) < MAX_SESSIONS_RECORDED:
+            sessions.add(cid)
+      conn.close()
+    except Exception:
+      pass
+
+  # History scan merge for prompt counts
+  hist_today_prompts, hist_today_sessions, hist_all_sessions, hist_days = scan_antigravity_history()
+  today_prompt_count = max(today_prompt_count, hist_today_prompts)
+  today_sessions = (today_sessions | hist_today_sessions)
+  sessions = (sessions | hist_all_sessions)
+  for d in hist_days:
+    if d >= min_cutoff_date:
+      active_days.add(d)
+
+  # Bound model maps and active dates
+  bounded_model_usage = dict(
+    sorted(usage_by_model.items(), key=lambda x: sum(x[1].values()), reverse=True)[:MAX_MODELS_RECORDED]
+  )
+  bounded_today_tokens = dict(
+    sorted(today_tokens.items(), key=lambda x: x[1], reverse=True)[:MAX_MODELS_RECORDED]
+  )
+  bounded_active_dates = sorted([d for d in active_days if d >= min_cutoff_date])
+
+  return {
+    "todayPrompts": today_prompt_count,
+    "todaySessions": len(today_sessions),
+    "todayTotalTokens": today_token_total,
+    "todayTokensByModel": bounded_today_tokens,
+    "recentDays": [recent[day] for day in recent_dates],
+    "modelUsage": bounded_model_usage,
+    "totalPrompts": max(prompts, sum(hist_days.values())),
+    "totalSessions": len(sessions),
+    "activeDays": len(bounded_active_dates),
+    "activeDates": bounded_active_dates,
+  }
+
+
+# ------------------------------------------------------------- gemini cli scan
+
+
+def scan_gemini_cli_sessions() -> dict[str, Any] | None:
+  """Scan Gemini CLI chat sessions under ~/.gemini/tmp/<project>/chats/.
+
+  The Gemini CLI records one JSONL file per session: a metadata line, then one
+  record per message. A `gemini` message carries the response's raw
+  `usageMetadata` in `tokens`, so the token split here is read rather than
+  estimated from content length the way the Antigravity transcripts are.
+
+  Two control records share the stream and are skipped: `{"$set": ...}` rewrites
+  session metadata, and `{"$rewindTo": id}` drops the messages after an id. A
+  rewound turn still spent the tokens it spent, so usage counts it.
+  """
+  root = Path.home() / ".gemini" / "tmp"
+  if not root.is_dir():
+    return None
+
+  today = local_date_string()
+  min_cutoff_date = cutoff_date_string()
+  cutoff_time = time.time() - HISTORY_CUTOFF_DAYS * 86400
+  recent_dates = recent_date_strings()
+  recent = {day: {"date": day, "messageCount": 0} for day in recent_dates}
+  sessions: set[str] = set()
+  active_days: set[str] = set()
+  today_sessions: set[str] = set()
+  today_tokens: dict[str, int] = {}
+  usage_by_model: dict[str, dict[str, int]] = {}
+  prompts = 0
+  today_prompt_count = 0
+  today_token_total = 0
+  found_usage = False
+
+  # `session-*.json*` covers both extensions: sessions written before the JSONL
+  # format are `.json`, the CLI still reads them, so they are still usage.
+  for path in find_recent_files(root, "session-*.json*", cutoff_time):
+    session_key = path.stem
+    opened = open_regular(path, max_bytes=MAX_FILE_SIZE_BYTES)
+    if opened is None:
+      continue
+    handle, _ = opened
+    with handle:
+      for line in iter_bounded_lines(handle):
+        # Only user turns and token-bearing model turns carry usage; metadata
+        # and rewind records never do, so they never reach the JSON decoder.
+        if '"tokens"' not in line and '"user"' not in line:
+          continue
+        try:
+          entry = json.loads(line)
+        except Exception:
+          continue
+        # Every message record has a string id; the metadata and control
+        # records do not, which is exactly how the CLI itself tells them apart.
+        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
+          continue
+
+        day = local_date_from_timestamp(entry.get("timestamp"))
+        if day < min_cutoff_date:
+          continue
+        entry_type = entry.get("type")
+
+        if entry_type == "user":
+          found_usage = True
+          prompts += 1
+          active_days.add(day)
+          if len(sessions) < MAX_SESSIONS_RECORDED:
+            sessions.add(session_key)
+          if day == today:
+            today_prompt_count += 1
+            if len(today_sessions) < MAX_SESSIONS_RECORDED:
+              today_sessions.add(session_key)
+          continue
+
+        if entry_type != "gemini":
+          continue
+        tokens = entry.get("tokens")
+        if not isinstance(tokens, dict):
+          continue
+
+        # usageMetadata counts the cached prefix inside promptTokenCount and
+        # reports thinking apart from the candidates, so the split is rebuilt
+        # rather than copied across: cached tokens move out of the input, and
+        # thinking folds into the output. Copied as-is, the cache would be
+        # counted twice and the thinking not at all.
+        cache_read = number(tokens.get("cached"))
+        input_tokens = max(0, number(tokens.get("input")) - cache_read)
+        output_tokens = number(tokens.get("output")) + number(tokens.get("thoughts"))
+        total = input_tokens + output_tokens + cache_read
+        if total <= 0:
+          continue
+
+        found_usage = True
+        active_days.add(day)
+        if len(sessions) < MAX_SESSIONS_RECORDED:
+          sessions.add(session_key)
+
+        # The model name comes out of the session file, so it is bounded in
+        # both length and cardinality before it can become a map key.
+        model = str(entry.get("model") or "gemini")[:64]
+        if model not in usage_by_model and len(usage_by_model) >= MAX_MODELS_RECORDED:
+          model = "other"
+        bucket = usage_by_model.setdefault(model, empty_bucket())
+        bucket["inputTokens"] += input_tokens
+        bucket["outputTokens"] += output_tokens
+        bucket["cacheReadInputTokens"] += cache_read
+
+        if day in recent:
+          recent[day]["messageCount"] += total
+        if day == today:
+          today_token_total += total
+          today_tokens[model] = today_tokens.get(model, 0) + total
+
+  if not found_usage:
+    return None
+
+  bounded_model_usage = dict(
+    sorted(usage_by_model.items(), key=lambda x: sum(x[1].values()), reverse=True)[:MAX_MODELS_RECORDED]
+  )
+  bounded_today_tokens = dict(
+    sorted(today_tokens.items(), key=lambda x: x[1], reverse=True)[:MAX_MODELS_RECORDED]
+  )
+  bounded_active_dates = sorted([d for d in active_days if d >= min_cutoff_date])
+
+  return {
+    "todayPrompts": today_prompt_count,
+    "todaySessions": len(today_sessions),
+    "todayTotalTokens": today_token_total,
+    "todayTokensByModel": bounded_today_tokens,
+    "recentDays": [recent[day] for day in recent_dates],
+    "modelUsage": bounded_model_usage,
+    "totalPrompts": prompts,
+    "totalSessions": len(sessions),
+    "activeDays": len(bounded_active_dates),
+    "activeDates": bounded_active_dates,
+  }
+
+
+# ------------------------------------------------------------- opencode scan
+
+
+def scan_opencode_sessions() -> dict[str, Any] | None:
+  db = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
+  if not db.is_file():
+    return None
+
+  today = local_date_string()
+  min_cutoff_date = cutoff_date_string()
+  cutoff_ms = (time.time() - HISTORY_CUTOFF_DAYS * 86400) * 1000
+  recent_dates = recent_date_strings()
+  recent = {day: {"date": day, "messageCount": 0} for day in recent_dates}
+  sessions: set[str] = set()
+  active_days: set[str] = set()
+  today_sessions: set[str] = set()
+  today_tokens: dict[str, int] = {}
+  usage_by_model: dict[str, dict[str, int]] = {}
+  prompts = 0
+  today_prompt_count = 0
+  today_token_total = 0
+
+  try:
+    conn = sqlite3.connect(db.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
+    conn.execute("PRAGMA query_only = ON")
+    for session_id, raw in conn.execute(
+      "SELECT session_id, data FROM message"
+      " WHERE (data LIKE '%\"providerID\"%:%\"google\"%' OR data LIKE '%\"providerID\"%:%\"gemini\"%')"
+      " AND data LIKE '%\"role\"%:%\"assistant\"%'"
+      " ORDER BY id DESC LIMIT 500"
+    ):
+      try:
+        entry = json.loads(raw)
+        if not isinstance(entry, dict) or entry.get("role") != "assistant":
+          continue
+        provider_id = str(entry.get("providerID") or "")
+        if provider_id not in ("google", "gemini"):
+          continue
+
+        created = number((entry.get("time") or {}).get("created"))
+        if created > 0 and created < cutoff_ms:
+          continue
+
+        tokens = entry.get("tokens") or {}
+        cache = tokens.get("cache") or {}
+        input_tokens = number(tokens.get("input"))
+        output_tokens = number(tokens.get("output")) + number(tokens.get("reasoning"))
+        cache_read = number(cache.get("read"))
+        cache_write = number(cache.get("write"))
+        total = input_tokens + output_tokens + cache_read + cache_write
+        if total <= 0:
+          continue
+
+        day = dt.datetime.fromtimestamp(created / 1000).strftime("%Y-%m-%d") if created > 0 else today
+        if day < min_cutoff_date:
+          continue
+
+        raw_model = str(entry.get("modelID") or "gemini-2.5-flash").rstrip("/").split("/")[-1]
+        model = raw_model if raw_model else "gemini-2.5-flash"
+      except Exception:
+        continue
+
+      session_key = "opencode:" + str(session_id)
+      if len(sessions) < MAX_SESSIONS_RECORDED:
+        sessions.add(session_key)
+      active_days.add(day)
+      prompts += 1
+
+      bucket = usage_by_model.setdefault(model, empty_bucket())
+      bucket["inputTokens"] += input_tokens
+      bucket["outputTokens"] += output_tokens
+      bucket["cacheReadInputTokens"] += cache_read
+      bucket["cacheCreationInputTokens"] += cache_write
+
+      if day in recent:
+        recent[day]["messageCount"] += total
+      if day == today:
+        today_prompt_count += 1
+        if len(today_sessions) < MAX_SESSIONS_RECORDED:
+          today_sessions.add(session_key)
+        today_token_total += total
+        today_tokens[model] = today_tokens.get(model, 0) + total
+    conn.close()
+  except Exception:
+    return None
+
+  if prompts == 0:
+    return None
+
+  bounded_model_usage = dict(
+    sorted(usage_by_model.items(), key=lambda x: sum(x[1].values()), reverse=True)[:MAX_MODELS_RECORDED]
+  )
+  bounded_today_tokens = dict(
+    sorted(today_tokens.items(), key=lambda x: x[1], reverse=True)[:MAX_MODELS_RECORDED]
+  )
+  bounded_active_dates = sorted([d for d in active_days if d >= min_cutoff_date])
+
+  return {
+    "todayPrompts": today_prompt_count,
+    "todaySessions": len(today_sessions),
+    "todayTotalTokens": today_token_total,
+    "todayTokensByModel": bounded_today_tokens,
+    "recentDays": [recent[day] for day in recent_dates],
+    "modelUsage": bounded_model_usage,
+    "totalPrompts": prompts,
+    "totalSessions": len(sessions),
+    "activeDays": len(bounded_active_dates),
+    "activeDates": bounded_active_dates,
+  }
+
+
+# ------------------------------------------------------------- pi and omp scan
+
+
+def scan_pi_usage() -> dict[str, Any] | None:
+  roots = [
+    Path.home() / ".pi" / "agent" / "sessions",
+    Path.home() / ".omp" / "agent" / "sessions",
+  ]
+  today = local_date_string()
+  min_cutoff_date = cutoff_date_string()
+  cutoff_time = time.time() - HISTORY_CUTOFF_DAYS * 86400
+  recent_dates = recent_date_strings()
+  recent = {day: {"date": day, "messageCount": 0} for day in recent_dates}
+  sessions: set[str] = set()
+  active_days: set[str] = set()
+  today_sessions: set[str] = set()
+  today_tokens: dict[str, int] = {}
+  usage_by_model: dict[str, dict[str, int]] = {}
+  seen: set[str] = set()
+  prompts = 0
+  today_prompt_count = 0
+  today_token_total = 0
+
+  for root in roots:
+    if not root.is_dir():
+      continue
+    selected_files = find_recent_files(root, "*.jsonl", cutoff_time, MAX_TRANSCRIPT_FILES, MAX_DIRS_TO_SCAN)
+
+    for path in selected_files:
+      try:
+        opened = open_regular(path, max_bytes=MAX_FILE_SIZE_BYTES)
+        if opened is None:
+          continue
+        handle, _ = opened
+        with handle:
+          for line_number, line in enumerate(iter_bounded_lines(handle), 1):
+            if '"usage"' not in line or '"assistant"' not in line:
+              continue
+            try:
+              entry = json.loads(line)
+              message = entry.get("message") if isinstance(entry.get("message"), dict) else {}
+              if entry.get("type") != "message" or message.get("role") != "assistant":
+                continue
+              provider = str(message.get("provider") or "")
+              if provider not in ("google", "gemini"):
+                continue
+              unique_key = f"{path}:{entry.get('id') or line_number}"
+              if unique_key in seen:
+                continue
+              if len(seen) < MAX_SESSIONS_RECORDED * 2:
+                seen.add(unique_key)
+              usage = message.get("usage") or {}
+              input_tokens = number(usage.get("input") or usage.get("inputTokens"))
+              output_tokens = number(usage.get("output") or usage.get("outputTokens"))
+              cache_read = number(usage.get("cacheRead") or usage.get("cache_read_input_tokens"))
+              cache_write = number(usage.get("cacheWrite") or usage.get("cache_creation_input_tokens"))
+              total = input_tokens + output_tokens + cache_read + cache_write
+              if total <= 0:
+                total = number(usage.get("totalTokens"))
+                input_tokens = total
+              if total <= 0:
+                continue
+              model = str(message.get("model") or "gemini-2.5-flash")
+              day = local_date_from_timestamp(entry.get("timestamp") or message.get("timestamp"))
+              if day < min_cutoff_date:
+                continue
+            except Exception:
+              continue
+
+            session_key = str(path)
+            if len(sessions) < MAX_SESSIONS_RECORDED:
+              sessions.add(session_key)
+            active_days.add(day)
+            prompts += 1
+            bucket = usage_by_model.setdefault(model, empty_bucket())
+            bucket["inputTokens"] += input_tokens
+            bucket["outputTokens"] += output_tokens
+            bucket["cacheReadInputTokens"] += cache_read
+            bucket["cacheCreationInputTokens"] += cache_write
+            if day in recent:
+              recent[day]["messageCount"] += total
+            if day == today:
+              today_prompt_count += 1
+              if len(today_sessions) < MAX_SESSIONS_RECORDED:
+                today_sessions.add(session_key)
+              today_token_total += total
+              today_tokens[model] = today_tokens.get(model, 0) + total
+      except OSError:
+        continue
+
+  if prompts == 0:
+    return None
+
+  bounded_model_usage = dict(
+    sorted(usage_by_model.items(), key=lambda x: sum(x[1].values()), reverse=True)[:MAX_MODELS_RECORDED]
+  )
+  bounded_today_tokens = dict(
+    sorted(today_tokens.items(), key=lambda x: x[1], reverse=True)[:MAX_MODELS_RECORDED]
+  )
+  bounded_active_dates = sorted([d for d in active_days if d >= min_cutoff_date])
+
+  return {
+    "todayPrompts": today_prompt_count,
+    "todaySessions": len(today_sessions),
+    "todayTotalTokens": today_token_total,
+    "todayTokensByModel": bounded_today_tokens,
+    "recentDays": [recent[day] for day in recent_dates],
+    "modelUsage": bounded_model_usage,
+    "totalPrompts": prompts,
+    "totalSessions": len(sessions),
+    "activeDays": len(bounded_active_dates),
+    "activeDates": bounded_active_dates,
+  }
+
+
+def merge_stats(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
+  merged = dict(base)
+  for key in ("todayPrompts", "todaySessions", "todayTotalTokens", "totalPrompts", "totalSessions"):
+    merged[key] = number(base.get(key)) + number(extra.get(key))
+
+  combined = dict(base.get("todayTokensByModel") or {})
+  for model, count in (extra.get("todayTokensByModel") or {}).items():
+    combined[model] = number(combined.get(model)) + number(count)
+  merged["todayTokensByModel"] = dict(
+    sorted(combined.items(), key=lambda x: x[1], reverse=True)[:MAX_MODELS_RECORDED]
+  )
+
+  usage = {model: dict(bucket) for model, bucket in (base.get("modelUsage") or {}).items()}
+  for model, bucket in (extra.get("modelUsage") or {}).items():
+    target = usage.setdefault(model, empty_bucket())
+    for field, count in (bucket or {}).items():
+      target[field] = number(target.get(field)) + number(count)
+  merged["modelUsage"] = dict(
+    sorted(usage.items(), key=lambda x: sum(x[1].values()), reverse=True)[:MAX_MODELS_RECORDED]
+  )
+
+  recent_dates = recent_date_strings()
+  by_date: dict[str, int] = {d: 0 for d in recent_dates}
+  for source in (base.get("recentDays") or [], extra.get("recentDays") or []):
+    for day in source:
+      date = str((day or {}).get("date") or "")
+      if date in by_date:
+        by_date[date] += number((day or {}).get("messageCount"))
+  merged["recentDays"] = [{"date": date, "messageCount": by_date[date]} for date in recent_dates]
+
+  dates = set(base.get("activeDates") or []) | set(extra.get("activeDates") or [])
+  bounded_dates = sorted([d for d in dates if d >= cutoff_date_string()])
+  merged["activeDates"] = bounded_dates
+  merged["activeDays"] = max(len(bounded_dates), min(number(base.get("activeDays")), HISTORY_CUTOFF_DAYS))
+  return merged
+
+
+def collect_local_stats() -> dict[str, Any]:
+  stats = scan_antigravity_transcripts()
+  gemini_cli_stats = scan_gemini_cli_sessions()
+  if gemini_cli_stats:
+    stats = merge_stats(stats, gemini_cli_stats)
+  opencode_stats = scan_opencode_sessions()
+  if opencode_stats:
+    stats = merge_stats(stats, opencode_stats)
+  pi_stats = scan_pi_usage()
+  if pi_stats:
+    stats = merge_stats(stats, pi_stats)
+  return stats
+
+
+def cached_scan(max_age_seconds: float) -> dict[str, Any]:
+  cache_file, lock_file = scan_cache_paths()
+  cached = read_fresh_json(cache_file, max_age_seconds)
+  if cached is not None:
+    return cached
+
+  with lock_file.open("w") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    cached = read_fresh_json(cache_file, max_age_seconds)
+    if cached is not None:
+      return cached
+    summary = collect_local_stats()
+    write_json(cache_file, summary)
+    return summary
+
+
+def usage_record_path() -> Path:
+  state = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+  return state / "omarchy" / "agents" / "usage" / f"{AGENT_ID}.json"
+
+
+def main() -> None:
+  parser = argparse.ArgumentParser(description="Print the Gemini / Antigravity usage record as JSON")
+  parser.add_argument("--force", action="store_true", help="Force refresh and scan")
+  parser.add_argument("--limits-only", action="store_true", help="Limits-only mode (reuse cache)")
+  parser.add_argument(
+    "--write",
+    action="store_true",
+    help="Also write the record into the Omarchy agents usage directory",
+  )
+  args = parser.parse_args()
+
+  max_age = 0 if args.force else (LIMITS_ONLY_REUSE_SECONDS if args.limits_only else SCAN_REUSE_SECONDS)
+  try:
+    stats = cached_scan(max_age)
+  except Exception as exc:
+    print(f"omarchy-agent-usage-gemini: direct scan due to {exc}", file=sys.stderr)
+    stats = collect_local_stats()
+
+  _, tier_label = detect_account_info()
+  limits = probe_agy_limits(force=args.force, limits_only=args.limits_only)
+
+  record: dict[str, Any] = {
+    "schemaVersion": 1,
+    "id": AGENT_ID,
+    "name": AGENT_NAME,
+    "updatedAt": dt.datetime.now(dt.timezone.utc).isoformat(),
+    "ready": True,
+    "hasLocalStats": True,
+    "hasPromptStats": True,
+    "tierLabel": tier_label,
+    "usageStatusText": "",
+    "authHelpText": AUTH_HELP,
+    "limits": limits,
+  }
+  record.update(stats)
+
+  # The panel draws whatever records appear in the usage directory, whoever
+  # wrote them, so --write is what lets the plugin's own service keep the tab
+  # alive without a collector installed into $OMARCHY_PATH/bin. The write is a
+  # create-and-rename, the same as omarchy-agent-usage-update's, so the two
+  # can refresh the same record without either one ever being read half-written.
+  if args.write:
+    destination = usage_record_path()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    write_json(destination, record)
+
+  print(json.dumps(record, separators=(",", ":")))
+
+
+if __name__ == "__main__":
+  main()

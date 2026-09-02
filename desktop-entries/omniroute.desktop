@@ -1,0 +1,16 @@
+[Desktop Entry]
+Name=OmniRoute
+GenericName=AI Gateway & Router
+Comment=Unified AI router with 352+ providers, RTK+Caveman compression, auto fallback, MCP/A2A, and OpenAI-compatible APIs
+Exec=/home/soham/.local/bin/omniroute-desktop %U
+Icon=omniroute
+Terminal=false
+Type=Application
+StartupWMClass=OmniRoute
+Categories=Development;Utility;Network;
+Keywords=ai;llm;router;gateway;claude;gpt;gemini;omniroute;
+Actions=Dashboard;
+
+[Desktop Action Dashboard]
+Name=Open Web Dashboard
+Exec=xdg-open http://localhost:20128

@@ -1,0 +1,24 @@
+[Desktop Entry]
+Version=1.0
+Name=Zen Browser
+GenericName=Web Browser
+Comment=Experience tranquillity while browsing the web
+Keywords=internet;browser;web;zen
+Exec=/home/soham/.local/share/zen/zen %u
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Icon=/home/soham/.local/share/icons/hicolor/128x128/apps/zen.png
+Categories=Network;WebBrowser;
+MimeType=text/html;text/xml;application/xhtml+xml;application/xml;application/rss+xml;application/rdf+xml;image/gif;image/jpeg;image/png;x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/zen;
+StartupNotify=true
+StartupWMClass=zen-alpha
+Actions=new-window;new-private-window;
+
+[Desktop Action new-window]
+Name=New Window
+Exec=/home/soham/.local/share/zen/zen --new-window %u
+
+[Desktop Action new-private-window]
+Name=New Private Window
+Exec=/home/soham/.local/share/zen/zen --private-window %u

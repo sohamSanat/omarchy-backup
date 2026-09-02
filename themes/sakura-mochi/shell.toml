@@ -1,0 +1,196 @@
+#  .-^~^-. \/ .-^~^-. \\ `-._.-` // .-^~^-. \/ .-^~^-.
+# |                                                   |
+# |   ,---.          ,--.                             |
+# |  '   .-'  ,--,--.|  |,-.,--.,--.,--.--. ,--,--.   |
+# |  `.  `-. ' ,-.  ||     /|  ||  ||  .--'' ,-.  |   |
+# |  .-'    |\ '-'  ||  \  \'  ''  '|  |   \ '-'  |   |
+# |  `-----'  `--`--'`--'`--'`----' `--'    `--`--'   |
+# |                 . .         . .                   |
+# |               .-^~^-.     .-^~^-.                 |
+# |               `-._.-'     `-._.-'                 |
+# |                  |           |                    |
+# |     ,--.   ,--.             ,--.     ,--.         |
+# |     |   `.'   | ,---.  ,---.|  ,---. `--'         |
+# |     |  |'.'|  || .-. || .--'|  .-.  |,--.         |
+# |     |  |   |  |' '-' '\ `--.|  | |  ||  |         |
+# |     `--'   `--' `---'  `---'`--' `--'`--'         |
+# |                                                   |
+#  .-^~^-. \/ .-^~^-. \\ `-._.-` // .-^~^-. \/ .-^~^-.
+
+# Sakura Mochi — dark lacquer glass with sakura bloom and leaf-green structure.
+# Pink leads focus and selection; green supports framing, depth, and quiet states.
+
+[bar]
+background       = "#0b0d11"
+background-alpha = 0.80
+text             = "#f0b7ca"
+active           = "#f23888"
+scale-with-font  = true
+size-horizontal  = 30
+size-vertical    = 32
+
+[hyprland]
+active-border            = "rgba(f23888ee) rgba(f0b7cacc) rgba(67dd82aa) 35deg"
+active-border-foreground = "rgb(f23888) rgb(8bf0a1) 35deg"
+
+[controls]
+# Quiet controls carry the leaf tone without outlining every element.
+normal-color        = "#8bb0a4"
+normal-fill-alpha   = 0.05
+normal-border       = "#6f9485"
+normal-border-width = 0
+normal-border-alpha = 0.0
+
+hover-cursor-color        = "#f0b7ca"
+hover-cursor-fill-alpha   = 0.10
+hover-cursor-border       = "#67dd82"
+hover-cursor-border-width = 0
+hover-cursor-border-alpha = 0.0
+
+# Focus catches both blossom light and the green structural edge.
+focus-color        = "#fff1f6"
+focus-fill-alpha   = 0.13
+focus-border       = "hyprland.active-border-foreground"
+focus-border-width = 1
+focus-border-alpha = 0.72
+
+# Persistent selection uses a soft pink fill with one disciplined underline.
+selected-color        = "#fff1f6"
+selected-fill-alpha   = 0.18
+selected-border       = "#f23888"
+selected-border-width = "0 0 1 0"
+selected-border-alpha = 0.82
+
+pressed-fill-alpha   = 0.24
+selection-fill-alpha = 0.34
+
+[spacing]
+# Slightly plush, but still compact enough for a daily-driver shell.
+scale = 1.08
+scale-with-font = true
+control-gap       = 9
+control-padding-x = 12
+control-padding-y = 7
+input-padding-y   = 8
+control-height    = 31
+popup-row-height  = 32
+row-gap           = 9
+row-padding-x     = 14
+label-gap         = 5
+panel-gap         = 16
+panel-padding     = 20
+popup-padding     = 17
+
+[font]
+base-size     = 12
+caption       = 10
+body-small    = 11
+body          = 12
+subtitle      = 13
+title         = 15
+heading       = 18
+display       = 26
+display-large = 31
+icon-small    = 11
+icon          = 14
+icon-large    = 19
+
+[popups]
+background       = "#0b0d11"
+background-alpha = 0.90
+text             = "#f0b7ca"
+border           = "hyprland.active-border"
+border-alpha     = 0.72
+border-width     = 2
+
+[tooltip]
+background       = "#0b0d11"
+background-alpha = 0.96
+text             = "#fff1f6"
+border           = "#6f9485"
+border-alpha     = 0.68
+
+[notifications]
+background       = "#0b0d11"
+background-alpha = 0.92
+text             = "#f0b7ca"
+border           = "hyprland.active-border"
+border-alpha     = 0.78
+border-width     = 2
+countdown        = "#67dd82"
+
+[launcher]
+background                = "#0b0d11"
+background-alpha          = 0.91
+text                      = "#8bb0a4"
+border                    = "hyprland.active-border"
+border-alpha              = 0.78
+border-width              = 2
+scrim                     = "#060709"
+scrim-alpha               = 0.60
+selected-background       = "#f23888"
+selected-background-alpha = 0.14
+selected-text             = "#fff1f6"
+selected-border           = "hyprland.active-border-foreground"
+selected-border-alpha     = 0.78
+selected-border-width     = 1
+
+[menu]
+background                = "#0b0d11"
+background-alpha          = 0.93
+text                      = "#8bb0a4"
+border                    = "hyprland.active-border"
+border-alpha              = 0.76
+border-width              = 2
+scrim                     = "#060709"
+scrim-alpha               = 0.56
+selected-background       = "#f23888"
+selected-background-alpha = 0.13
+selected-text             = "#fff1f6"
+selected-border           = "hyprland.active-border-foreground"
+selected-border-alpha     = 0.74
+selected-border-width     = 1
+
+[polkit]
+background       = "#0b0d11"
+background-alpha = 0.96
+text             = "#f0b7ca"
+text-error       = "#ff6aa7"
+border           = "hyprland.active-border"
+border-error     = "#ff6aa7"
+border-alpha     = 0.88
+scrim            = "#060709"
+scrim-alpha      = 0.66
+accent           = "#f23888"
+
+[lock]
+background       = "#0b0d11"
+background-alpha = 0.84
+text             = "#fff1f6"
+placeholder      = "#8bb0a4"
+text-error       = "#ff6aa7"
+border           = "#6f9485"
+border-active    = "hyprland.active-border"
+border-error     = "#ff6aa7"
+border-alpha     = 0.88
+selection        = "#f23888"
+selection-alpha  = 0.40
+
+[image-picker]
+scrim                   = "#060709"
+scrim-alpha             = 0.66
+text                    = "#fff1f6"
+selected-border         = "hyprland.active-border"
+selected-border-alpha   = 1.0
+unselected-border       = "#6f9485"
+unselected-border-alpha = 0.42
+
+#   ____  __   __
+#  / __ \/ /__/ /
+# / /_/ / / _  / 
+# \____/_/\_,_/  
+#      __     __        __      
+#  __ / /__  / /  ___  / /  ___ 
+# / // / _ \/ _ \/ _ \/ _ \/ _ \
+# \___/\___/_.__/\___/_.__/\___/
+#                               

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+if ! omarchy-sensei refresh; then
+  logger -t omarchy-sensei "Catalog refresh skipped after Omarchy update"
+fi

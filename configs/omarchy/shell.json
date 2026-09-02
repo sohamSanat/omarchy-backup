@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "idle": {
+    "screensaver": 150,
+    "lock": 300
+  },
+  "bar": {
+    "position": "top",
+    "transparent": false,
+    "centerAnchor": "",
+    "layout": {
+      "left": [
+        {
+          "id": "omarchy.workspaces"
+        },
+        {
+          "id": "omarchy.agents"
+        },
+        {
+          "id": "krall.switchboard"
+        }
+      ],
+      "center": [
+        {
+          "id": "omarchy.clock",
+          "format": "dddd HH:mm",
+          "formatAlt": "d MMMM 'W'ww yyyy",
+          "verticalFormat": "HH\n—\nmm"
+        },
+        {
+          "id": "omarchy.keyboard-layout"
+        },
+        {
+          "id": "mryll.meteobar"
+        },
+        {
+          "id": "io.github.diegopluna.argus"
+        },
+        {
+          "id": "omarchy.system-update"
+        }
+      ],
+      "right": [
+        {
+          "id": "omarchy.tray"
+        },
+        {
+          "id": "io.github.ricky.whatsapp"
+        },
+        {
+          "id": "omamail"
+        },
+        {
+          "id": "io.github.nilszeilon.omarchy-sensei"
+        },
+        {
+          "id": "io.github.elevate08.qs-bitwarden-cli",
+          "clearClipboardSec": 60,
+          "fingerprintUnlock": true
+        },
+        {
+          "id": "jkoestinger.vpn"
+        },
+        {
+          "id": "io.github.r-witz.nothing-ear"
+        },
+        {
+          "id": "omaconnect"
+        },
+        {
+          "id": "omarchy.bluetooth"
+        },
+        {
+          "id": "omarchy.network"
+        },
+        {
+          "id": "omarchy.audio"
+        },
+        {
+          "id": "omarchy.monitor"
+        },
+        {
+          "id": "soham.power"
+        }
+      ]
+    },
+    "id": "charlieras262.floating-bar"
+  },
+  "plugins": [
+    {
+      "id": "io.github.calebhat.themebook"
+    },
+    {
+      "id": "chispes.agent-gemini"
+    }
+  ],
+  "disabledPlugins": [
+    "omarchy.menu"
+  ],
+  "cloneSourceRestores": [
+    "krall.switchboard"
+  ]
+}

@@ -1,0 +1,27 @@
+#!/bin/bash
+# Sync Omarchy theme to KDE and Qt applications (KDE Connect, Kirigami, etc.)
+
+CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+KDEGLOBALS_SRC="$CURRENT_THEME_DIR/kdeglobals"
+KDEGLOBALS_DEST="$HOME/.config/kdeglobals"
+COLOR_SCHEME_DIR="$HOME/.local/share/color-schemes"
+
+# If kdeglobals template hasn't rendered yet into current theme, generate it
+if [[ ! -f "$KDEGLOBALS_SRC" && -f "$HOME/.config/omarchy/themed/kdeglobals.tpl" ]]; then
+  omarchy-theme-set-templates 2>/dev/null || true
+fi
+
+if [[ -f "$KDEGLOBALS_SRC" ]]; then
+  # Update ~/.config/kdeglobals
+  mkdir -p "$(dirname "$KDEGLOBALS_DEST")"
+  cp "$KDEGLOBALS_SRC" "$KDEGLOBALS_DEST"
+
+  # Also install to KDE color-schemes directory
+  mkdir -p "$COLOR_SCHEME_DIR"
+  cp "$KDEGLOBALS_SRC" "$COLOR_SCHEME_DIR/Omarchy.colors"
+
+  # Notify KDE/Qt/Kirigami applications over DBus of setting change (KGlobalSettings palette change)
+  if [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+    dbus-send --type=signal /KGlobalSettings org.kde.KGlobalSettings.notifyChange int32:0 int32:0 2>/dev/null || true
+  fi
+fi

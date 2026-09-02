@@ -1,0 +1,50 @@
+{
+  // Extend the Quickshell Omarchy menu with JSONC.
+  //
+  // IDs are object keys. The parent is inferred from the dotted id, so
+  // "personal.notes" appears under "personal", and "personal" appears on the
+  // root menu. Reuse an existing id to override/extend it.
+
+  // Remove Gemini from the default agent section
+  "setup.default.agent.gemini": {
+    "when": "false"
+  },
+
+  // Add Antigravity AI Agent
+  "setup.default.agent.antigravity": {
+    "icon": "󱚣",
+    "label": "Antigravity",
+    "checked": "[[ \"$(omarchy-default-agent)\" == \"antigravity\" ]]",
+    "action": "omarchy-default-agent antigravity"
+  },
+
+
+,
+
+  // BEGIN OMARCHY SENSEI (managed by omarchy-sensei setup)
+  "learn.herdr-keybindings": {"parent":"learn","label":"Herdr","action":"omarchy-sensei run --action 'herdr-keybindings' --title 'Herdr keybindings' --shortcut 'SUPER CTRL + K' -- 'omarchy-menu-herdr-keybindings'","icon":""},
+  "learn.keybindings": {"parent":"learn","label":"Keybindings","action":"omarchy-sensei run --action 'keybindings' --title 'Keybindings' --shortcut 'SUPER + K' -- 'omarchy-menu-keybindings'","icon":""},
+  "learn.tmux-keybindings": {"parent":"learn","label":"Tmux","action":"omarchy-sensei run --action 'tmux-keybindings' --title 'Tmux keybindings' --shortcut 'SUPER ALT + K' -- 'omarchy-menu-tmux-keybindings'","icon":""},
+  "style.background": {"parent":"style","label":"Background","action":"omarchy-sensei run --action 'background-switcher' --title 'Background switcher' --shortcut 'SUPER CTRL + SPACE' -- 'background=$(omarchy-theme-bg-switcher); [[ -n $background ]] && omarchy-theme-bg-set \"$background\"'","icon":"","aliases":["background","wallpaper"]},
+  "system.lock": {"parent":"system","label":"Lock","action":"omarchy-sensei run --action 'lock-system' --title 'Lock system' --shortcut 'SUPER CTRL + L' -- 'omarchy-system-lock'","icon":""},
+  "trigger.capture.color": {"parent":"trigger.capture","label":"Color","action":"omarchy-sensei run --action 'color-picker' --title 'Color picker' --shortcut 'SUPER + PRINT' -- 'pkill hyprpicker || hyprpicker -a'","icon":"󰃉"},
+  "trigger.capture.screenshot": {"parent":"trigger.capture","label":"Screenshot","action":"omarchy-sensei run --action 'screenshot' --title 'Screenshot' --shortcut 'PRINT' -- 'omarchy-capture-screenshot'","icon":""},
+  "trigger.capture.text": {"parent":"trigger.capture","label":"Text","action":"omarchy-sensei run --action 'extract-text-ocr-from-screenshot' --title 'Extract text (OCR) from screenshot' --shortcut 'SUPER CTRL + PRINT' -- 'omarchy-capture-text'","icon":"󰴑"},
+  "trigger.emoji": {"parent":"trigger","label":"Emoji","action":"omarchy-sensei run --action 'emojis' --title 'Emojis' --shortcut 'SUPER CTRL + E' -- 'omarchy-menu-emoji'","icon":"","aliases":["emoji","emojis"]},
+  "trigger.hardware.laptop-display": {"parent":"trigger.hardware","label":"Laptop Display","action":"omarchy-sensei run --action 'toggle-laptop-display' --title 'Toggle laptop display' --shortcut 'SUPER CTRL + Delete' -- 'omarchy-hyprland-monitor-internal toggle'","icon":"󰛧","when":"omarchy-hw-laptop"},
+  "trigger.hardware.mirror-display": {"parent":"trigger.hardware","label":"Mirror Display","action":"omarchy-sensei run --action 'toggle-laptop-display-mirroring' --title 'Toggle laptop display mirroring' --shortcut 'SUPER CTRL ALT + Delete' -- 'omarchy-hyprland-monitor-internal-mirror toggle'","icon":"󰍹","when":"omarchy-hw-laptop"},
+  "trigger.hardware.touchpad": {"parent":"trigger.hardware","label":"Touchpad","action":"omarchy-sensei run --action 'toggle-touchpad' --title 'Toggle touchpad' --shortcut 'XF86TouchpadToggle' -- 'omarchy-toggle-touchpad'","icon":"󰟸","when":"omarchy-hw-touchpad"},
+  "trigger.reminder.clear": {"parent":"trigger.reminder","label":"Clear all","action":"omarchy-sensei run --action 'clear-reminders' --title 'Clear reminders' --shortcut 'SUPER SHIFT CTRL + R' -- 'omarchy-reminder clear'","icon":"󰢌"},
+  "trigger.reminder.set": {"parent":"trigger.reminder","label":"Set one","action":"omarchy-sensei run --action 'set-reminder' --title 'Set reminder' --shortcut 'SUPER CTRL + R' -- 'omarchy-reminder -i'","icon":"󰢌","aliases":["reminder-set","remind"]},
+  "trigger.reminder.show": {"parent":"trigger.reminder","label":"Show all","action":"omarchy-sensei run --action 'show-reminders' --title 'Show reminders' --shortcut 'SUPER CTRL ALT + R' -- 'omarchy-reminder show'","icon":"󰢌"},
+  "trigger.toggle.idle-lock": {"parent":"trigger.toggle","label":"Stay Awake","action":"omarchy-sensei run --action 'toggle-locking-on-idle' --title 'Toggle locking on idle' --shortcut 'SUPER CTRL + I' -- 'omarchy-toggle-idle'","icon":"󰅶"},
+  "trigger.toggle.nightlight": {"parent":"trigger.toggle","label":"Nightlight","action":"omarchy-sensei run --action 'toggle-nightlight' --title 'Toggle nightlight' --shortcut 'SUPER CTRL + N' -- 'omarchy-toggle-nightlight'","icon":"󰔎"},
+  "trigger.toggle.notifications": {"parent":"trigger.toggle","label":"Notifications","action":"omarchy-sensei run --action 'toggle-silencing-notifications' --title 'Toggle silencing notifications' --shortcut 'SUPER CTRL + COMMA' -- 'omarchy-toggle-notification-silencing'","icon":"󰂛"},
+  "trigger.toggle.one-window-ratio": {"parent":"trigger.toggle","label":"1-Window Ratio","action":"omarchy-sensei run --action 'toggle-single-window-square-aspect' --title 'Toggle single-window square aspect' --shortcut 'SUPER CTRL + BACKSPACE' -- 'omarchy-hyprland-window-single-square-aspect-toggle'","icon":""},
+  "trigger.toggle.top-bar": {"parent":"trigger.toggle","label":"Menu Bar","action":"omarchy-sensei run --action 'toggle-top-bar' --title 'Toggle top bar' --shortcut 'SUPER SHIFT + SPACE' -- 'omarchy-toggle-bar'","icon":"󰍜"},
+  "trigger.toggle.window-gaps": {"parent":"trigger.toggle","label":"Window Gaps","action":"omarchy-sensei run --action 'toggle-window-gaps' --title 'Toggle window gaps' --shortcut 'SUPER SHIFT + BACKSPACE' -- 'omarchy-hyprland-window-gaps-toggle'","icon":""},
+  "trigger.toggle.workspace-layout": {"parent":"trigger.toggle","label":"Workspace Layout","action":"omarchy-sensei run --action 'toggle-workspace-layout' --title 'Toggle workspace layout' --shortcut 'SUPER + L' -- 'omarchy-hyprland-workspace-layout-toggle'","icon":"󱂬"},
+  "trigger.transcode": {"parent":"trigger","label":"Transcode","action":"omarchy-sensei run --action 'transcode' --title 'Transcode' --shortcut 'SUPER CTRL + PERIOD' -- 'omarchy-transcode'","icon":"󰧸"},
+  // END OMARCHY SENSEI,
+  "style.theme": {"icon":"󰸌","label":"Theme","aliases":["theme","themes"],"action":"omarchy-shell themebook pick"}
+}

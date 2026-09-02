@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "id": "omamail",
+  "name": "Omamail",
+  "version": "0.6.0",
+  "author": "Jason Lee <huacnlee@gmail.com>",
+  "license": "MIT",
+  "description": "Email client for Omarchy: read, triage, and reply to Gmail, HEY and any IMAP mailbox in a native window. Fastmail, iCloud, Outlook, Zoho, or your own server.",
+  "kinds": [
+    "service",
+    "bar-widget",
+    "panel"
+  ],
+  "activation": "on-demand",
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml",
+    "panel": "App.qml"
+  },
+  "barWidget": {
+    "displayName": "Omamail",
+    "description": "Unread mail count in the bar; the inbox itself opens as its own window. Works with Gmail, HEY and any IMAP mail server.",
+    "category": "Communication",
+    "aliases": [
+      "mail",
+      "email",
+      "gmail",
+      "hey",
+      "imap",
+      "inbox",
+      "e-mail",
+      "mailbox",
+      "smtp"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "refreshIntervalSec": 120,
+      "maxMessages": 25,
+      "heavyMessageRendering": "Show plain text first",
+      "defaultQuery": "in:inbox",
+      "notifyNewMail": "On",
+      "oauthPort": 9481,
+      "undoSendSeconds": 10,
+      "openOnClick": "Window"
+    },
+    "schema": [
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Check for mail every (seconds)",
+        "min": 30,
+        "max": 3600,
+        "step": 30,
+        "defaultValue": 120,
+        "description": "How often the unread count is refreshed while the panel is closed."
+      },
+      {
+        "key": "maxMessages",
+        "type": "integer",
+        "label": "Messages per page",
+        "min": 5,
+        "max": 100,
+        "step": 5,
+        "defaultValue": 25
+      },
+      {
+        "key": "heavyMessageRendering",
+        "type": "enum",
+        "label": "Heavy message rendering",
+        "options": [
+          "Show plain text first",
+          "Always render"
+        ],
+        "defaultValue": "Show plain text first",
+        "description": "Choose whether potentially expensive rich text falls back to plain text with a Show anyway action."
+      },
+      {
+        "key": "defaultQuery",
+        "type": "string",
+        "label": "Default search",
+        "defaultValue": "in:inbox",
+        "description": "Applies to the inbox only, and to Gmail and IMAP accounts. Gmail takes any Gmail search operator, for example `in:inbox -category:promotions`; IMAP takes IMAP SEARCH criteria. HEY accounts always open their Imbox."
+      },
+      {
+        "key": "notifyNewMail",
+        "type": "enum",
+        "label": "Notify on new mail",
+        "options": [
+          "On",
+          "Off"
+        ],
+        "defaultValue": "On",
+        "description": "Sends a desktop notification when a new unread message arrives in the inbox."
+      },
+      {
+        "key": "oauthPort",
+        "type": "integer",
+        "label": "Sign-in callback port",
+        "min": 1024,
+        "max": 65535,
+        "step": 1,
+        "defaultValue": 9481,
+        "description": "Loopback port used once during Google sign-in. HEY and IMAP accounts never use it. Change it only if something else already listens there."
+      },
+      {
+        "key": "undoSendSeconds",
+        "type": "integer",
+        "label": "Undo send window (seconds)",
+        "min": 0,
+        "max": 60,
+        "step": 1,
+        "defaultValue": 10,
+        "description": "Delays outgoing mail so you can cancel it. Set this to 0 to send immediately."
+      },
+      {
+        "key": "openOnClick",
+        "type": "enum",
+        "label": "Clicking the bar icon opens",
+        "options": [
+          "Window",
+          "Quick preview"
+        ],
+        "defaultValue": "Window",
+        "description": "The full window, or a small card with the most recent unread mail."
+      }
+    ]
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.diegopluna.argus",
+  "name": "Argus",
+  "version": "1.2.2",
+  "author": "Diego Peter",
+  "license": "MIT",
+  "description": "CPU, RAM, GPU, disk, network, battery, power, and temperature stats in the bar, with a full system panel: 2m/1h/24h history that survives restarts (the flight recorder), per-metric opt-in alerts with context snapshots, a filterable sortable process table, per-process GPU usage, drive SMART health, an alert hook for automation, and a GAME tab that configures your MangoHud in-game overlay live.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "barWidget": {
+    "displayName": "Argus",
+    "description": "Pick which system stats (CPU, RAM, GPU, disk, network, battery, temperatures) appear in the bar — reorderable, urgent-colored past thresholds. Click for the full panel: Home dashboard, 24h flight-recorder history, opt-in alerts with context snapshots, process table, power draw, and the in-game HUD's control room.",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "show": ["cpu", "ram", "cputemp"],
+      "intervalSec": 2,
+      "diskMount": "/"
+    },
+    "schema": [
+      {
+        "key": "diskMount",
+        "type": "string",
+        "label": "Disk mount for the bar metric",
+        "defaultValue": "/",
+        "description": "Mount point whose usage the bar's disk metric shows."
+      },
+      {
+        "key": "alerts",
+        "type": "enum",
+        "label": "Allow alert notifications",
+        "options": ["On", "Off"],
+        "defaultValue": "On",
+        "description": "Master switch over every alert. Individual alerts are off by default — toggle them on and set their thresholds in the panel's ALERTS tab."
+      },
+      {
+        "key": "alertCommand",
+        "type": "string",
+        "label": "Run command on alert",
+        "defaultValue": "",
+        "description": "Shell command run on every fired alert (in addition to the notification); details arrive in ARGUS_ALERT_KEY/TEXT/CRITICAL/AT environment variables."
+      }
+    ]
+  },
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  }
+}

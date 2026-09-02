@@ -1,0 +1,5 @@
+brave-origin-nightly-bin
+fetch-git
+libfprint-fpc1022
+libfprint-fpc1022-debug
+meteobar-bin

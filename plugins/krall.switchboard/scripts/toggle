@@ -1,0 +1,14 @@
+#!/bin/bash
+# Feature flag: flip between Switchboard and the built-in Omarchy menu.
+# Enabling Switchboard makes the shell route every `omarchy.menu` summon
+# (SUPER+SPACE, the bar button, `omarchy menu toggle ...`) here; disabling it
+# restores the built-in menu. Nothing else changes.
+set -euo pipefail
+id="krall.switchboard"
+if omarchy-plugin-list --json | jq -e --arg id "$id" 'any(.[]; .id == $id and .enabled)' >/dev/null; then
+  omarchy-plugin-disable "$id"
+  omarchy-notification-send -g 󰕰 "Switchboard off" "Back to the built-in Omarchy menu."
+else
+  omarchy-plugin-enable "$id"
+  omarchy-notification-send -g 󰕰 "Switchboard on" "SUPER+SPACE now opens Switchboard."
+fi

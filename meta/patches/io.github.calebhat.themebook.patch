@@ -1,0 +1,357 @@
+diff --git i/Model.js w/Model.js
+index 976acea..37450c0 100644
+--- i/Model.js
++++ w/Model.js
+@@ -4,6 +4,7 @@ function defaultConfig() {
+   return {
+     favorites: [],
+     hidden: [],
++    removed: [],
+     recents: [],
+     folders: [],
+     collapsed: { recents: true },
+@@ -434,6 +435,7 @@ function normalizeConfig(raw) {
+   var cfg = defaultConfig()
+   cfg.favorites = asStringArray(c.favorites)
+   cfg.hidden = asStringArray(c.hidden)
++  cfg.removed = asStringArray(c.removed)
+   cfg.recents = asStringArray(c.recents).slice(0, 8)
+   cfg.folders = normalizeFolders(c.folders)
+   cfg.collapsed = normalizeCollapsed(c.collapsed)
+@@ -860,6 +862,38 @@ function setThemeFolders(config, slug, folderIds) {
+   return cfg
+ }
+ 
++function removeThemeFromConfig(config, slug) {
++  var cfg = normalizeConfig(config)
++  if (!isValidSlug(slug)) return cfg
++  cfg.favorites = cfg.favorites.filter(function(s) { return s !== slug })
++  cfg.hidden = cfg.hidden.filter(function(s) { return s !== slug })
++  cfg.recents = cfg.recents.filter(function(s) { return s !== slug })
++  if (!cfg.removed) cfg.removed = []
++  if (cfg.removed.indexOf(slug) < 0) cfg.removed.push(slug)
++  for (var f = 0; f < cfg.folders.length; f++) {
++    cfg.folders[f].themes = cfg.folders[f].themes.filter(function(s) { return s !== slug })
++  }
++  if (cfg.defaultWallpapers && cfg.defaultWallpapers[slug]) {
++    delete cfg.defaultWallpapers[slug]
++  }
++  if (cfg.picker.lastSlug === slug) cfg.picker.lastSlug = ""
++  if (cfg.schedule) {
++    if (cfg.schedule.day === slug) cfg.schedule.day = ""
++    if (cfg.schedule.night === slug) cfg.schedule.night = ""
++    if (cfg.schedule.sun) {
++      if (cfg.schedule.sun.day === slug) cfg.schedule.sun.day = ""
++      if (cfg.schedule.sun.night === slug) cfg.schedule.sun.night = ""
++    }
++    if (cfg.schedule.rules) {
++      for (var r = 0; r < cfg.schedule.rules.length; r++) {
++        if (cfg.schedule.rules[r].theme === slug) cfg.schedule.rules[r].theme = ""
++      }
++    }
++  }
++  if (cfg.themeCycle && cfg.themeCycle.lastSlug === slug) cfg.themeCycle.lastSlug = ""
++  return cfg
++}
++
+ function replaceFolderThemes(config, folderId, slugs, known) {
+   var cfg = normalizeConfig(config)
+   if (isReservedSection(folderId)) return cfg
+diff --git i/README.md w/README.md
+index 6e731d6..b3219ee 100644
+--- i/README.md
++++ w/README.md
+@@ -29,7 +29,7 @@ No sudo or pkexec is required. No network calls. No extra packages.
+ - **Move to folder** is the first preview action (then Favorite, then Edit in Aether). Hide and Show are separate buttons: Hide when the theme is visible, Show when it is hidden.
+ - **Backgrounds** — click a wallpaper in the strip to preview it in the panel (it does not change the live theme). **Apply theme** uses the wallpaper you are previewing, or the starred **default** if you have not picked one. Star a default for apply and picker/catalog previews, including schedules.
+ - **Hide** themes without uninstalling; **Hidden** filter lists them. **Show** replaces Hide when the theme is already hidden. **Unfavorite** when it is already a favorite.
+-- **Remove** user themes (never stock, never the active theme) with a confirmation dialog.
++- **Remove** any theme with a confirmation dialog (deletes user themes from disk; hides stock themes from the catalog and picker). If the active theme is removed, ThemeBook switches away first.
+ - **Update git themes** via `omarchy theme update` (shown when the selected theme is git-backed).
+ - **Edit in Aether** (optional) opens the Aether GUI with the theme wallpaper loaded for editing. It does not apply the theme through Aether.
+ - **Theme menu** (checkbox, on for new installs) can replace Super+Ctrl+Shift+Space / Style > Theme with ThemeBook’s enhanced stock-style carousel. Toggle off to restore Omarchy’s picker.
+@@ -91,6 +91,7 @@ Catalog (also printed at the bottom of that view):
+ | `Shift+←/→` | Reorder folders |
+ | `N` | New folder |
+ | `Enter` | Apply |
++| `Delete` / `Backspace` / `D` | Remove |
+ | `E` | Edit in Aether |
+ | `R` | Random favorite |
+ | `Esc` | Close |
+diff --git i/Service.qml w/Service.qml
+index c6149ee..1d8728f 100644
+--- i/Service.qml
++++ w/Service.qml
+@@ -237,9 +237,34 @@ Item {
+   function removeTheme(slug) {
+     if (!Model.isValidSlug(slug) || !knownTheme(slug)) return
+     var t = Model.themeBySlug(root.themes, slug)
+-    if (!t || t.source !== "user" || slug === root.currentSlug) return
+-    removeProc.command = ["omarchy", "theme", "remove", slug]
+-    removeProc.running = true
++    if (!t) return
++
++    if (slug === root.currentSlug) {
++      var nextTheme = ""
++      for (var i = 0; i < root.themes.length; i++) {
++        var s = root.themes[i].slug
++        if (s !== slug) {
++          nextTheme = s
++          break
++        }
++      }
++      if (!nextTheme) nextTheme = "catppuccin"
++      applyProc.command = ["omarchy", "theme", "set", nextTheme]
++      applyProc.running = true
++    }
++
++    var nextCfg = Model.removeThemeFromConfig(root.config, slug)
++    saveConfig(nextCfg)
++    root.syncCycles()
++
++    if (t.source === "user") {
++      removeProc.command = ["omarchy", "theme", "remove", slug]
++      removeProc.running = true
++    } else {
++      notificationProc.command = ["omarchy-notification-send", "Theme removed", t.name || slug]
++      notificationProc.running = true
++      root.reloadCatalog()
++    }
+   }
+ 
+   function openPicker() {
+@@ -910,6 +935,12 @@ Item {
+     onExited: root.reloadCatalog()
+   }
+ 
++  Process {
++    id: notificationProc
++    stdout: StdioCollector { waitForEnd: true }
++    stderr: StdioCollector { waitForEnd: true }
++  }
++
+   Process {
+     id: aetherProc
+     stdout: StdioCollector { waitForEnd: true }
+diff --git i/ThemeBook.qml w/ThemeBook.qml
+index 8f14c15..1f29bdb 100644
+--- i/ThemeBook.qml
++++ w/ThemeBook.qml
+@@ -69,6 +69,17 @@ Item {
+     if (!svc || !selectedSlug) return null
+     return Model.themeBySlug(svc.themes, selectedSlug)
+   }
++  onThemesChanged: {
++    if (selectedSlug && !Model.themeBySlug(root.themes, selectedSlug)) {
++      if (svc && svc.currentSlug && Model.themeBySlug(root.themes, svc.currentSlug)) {
++        selectedSlug = svc.currentSlug
++      } else if (root.themes.length > 0) {
++        selectedSlug = root.themes[0].slug
++      } else {
++        selectedSlug = ""
++      }
++    }
++  }
+   readonly property var addThemeChoices: {
+     var draft = root.addDraft || []
+     var inDraft = {}
+@@ -164,6 +175,46 @@ Item {
+     }
+   }
+ 
++  function doRemoveTheme(slug) {
++    if (!svc || !slug) return
++    var targetSlug = slug
++    var nextSelect = ""
++    var list = root.rows || []
++    var themeIdx = -1
++    for (var i = 0; i < list.length; i++) {
++      if (list[i].rowType === "theme" && list[i].slug === targetSlug) {
++        themeIdx = i
++        break
++      }
++    }
++    if (themeIdx >= 0) {
++      for (var j = themeIdx + 1; j < list.length; j++) {
++        if (list[j].rowType === "theme" && list[j].slug !== targetSlug) {
++          nextSelect = list[j].slug
++          break
++        }
++      }
++      if (!nextSelect) {
++        for (var k = themeIdx - 1; k >= 0; k--) {
++          if (list[k].rowType === "theme" && list[k].slug !== targetSlug) {
++            nextSelect = list[k].slug
++            break
++          }
++        }
++      }
++    }
++    if (!nextSelect) {
++      for (var t = 0; t < root.themes.length; t++) {
++        if (root.themes[t].slug !== targetSlug) {
++          nextSelect = root.themes[t].slug
++          break
++        }
++      }
++    }
++    root.selectedSlug = nextSelect
++    svc.removeTheme(targetSlug)
++  }
++
+   function selectedSection() {
+     for (var i = 0; i < rows.length; i++) {
+       if (rows[i].rowType === "theme" && rows[i].slug === selectedSlug) return rows[i].section
+@@ -687,8 +738,9 @@ Item {
+         if (root.confirmRemove) {
+           if (event.key === Qt.Key_Escape) { root.confirmRemove = false; event.accepted = true }
+           else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+-            if (svc && selectedSlug) svc.removeTheme(selectedSlug)
++            var slugToRemove = selectedSlug
+             root.confirmRemove = false
++            if (slugToRemove) root.doRemoveTheme(slugToRemove)
+             event.accepted = true
+           }
+           return
+@@ -788,6 +840,9 @@ Item {
+         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { root.applySelected(); event.accepted = true }
+         else if (event.key === Qt.Key_F) { if (svc && selectedSlug) svc.toggleFavorite(selectedSlug); event.accepted = true }
+         else if (event.key === Qt.Key_H) { if (svc && selectedSlug) svc.toggleHidden(selectedSlug); event.accepted = true }
++        else if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace || event.key === Qt.Key_D) {
++          if (root.selected) { root.confirmRemove = true; event.accepted = true }
++        }
+         else if (event.key === Qt.Key_E) { if (svc && root.selected) svc.openAether(root.selected); event.accepted = true }
+         else if (event.key === Qt.Key_N) {
+           root.promptKind = "folder"
+@@ -1739,7 +1794,7 @@ Item {
+                       if (modelData.id === "hide") return root.config.hidden.indexOf(root.selectedSlug) < 0
+                       if (modelData.id === "show") return root.config.hidden.indexOf(root.selectedSlug) >= 0
+                       if (modelData.id === "update") return !!(root.selected && root.selected.git)
+-                      if (modelData.id === "remove") return !!(root.selected && root.selected.source === "user" && root.selected.slug !== (svc ? svc.currentSlug : ""))
++                      if (modelData.id === "remove") return !!root.selected
+                       if (modelData.id === "random") return !!(root.config.favorites && root.config.favorites.length)
+                       return true
+                     }
+@@ -3090,8 +3145,8 @@ Item {
+         MouseArea { anchors.fill: parent; onClicked: root.confirmRemove = false }
+ 
+         Rectangle {
+-          width: 420
+-          height: 160
++          width: 440
++          height: 175
+           radius: Style.cornerRadius
+           color: root.bg
+           border.color: root.accent
+@@ -3102,12 +3157,24 @@ Item {
+           Column {
+             anchors.centerIn: parent
+             spacing: Style.space(12)
+-            width: 380
++            width: 400
+             Text {
+               textFormat: Text.PlainText
+               width: parent.width
+               wrapMode: Text.WordWrap
+-              text: root.selected ? ("Remove user theme “" + root.selected.name + "”? This deletes that theme from your user themes folder.") : "Remove this user theme from disk?"
++              text: {
++                if (!root.selected) return "Remove this theme?"
++                var isCurrent = root.selected.slug === (svc ? svc.currentSlug : "")
++                if (root.selected.source === "user") {
++                  if (isCurrent)
++                    return "Remove user theme “" + root.selected.name + "”? This is your active theme. Omarchy will switch to a default theme and delete this theme from disk."
++                  return "Remove user theme “" + root.selected.name + "”? This deletes that theme from your user themes folder."
++                } else {
++                  if (isCurrent)
++                    return "Remove stock theme “" + root.selected.name + "”? This is your active theme. Omarchy will switch to another theme and remove this theme from ThemeBook."
++                  return "Remove stock theme “" + root.selected.name + "”? This removes this theme from your ThemeBook catalog and picker."
++                }
++              }
+               color: root.fg
+               font.family: root.fontFamily
+             }
+@@ -3119,7 +3186,11 @@ Item {
+                 radius: Style.cornerRadius
+                 color: Util.alpha(root.fg, 0.08)
+                 Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "Cancel"; color: root.fg; font.family: root.fontFamily }
+-                MouseArea { anchors.fill: parent; onClicked: root.confirmRemove = false }
++                MouseArea {
++                  anchors.fill: parent
++                  cursorShape: Qt.PointingHandCursor
++                  onClicked: root.confirmRemove = false
++                }
+               }
+               Rectangle {
+                 width: 90
+@@ -3129,9 +3200,11 @@ Item {
+                 Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "Remove"; color: root.fg; font.family: root.fontFamily }
+                 MouseArea {
+                   anchors.fill: parent
++                  cursorShape: Qt.PointingHandCursor
+                   onClicked: {
+-                    if (svc && selectedSlug) svc.removeTheme(selectedSlug)
++                    var slugToRemove = selectedSlug
+                     root.confirmRemove = false
++                    if (slugToRemove) root.doRemoveTheme(slugToRemove)
+                   }
+                 }
+               }
+diff --git i/scripts/catalog w/scripts/catalog
+index b4dee12..b5ebb94 100755
+--- i/scripts/catalog
++++ w/scripts/catalog
+@@ -310,6 +310,11 @@ if [[ -d $OMARCHY_THEMES_PATH ]]; then
+         break
+       fi
+     done
++    if [[ $skip == false && -n $DEFAULTS_JSON ]] && command -v jq >/dev/null 2>&1; then
++      if jq -e --arg s "$slug" '(.removed // []) | index($s) != null' <<<"$DEFAULTS_JSON" >/dev/null 2>&1; then
++        skip=true
++      fi
++    fi
+     if [[ $skip == false ]]; then
+       emit_theme "$slug" "$theme_path" "stock"
+     fi
+diff --git i/test/model.test.js w/test/model.test.js
+index cdf60c2..ea64647 100755
+--- i/test/model.test.js
++++ w/test/model.test.js
+@@ -3,7 +3,7 @@ const fs = require("fs")
+ const path = require("path")
+ const src = fs.readFileSync(path.join(__dirname, "..", "Model.js"), "utf8")
+   .replace(/^\.pragma library\s*/, "")
+-eval(src + "\nmodule.exports = { defaultConfig, normalizeConfig, flatten, clockPeriod, bumpHHMM, pruneConfig, toggleInList, moveInList, isValidSlug, isReservedSection, currentPeriod, sanitizeFolderName, isCollapsed, activeRule, themeSlugForBackground, moveFolderIds, parseTimeInput, formatTimeDisplay, formatHourMinute, hourIsPm, applyMeridiem, parseClockTime, pickerSections, fuzzyMatch, minutesOf, moveIdBefore, wallpaperCyclePaths, nextWallpaper, cycleFolderChoices, isReorderableSection, themeWallpaperPaths, cycleIntervalMs, cycleSlugs, syncThemeCycleState, activeWallpaperSpec, isScheduleActive, clearSchedule, scheduleActiveLabel, defaultWallpaper, applyDefaultPreviews, boundCatalog, foldersForSlug, addSlugToFolder, dropSlugFromFolder, replaceFolderThemes, setThemeFolders }")
++eval(src + "\nmodule.exports = { defaultConfig, normalizeConfig, flatten, clockPeriod, bumpHHMM, pruneConfig, toggleInList, moveInList, isValidSlug, isReservedSection, currentPeriod, sanitizeFolderName, isCollapsed, activeRule, themeSlugForBackground, moveFolderIds, parseTimeInput, formatTimeDisplay, formatHourMinute, hourIsPm, applyMeridiem, parseClockTime, pickerSections, fuzzyMatch, minutesOf, moveIdBefore, wallpaperCyclePaths, nextWallpaper, cycleFolderChoices, isReorderableSection, themeWallpaperPaths, cycleIntervalMs, cycleSlugs, syncThemeCycleState, activeWallpaperSpec, isScheduleActive, clearSchedule, scheduleActiveLabel, defaultWallpaper, applyDefaultPreviews, boundCatalog, foldersForSlug, addSlugToFolder, dropSlugFromFolder, replaceFolderThemes, setThemeFolders, removeThemeFromConfig }")
+ 
+ const m = module.exports
+ const cfg = m.normalizeConfig({
+@@ -249,4 +249,29 @@ if (!freshPick.picker.includeStock || !freshPick.picker.includeUser) throw new E
+ const keptOff = m.normalizeConfig({ picker: { includeStock: false, includeUser: false, defaultFolder: "favorites" } })
+ if (keptOff.picker.includeStock || keptOff.picker.includeUser) throw new Error("keep picker includes off")
+ if (keptOff.picker.defaultFolder !== "favorites") throw new Error("keep picker folder")
++
++const removeSample = m.normalizeConfig({
++  favorites: ["nord", "catppuccin"],
++  recents: ["nord"],
++  folders: [{ id: "f1", name: "F1", themes: ["nord", "other"] }],
++  defaultWallpapers: { nord: "/bg.png", other: "/other.png" },
++  schedule: {
++    enabled: true,
++    rules: [{ id: "r1", time: "07:00", theme: "nord" }],
++    sun: { enabled: true, day: "nord", night: "other" }
++  },
++  themeCycle: { lastSlug: "nord" }
++})
++const afterRemove = m.removeThemeFromConfig(removeSample, "nord")
++if (afterRemove.favorites.indexOf("nord") >= 0) throw new Error("remove from favorites")
++if (afterRemove.recents.indexOf("nord") >= 0) throw new Error("remove from recents")
++if (afterRemove.folders[0].themes.indexOf("nord") >= 0) throw new Error("remove from folders")
++if (afterRemove.folders[0].themes.indexOf("other") < 0) throw new Error("keep other in folder")
++if (afterRemove.defaultWallpapers.nord) throw new Error("remove default wallpaper")
++if (afterRemove.schedule.rules[0].theme !== "") throw new Error("clear schedule rule theme")
++if (afterRemove.schedule.sun.day !== "") throw new Error("clear sun day theme")
++if (afterRemove.schedule.sun.night !== "other") throw new Error("keep sun night theme")
++if (afterRemove.themeCycle.lastSlug !== "") throw new Error("clear themeCycle lastSlug")
++if (!afterRemove.removed || afterRemove.removed.indexOf("nord") < 0) throw new Error("add to removed list")
++
+ console.log("model ok")

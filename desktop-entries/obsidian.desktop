@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Obsidian
+Exec=/home/soham/.local/bin/obsidian %U
+Terminal=false
+Type=Application
+Icon=obsidian
+StartupWMClass=md.obsidian.Obsidian
+Comment=Obsidian with dynamic Omarchy theme palette sync
+MimeType=x-scheme-handler/obsidian;
+Categories=Office;
