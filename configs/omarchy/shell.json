@@ -45,13 +45,13 @@
           "id": "omarchy.tray"
         },
         {
-          "id": "io.github.ricky.whatsapp"
+          "id": "io.github.r-witz.nothing-ear"
         },
         {
-          "id": "omamail"
+          "id": "omaconnect"
         },
         {
-          "id": "io.github.nilszeilon.omarchy-sensei"
+          "id": "jkoestinger.vpn"
         },
         {
           "id": "io.github.elevate08.qs-bitwarden-cli",
@@ -59,13 +59,17 @@
           "fingerprintUnlock": true
         },
         {
-          "id": "jkoestinger.vpn"
+          "id": "io.github.nilszeilon.omarchy-sensei"
         },
         {
-          "id": "io.github.r-witz.nothing-ear"
+          "id": "omamail"
         },
         {
-          "id": "omaconnect"
+          "id": "io.github.ricky.whatsapp"
+        },
+        {
+          "id": "jrmmhm.pocket",
+          "members": "omaconnect, jkoestinger.vpn, io.github.elevate08.qs-bitwarden-cli, io.github.nilszeilon.omarchy-sensei, omamail, io.github.ricky.whatsapp"
         },
         {
           "id": "omarchy.bluetooth"

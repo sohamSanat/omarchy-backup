@@ -78,7 +78,8 @@ This repository contains the full snapshot of user customizations:
 - `aetheria`, `artzen`, `harbor`, `harbordark`, `moodpeak`, `purple-moon`, `quattrocento-light`, `aether`.
 
 ### E. Shell Plugins (`plugins/` -> `~/.config/omarchy/plugins/`)
-14 plugins included with complete source code:
+15 plugins included with complete source code:
+- **`jrmmhm.pocket`**: Collapsible drawer plugin that groups tray and status widgets together.
 - **`soham.power`**: Fully custom battery limiter & power panel plugin written by Soham.
 - **`charlieras262.floating-bar`**: Custom floating status bar container.
 - **`chispes.agent-gemini`**: Enhanced with custom launcher commands.

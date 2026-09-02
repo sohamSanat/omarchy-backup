@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # run.sh prints the success line itself, so a crashed run prints nothing
+      # recognizable rather than an empty success.
+      - run: bash tests/run.sh
+
+  qml:
+    name: qml parses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # qmlformat, deliberately, and not qmllint. Nothing here can resolve the
+      # shell's own qs.* imports, and qmllint responds by treating every
+      # inherited property as missing -- forty warnings about code that is
+      # correct, which is the kind of red that teaches people to ignore CI.
+      # qmlformat parses without resolving a single type, so it fails on a
+      # syntax error and on nothing else. That is the honest half the node
+      # suite cannot reach; semantics stay uncovered and are not claimed.
+      #
+      # Skipped rather than failed when the Qt tools are not installable: a
+      # packaging change upstream is not a defect in this repository.
+      - name: parse
+        run: |
+          set -u
+          sudo apt-get update -qq || { echo "::warning::apt update failed, skipping"; exit 0; }
+          sudo apt-get install -y -qq qt6-declarative-dev-tools \
+            || { echo "::warning::qt6-declarative-dev-tools unavailable, skipping"; exit 0; }
+          QMLFORMAT="$(command -v qmlformat || true)"
+          [ -n "$QMLFORMAT" ] || QMLFORMAT=/usr/lib/qt6/bin/qmlformat
+          [ -x "$QMLFORMAT" ] || { echo "::warning::qmlformat not found, skipping"; exit 0; }
+          "$QMLFORMAT" BarWidget.qml > /dev/null || { echo "::error::BarWidget.qml does not parse"; exit 1; }
+          echo "BarWidget.qml parses"

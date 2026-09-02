@@ -69,6 +69,12 @@
     "has_local_changes": false,
     "dirty_files": []
   },
+  "jrmmhm.pocket": {
+    "remote": "https://github.com/jrmmhm/omarchy-pocket.git",
+    "commit": "f01fe358d3b16b9c3c170a7314271d00bf936fc7",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
   "krall.switchboard": {
     "remote": "https://github.com/krall12/omarchy-switchboard.git",
     "commit": "fa9b45af82658306148dbd2240c970dafcb5d252",
