@@ -1,0 +1,58 @@
+#!/bin/sh
+
+CHANNEL=stable
+DOWNLOAD=https://updates.discord.com/
+DIR=discord
+EXE=Discord
+BOOTSTRAP_SUFFIX=discord/updater_bootstrap
+
+config_home=$XDG_CONFIG_HOME
+if [ -z "$config_home" ]; then
+    config_home=$HOME/.config
+fi
+
+discord_host=$config_home/$DIR/$EXE
+
+# Clean up stale locks if no Discord process is running
+if ! pgrep -u $(id -u) -x Discord >/dev/null 2>&1; then
+    rm -f "$config_home/$DIR"/Singleton* "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/discord-ipc-* 2>/dev/null
+fi
+
+mkdir -p "$config_home/$DIR/logs"
+log_file="$config_home/$DIR/logs/discord-stdout.log"
+if [ -f "$log_file" ] && [ $(stat -c%s "$log_file" 2>/dev/null || echo 0) -gt 10485760 ]; then
+    mv -f "$log_file" "$log_file.old"
+fi
+
+if [ ! -x "$discord_host" ]; then
+    mkdir -p "$config_home/$DIR"
+    if [ ! -d "$config_home/$DIR" ]; then
+        echo "Fatal error, failed to create $DIR in $config_home" >&2
+        exit 1
+    fi
+    if [ -t 1 ]; then
+        zenity=--no-zenity
+    else
+        zenity=--zenity
+    fi
+    bootstrap=/usr/share/$BOOTSTRAP_SUFFIX
+    if [ ! -x "$bootstrap" ]; then
+        bootstrap="$HOME/.local/share/$BOOTSTRAP_SUFFIX"
+        if [ ! -x "$bootstrap" ]; then
+            bootstrap=/opt/$BOOTSTRAP_SUFFIX
+            if [ ! -x "$bootstrap" ]; then
+                bootstrap=`dirname -- "$0"`/updater_bootstrap
+            fi
+        fi
+    fi
+    app_dir=`"$bootstrap" $zenity "$config_home/$DIR" $CHANNEL "$DOWNLOAD"`
+
+    if [ $? -eq 0 ] ; then
+        echo "Bootstrap complete"
+        exec "$config_home/$DIR/$app_dir/$EXE" "$@" >> "$log_file" 2>&1 < /dev/null
+    else
+        echo "Bootstrap failed or was canceled"
+        exit 2
+    fi
+fi
+exec "$discord_host" "$@" >> "$log_file" 2>&1 < /dev/null

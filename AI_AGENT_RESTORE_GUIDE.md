@@ -145,6 +145,13 @@ This repository contains the full snapshot of user customizations:
    - `~/.pi/agent/skills/` links to all skills in `~/.agents/skills/`.
    - `firstmate launch pi` or setting default via `omarchy default agent pi`.
 
+
+10. **Desktop Tools, Flatpaks & Lavish**:
+   - `bin/cleaning`: Laptop keyboard/trackpad lock script for cleaning.
+   - `bin/discord` and `desktop-entries/`: Desktop app launchers.
+   - Flatpaks: `com.stremio.Stremio` tracked in `meta/flatpak-packages.txt`.
+   - `lavish-axi` repository tracked in `meta/external-repos.json`, with skills `lavish` and `lavish-design` in `agents/skills/`.
+
 ## 3. Fast Restoration (Automated)
 
 To apply everything at once, simply clone this repository onto the target Omarchy machine and execute:

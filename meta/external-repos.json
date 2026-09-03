@@ -19,6 +19,11 @@
     "remote": "https://github.com/johnfactotum/foliate.git",
     "commit": "67b6676d3f936c5edea91d4d903385ef39dd25c0"
   },
+  "lavish-axi": {
+    "path": "/home/soham/lavish-axi",
+    "remote": "https://github.com/kunchenguid/lavish-axi.git",
+    "commit": "19a0800809c469d7924daf5cee1d80dbbef3175f"
+  },
   "treehouse": {
     "path": "/home/soham/treehouse",
     "remote": "https://github.com/kunchenguid/treehouse.git",

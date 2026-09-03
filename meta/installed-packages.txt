@@ -36,6 +36,7 @@ fcitx5-qt
 fd
 fetch-git
 ffmpegthumbnailer
+flatpak
 foot
 fprintd
 fzf
@@ -54,6 +55,7 @@ gvfs-mtp
 gvfs-nfs
 gvfs-smb
 herdr
+hyphen-en
 hyprland
 hyprland-guiutils
 hyprland-preview-share-picker
@@ -85,6 +87,7 @@ lua51
 luarocks
 man-db
 mariadb-libs
+meson
 meteobar-bin
 mise-bin
 mkinitcpio
@@ -94,12 +97,13 @@ nano
 nautilus
 nautilus-python
 networkmanager
+ninja
 noto-fonts
 noto-fonts-cjk
 noto-fonts-emoji
 nss-mdns
-obsidian
 obs-studio
+obsidian
 omacalc
 omacut
 omarchy
@@ -157,6 +161,7 @@ uwsm
 voxtype-bin
 vpl-gpu-rt
 vulkan-intel
+webkitgtk-6.0
 whois
 wireless-regdb
 wireplumber

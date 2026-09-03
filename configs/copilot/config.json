@@ -1,0 +1,18 @@
+// User settings belong in settings.json.
+// This file is managed automatically.
+{
+  "installedPlugins": [
+    {
+      "name": "lavish-axi",
+      "marketplace": "",
+      "version": "0.1.63",
+      "installed_at": "2026-09-03T15:36:42.367030142Z",
+      "cache_path": "/home/soham/.copilot/installed-plugins/_direct/lavish-axi",
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "/home/soham/.local/share/mise/installs/node/26.7.0/lib/node_modules/lavish-axi"
+      }
+    }
+  ]
+}

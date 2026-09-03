@@ -1,0 +1,465 @@
+#!/usr/bin/env python3
+"""
+cleaning - Temporarily disable keyboard and trackpad for cleaning with a countdown timer.
+"""
+
+import argparse
+import atexit
+import json
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
+
+STATE_DIR = os.path.expanduser("~/.local/state/cleaning")
+STATE_FILE = os.path.join(STATE_DIR, "state.json")
+
+# ANSI Color codes
+BOLD = "\033[1m"
+DIM = "\033[2m"
+CYAN = "\033[36m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RED = "\033[31m"
+BLUE = "\033[34m"
+MAGENTA = "\033[35m"
+RESET = "\033[0m"
+HIDE_CURSOR = "\033[?25l"
+SHOW_CURSOR = "\033[?25h"
+CLEAR_SCREEN = "\033[2J\033[H"
+
+# Global state for signal handling & cleanup
+disabled_devices = []
+cleanup_done = False
+
+
+def ensure_state_dir():
+    os.makedirs(STATE_DIR, exist_ok=True)
+
+
+def get_hyprland_devices():
+    """Retrieve all connected devices from hyprctl."""
+    try:
+        output = subprocess.check_output(
+            ["hyprctl", "devices", "-j"],
+            stderr=subprocess.DEVNULL,
+            timeout=5
+        ).decode("utf-8", errors="ignore")
+        return json.loads(output)
+    except Exception as e:
+        print(f"{RED}Error fetching Hyprland devices: {e}{RESET}", file=sys.stderr)
+        return {"mice": [], "keyboards": []}
+
+
+def detect_devices_to_disable():
+    """
+    Detect trackpad/touchpad and keyboards that should be disabled for cleaning.
+    Excludes virtual IMEs, media earbuds, and external mouse pointers.
+    """
+    data = get_hyprland_devices()
+
+    # Detect touchpads / trackpads
+    touchpads = []
+    all_mice = [m.get("name", "") for m in data.get("mice", []) if m.get("name")]
+    for m in all_mice:
+        ml = m.lower()
+        if "touchpad" in ml or "trackpad" in ml:
+            touchpads.append(m)
+
+    # Catch companion endpoints sharing the same hardware identifier (e.g. elan230c:00-04f3:30b7-mouse)
+    for tp in list(touchpads):
+        for suffix in ["-touchpad", "-trackpad"]:
+            if tp.endswith(suffix):
+                prefix = tp[:-len(suffix)]
+                for m in all_mice:
+                    if m.startswith(prefix) and m not in touchpads:
+                        touchpads.append(m)
+
+    # Detect keyboards to disable
+    keyboards = []
+    excluded_keywords = [
+        "virtual", "fcitx", "ibus", "uinput", "ydotool",
+        "buds", "headset", "headphone", "avrcp", "mouse"
+    ]
+    for k in data.get("keyboards", []):
+        name = k.get("name", "")
+        if not name:
+            continue
+        nl = name.lower()
+        if any(ex in nl for ex in excluded_keywords):
+            continue
+        keyboards.append(name)
+
+    return sorted(list(set(touchpads))), sorted(list(set(keyboards)))
+
+
+def set_devices_enabled(devices, enabled=True):
+    """Enable or disable devices using Hyprland Lua evaluation."""
+    if not devices:
+        return True
+
+    enabled_str = "true" if enabled else "false"
+    lua_entries = []
+    for d in devices:
+        quoted = d.replace("\\", "\\\\").replace('"', '\\"')
+        lua_entries.append(f'"{quoted}"')
+
+    lua_code = (
+        f"local devs = {{ {', '.join(lua_entries)} }}; "
+        f"for _, d in ipairs(devs) do hl.device({{ name = d, enabled = {enabled_str} }}) end"
+    )
+
+    try:
+        res = subprocess.run(
+            ["hyprctl", "eval", lua_code],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        return res.returncode == 0
+    except Exception as e:
+        print(f"{RED}Error evaluating device config: {e}{RESET}", file=sys.stderr)
+        return False
+
+
+def play_sound():
+    """Play notification sound when cleaning completes."""
+    sound_file = "/usr/share/sounds/freedesktop/stereo/complete.oga"
+    if shutil.which("canberra-gtk-play"):
+        subprocess.Popen(["canberra-gtk-play", "-i", "complete"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    elif shutil.which("paplay") and os.path.isfile(sound_file):
+        subprocess.Popen(["paplay", sound_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    elif shutil.which("pw-play") and os.path.isfile(sound_file):
+        subprocess.Popen(["pw-play", sound_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        # Terminal bell fallback
+        sys.stdout.write("\a")
+        sys.stdout.flush()
+
+
+def send_notification(summary, message, icon="input-keyboard"):
+    """Send desktop notification and quickshell OSD if available."""
+    if shutil.which("omarchy-osd"):
+        try:
+            subprocess.Popen(["omarchy-osd", "-i", icon, "-m", summary], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+    if shutil.which("notify-send"):
+        try:
+            subprocess.Popen(["notify-send", "-a", "Cleaning Mode", "-i", icon, summary, message], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+
+def cleanup():
+    """Re-enable all disabled devices and clean up state files."""
+    global cleanup_done, disabled_devices
+    if cleanup_done:
+        return
+    cleanup_done = True
+
+    # Restore cursor
+    sys.stdout.write(SHOW_CURSOR)
+    sys.stdout.flush()
+
+    # Load any devices saved in state file
+    all_to_enable = list(disabled_devices)
+    if os.path.isfile(STATE_FILE):
+        try:
+            with open(STATE_FILE, "r") as f:
+                saved_state = json.load(f)
+                all_to_enable.extend(saved_state.get("devices", []))
+        except Exception:
+            pass
+
+    # Ensure all target devices are enabled
+    all_to_enable = sorted(list(set(all_to_enable)))
+    if all_to_enable:
+        set_devices_enabled(all_to_enable, enabled=True)
+
+    # Remove state file
+    if os.path.isfile(STATE_FILE):
+        try:
+            os.remove(STATE_FILE)
+        except Exception:
+            pass
+
+
+def handle_signal(sig, frame):
+    """Handle termination signals safely."""
+    cleanup()
+    print(f"\n{YELLOW}Cleaning mode cancelled early. Keyboard and trackpad re-enabled.{RESET}")
+    send_notification("Cleaning Mode Cancelled", "Keyboard and trackpad have been re-enabled.")
+    sys.exit(0)
+
+
+def format_time(seconds):
+    """Format seconds into MM:SS."""
+    m = max(0, seconds) // 60
+    s = max(0, seconds) % 60
+    return f"{m:02d}:{s:02d}"
+
+
+def render_progress_bar(elapsed, total, width=32):
+    """Generate a clean unicode progress bar."""
+    fraction = min(1.0, max(0.0, elapsed / total)) if total > 0 else 1.0
+    filled = int(fraction * width)
+    bar = "█" * filled + "░" * (width - filled)
+    percent = int(fraction * 100)
+    return bar, percent
+
+
+def stop_running_session():
+    """Stop any currently active cleaning session."""
+    if not os.path.isfile(STATE_FILE):
+        print(f"{YELLOW}No active cleaning session found.{RESET}")
+        # As a precaution, make sure all keyboards and touchpads are enabled
+        tps, kbs = detect_devices_to_disable()
+        all_devs = sorted(list(set(tps + kbs)))
+        if all_devs:
+            set_devices_enabled(all_devs, enabled=True)
+            print(f"{GREEN}Ensured {len(all_devs)} input device(s) are enabled.{RESET}")
+        return
+
+    try:
+        with open(STATE_FILE, "r") as f:
+            state = json.load(f)
+        pid = state.get("pid")
+        devices = state.get("devices", [])
+
+        # Re-enable devices
+        if devices:
+            set_devices_enabled(devices, enabled=True)
+
+        # Terminate running process if still alive
+        if pid:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            except Exception as e:
+                print(f"Note: Could not signal process {pid}: {e}")
+
+        if os.path.isfile(STATE_FILE):
+            os.remove(STATE_FILE)
+
+        print(f"{GREEN}Active cleaning mode stopped. Keyboard and trackpad have been re-enabled.{RESET}")
+        send_notification("Cleaning Mode Stopped", "Keyboard and trackpad have been re-enabled.")
+    except Exception as e:
+        print(f"{RED}Error stopping cleaning session: {e}{RESET}", file=sys.stderr)
+
+
+def parse_duration(arg_str):
+    """Parse duration like '3m', '180s', '180', '2.5m'."""
+    s = arg_str.strip().lower()
+    if s.endswith("m"):
+        return int(float(s[:-1]) * 60)
+    if s.endswith("s"):
+        return int(float(s[:-1]))
+    return int(float(s))
+
+
+def main():
+    global disabled_devices
+
+    parser = argparse.ArgumentParser(
+        description="Temporarily disable keyboard and trackpad for cleaning with a 3-minute countdown timer."
+    )
+    parser.add_argument(
+        "duration",
+        nargs="?",
+        default="3m",
+        help="Duration for cleaning mode (default: 3m / 180s). Examples: '3m', '180', '5m'."
+    )
+    parser.add_argument(
+        "--stop", "-s",
+        action="store_true",
+        help="Stop any active cleaning session and re-enable devices immediately."
+    )
+    parser.add_argument(
+        "--status",
+        action="store_true",
+        help="Check whether cleaning mode is currently running."
+    )
+
+    args = parser.parse_args()
+
+    if args.stop:
+        stop_running_session()
+        return
+
+    if args.status:
+        if os.path.isfile(STATE_FILE):
+            try:
+                with open(STATE_FILE, "r") as f:
+                    state = json.load(f)
+                remaining = max(0, int(state.get("end_time", 0) - time.time()))
+                print(f"{YELLOW}Cleaning mode is currently ACTIVE (PID {state.get('pid')}).{RESET}")
+                print(f"Time remaining: {format_time(remaining)}")
+            except Exception:
+                print(f"{YELLOW}Cleaning mode state file exists.{RESET}")
+        else:
+            print(f"{GREEN}Cleaning mode is inactive. All input devices are normal.{RESET}")
+        return
+
+    try:
+        total_seconds = parse_duration(args.duration)
+        if total_seconds <= 0:
+            raise ValueError()
+    except Exception:
+        print(f"{RED}Invalid duration '{args.duration}'. Use format like '3m', '180', or '90s'.{RESET}")
+        sys.exit(1)
+
+    # Check if another session is already running
+    if os.path.isfile(STATE_FILE):
+        try:
+            with open(STATE_FILE, "r") as f:
+                state = json.load(f)
+            pid = state.get("pid")
+            if pid:
+                # Check if process is still running
+                os.kill(pid, 0)
+                print(f"{YELLOW}A cleaning session is already active (PID {pid}).{RESET}")
+                print(f"Run {BOLD}cleaning --stop{RESET} to stop it or wait for the timer to finish.")
+                sys.exit(1)
+        except (ProcessLookupError, OSError):
+            # Stale state file, remove it
+            try:
+                os.remove(STATE_FILE)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    # Register exit and signal hooks
+    atexit.register(cleanup)
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGHUP, handle_signal)
+    if hasattr(signal, "SIGQUIT"):
+        signal.signal(signal.SIGQUIT, handle_signal)
+
+    # Detect devices
+    touchpads, keyboards = detect_devices_to_disable()
+    devices_to_disable = sorted(list(set(touchpads + keyboards)))
+
+    if not devices_to_disable:
+        print(f"{RED}No compatible keyboard or trackpad devices found in Hyprland.{RESET}")
+        sys.exit(1)
+
+    ensure_state_dir()
+    start_time = time.time()
+    end_time = start_time + total_seconds
+
+    # Save state
+    state_data = {
+        "pid": os.getpid(),
+        "start_time": start_time,
+        "end_time": end_time,
+        "total_seconds": total_seconds,
+        "devices": devices_to_disable,
+        "touchpads": touchpads,
+        "keyboards": keyboards
+    }
+    with open(STATE_FILE, "w") as f:
+        json.dump(state_data, f, indent=2)
+
+    # Disable devices
+    disabled_devices = list(devices_to_disable)
+    success = set_devices_enabled(disabled_devices, enabled=False)
+    if not success:
+        print(f"{RED}Failed to apply device lock in Hyprland.{RESET}", file=sys.stderr)
+        cleanup()
+        sys.exit(1)
+
+    # Notify user
+    send_notification(
+        "Cleaning Mode Active",
+        f"Keyboard and trackpad disabled for {format_time(total_seconds)}."
+    )
+
+    # Hide terminal cursor for clean animation
+    sys.stdout.write(HIDE_CURSOR)
+    sys.stdout.flush()
+
+    try:
+        while True:
+            now = time.time()
+            remaining = int(round(end_time - now))
+            if remaining <= 0:
+                break
+
+            elapsed = int(now - start_time)
+            bar, percent = render_progress_bar(elapsed, total_seconds, width=34)
+            time_str = format_time(remaining)
+            elapsed_str = format_time(elapsed)
+            total_str = format_time(total_seconds)
+
+            # Build UI screen
+            ui = [
+                CLEAR_SCREEN,
+                f"{CYAN}╔══════════════════════════════════════════════════════════════════╗{RESET}",
+                f"{CYAN}║{BOLD}                🧼  KEYBOARD & TRACKPAD CLEANING MODE             {RESET}{CYAN}║{RESET}",
+                f"{CYAN}╚══════════════════════════════════════════════════════════════════╝{RESET}",
+                "",
+                f"  Status:         {YELLOW}{BOLD}🔒 LOCKED{RESET} (Keyboard & Trackpad disabled)",
+                f"  Time Remaining: {CYAN}{BOLD}⏳ {time_str}{RESET}  {DIM}(elapsed: {elapsed_str} / {total_str}){RESET}",
+                f"  Progress:       [{GREEN}{bar}{RESET}] {BOLD}{percent:3d}%{RESET}",
+                "",
+                f"  {BOLD}Disabled Devices:{RESET}",
+            ]
+
+            if touchpads:
+                ui.append(f"    • {BOLD}Trackpad:{RESET} {', '.join(touchpads)}")
+            if keyboards:
+                ui.append(f"    • {BOLD}Keyboard:{RESET} {', '.join(keyboards)}")
+
+            ui.extend([
+                "",
+                f"  {BOLD}Cleaning Tips:{RESET}",
+                f"    {DIM}1. Use a soft, lightly damp microfiber cloth.{RESET}",
+                f"    {DIM}2. Never spray liquids directly onto keyboard or trackpad.{RESET}",
+                f"    {DIM}3. Gently wipe keycaps, edges, and trackpad surface.{RESET}",
+                "",
+                f"  {DIM}ℹ️  Devices automatically re-enable when the timer reaches 00:00.{RESET}",
+                f"  {DIM}ℹ️  To unlock early: close this terminal or run 'cleaning --stop'.{RESET}",
+            ])
+
+            sys.stdout.write("\n".join(ui) + "\n")
+            sys.stdout.flush()
+
+            time.sleep(0.5)
+
+    except KeyboardInterrupt:
+        pass
+    finally:
+        cleanup()
+
+    # Post-cleaning screen
+    play_sound()
+    send_notification(
+        "Cleaning Complete",
+        "Keyboard and trackpad have been re-enabled."
+    )
+
+    complete_ui = [
+        CLEAR_SCREEN,
+        f"{GREEN}╔══════════════════════════════════════════════════════════════════╗{RESET}",
+        f"{GREEN}║{BOLD}               ✨  CLEANING MODE COMPLETED!                       {RESET}{GREEN}║{RESET}",
+        f"{GREEN}╚══════════════════════════════════════════════════════════════════╝{RESET}",
+        "",
+        f"  Status:   {GREEN}{BOLD}🔓 UNLOCKED{RESET} (Keyboard and Trackpad are re-enabled)",
+        f"  Duration: {BOLD}{format_time(total_seconds)}{RESET}",
+        "",
+        f"  All input devices have been restored to normal operation.",
+        f"  You can now type and use your trackpad freely.",
+        "",
+    ]
+    sys.stdout.write("\n".join(complete_ui) + "\n")
+    sys.stdout.flush()
+
+
+if __name__ == "__main__":
+    main()

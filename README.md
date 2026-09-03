@@ -89,6 +89,13 @@ This backup integrates frontier agent tooling and multi-agent fleet operations:
 - **Fleet Orchestration**: Firstmate (`firstmate launch pi` or `FM_HARNESS=pi`) and `no-mistakes` natively drive Pi for multi-agent loops and verification.
 - **Omarchy Default**: Selectable via `omarchy default agent pi`.
 
+
+### 🖥️ Desktop Utilities, Flatpaks & Applications
+- **Cleaning Utility (`bin/cleaning`)**: Temporarily disables the laptop keyboard and trackpad with an interactive countdown timer to allow cleaning the device without false input.
+- **Discord Custom Runner (`bin/discord`, `desktop-entries/discord.desktop`)**: Custom Discord runner script with stale socket cleanup, Wayland support, and auto-bootstrap.
+- **Stremio Flatpak (`desktop-entries/com.stremio.Stremio.desktop`, `meta/flatpak-packages.txt`)**: Media player installed via Flatpak.
+- **Lavish AXI (`lavish-axi` repo, skills: `lavish`, `lavish-design`)**: Turns complex artifacts, plans, and reports into interactive visual whiteboards and review boards.
+
 ## 🎨 Themes Included
 
 | Theme | Type | Source / Upstream |

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Herdr
+GenericName=AI Agent Terminal Multiplexer
+Comment=Terminal workspace manager for AI coding agents
+Exec=ghostty -e herdr
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=Development;System;TerminalEmulator;
+Keywords=herdr;agent;tmux;multiplexer;terminal;ai;

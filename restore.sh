@@ -284,12 +284,20 @@ if [[ -d "${SCRIPT_DIR}/desktop-entries" ]]; then
     update-desktop-database "${USER_HOME}/.local/share/applications" 2>/dev/null || true
   fi
   echo "  [OK] Desktop applications registered."
+if command -v flatpak >/dev/null 2>&1; then
+  echo "  -> Ensuring Flatpak user remote and apps..."
+  flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
+  if [[ -f "${SCRIPT_DIR}/meta/flatpak-packages.txt" ]]; then
+    flatpak install --user -y flathub com.stremio.Stremio 2>/dev/null || true
+  fi
+fi
+
 fi
 
 echo ""
 echo "==> Step 11: Applying customizations and restarting components..."
 if command -v omarchy >/dev/null 2>&1; then
-  echo "  -> Setting theme: Sakura Mochi"
+  echo "  -> Setting theme: Aetheria"
   omarchy theme set "Aetheria" || true
 
   echo "  -> Setting font: JetBrainsMono Nerd Font"
