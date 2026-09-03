@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# firstmate - CLI wrapper for Firstmate integrated with Herdr
+set -euo pipefail
+
+FM_HOME="${FM_HOME:-/home/soham/firstmate}"
+export FM_HOME
+export FM_BACKEND="${FM_BACKEND:-herdr}"
+
+case "${1:-}" in
+  fleet|status|board|"")
+    if [ $# -eq 0 ]; then
+      "$FM_HOME/bin/fm-fleet-view.sh"
+    else
+      "$FM_HOME/bin/fm-fleet-view.sh" "${@:2}"
+    fi
+    ;;
+  snapshot)
+    "$FM_HOME/bin/fm-fleet-snapshot.sh" "${@:2}"
+    ;;
+  sync)
+    "$FM_HOME/bin/fm-fleet-sync.sh" "${@:2}"
+    ;;
+  peek)
+    if [ $# -lt 2 ]; then
+      echo "Usage: firstmate peek <task-id>" >&2
+      exit 1
+    fi
+    "$FM_HOME/bin/fm-peek.sh" "${@:2}"
+    ;;
+  send)
+    if [ $# -lt 3 ]; then
+      echo "Usage: firstmate send <task-id> '<instruction>'" >&2
+      exit 1
+    fi
+    "$FM_HOME/bin/fm-send.sh" "${@:2}"
+    ;;
+  bootstrap)
+    "$FM_HOME/bin/fm-bootstrap.sh" "${@:2}"
+    ;;
+  launch|start|run)
+    HARNESS="${2:-}"
+    if [ -z "$HARNESS" ]; then
+      if command -v claude >/dev/null 2>&1; then
+        HARNESS="claude"
+      elif command -v codex >/dev/null 2>&1; then
+        HARNESS="codex"
+      elif command -v opencode >/dev/null 2>&1; then
+        HARNESS="opencode"
+      else
+        HARNESS="agy"
+      fi
+    fi
+
+    if [ "${HERDR_ENV:-0}" = "1" ]; then
+      echo "Launching Firstmate ($HARNESS) in current Herdr pane..."
+      cd "$FM_HOME"
+      exec "$HARNESS"
+    else
+      echo "Launching Firstmate ($HARNESS) inside Herdr..."
+      if herdr status 2>&1 | grep -q "status: running"; then
+        exec herdr workspace create --label "Firstmate" --cwd "$FM_HOME" --focus
+      else
+        cd "$FM_HOME"
+        exec herdr
+      fi
+    fi
+    ;;
+  help|--help|-h)
+    echo "Firstmate - Agent Distro for Fleet Management with Herdr"
+    echo ""
+    echo "Usage:"
+    echo "  firstmate [fleet|status]      View live crew status, backlog, and active tasks"
+    echo "  firstmate launch [harness]    Launch the Firstmate agent session inside Herdr"
+    echo "  firstmate peek <task-id>      Inspect recent terminal output from a crewmate"
+    echo "  firstmate send <task-id> <msg> Send an instruction to a crewmate"
+    echo "  firstmate sync                Synchronize projects and branch states"
+    echo "  firstmate bootstrap           Run environment and tool checks"
+    echo "  firstmate <script> [args...]  Invoke any bin/fm-<script>.sh helper"
+    ;;
+  *)
+    if [ -f "$FM_HOME/bin/fm-$1.sh" ]; then
+      CMD="$FM_HOME/bin/fm-$1.sh"
+      shift
+      exec "$CMD" "$@"
+    else
+      echo "Unknown command: $1" >&2
+      echo "Run 'firstmate --help' for usage." >&2
+      exit 1
+    fi
+    ;;
+esac

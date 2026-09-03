@@ -1,0 +1,229 @@
+diff --git i/ColourField.qml w/ColourField.qml
+index d012182..c401138 100644
+--- i/ColourField.qml
++++ w/ColourField.qml
+@@ -27,20 +27,24 @@ RowLayout {
+   readonly property bool editing: field.activeFocus
+ 
+   function isColour(text) {
+-    var candidate = String(text || "").trim()
+-    if (candidate === "") return root.allowEmpty
++    var candidate = String(text || "").trim().toLowerCase()
++    if (candidate === "" || candidate === "theme" || candidate === "inherit") return root.allowEmpty
+     return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(candidate)
+   }
+ 
+   function commit() {
+     var candidate = String(field.text || "").trim()
++    if (candidate.toLowerCase() === "theme" || candidate.toLowerCase() === "inherit") candidate = ""
+     if (!isColour(candidate)) {
+       // Put the last good value back rather than leaving something that does
+       // not parse sitting in the field.
+       field.text = root.value
+       return
+     }
+-    if (candidate === root.value) return
++    if (candidate === root.value) {
++      field.text = root.value
++      return
++    }
+     root.changed(candidate)
+   }
+ 
+@@ -59,7 +63,7 @@ RowLayout {
+     implicitWidth: Style.space(18)
+     implicitHeight: Style.space(18)
+     radius: Math.min(Style.cornerRadius, Style.space(5))
+-    color: root.valid && field.text.trim() !== "" ? field.text.trim() : root.swatchFallback
++    color: root.valid && field.text.trim() !== "" && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(field.text.trim()) ? field.text.trim() : root.swatchFallback
+     border.width: 1
+     border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+     Layout.alignment: Qt.AlignVCenter
+diff --git i/Model.js w/Model.js
+index 9c81b65..274effd 100644
+--- i/Model.js
++++ w/Model.js
+@@ -6,6 +6,27 @@
+ // is why there is no `.pragma library` here: it would make the file unloadable
+ // outside QML, and these decisions are worth being able to test directly.
+ 
++function colorToHex(c) {
++  if (!c) return ""
++  if (typeof c === "string") {
++    var s = c.trim()
++    if (/^#[0-9a-fA-F]{8}$/.test(s)) return ("#" + s.slice(3)).toLowerCase()
++    return s.toLowerCase()
++  }
++  if (typeof c === "object" && c.r !== undefined) {
++    var r = Math.round(c.r * 255).toString(16)
++    var g = Math.round(c.g * 255).toString(16)
++    var b = Math.round(c.b * 255).toString(16)
++    if (r.length < 2) r = "0" + r
++    if (g.length < 2) g = "0" + g
++    if (b.length < 2) b = "0" + b
++    return ("#" + r + g + b).toLowerCase()
++  }
++  var str = String(c).trim()
++  if (/^#[0-9a-fA-F]{8}$/.test(str)) return ("#" + str.slice(3)).toLowerCase()
++  return str.toLowerCase()
++}
++
+ function defaults() {
+   return {
+     level: "M",
+@@ -13,8 +34,8 @@ function defaults() {
+     body: "square",
+     eyeFrame: "square",
+     eyeBall: "square",
+-    foreground: "#111827",
+-    background: "#ffffff",
++    foreground: "",
++    background: "",
+     transparentBackground: false,
+     eyeFrameColour: "",
+     eyeBallColour: "",
+@@ -32,7 +53,7 @@ function defaults() {
+     // switch is right there to turn off.
+     correctionAuto: true,
+     marginAuto: true,
+-    compressAuto: true
++    compressAuto: false
+   }
+ }
+ 
+@@ -268,6 +289,6 @@ if (typeof module !== "undefined") {
+     defaults: defaults, correctionLevels: correctionLevels, normalizedLevel: normalizedLevel,
+     clamp: clamp, plan: plan, renderOptions: renderOptions, describe: describe,
+     describeCorrection: describeCorrection, describeMargin: describeMargin,
+-    describeCompression: describeCompression
++    describeCompression: describeCompression, colorToHex: colorToHex
+   }
+ }
+diff --git i/Panel.qml w/Panel.qml
+index cac53a0..5930161 100644
+--- i/Panel.qml
++++ w/Panel.qml
+@@ -54,8 +54,19 @@ Panel {
+   property string bodyShape: setting("body", "square")
+   property string eyeFrameShape: setting("eyeFrame", "square")
+   property string eyeBallShape: setting("eyeBall", "square")
+-  property string foreground: setting("foreground", "#111827")
+-  property string background: setting("background", "#ffffff")
++  readonly property string themeForeground: Model.colorToHex(Color.foreground)
++  readonly property string themeBackground: Model.colorToHex(Color.background)
++
++  property string foreground: {
++    var val = setting("foreground", "")
++    return (val === "#111827") ? "" : val
++  }
++  property string background: {
++    var val = setting("background", "")
++    return (val === "#ffffff") ? "" : val
++  }
++  readonly property string effectiveForeground: foreground !== "" ? foreground : themeForeground
++  readonly property string effectiveBackground: background !== "" ? background : themeBackground
+   property bool transparentBackground: setting("transparentBackground", false) === true
+   property string eyeFrameColour: setting("eyeFrameColour", "")
+   property string eyeBallColour: setting("eyeBallColour", "")
+@@ -69,7 +80,7 @@ Panel {
+   // manual value underneath is kept, so turning automatic off returns to it.
+   property bool correctionAuto: setting("correctionAuto", true) === true
+   property bool marginAuto: setting("marginAuto", true) === true
+-  property bool compressAuto: setting("compressAuto", true) === true
++  property bool compressAuto: setting("compressAuto", false) === true
+ 
+   property string level: Model.normalizedLevel(setting("level", "M"), "M")
+   property int margin: Math.round(Model.clamp(setting("margin", 4), 0, 16))
+@@ -93,8 +104,8 @@ Panel {
+       body: root.bodyShape,
+       eyeFrame: root.eyeFrameShape,
+       eyeBall: root.eyeBallShape,
+-      foreground: root.foreground,
+-      background: root.background,
++      foreground: root.effectiveForeground,
++      background: root.effectiveBackground,
+       transparentBackground: root.transparentBackground,
+       eyeFrameColour: root.eyeFrameColour,
+       eyeBallColour: root.eyeBallColour,
+@@ -205,7 +216,8 @@ Panel {
+   }
+ 
+   function encode(text) {
+-    linkField.text = String(text || "")
++    root.link = String(text || "")
++    linkField.text = root.link
+     root.open()
+     Qt.callLater(function() { linkField.selectAll() })
+   }
+@@ -230,6 +242,9 @@ Panel {
+     delete state.link
+     for (var key in state) entry[key] = state[key]
+ 
++    entry.foreground = root.foreground
++    entry.background = root.background
++
+     entry.customizeOpen = root.customizeOpen
+     entry.advancedOpen = root.advancedOpen
+ 
+@@ -334,8 +349,9 @@ Panel {
+   }
+ 
+   function runExport(action) {
+-    if (!root.hasCode) return
++    if (!root.hasCode || root.currentSvg === "" || exportProc.running) return
+     exportProc.payload = root.currentSvg
++    exportProc.stdinEnabled = true
+     exportProc.command = [root.pluginDir + "bin/qrgen-export", action]
+     exportProc.running = true
+   }
+@@ -564,6 +580,10 @@ Panel {
+       stdinEnabled = false
+     }
+ 
++    onExited: {
++      stdinEnabled = true
++    }
++
+     stdout: StdioCollector {
+       waitForEnd: true
+       onStreamFinished: {
+@@ -898,7 +918,9 @@ Panel {
+               id: foregroundField
+               label: "Foreground"
+               value: root.foreground
+-              swatchFallback: root.contentForeground
++              placeholder: "theme"
++              allowEmpty: true
++              swatchFallback: root.themeForeground
+               foreground: root.contentForeground
+               fontFamily: root.contentFontFamily
+               Layout.fillWidth: true
+@@ -909,7 +931,9 @@ Panel {
+               id: backgroundField
+               label: "Background"
+               value: root.background
+-              swatchFallback: "white"
++              placeholder: "theme"
++              allowEmpty: true
++              swatchFallback: root.themeBackground
+               foreground: root.contentForeground
+               fontFamily: root.contentFontFamily
+               Layout.fillWidth: true
+@@ -931,7 +955,7 @@ Panel {
+               value: root.eyeFrameColour
+               placeholder: "inherit"
+               allowEmpty: true
+-              swatchFallback: root.foreground
++              swatchFallback: root.effectiveForeground
+               foreground: root.contentForeground
+               fontFamily: root.contentFontFamily
+               Layout.fillWidth: true
+@@ -944,7 +968,7 @@ Panel {
+               value: root.eyeBallColour
+               placeholder: "inherit"
+               allowEmpty: true
+-              swatchFallback: root.foreground
++              swatchFallback: root.effectiveForeground
+               foreground: root.contentForeground
+               fontFamily: root.contentFontFamily
+               Layout.fillWidth: true

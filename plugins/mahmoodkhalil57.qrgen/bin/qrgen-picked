@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Poll target for the asset picker.
+#
+# Omarchy's image picker answers by writing the chosen path to a selection file
+# and then touching a done file; a dismissal touches the done file alone. The
+# panel polls this rather than watching the files itself, so the three outcomes
+# — still choosing, chose nothing, chose something — arrive as exit codes.
+
+set -uo pipefail
+
+done_file=${1:-}
+selection_file=${2:-}
+
+[[ -e $done_file ]] || exit 3        # the picker is still up
+[[ -s $selection_file ]] || exit 4   # dismissed without choosing
+
+# Bounded: the picker writes one path, but this file is only as trustworthy as
+# whatever last wrote to it, and a single enormous line is still enormous.
+path=$(head -c 4096 -- "$selection_file" | head -n 1)
+[[ -n $path && -f $path ]] || exit 5 # chose something that is not there any more
+
+printf '%s\n' "$path"

@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Rasterise the code on stdin and either put it on the clipboard or save it.
+#
+# The SVG arrives on stdin rather than as a path because the panel renders in
+# process and never writes one — what is on screen is a string in the shell's
+# memory, and this is the only thing that ever needs it as a file.
+
+set -uo pipefail
+
+action=${1:-}
+
+command -v rsvg-convert >/dev/null 2>&1 || { echo "Exporting needs rsvg-convert (librsvg)" >&2; exit 1; }
+
+svg=$(mktemp --suffix=.svg) || exit 1
+trap 'rm -f "$svg"' EXIT
+cat > "$svg"
+[[ -s $svg ]] || { echo "Nothing to export yet" >&2; exit 1; }
+
+# Big enough to print, or to drop into a slide without resampling artefacts.
+SIDE=1024
+
+case $action in
+copy)
+  command -v wl-copy >/dev/null 2>&1 || { echo "Copying needs wl-clipboard" >&2; exit 1; }
+  rsvg-convert --width "$SIDE" --height "$SIDE" --keep-aspect-ratio "$svg" |
+    wl-copy --type image/png || { echo "Could not copy the code" >&2; exit 1; }
+  echo "Copied to the clipboard"
+  ;;
+save)
+  directory=$(xdg-user-dir PICTURES 2>/dev/null) || directory=""
+  [[ -n $directory && -d $directory ]] || directory="$HOME/Pictures"
+  mkdir -p "$directory" || { echo "Could not reach $directory" >&2; exit 1; }
+
+  file="$directory/qr-$(date +%Y%m%d-%H%M%S).png"
+  rsvg-convert --width "$SIDE" --height "$SIDE" --keep-aspect-ratio "$svg" --output "$file" ||
+    { echo "Could not save the code" >&2; exit 1; }
+
+  notify-send -u low -i "$file" "QR code saved" "${file/#$HOME/\~}" 2>/dev/null || true
+  echo "Saved to ${file/#$HOME/\~}"
+  ;;
+svg)
+  directory=$(xdg-user-dir PICTURES 2>/dev/null) || directory=""
+  [[ -n $directory && -d $directory ]] || directory="$HOME/Pictures"
+  mkdir -p "$directory" || { echo "Could not reach $directory" >&2; exit 1; }
+
+  file="$directory/qr-$(date +%Y%m%d-%H%M%S).svg"
+  cp "$svg" "$file" || { echo "Could not save the code" >&2; exit 1; }
+  notify-send -u low "QR code saved" "${file/#$HOME/\~}" 2>/dev/null || true
+  echo "Saved to ${file/#$HOME/\~}"
+  ;;
+*)
+  echo "Usage: qrgen-export <copy|save|svg>  (SVG on stdin)" >&2
+  exit 1
+  ;;
+esac

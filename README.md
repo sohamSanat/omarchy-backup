@@ -9,7 +9,7 @@ This repository ensures your desktop setup is completely reproducible, disaster-
 ## 🌟 Customization Highlights
 
 - **Active Theme**: `Aetheria` (with custom live-rendered templates and wallpapers).
-- **Status Bar**: Top floating bar (`charlieras262.floating-bar`) loaded with 19 modular plugins.
+- **Status Bar**: Top floating bar (`charlieras262.floating-bar`) loaded with 20 modular plugins.
 - **Custom Plugins**: Includes `soham.power` (custom battery limiter & power panel developed by Soham), `chispes.agent-gemini`, `io.github.calebhat.themebook`, `io.github.diegopluna.argus`, `io.github.nilszeilon.omarchy-sensei`, `io.github.ricky.whatsapp`, `mryll.meteobar`, `omamail`, and more.
 - **Theme Sync Engine**: Automated hooks (`theme-set.d`) that instantly propagate active theme colors and transparency into:
   - **Zen Browser** (`omarchy-sync-zen` + dynamic `zen.css.tpl`)
@@ -59,6 +59,20 @@ omarchy-backup/
 
 ---
 
+
+---
+
+## 🤖 Agentic Distro, Herdr & AXI Tooling
+
+This backup integrates frontier agent tooling and multi-agent fleet operations:
+- **Herdr Integration**: Configuration (`~/.config/herdr/config.toml`) mapping tmux layouts, panes, tabs, and mouse capture into Herdr.
+- **Firstmate Distro**: Fleet manager CLI (`firstmate` / `fm`), task dispatch, and integration with `treehouse` worktrees.
+- **no-mistakes**: Automated multi-agent review, verification, auto-repair, and guarded git merge pipeline (`~/.no-mistakes/config.yaml`).
+- **AXI Standards & Tools**:
+  - Global CLI tools: `gh-axi`, `chrome-devtools-axi`, `tasks-axi`, `quota-axi`, `lavish-axi`.
+  - Guidelines and rule set: `~/.agents/rules/axi.md`.
+  - Frontier Agent Skills in `~/.agents/skills/`: `herdr`, `firstmate`, `axi`, `agent-architecture-design`, `agent-evals-and-benchmarking`, `agent-memory-and-rag`, `agentic-research-scout`, `mcp-and-tool-engineering`, `multi-agent-orchestrator`.
+
 ## 🎨 Themes Included
 
 | Theme | Type | Source / Upstream |
@@ -100,6 +114,7 @@ omarchy-backup/
 | `io.github.weedwhitesandwine.obsiduous` | Obsidian notes & vault quick-capture indicator |
 | `x692137x.powerwave` | PowerWave audio visualizer & pulse indicator |
 | `reomarchy.workspace-switcher` | Visual card workspace switcher with animations & digit jump |
+| `mahmoodkhalil57.qrgen` | Interactive QR Code generator & bar widget with active theme adaptation |
 
 ---
 

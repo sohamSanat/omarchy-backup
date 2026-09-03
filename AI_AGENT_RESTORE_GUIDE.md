@@ -78,7 +78,8 @@ This repository contains the full snapshot of user customizations:
 - `aetheria`, `artzen`, `harbor`, `harbordark`, `moodpeak`, `purple-moon`, `quattrocento-light`, `aether`.
 
 ### E. Shell Plugins (`plugins/` -> `~/.config/omarchy/plugins/`)
-19 plugins included with complete source code:
+20 plugins included with complete source code:
+- **`mahmoodkhalil57.qrgen`**: QR generator bar widget with dynamic theme foreground/background adaptation (includes custom patch).
 - **`reomarchy.workspace-switcher`**: Visual workspace switcher with hold-Super activation, live screencopy previews, and digit jumping (includes custom patch).
 - **`io.github.adamcbrewer.voxtype-aura`**: Native audio recording OSD for Voxtype dictation.
 - **`io.github.weedwhitesandwine.obsiduous`**: Obsidian status & indexing bar widget (includes custom vault path resolution patch).
@@ -113,6 +114,21 @@ This repository contains the full snapshot of user customizations:
 - `omarchy-whatsapp/sweep`: Session cleaner script for WhatsApp widget.
 
 ---
+
+
+### H. Herdr, Firstmate, no-mistakes & AXI Tooling
+1. **Herdr (`configs/herdr/config.toml` -> `~/.config/herdr/config.toml`)**:
+   - Terminal multiplexer config with prefix `ctrl+space`, custom pane splitting, tab switching, and follow-cwd settings.
+2. **Firstmate (`bin/firstmate`, `bin/treehouse`, `configs/firstmate/`)**:
+   - Agent fleet orchestrator CLI (`firstmate` and `fm` symlink).
+   - Git worktree runner `treehouse`.
+3. **no-mistakes (`configs/no-mistakes/config.yaml` -> `~/.no-mistakes/config.yaml`)**:
+   - Multi-agent auto-fix, guarded branch synchronization, review provenance capture, and intent extraction.
+4. **Agent Skills & Rules (`agents/` -> `~/.agents/`)**:
+   - Rules: `agents/rules/axi.md` (AXI token-efficient tooling guidelines).
+   - Skills: `herdr`, `firstmate`, `axi`, `agent-architecture-design`, `agent-evals-and-benchmarking`, `agent-memory-and-rag`, `agentic-research-scout`, `mcp-and-tool-engineering`, `multi-agent-orchestrator`.
+5. **AXI Global CLIs**:
+   - Install via npm: `npm install -g gh-axi chrome-devtools-axi tasks-axi quota-axi lavish-axi`.
 
 ## 3. Fast Restoration (Automated)
 

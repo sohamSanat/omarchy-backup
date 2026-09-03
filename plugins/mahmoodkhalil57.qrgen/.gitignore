@@ -1,0 +1,11 @@
+# QML bytecode caches, written next to the sources at runtime
+*.qmlc
+*.jsc
+
+# Nothing here is built at install time. renderer.js is a committed artefact on
+# purpose — see THIRD-PARTY.md — so it is deliberately NOT ignored.
+
+# Editor and OS leavings
+.DS_Store
+*.swp
+*~

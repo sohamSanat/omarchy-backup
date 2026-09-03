@@ -215,6 +215,9 @@ for script_path in "${SCRIPT_DIR}/bin"/*; do
 done
 
 # Set up symlinks for plugins if necessary
+if [[ -f "${USER_HOME}/.local/bin/firstmate" ]]; then
+  ln -nsf "${USER_HOME}/.local/bin/firstmate" "${USER_HOME}/.local/bin/fm"
+fi
 if [[ -f "${USER_HOME}/.config/omarchy/plugins/soham.power/scripts/battery-limiter.sh" ]]; then
   ln -nsf "${USER_HOME}/.config/omarchy/plugins/soham.power/scripts/battery-limiter.sh" "${USER_HOME}/.local/bin/omarchy-battery-limit"
 fi

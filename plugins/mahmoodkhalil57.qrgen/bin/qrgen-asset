@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# Read an image for the centre of a code, and refuse anything that is not one.
+#
+# The path can come from a persisted setting as easily as from the picker, so it
+# is not trusted. Handing it straight to base64 would let a fifo or a character
+# device stall the shell — omarchy-shell runs the bar, the notifications and
+# every other panel, so a stall there is not a local problem — and a large file
+# would be read wholly into its memory at four thirds of its size.
+#
+# So: follow the link once, judge the target, copy at most one byte more than
+# the ceiling, and decide from the bytes actually captured rather than from what
+# the filesystem claimed a moment earlier. Nothing unbounded is ever read, and
+# nothing reaches the shell that has not already been measured.
+#
+# Prints a complete data URI on success. On refusal, prints why on stderr and
+# exits non-zero.
+
+set -uo pipefail
+
+# Generous for a logo — a 512x512 PNG is a few hundred kilobytes — and small
+# enough that the base64 of it, the SVG carrying it, and the exported PNG all
+# stay comfortable.
+readonly MAX_BYTES=$((2 * 1024 * 1024))
+readonly MAX_HUMAN="2 MiB"
+
+path=${1:-}
+[[ -n $path ]] || { echo "No asset given" >&2; exit 2; }
+
+# A symlink to a real image is a normal thing to have; a symlink to /dev/zero is
+# not. Resolve first, then judge what it actually points at.
+resolved=$(readlink -f -- "$path" 2>/dev/null) || resolved=""
+[[ -n $resolved ]] || { echo "Cannot resolve that path" >&2; exit 2; }
+
+# -f is true only for regular files, so this is what rejects fifos, block and
+# character devices, sockets and directories.
+[[ -f $resolved ]] || { echo "Not a regular file" >&2; exit 2; }
+[[ -r $resolved ]] || { echo "Not readable" >&2; exit 2; }
+
+captured=$(mktemp) || exit 2
+trap 'rm -f "$captured"' EXIT
+
+# One byte over the ceiling, so "exactly at the limit" and "too big" are
+# distinguishable. timeout bounds the read even if the file is swapped for
+# something slow between the check above and the open below.
+timeout 10 head -c $((MAX_BYTES + 1)) -- "$resolved" > "$captured" 2>/dev/null
+status=$?
+(( status == 0 )) || { echo "Could not read that file" >&2; exit 2; }
+
+size=$(stat -c '%s' -- "$captured" 2>/dev/null) || size=0
+(( size > 0 )) || { echo "That file is empty" >&2; exit 2; }
+(( size <= MAX_BYTES )) || { echo "That asset is larger than $MAX_HUMAN" >&2; exit 3; }
+
+# Sniffed from the bytes in hand rather than from the name or the original path:
+# an extension proves nothing, and the file on disk may not be the one measured.
+mime=$(file --brief --mime-type -- "$captured" 2>/dev/null) || mime=""
+case $mime in
+  image/*) ;;
+  *) echo "That is not an image${mime:+ (}${mime}${mime:+)}" >&2; exit 4 ;;
+esac
+
+printf 'data:%s;base64,' "$mime"
+base64 -w 0 -- "$captured"

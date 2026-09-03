@@ -1,0 +1,9 @@
+/home/soham/.local/share/mise/installs/node/26.7.0/lib
+├── chrome-devtools-axi@0.1.33
+├── gh-axi@0.1.35
+├── lavish-axi@0.1.63
+├── npm@11.19.0
+├── omniroute@3.8.50
+├── quota-axi@0.1.36
+└── tasks-axi@0.2.5
+

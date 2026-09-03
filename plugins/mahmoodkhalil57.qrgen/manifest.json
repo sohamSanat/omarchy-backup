@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "mahmoodkhalil57.qrgen",
+  "name": "QR generator",
+  "version": "2.0.0",
+  "author": "Mahmood Ihab Khalil",
+  "description": "Turn a link into a styled QR code from the bar — offline, with a scan check",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "QR generator",
+    "description": "Paste a link, get a QR code: shapes, colours, a centre asset, and optional ha.mr link compression. Renders in the shell with nothing to install, and checks that what it drew actually scans.",
+    "category": "Utilities",
+    "allowMultiple": false,
+    "defaults": {}
+  },
+  "license": "MIT"
+}

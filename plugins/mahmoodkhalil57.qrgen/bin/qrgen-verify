@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Read the code on stdin back, and print what it says.
+#
+# The options under Customize can produce a code that looks right and does not
+# scan — a centre asset lands on the middle alignment pattern from version 7 up,
+# and that is structure rather than payload, so error correction cannot put it
+# back. Nothing about the picture says so. The only honest check is to decode
+# what was actually drawn.
+#
+# Rendered onto white first: a transparent background is a legitimate choice,
+# but a decoder handed bare alpha reads it as black and fails a code that is
+# fine everywhere it will really be looked at.
+#
+# Exit 3 means "no decoder here", which the panel treats as no opinion rather
+# than as a failure.
+
+set -uo pipefail
+
+command -v zbarimg >/dev/null 2>&1 || exit 3
+command -v rsvg-convert >/dev/null 2>&1 || exit 3
+
+svg=$(mktemp --suffix=.svg) || exit 3
+png=$(mktemp --suffix=.png) || exit 3
+trap 'rm -f "$svg" "$png"' EXIT
+
+cat > "$svg"
+[[ -s $svg ]] || exit 2
+
+rsvg-convert --width 900 --height 900 --keep-aspect-ratio \
+  --background-color=white "$svg" --output "$png" 2>/dev/null || exit 3
+
+zbarimg --quiet --raw -Sdisable -Sqrcode.enable "$png" 2>/dev/null | head -n 1

@@ -96,6 +96,16 @@
     "has_local_changes": false,
     "dirty_files": []
   },
+  "mahmoodkhalil57.qrgen": {
+    "remote": "https://github.com/MahmoodKhalil57/omarchy-qrgen.git",
+    "commit": "59359588a522dcfe4d7a67454887e7c9e307b054",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M ColourField.qml",
+      "M Model.js",
+      "M Panel.qml"
+    ]
+  },
   "mryll.meteobar": {
     "remote": "https://github.com/mryll/meteobar.git",
     "commit": "c9d3c814156a610d4bd79f53b73fb8d0f35f162d",

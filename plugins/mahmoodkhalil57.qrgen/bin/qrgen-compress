@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Runs qrgen-compress.mjs on whichever JavaScript runtime is around.
+#
+# This is the one optional part of the plugin. ha.mr's compressor is BigInt
+# arithmetic and QML's engine has no BigInt, so link compression — and only link
+# compression — needs node or bun present. Everything else runs in the shell.
+#
+# Exits 127 with a readable JSON error when there is no runtime, so the panel
+# can grey the option out and say why instead of failing silently.
+
+set -uo pipefail
+
+here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+
+runtime=""
+for candidate in node bun; do
+  if command -v "$candidate" >/dev/null 2>&1; then runtime=$candidate; break; fi
+done
+
+if [[ -z $runtime ]]; then
+  for candidate in \
+    "$HOME/.local/share/mise/shims/node" \
+    "$HOME/.local/share/mise/shims/bun" \
+    "$HOME/.bun/bin/bun"
+  do
+    [[ -x $candidate ]] && { runtime=$candidate; break; }
+  done
+fi
+
+if [[ -z $runtime ]]; then
+  echo '{"ok":false,"error":"Link compression needs Node.js or Bun on PATH"}'
+  exit 127
+fi
+
+exec "$runtime" "$here/qrgen-compress.mjs" "$@"
