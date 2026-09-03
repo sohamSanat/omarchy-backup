@@ -139,6 +139,12 @@ This repository contains the full snapshot of user customizations:
 8. **External Repositories**:
    - Refer to `meta/external-repos.json` to inspect or clone upstream repos (`axi`, `compound-engineering-plugin`, `firstmate`, `foliate`, `treehouse`).
 
+
+9. **Pi Harness Integration**:
+   - `configs/pi/agent/AGENTS.md` -> `~/.pi/agent/AGENTS.md` (AXI, Omarchy, and multi-agent rules).
+   - `~/.pi/agent/skills/` links to all skills in `~/.agents/skills/`.
+   - `firstmate launch pi` or setting default via `omarchy default agent pi`.
+
 ## 3. Fast Restoration (Automated)
 
 To apply everything at once, simply clone this repository onto the target Omarchy machine and execute:

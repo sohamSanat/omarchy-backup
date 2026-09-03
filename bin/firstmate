@@ -38,7 +38,7 @@ case "${1:-}" in
     "$FM_HOME/bin/fm-bootstrap.sh" "${@:2}"
     ;;
   launch|start|run)
-    HARNESS="${2:-}"
+    HARNESS="${2:-${FM_HARNESS:-}}"
     if [ -z "$HARNESS" ]; then
       if command -v claude >/dev/null 2>&1; then
         HARNESS="claude"
@@ -46,6 +46,8 @@ case "${1:-}" in
         HARNESS="codex"
       elif command -v opencode >/dev/null 2>&1; then
         HARNESS="opencode"
+      elif command -v pi >/dev/null 2>&1; then
+        HARNESS="pi"
       else
         HARNESS="agy"
       fi
@@ -58,7 +60,7 @@ case "${1:-}" in
     else
       echo "Launching Firstmate ($HARNESS) inside Herdr..."
       if herdr status 2>&1 | grep -q "status: running"; then
-        exec herdr workspace create --label "Firstmate" --cwd "$FM_HOME" --focus
+        exec herdr workspace create --label "Firstmate ($HARNESS)" --cwd "$FM_HOME" --focus
       else
         cd "$FM_HOME"
         exec herdr
@@ -70,7 +72,7 @@ case "${1:-}" in
     echo ""
     echo "Usage:"
     echo "  firstmate [fleet|status]      View live crew status, backlog, and active tasks"
-    echo "  firstmate launch [harness]    Launch the Firstmate agent session inside Herdr"
+    echo "  firstmate launch [harness]    Launch the Firstmate agent session inside Herdr (claude|codex|opencode|pi|agy)"
     echo "  firstmate peek <task-id>      Inspect recent terminal output from a crewmate"
     echo "  firstmate send <task-id> <msg> Send an instruction to a crewmate"
     echo "  firstmate sync                Synchronize projects and branch states"

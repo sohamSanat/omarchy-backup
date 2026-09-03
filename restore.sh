@@ -164,6 +164,43 @@ if [[ -d "${SCRIPT_DIR}/configs/fcitx5" ]]; then
   mkdir -p "${USER_HOME}/.config/fcitx5"
   cp -a "${SCRIPT_DIR}/configs/fcitx5/." "${USER_HOME}/.config/fcitx5/"
 fi
+if [[ -d "${SCRIPT_DIR}/configs/herdr" ]]; then
+  mkdir -p "${USER_HOME}/.config/herdr"
+  cp -a "${SCRIPT_DIR}/configs/herdr/." "${USER_HOME}/.config/herdr/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/no-mistakes" ]]; then
+  mkdir -p "${USER_HOME}/.no-mistakes"
+  cp -a "${SCRIPT_DIR}/configs/no-mistakes/." "${USER_HOME}/.no-mistakes/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/firstmate/config" ]]; then
+  mkdir -p "${USER_HOME}/firstmate/config"
+  cp -a "${SCRIPT_DIR}/configs/firstmate/config/." "${USER_HOME}/firstmate/config/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/opencode" ]]; then
+  mkdir -p "${USER_HOME}/.config/opencode"
+  cp -a "${SCRIPT_DIR}/configs/opencode/." "${USER_HOME}/.config/opencode/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/copilot" ]]; then
+  mkdir -p "${USER_HOME}/.copilot"
+  cp -a "${SCRIPT_DIR}/configs/copilot/." "${USER_HOME}/.copilot/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/pi" ]]; then
+  mkdir -p "${USER_HOME}/.pi/agent"
+  cp -a "${SCRIPT_DIR}/configs/pi/agent/." "${USER_HOME}/.pi/agent/"
+fi
+if [[ -d "${SCRIPT_DIR}/agents" ]]; then
+  mkdir -p "${USER_HOME}/.agents/rules" "${USER_HOME}/.agents/skills"
+  cp -a "${SCRIPT_DIR}/agents/rules/." "${USER_HOME}/.agents/rules/"
+  cp -a "${SCRIPT_DIR}/agents/skills/." "${USER_HOME}/.agents/skills/"
+  echo "  [OK] Agent rules and skills restored."
+  mkdir -p "${USER_HOME}/.pi/agent/skills"
+  for sk in "${USER_HOME}/.agents/skills"/*; do
+    if [[ -e "$sk" ]]; then
+      sk_name="$(basename "$sk")"
+      ln -nsf "$sk" "${USER_HOME}/.pi/agent/skills/${sk_name}"
+    fi
+  done
+fi
 if [[ -f "${SCRIPT_DIR}/configs/shell/bashrc" ]]; then
   backup_if_exists "${USER_HOME}/.bashrc"
   cp -a "${SCRIPT_DIR}/configs/shell/bashrc" "${USER_HOME}/.bashrc"

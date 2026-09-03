@@ -82,6 +82,13 @@ This backup integrates frontier agent tooling and multi-agent fleet operations:
   - GitHub Copilot AXI ambient context hook: `configs/copilot/hooks/lavish-axi.json`.
 - **External Cloned Repositories**: Tracked in `meta/external-repos.json` (`axi`, `compound-engineering-plugin`, `firstmate`, `foliate`, `treehouse`).
 
+
+### 🥧 Pi Coding Agent Harness Integration
+- **Direct Skill Linkage**: All 45+ agent skills from `~/.agents/skills/` are symlinked into `~/.pi/agent/skills/`, giving Pi instant access to `herdr`, `firstmate`, `treehouse`, and all `ce-*` skills.
+- **Global Context & AXI Standards**: `~/.pi/agent/AGENTS.md` equips Pi with AXI tool preference rules, Omarchy safety protocols, and multi-agent coordination instructions.
+- **Fleet Orchestration**: Firstmate (`firstmate launch pi` or `FM_HARNESS=pi`) and `no-mistakes` natively drive Pi for multi-agent loops and verification.
+- **Omarchy Default**: Selectable via `omarchy default agent pi`.
+
 ## 🎨 Themes Included
 
 | Theme | Type | Source / Upstream |
