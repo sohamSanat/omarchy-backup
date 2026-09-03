@@ -1,0 +1,27 @@
+{
+  "axi": {
+    "path": "/home/soham/axi",
+    "remote": "https://github.com/kunchenguid/axi.git",
+    "commit": "470b20c0362cb197f47790f98a6e573ab4293498"
+  },
+  "compound-engineering-plugin": {
+    "path": "/home/soham/compound-engineering-plugin",
+    "remote": "https://github.com/EveryInc/compound-engineering-plugin.git",
+    "commit": "d3c6f12d4b64d36ec9924bb8cf4ad6bb8e97ce5e"
+  },
+  "firstmate": {
+    "path": "/home/soham/firstmate",
+    "remote": "https://github.com/kunchenguid/firstmate.git",
+    "commit": "3d2a08b2097dd24f9ce03fdafe6501e39b79dbd0"
+  },
+  "foliate": {
+    "path": "/home/soham/foliate",
+    "remote": "https://github.com/johnfactotum/foliate.git",
+    "commit": "67b6676d3f936c5edea91d4d903385ef39dd25c0"
+  },
+  "treehouse": {
+    "path": "/home/soham/treehouse",
+    "remote": "https://github.com/kunchenguid/treehouse.git",
+    "commit": "db06078c6f5569e539b8cdb7703f38fdefe06382"
+  }
+}

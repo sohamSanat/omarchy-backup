@@ -1,0 +1,16 @@
+[Unit]
+Description=no-mistakes background daemon
+
+[Service]
+Type=simple
+ExecStart=/home/soham/.no-mistakes/bin/no-mistakes daemon run --root /home/soham/.no-mistakes
+WorkingDirectory=/home/soham/.no-mistakes
+Environment="HOME=/home/soham"
+Environment="PATH=/home/soham/.local/bin:/home/soham/go/bin:/home/soham/.cargo/bin:/home/soham/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin"
+StandardOutput=append:/home/soham/.no-mistakes/logs/daemon-bootstrap.log
+StandardError=append:/home/soham/.no-mistakes/logs/daemon-bootstrap.log
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

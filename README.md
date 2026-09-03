@@ -73,6 +73,15 @@ This backup integrates frontier agent tooling and multi-agent fleet operations:
   - Guidelines and rule set: `~/.agents/rules/axi.md`.
   - Frontier Agent Skills in `~/.agents/skills/`: `herdr`, `firstmate`, `axi`, `agent-architecture-design`, `agent-evals-and-benchmarking`, `agent-memory-and-rag`, `agentic-research-scout`, `mcp-and-tool-engineering`, `multi-agent-orchestrator`.
 
+
+### 🛠️ Compound Engineering & Agent Suite
+- **Treehouse**: Reusable, isolated git worktree engine (`bin/treehouse`, skill in `agents/skills/treehouse`).
+- **Compound Engineering Plugin**: 25+ specialized engineering and orchestration skills (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-code-review`, `ce-debug`, `ce-test-browser`, `lfg`, etc.) in `agents/skills/`.
+- **OpenCode & Copilot Integrations**:
+  - OpenCode AXI & Herdr plugins: `configs/opencode/plugins/` (`axi-*.js`, `herdr-agent-state.js`, `herdr-tui-session.js`).
+  - GitHub Copilot AXI ambient context hook: `configs/copilot/hooks/lavish-axi.json`.
+- **External Cloned Repositories**: Tracked in `meta/external-repos.json` (`axi`, `compound-engineering-plugin`, `firstmate`, `foliate`, `treehouse`).
+
 ## 🎨 Themes Included
 
 | Theme | Type | Source / Upstream |

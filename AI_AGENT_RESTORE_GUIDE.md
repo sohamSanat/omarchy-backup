@@ -130,6 +130,15 @@ This repository contains the full snapshot of user customizations:
 5. **AXI Global CLIs**:
    - Install via npm: `npm install -g gh-axi chrome-devtools-axi tasks-axi quota-axi lavish-axi`.
 
+
+6. **Compound Engineering Skills & Treehouse**:
+   - `agents/skills/` contains the full offline copies of all 34+ skills including `treehouse`, `lfg`, and the entire `ce-*` workflow suite (`ce-plan`, `ce-work`, `ce-code-review`, `ce-debug`, etc.).
+7. **OpenCode & Copilot AXI Context**:
+   - `configs/opencode/` -> `~/.config/opencode/`
+   - `configs/copilot/hooks/lavish-axi.json` -> `~/.copilot/hooks/lavish-axi.json`
+8. **External Repositories**:
+   - Refer to `meta/external-repos.json` to inspect or clone upstream repos (`axi`, `compound-engineering-plugin`, `firstmate`, `foliate`, `treehouse`).
+
 ## 3. Fast Restoration (Automated)
 
 To apply everything at once, simply clone this repository onto the target Omarchy machine and execute:

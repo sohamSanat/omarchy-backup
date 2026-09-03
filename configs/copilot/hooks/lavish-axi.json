@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "node -e 'const { spawnSync } = require(\"node:child_process\"); const command = \"lavish-axi\"; const result = spawnSync(command, [], { encoding: \"utf8\", shell: true }); const detail = result.error ? result.error.message : (result.stderr || result.stdout || \"exit \" + (result.status ?? \"unknown\")); const text = String(result.status === 0 ? result.stdout : detail).trim(); if (!text) { console.log(\"{}\"); process.exit(0); } const prefix = result.status === 0 ? \"## AXI ambient context: lavish-axi\\n\" : \"## AXI ambient context: lavish-axi\\nerror: lavish-axi ambient context failed: \"; console.log(JSON.stringify({ additionalContext: prefix + text }));'",
+        "powershell": "node -e 'const { spawnSync } = require(\"node:child_process\"); const command = \"lavish-axi\"; const result = spawnSync(command, [], { encoding: \"utf8\", shell: true }); const detail = result.error ? result.error.message : (result.stderr || result.stdout || \"exit \" + (result.status ?? \"unknown\")); const text = String(result.status === 0 ? result.stdout : detail).trim(); if (!text) { console.log(\"{}\"); process.exit(0); } const prefix = result.status === 0 ? \"## AXI ambient context: lavish-axi\\n\" : \"## AXI ambient context: lavish-axi\\nerror: lavish-axi ambient context failed: \"; console.log(JSON.stringify({ additionalContext: prefix + text }));'",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}
