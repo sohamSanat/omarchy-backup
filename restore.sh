@@ -185,7 +185,7 @@ if [[ -d "${SCRIPT_DIR}/configs/copilot" ]]; then
   cp -a "${SCRIPT_DIR}/configs/copilot/." "${USER_HOME}/.copilot/"
 fi
 if [[ -d "${SCRIPT_DIR}/configs/pi" ]]; then
-  mkdir -p "${USER_HOME}/.pi/agent"
+  mkdir -p "${USER_HOME}/.pi/agent/themes"
   cp -a "${SCRIPT_DIR}/configs/pi/agent/." "${USER_HOME}/.pi/agent/"
 fi
 if [[ -d "${SCRIPT_DIR}/agents" ]]; then
