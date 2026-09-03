@@ -1,17 +1,31 @@
 {
-  "aether": {
-    "remote": null,
-    "custom": true
-  },
   "aetheria": {
     "remote": "https://github.com/JJDizz1L/aetheria.git",
     "commit": "dcf698e2a16226b8ec8b5a70fe8b1fd153daf0d7",
     "has_local_changes": false,
     "dirty_files": []
   },
+  "akaito": {
+    "remote": "https://github.com/stannorbvb-cmd/akaito.git",
+    "commit": "b39b1b8d0fb7816a73a67e376ea5268ed882c4bc",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "amekoji": {
+    "remote": "https://github.com/atif-1402/omarchy-amekoji-theme.git",
+    "commit": "b9086b539d7c1c3abf6ea6363bd87f43f55b8ea0",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
   "artzen": {
     "remote": "https://github.com/tahfizhabib/omarchy-artzen-theme.git",
     "commit": "d4255350a0ca7acd3f681b5da49e46bd15f41b9a",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "city-783": {
+    "remote": "https://github.com/OldJobobo/omarchy-city-783-theme.git",
+    "commit": "a9ef3ae0a2e16ec1e4664a9b7625e5450080059e",
     "has_local_changes": false,
     "dirty_files": []
   },
@@ -33,12 +47,6 @@
     "has_local_changes": false,
     "dirty_files": []
   },
-  "purple-moon": {
-    "remote": "https://github.com/Grey-007/purple-moon.git",
-    "commit": "8a1e89036b8d8387dd4bf0f240c5ebf4ede200b6",
-    "has_local_changes": false,
-    "dirty_files": []
-  },
   "quattrocento-light": {
     "remote": "https://github.com/r-bart/omarchy-quattrocento-light-theme.git",
     "commit": "c3e4cbaf0b7b5fc1f42df98cd9623f5f0aa6a9c4",
@@ -48,6 +56,12 @@
   "sakura-mochi": {
     "remote": "https://github.com/OldJobobo/omarchy-sakura-mochi-theme.git",
     "commit": "a64fd93e43838366eab7884db6c49721e4d0d27c",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "synthetica": {
+    "remote": "https://github.com/stannorbvb-cmd/synthetica.git",
+    "commit": "caec7ed0cb973f4d791ba5d5422de3738458709a",
     "has_local_changes": false,
     "dirty_files": []
   }

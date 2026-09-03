@@ -8,8 +8,8 @@ This repository ensures your desktop setup is completely reproducible, disaster-
 
 ## 🌟 Customization Highlights
 
-- **Active Theme**: `Sakura Mochi` (with custom live-rendered templates and wallpapers).
-- **Status Bar**: Top floating bar (`charlieras262.floating-bar`) loaded with 18 modular plugins.
+- **Active Theme**: `Aetheria` (with custom live-rendered templates and wallpapers).
+- **Status Bar**: Top floating bar (`charlieras262.floating-bar`) loaded with 19 modular plugins.
 - **Custom Plugins**: Includes `soham.power` (custom battery limiter & power panel developed by Soham), `chispes.agent-gemini`, `io.github.calebhat.themebook`, `io.github.diegopluna.argus`, `io.github.nilszeilon.omarchy-sensei`, `io.github.ricky.whatsapp`, `mryll.meteobar`, `omamail`, and more.
 - **Theme Sync Engine**: Automated hooks (`theme-set.d`) that instantly propagate active theme colors and transparency into:
   - **Zen Browser** (`omarchy-sync-zen` + dynamic `zen.css.tpl`)
@@ -63,15 +63,17 @@ omarchy-backup/
 
 | Theme | Type | Source / Upstream |
 |-------|------|-------------------|
-| **🌸 Sakura Mochi** *(Active)* | Custom | [OldJobobo/omarchy-sakura-mochi-theme](https://github.com/OldJobobo/omarchy-sakura-mochi-theme) |
-| **Aetheria** | Custom | [JJDizz1L/aetheria](https://github.com/JJDizz1L/aetheria) |
+| **🌌 Aetheria** *(Active)* | Custom | [JJDizz1L/aetheria](https://github.com/JJDizz1L/aetheria) |
+| **Akaito** | Custom | [stannorbvb-cmd/akaito](https://github.com/stannorbvb-cmd/akaito) |
+| **Amekoji** | Custom | [atif-1402/omarchy-amekoji-theme](https://github.com/atif-1402/omarchy-amekoji-theme) |
+| **City 783** | Custom | [OldJobobo/omarchy-city-783-theme](https://github.com/OldJobobo/omarchy-city-783-theme) |
+| **Synthetica** | Custom | [stannorbvb-cmd/synthetica](https://github.com/stannorbvb-cmd/synthetica) |
+| **Sakura Mochi** | Custom | [OldJobobo/omarchy-sakura-mochi-theme](https://github.com/OldJobobo/omarchy-sakura-mochi-theme) |
 | **Artzen** | Custom | [tahfizhabib/omarchy-artzen-theme](https://github.com/tahfizhabib/omarchy-artzen-theme) |
 | **Harbor** | Custom | [HANCORE-linux/omarchy-harbor-theme](https://github.com/HANCORE-linux/omarchy-harbor-theme) |
 | **Harbordark** | Custom | [HANCORE-linux/omarchy-harbordark-theme](https://github.com/HANCORE-linux/omarchy-harbordark-theme) |
 | **Moodpeak** | Custom | [HANCORE-linux/omarchy-moodpeak-theme](https://github.com/HANCORE-linux/omarchy-moodpeak-theme) |
-| **Purple Moon** | Custom | [Grey-007/purple-moon](https://github.com/Grey-007/purple-moon) |
 | **Quattrocento Light**| Custom | [r-bart/omarchy-quattrocento-light-theme](https://github.com/r-bart/omarchy-quattrocento-light-theme) |
-| **Aether** | Custom | User Custom Directory |
 
 ---
 
@@ -97,6 +99,7 @@ omarchy-backup/
 | `io.github.adamcbrewer.voxtype-aura` | Voice dictation (Voxtype) OSD audio indicator |
 | `io.github.weedwhitesandwine.obsiduous` | Obsidian notes & vault quick-capture indicator |
 | `x692137x.powerwave` | PowerWave audio visualizer & pulse indicator |
+| `reomarchy.workspace-switcher` | Visual card workspace switcher with animations & digit jump |
 
 ---
 

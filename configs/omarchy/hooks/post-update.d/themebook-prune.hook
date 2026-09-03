@@ -1,0 +1,19 @@
+#!/bin/bash
+# Re-prune themes removed by ThemeBook after an omarchy update
+set -e
+
+THEMEBOOK_JSON="$HOME/.config/omarchy/themebook.json"
+OMARCHY_THEMES_PATH="${OMARCHY_PATH:-/usr/share/omarchy}/themes"
+
+if [[ -f "$THEMEBOOK_JSON" && -d "$OMARCHY_THEMES_PATH" ]] && command -v jq >/dev/null 2>&1; then
+  mapfile -t removed_slugs < <(jq -r '(.removed // [])[]' "$THEMEBOOK_JSON" 2>/dev/null || true)
+  for slug in "${removed_slugs[@]}"; do
+    if [[ -n "$slug" && -d "$OMARCHY_THEMES_PATH/$slug" ]]; then
+      if [[ $EUID -eq 0 ]]; then
+        rm -rf "$OMARCHY_THEMES_PATH/$slug"
+      else
+        pkexec rm -rf "$OMARCHY_THEMES_PATH/$slug"
+      fi
+    fi
+  done
+fi

@@ -114,6 +114,15 @@
     "has_local_changes": false,
     "dirty_files": []
   },
+  "reomarchy.workspace-switcher": {
+    "remote": "https://github.com/cmyk/omarchy-workspace-switcher.git",
+    "commit": "a860155814d0bf563507ff071f4d62b2e7ef81dc",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M WorkspaceSwitcher.qml",
+      "M bindings.lua"
+    ]
+  },
   "soham.power": {
     "remote": null,
     "custom": true

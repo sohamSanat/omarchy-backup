@@ -37,5 +37,11 @@ o.window("(obsidian|md\\.obsidian\\.Obsidian)", {
   opacity = "0.85 0.78",
 })
 
+-- Increase transparency for file managers (Strata & Nautilus) for a glass-like blur effect
+o.window("(io\\.github\\.lgse\\.Strata|strata|org\\.gnome\\.Nautilus|nautilus)", {
+  tag = "-default-opacity",
+  opacity = "0.82 0.75",
+})
+
 -- wmfeht.border-fx (Omarchy plugin control plane; pcall if the file is missing)
 pcall(require, "hypr.border-fx")

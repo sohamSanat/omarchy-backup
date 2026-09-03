@@ -248,7 +248,7 @@ Item {
           break
         }
       }
-      if (!nextTheme) nextTheme = "catppuccin"
+      if (!nextTheme) nextTheme = "tokyo-night"
       applyProc.command = ["omarchy", "theme", "set", nextTheme]
       applyProc.running = true
     }
@@ -257,14 +257,8 @@ Item {
     saveConfig(nextCfg)
     root.syncCycles()
 
-    if (t.source === "user") {
-      removeProc.command = ["omarchy", "theme", "remove", slug]
-      removeProc.running = true
-    } else {
-      notificationProc.command = ["omarchy-notification-send", "Theme removed", t.name || slug]
-      notificationProc.running = true
-      root.reloadCatalog()
-    }
+    removeProc.command = [scriptPath("theme-remove"), slug]
+    removeProc.running = true
   }
 
   function openPicker() {
@@ -932,6 +926,13 @@ Item {
   Process {
     id: removeProc
     stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var raw = String(text || "").trim()
+        if (raw.length) console.warn("theme-remove:", raw)
+      }
+    }
     onExited: root.reloadCatalog()
   }
 

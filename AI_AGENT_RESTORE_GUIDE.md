@@ -78,7 +78,8 @@ This repository contains the full snapshot of user customizations:
 - `aetheria`, `artzen`, `harbor`, `harbordark`, `moodpeak`, `purple-moon`, `quattrocento-light`, `aether`.
 
 ### E. Shell Plugins (`plugins/` -> `~/.config/omarchy/plugins/`)
-18 plugins included with complete source code:
+19 plugins included with complete source code:
+- **`reomarchy.workspace-switcher`**: Visual workspace switcher with hold-Super activation, live screencopy previews, and digit jumping (includes custom patch).
 - **`io.github.adamcbrewer.voxtype-aura`**: Native audio recording OSD for Voxtype dictation.
 - **`io.github.weedwhitesandwine.obsiduous`**: Obsidian status & indexing bar widget (includes custom vault path resolution patch).
 - **`x692137x.powerwave`**: PowerWave audio wave animation indicator.
@@ -214,7 +215,7 @@ cp -a configs/shell/bash_profile ~/.bash_profile
 ### Step 7: Apply Theming & Restart Services
 ```bash
 # 1. Apply theme and font
-omarchy theme set "Sakura Mochi"
+omarchy theme set "Aetheria"
 omarchy font set "JetBrainsMono Nerd Font"
 
 # 2. Rescan plugins and restart quickshell
@@ -235,7 +236,7 @@ Run these commands after restoration to verify system health:
 
 | Component | Verification Command | Expected Outcome |
 |-----------|----------------------|------------------|
-| **Theme** | `omarchy theme current` | Prints `Sakura Mochi` |
+| **Theme** | `omarchy theme current` | Prints `Aetheria` |
 | **Font** | `omarchy font current` | Prints `JetBrainsMono Nerd Font` |
 | **Hyprland** | `hyprctl configerrors` | Prints `ok` (no syntax errors) |
 | **Default Agent** | `omarchy-default-agent` | Prints `antigravity` |

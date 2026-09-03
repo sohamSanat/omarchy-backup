@@ -1801,7 +1801,15 @@ Item {
                     width: btnLabel.implicitWidth + Style.space(16)
                     height: Style.space(30)
                     radius: Style.cornerRadius
-                    color: modelData.id === "apply" ? Util.alpha(root.accent, 0.28) : Util.alpha(root.fg, 0.08)
+                    color: {
+                      if (modelData.id === "apply")
+                        return btnMouseArea.containsMouse ? Util.alpha(root.accent, 0.42) : Util.alpha(root.accent, 0.28)
+                      if (modelData.id === "remove")
+                        return btnMouseArea.containsMouse ? Util.alpha("#e05252", 0.35) : Util.alpha("#e05252", 0.16)
+                      return btnMouseArea.containsMouse ? Util.alpha(root.fg, 0.14) : Util.alpha(root.fg, 0.08)
+                    }
+                    border.color: modelData.id === "remove" ? Util.alpha("#e05252", btnMouseArea.containsMouse ? 0.75 : 0.35) : "transparent"
+                    border.width: modelData.id === "remove" ? 1 : 0
                     Text {
                       textFormat: Text.PlainText
                       id: btnLabel
@@ -1811,12 +1819,15 @@ Item {
                           return "Unfavorite"
                         return modelData.label
                       }
-                      color: root.fg
+                      color: modelData.id === "remove" ? (btnMouseArea.containsMouse ? "#ff8080" : "#f07171") : root.fg
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.caption
+                      font.bold: modelData.id === "remove" || modelData.id === "apply"
                     }
                     MouseArea {
+                      id: btnMouseArea
                       anchors.fill: parent
+                      hoverEnabled: true
                       cursorShape: Qt.PointingHandCursor
                       onClicked: {
                         if (!svc) return
@@ -3141,15 +3152,15 @@ Item {
         visible: root.confirmRemove
         anchors.fill: parent
         z: 30
-        color: Util.alpha(root.bg, 0.72)
+        color: Util.alpha(root.bg, 0.78)
         MouseArea { anchors.fill: parent; onClicked: root.confirmRemove = false }
 
         Rectangle {
-          width: 440
-          height: 175
+          width: 460
+          height: 195
           radius: Style.cornerRadius
           color: root.bg
-          border.color: root.accent
+          border.color: "#e05252"
           border.width: 1
           anchors.centerIn: parent
           MouseArea { anchors.fill: parent; onClicked: { } }
@@ -3157,49 +3168,58 @@ Item {
           Column {
             anchors.centerIn: parent
             spacing: Style.space(12)
-            width: 400
+            width: 410
+            Text {
+              textFormat: Text.PlainText
+              text: "Permanently Remove Theme"
+              color: "#ff7b72"
+              font.bold: true
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.subtitle
+            }
             Text {
               textFormat: Text.PlainText
               width: parent.width
               wrapMode: Text.WordWrap
               text: {
-                if (!root.selected) return "Remove this theme?"
+                if (!root.selected) return "Permanently remove this theme from the system?"
                 var isCurrent = root.selected.slug === (svc ? svc.currentSlug : "")
-                if (root.selected.source === "user") {
-                  if (isCurrent)
-                    return "Remove user theme “" + root.selected.name + "”? This is your active theme. Omarchy will switch to a default theme and delete this theme from disk."
-                  return "Remove user theme “" + root.selected.name + "”? This deletes that theme from your user themes folder."
-                } else {
-                  if (isCurrent)
-                    return "Remove stock theme “" + root.selected.name + "”? This is your active theme. Omarchy will switch to another theme and remove this theme from ThemeBook."
-                  return "Remove stock theme “" + root.selected.name + "”? This removes this theme from your ThemeBook catalog and picker."
-                }
+                if (isCurrent)
+                  return "“" + root.selected.name + "” is your active theme. Omarchy will switch away first and delete this theme permanently from the system."
+                return "Permanently remove “" + root.selected.name + "”? This will delete the theme files from the system for good. This cannot be undone."
               }
               color: root.fg
               font.family: root.fontFamily
+              lineHeight: 1.2
             }
             Row {
-              spacing: Style.space(8)
+              spacing: Style.space(10)
               Rectangle {
-                width: 80
-                height: Style.space(30)
+                width: 90
+                height: Style.space(32)
                 radius: Style.cornerRadius
-                color: Util.alpha(root.fg, 0.08)
+                color: cancelBtnMouse.containsMouse ? Util.alpha(root.fg, 0.14) : Util.alpha(root.fg, 0.08)
                 Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "Cancel"; color: root.fg; font.family: root.fontFamily }
                 MouseArea {
+                  id: cancelBtnMouse
                   anchors.fill: parent
+                  hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: root.confirmRemove = false
                 }
               }
               Rectangle {
-                width: 90
-                height: Style.space(30)
+                width: 140
+                height: Style.space(32)
                 radius: Style.cornerRadius
-                color: Util.alpha(root.accent, 0.28)
-                Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "Remove"; color: root.fg; font.family: root.fontFamily }
+                color: removeConfirmMouse.containsMouse ? "#d73a49" : Util.alpha("#e05252", 0.4)
+                border.color: "#e05252"
+                border.width: 1
+                Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "Delete Forever"; color: "#ffffff"; font.bold: true; font.family: root.fontFamily }
                 MouseArea {
+                  id: removeConfirmMouse
                   anchors.fill: parent
+                  hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: {
                     var slugToRemove = selectedSlug

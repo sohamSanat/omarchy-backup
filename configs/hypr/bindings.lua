@@ -34,3 +34,15 @@ hl.unbind("SUPER + ALT + SHIFT + F")
 o.bind("SUPER + SHIFT + F", "File manager", { launch = "strata" })
 o.bind("SUPER + ALT + SHIFT + F", "File manager (cwd)", "uwsm-app -- strata \"$(omarchy-cmd-terminal-cwd)\"")
 
+
+-- Workspace Switcher: begin
+do
+  local config_home = os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")
+  local path = config_home .. "/omarchy/plugins/reomarchy.workspace-switcher/bindings.lua"
+  local file = io.open(path, "r")
+  if file then
+    file:close()
+    dofile(path)
+  end
+end
+-- Workspace Switcher: end

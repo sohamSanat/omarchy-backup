@@ -42,9 +42,6 @@
           "id": "omarchy.tray"
         },
         {
-          "id": "io.github.r-witz.nothing-ear"
-        },
-        {
           "id": "omaconnect"
         },
         {
@@ -65,8 +62,11 @@
           "id": "io.github.ricky.whatsapp"
         },
         {
+          "id": "io.github.r-witz.nothing-ear"
+        },
+        {
           "id": "jrmmhm.pocket",
-          "members": "omaconnect, jkoestinger.vpn, io.github.elevate08.qs-bitwarden-cli, io.github.nilszeilon.omarchy-sensei, omamail, io.github.ricky.whatsapp"
+          "members": "omaconnect, jkoestinger.vpn, io.github.elevate08.qs-bitwarden-cli, io.github.nilszeilon.omarchy-sensei, omamail, io.github.ricky.whatsapp, io.github.r-witz.nothing-ear"
         },
         {
           "id": "omarchy.bluetooth"
@@ -95,7 +95,7 @@
     "omarchy.menu"
   ],
   "idle": {
-    "lock": 300,
+    "lock": 750,
     "screensaver": 150
   },
   "plugins": [
@@ -110,6 +110,9 @@
     },
     {
       "id": "io.github.adamcbrewer.voxtype-aura"
+    },
+    {
+      "id": "reomarchy.workspace-switcher"
     }
   ],
   "version": 1

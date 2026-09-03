@@ -250,7 +250,7 @@ echo ""
 echo "==> Step 11: Applying customizations and restarting components..."
 if command -v omarchy >/dev/null 2>&1; then
   echo "  -> Setting theme: Sakura Mochi"
-  omarchy theme set "Sakura Mochi" || true
+  omarchy theme set "Aetheria" || true
 
   echo "  -> Setting font: JetBrainsMono Nerd Font"
   omarchy font set "JetBrainsMono Nerd Font" || true
@@ -272,7 +272,7 @@ fi
 echo ""
 echo "========================================================"
 echo "  Customizations Restored Successfully!"
-echo "  - Current theme: Sakura Mochi"
+echo "  - Current theme: Aetheria"
 echo "  - Current font: JetBrainsMono Nerd Font"
 echo "  - Bar Layout: Custom floating bar with 14 plugins"
 echo "  - Window Manager: Hyprland with blur, scale 2, and custom bindings"

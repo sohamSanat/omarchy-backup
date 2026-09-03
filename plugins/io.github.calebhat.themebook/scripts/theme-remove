@@ -1,0 +1,83 @@
+#!/bin/bash
+# Remove a theme permanently from the system (user themes and/or stock themes)
+set -eo pipefail
+
+slug="${1:-}"
+
+if [[ -z "$slug" || "$slug" == .* || "$slug" == */* || "$slug" =~ [^a-zA-Z0-9_-] ]]; then
+  echo "Error: Invalid theme slug '$slug'" >&2
+  exit 1
+fi
+
+USER_THEMES_PATH="$HOME/.config/omarchy/themes"
+OMARCHY_THEMES_PATH="${OMARCHY_PATH:-/usr/share/omarchy}/themes"
+USER_BG_PATH="$HOME/.config/omarchy/backgrounds/$slug"
+CACHE_SELECTOR="$HOME/.cache/omarchy/theme-selector"
+STATE_CURRENT="$HOME/.local/state/omarchy/current"
+BACKUP_DIR="$HOME/omarchy-backup/deleted-stock-themes"
+
+# 1. Check if theme is currently active. If so, switch away first!
+current_slug=""
+if [[ -f "$STATE_CURRENT/theme.name" ]]; then
+  current_slug=$(cat "$STATE_CURRENT/theme.name" 2>/dev/null || true)
+fi
+
+if [[ "$current_slug" == "$slug" ]]; then
+  next_theme=""
+  for d in "$USER_THEMES_PATH"/* "$OMARCHY_THEMES_PATH"/*; do
+    if [[ -d "$d" ]]; then
+      cand="${d##*/}"
+      if [[ "$cand" != "$slug" && "$cand" != "*" ]]; then
+        next_theme="$cand"
+        break
+      fi
+    fi
+  done
+  if [[ -z "$next_theme" ]]; then
+    next_theme="tokyo-night"
+  fi
+  omarchy theme set "$next_theme" >/dev/null 2>&1 || true
+fi
+
+removed_something=false
+
+# 2. Remove user theme if present
+if [[ -d "$USER_THEMES_PATH/$slug" || -L "$USER_THEMES_PATH/$slug" ]]; then
+  rm -rf "$USER_THEMES_PATH/$slug"
+  removed_something=true
+fi
+
+# 3. Remove stock theme if present
+if [[ -d "$OMARCHY_THEMES_PATH/$slug" ]]; then
+  # Safely backup to backup folder before deleting
+  mkdir -p "$BACKUP_DIR"
+  cp -a "$OMARCHY_THEMES_PATH/$slug" "$BACKUP_DIR/" 2>/dev/null || true
+  if [[ $EUID -eq 0 ]]; then
+    rm -rf "$OMARCHY_THEMES_PATH/$slug"
+  else
+    pkexec rm -rf "$OMARCHY_THEMES_PATH/$slug"
+  fi
+  removed_something=true
+fi
+
+# 4. Clean up user backgrounds for this theme
+if [[ -d "$USER_BG_PATH" ]]; then
+  rm -rf "$USER_BG_PATH"
+fi
+
+# 5. Clean up selector preview cache
+rm -f "$CACHE_SELECTOR/previews/$slug".* 2>/dev/null || true
+rm -f "$CACHE_SELECTOR/signature" "$CACHE_SELECTOR/fast-signature" 2>/dev/null || true
+
+# 6. Preload theme switcher so it updates immediately
+if command -v omarchy-theme-switcher >/dev/null 2>&1; then
+  omarchy-theme-switcher --preload >/dev/null 2>&1 || true
+fi
+
+# 7. Desktop notification
+pretty_name=$(echo "$slug" | sed -E 's/(^|-)([a-z])/\1\u\2/g; s/-/ /g')
+if command -v omarchy-notification-send >/dev/null 2>&1; then
+  omarchy-notification-send "Theme removed" "$pretty_name" 2>/dev/null || true
+fi
+
+echo "Removed $slug from system"
