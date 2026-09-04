@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "kenny.nightlight",
+  "name": "Night Light",
+  "version": "1.1.0",
+  "author": "Kenny Keeton",
+  "license": "MIT",
+  "description": "f.lux-style color temperature: slider, sunrise/sunset schedule, presets, and pause.",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Night Light",
+    "description": "Color temperature slider, auto sunrise/sunset schedule, and presets",
+    "category": "Display",
+    "allowMultiple": false,
+    "defaultSection": "center"
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.nightlight"
+  }
+}

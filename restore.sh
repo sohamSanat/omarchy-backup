@@ -164,6 +164,19 @@ if [[ -d "${SCRIPT_DIR}/configs/fcitx5" ]]; then
   mkdir -p "${USER_HOME}/.config/fcitx5"
   cp -a "${SCRIPT_DIR}/configs/fcitx5/." "${USER_HOME}/.config/fcitx5/"
 fi
+if [[ -d "${SCRIPT_DIR}/configs/zen" ]]; then
+  echo "  -> Restoring Zen Browser customizations & styles..."
+  mkdir -p "${USER_HOME}/.config/zen"
+  for profile_dir in "${USER_HOME}/.config/zen"/*; do
+    if [[ -d "$profile_dir" && ( "$profile_dir" == *"Default"* || -f "$profile_dir/prefs.js" ) ]]; then
+      mkdir -p "$profile_dir/chrome"
+      cp -a "${SCRIPT_DIR}/configs/zen/chrome/." "$profile_dir/chrome/"
+      cp -a "${SCRIPT_DIR}/configs/zen/user.js" "$profile_dir/user.js" 2>/dev/null || true
+      cp -a "${SCRIPT_DIR}/configs/zen/"*.json "$profile_dir/" 2>/dev/null || true
+    fi
+  done
+  echo "  [OK] Zen Browser chrome CSS, shortcuts, and preferences restored."
+fi
 if [[ -d "${SCRIPT_DIR}/configs/herdr" ]]; then
   mkdir -p "${USER_HOME}/.config/herdr"
   cp -a "${SCRIPT_DIR}/configs/herdr/." "${USER_HOME}/.config/herdr/"
@@ -299,6 +312,12 @@ echo "==> Step 11: Applying customizations and restarting components..."
 if command -v omarchy >/dev/null 2>&1; then
   echo "  -> Setting theme: Aetheria"
   omarchy theme set "Aetheria" || true
+
+  
+  if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-zen" ]]; then
+    echo "  -> Syncing Zen Browser with active Omarchy theme..."
+    "${USER_HOME}/.local/bin/omarchy-sync-zen" 2>/dev/null || true
+  fi
 
   echo "  -> Setting font: JetBrainsMono Nerd Font"
   omarchy font set "JetBrainsMono Nerd Font" || true

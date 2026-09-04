@@ -9,7 +9,7 @@ This repository ensures your desktop setup is completely reproducible, disaster-
 ## 🌟 Customization Highlights
 
 - **Active Theme**: `Aetheria` (with custom live-rendered templates and wallpapers).
-- **Status Bar**: Top floating bar (`charlieras262.floating-bar`) loaded with 20 modular plugins.
+- **Status Bar**: Top floating bar (`charlieras262.floating-bar`) loaded with 22 modular plugins.
 - **Custom Plugins**: Includes `soham.power` (custom battery limiter & power panel developed by Soham), `chispes.agent-gemini`, `io.github.calebhat.themebook`, `io.github.diegopluna.argus`, `io.github.nilszeilon.omarchy-sensei`, `io.github.ricky.whatsapp`, `mryll.meteobar`, `omamail`, and more.
 - **Theme Sync Engine**: Automated hooks (`theme-set.d`) that instantly propagate active theme colors and transparency into:
   - **Zen Browser** (`omarchy-sync-zen` + dynamic `zen.css.tpl`)
@@ -96,6 +96,22 @@ This backup integrates frontier agent tooling and multi-agent fleet operations:
 - **Stremio Flatpak (`desktop-entries/com.stremio.Stremio.desktop`, `meta/flatpak-packages.txt`)**: Media player installed via Flatpak.
 - **Lavish AXI (`lavish-axi` repo, skills: `lavish`, `lavish-design`)**: Turns complex artifacts, plans, and reports into interactive visual whiteboards and review boards.
 
+
+### 🌐 Zen Browser Custom Glass Engine & Theming
+- **`configs/zen/chrome/`**:
+  - `userChrome.css` & `userContent.css`: Imports dynamic Omarchy theme variables and retro styling.
+  - `matugen-retro.css` & `matugen-retro-content.css`: 120KB+ custom retro UI and web content stylesheets.
+  - Transparent glass rules for `about:blank`, `about:newtab`, and `about:home`.
+- **Dynamic Theme Hook Integration**:
+  - `bin/omarchy-sync-zen`: Dynamically compiles active Omarchy theme colors into CSS tokens and pushes them to all discovered Zen profiles.
+  - Hook in `configs/omarchy/hooks/theme-set.d/zen-sync.sh`: Auto-refreshes browser styling whenever Omarchy theme changes.
+- **Preferences & Shortcuts**:
+  - `zen-keyboard-shortcuts.json` & `user.js` enabling native Linux widget transparency, custom gradient colors, and compact UI.
+
+### 🖨️ Printer Control Suite (Canon G2060)
+- **`bin/printer`**: Full CLI tool for printer status, IPP ink level gauges, test page printing, maintenance routines (nozzle check, deep cleaning), and CUPS administration.
+- **`bin/printbar`**: Embedded status daemon for the `mryll.printbar` status bar widget.
+
 ## 🎨 Themes Included
 
 | Theme | Type | Source / Upstream |
@@ -137,6 +153,9 @@ This backup integrates frontier agent tooling and multi-agent fleet operations:
 | `io.github.weedwhitesandwine.obsiduous` | Obsidian notes & vault quick-capture indicator |
 | `x692137x.powerwave` | PowerWave audio visualizer & pulse indicator |
 | `reomarchy.workspace-switcher` | Visual card workspace switcher with animations & digit jump |
+| `kenny.nightlight` | Custom nightlight / blue-light filter bar control widget |
+| `mryll.printbar` | Hardware printer status, ink levels & Canon G2060 maintenance panel |
+| `soham.agents` | Custom Omarchy agents selector with bespoke icons and quick actions |
 | `mahmoodkhalil57.qrgen` | Interactive QR Code generator & bar widget with active theme adaptation |
 
 ---

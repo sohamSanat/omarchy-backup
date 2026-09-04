@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Agentic Engineering Setup (Herdr, Firstmate, Treehouse, Compound Engineering, AXI)
+export HERDR_ENV=1
+export FM_BACKEND=herdr
+exec firstmate fleet "$@"

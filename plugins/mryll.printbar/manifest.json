@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "id": "mryll.printbar",
+  "name": "Printbar",
+  "version": "0.5.2",
+  "author": "mryll",
+  "license": "MIT",
+  "description": "Printer status, supplies, trays and jobs (printbar) in the Omarchy bar.",
+  "kinds": [
+    "panel",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "barWidget": "omarchy/BarWidget.qml",
+    "panel": "omarchy/Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Printer",
+    "description": "Click: status panel. Right click: printer web panel (EWS). Middle click: refresh.",
+    "category": "Hardware",
+    "allowMultiple": true,
+    "defaultSection": "right",
+    "defaults": {
+      "printerName": "office",
+      "refreshIntervalSec": 30,
+      "configPath": "",
+      "hideWhenIdle": false,
+      "colorMode": "full"
+    },
+    "schema": [
+      {
+        "key": "printerName",
+        "type": "string",
+        "label": "Printer name",
+        "defaultValue": "office",
+        "description": "The [printer.<name>] section in printbar's config.toml."
+      },
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "description": "How often to poll the printer. Each poll is one request on the LAN, so a short interval is cheap — but a sleeping printer may take a few seconds to answer.",
+        "min": 5,
+        "max": 3600,
+        "step": 5,
+        "defaultValue": 30
+      },
+      {
+        "key": "configPath",
+        "type": "path",
+        "label": "Config file override",
+        "defaultValue": "",
+        "description": "Optional. Passed to printbar as PRINTBAR_CONFIG; empty uses ~/.config/printbar/config.toml."
+      },
+      {
+        "key": "hideWhenIdle",
+        "type": "boolean",
+        "label": "Hide when idle",
+        "defaultValue": false,
+        "description": "Show the widget only while printing or when the printer needs attention."
+      },
+      {
+        "key": "colorMode",
+        "type": "enum",
+        "label": "Colors",
+        "options": [
+          "full",
+          "none",
+          "bar-only",
+          "panel-only"
+        ],
+        "defaultValue": "full",
+        "description": "Monochrome rendering uses foreground tones only — severity stays readable through the numbers and glyphs. none: no color anywhere. bar-only: colored bar face, plain panel. panel-only: the reverse."
+      }
+    ]
+  }
+}

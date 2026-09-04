@@ -1,0 +1,644 @@
+/* ==========================================================================
+   Zen Browser - Matugen Retro Lo-Fi Rice Theme
+   Inspired by the warm espresso, framed container, and peach-accented rice.
+   Preserves Zen Browser's iconic usability and layout while infusing the
+   distinctive retro-framed aesthetic.
+   ========================================================================== */
+
+:root,
+#main-window,
+body {
+  /* --- Palette Tokens (dynamically inherited from active Omarchy theme) --- */
+  --matugen-bg: var(--omarchy-bg, #141110);
+  --matugen-bg-darker: var(--omarchy-bg-darker, #0d0b0a);
+  --matugen-bg-surface: var(--omarchy-bg-surface, #1a1513);
+  --matugen-bg-card: var(--omarchy-bg-card, #221b18);
+  --matugen-bg-card-hover: var(--omarchy-bg-card-hover, #2c221f);
+  --matugen-bg-card-active: var(--omarchy-bg-card-active, #352824);
+
+  /* Framed Borders (dynamically tracked from Omarchy theme palette) */
+  --matugen-border-subtle: var(--omarchy-border-subtle, #382823);
+  --matugen-border: var(--omarchy-border, #5e3f36);
+  --matugen-border-highlight: var(--omarchy-border-highlight, #8c5a4d);
+  --matugen-border-active: var(--omarchy-border-active, #e07a5f);
+
+  /* Theme Accents */
+  --matugen-accent: var(--omarchy-accent, #e07a5f);
+  --matugen-accent-bright: var(--omarchy-accent-bright, #f49d85);
+  --matugen-accent-soft: var(--omarchy-accent-soft, rgba(224, 122, 95, 0.16));
+  --matugen-accent-glow: var(--omarchy-accent-glow, 0 0 12px rgba(224, 122, 95, 0.28));
+
+  /* Typography */
+  --matugen-fg: var(--omarchy-fg, #f5ebe0);
+  --matugen-fg-bright: var(--omarchy-fg-bright, #fff6ee);
+  --matugen-fg-muted: var(--omarchy-fg-muted, #a89388);
+  --matugen-fg-dark: var(--omarchy-fg-dark, #6e5e57);
+
+  /* Pill Buttons */
+  --matugen-pill-bg: var(--omarchy-pill-bg, var(--omarchy-accent, #e07a5f));
+  --matugen-pill-fg: var(--omarchy-pill-fg, #141110);
+  --matugen-btn-bg: var(--omarchy-btn-bg, color-mix(in srgb, var(--matugen-fg) 8%, transparent));
+  --matugen-btn-bg-hover: var(--omarchy-btn-bg-hover, color-mix(in srgb, var(--matugen-fg) 16%, transparent));
+  --matugen-btn-border: var(--omarchy-btn-border, color-mix(in srgb, var(--matugen-fg) 12%, transparent));
+
+  /* Theme Green & UI Button Icon Palette */
+  --matugen-green: var(--omarchy-green, #556753);
+  --matugen-icon-color: var(--omarchy-icon-color, #556753);
+  --matugen-icon-color-hover: var(--omarchy-icon-color-hover, var(--matugen-accent));
+
+  /* --- Zen Browser Overrides --- */
+  --zen-primary-color: var(--matugen-accent) !important;
+  --zen-branding-dark: var(--matugen-bg-darker) !important;
+  --zen-branding-paper: var(--matugen-fg-muted) !important;
+  --zen-branding-bg: var(--matugen-bg) !important;
+  --zen-branding-bg-reverse: var(--matugen-fg-bright) !important;
+
+  --zen-colors-primary: var(--matugen-accent) !important;
+  --zen-colors-secondary: var(--matugen-bg-card) !important;
+  --zen-colors-tertiary: var(--matugen-bg-surface) !important;
+  --zen-colors-hover-bg: var(--matugen-bg-card-hover) !important;
+  --zen-colors-primary-foreground: var(--matugen-pill-fg) !important;
+  --zen-colors-border: var(--matugen-border) !important;
+  --zen-colors-border-contrast: var(--matugen-border-highlight) !important;
+  --zen-colors-input-bg: var(--matugen-bg-card) !important;
+
+  --zen-toolbar-element-bg: var(--matugen-bg-card) !important;
+  --zen-toolbar-element-bg-hover: var(--matugen-bg-card-hover) !important;
+
+  --zen-main-browser-background: var(--matugen-bg) !important;
+  --zen-main-browser-background-toolbar: var(--matugen-bg-surface) !important;
+  --zen-themed-toolbar-bg-transparent: transparent !important;
+  --zen-dialog-background: var(--matugen-bg-surface) !important;
+  --zen-in-content-dialog-background: var(--matugen-bg-surface) !important;
+  --zen-urlbar-background: var(--matugen-bg-card) !important;
+
+  --zen-sidebar-notification-bg: var(--matugen-accent) !important;
+  --zen-sidebar-notification-shadow: var(--matugen-accent-glow) !important;
+  --zen-sidebar-themed-icon-fill: var(--matugen-icon-color) !important;
+  --zen-split-view-active-tab-bg: var(--matugen-bg-card) !important;
+  --zen-theme-picker-dot-color: var(--matugen-accent) !important;
+  --zen-loading-progress-bar-color: var(--matugen-accent) !important;
+
+  /* Standard Toolbar & Tab Variables */
+  --toolbar-bgcolor: var(--matugen-bg-surface) !important;
+  --toolbar-color: var(--matugen-icon-color) !important;
+  --toolbarbutton-icon-fill: var(--matugen-icon-color) !important;
+  --toolbarbutton-icon-fill-opacity: 1 !important;
+  --lwt-toolbarbutton-icon-fill: var(--matugen-icon-color) !important;
+  --lwt-toolbarbutton-icon-fill-attention: var(--matugen-accent) !important;
+  --toolbarbutton-hover-background: var(--matugen-accent-soft) !important;
+  --toolbarbutton-active-background: var(--matugen-accent-soft) !important;
+  --toolbarbutton-border-radius: 8px !important;
+
+  --tab-selected-bgcolor: var(--matugen-bg-card-active) !important;
+  --tab-selected-textcolor: var(--matugen-fg-bright) !important;
+  --tab-background-color-hover: var(--matugen-bg-card-hover) !important;
+
+  --toolbar-field-background-color: var(--matugen-bg-card) !important;
+  --toolbar-field-color: var(--matugen-fg) !important;
+  --toolbar-field-focus-background-color: var(--matugen-bg-surface) !important;
+  --toolbar-field-focus-color: var(--matugen-fg-bright) !important;
+  --toolbar-field-border-color: var(--matugen-border) !important;
+
+  --arrowpanel-background: var(--matugen-bg-surface) !important;
+  --arrowpanel-color: var(--matugen-fg) !important;
+  --arrowpanel-border-color: var(--matugen-border) !important;
+  --panel-separator-color: var(--matugen-border-subtle) !important;
+
+  --sidebar-background-color: var(--matugen-bg-darker) !important;
+  --sidebar-text-color: var(--matugen-fg) !important;
+  --sidebar-border-color: var(--matugen-border-subtle) !important;
+  --lwt-sidebar-background-color: var(--matugen-bg-darker) !important;
+  --lwt-sidebar-text-color: var(--matugen-fg) !important;
+
+  /* Scrollbars */
+  scrollbar-color: var(--matugen-border) var(--matugen-bg) !important;
+}
+
+/* ==========================================================================
+   Window, Toolbars & Main Containers
+   ========================================================================== */
+
+#main-window,
+#browser,
+#zen-browser-background,
+.zen-browser-generic-background,
+.zen-browser-generic-background::after,
+.zen-browser-generic-background::before {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+#navigator-toolbox,
+#zen-sidebar-top-buttons,
+#zen-appcontent-navbar-wrapper {
+  background-color: var(--matugen-bg-surface) !important;
+  border-bottom: 1px solid var(--matugen-border-subtle) !important;
+}
+
+/* Symmetrical floating content margins (ensuring equal space on top, left, bottom, right) */
+:root:not([inDOMFullscreen="true"]) #zen-tabbox-wrapper,
+:root:not([inDOMFullscreen="true"]):not([chromehidden~="location"]):not([chromehidden~="toolbar"]) #zen-tabbox-wrapper,
+:root:not([inDOMFullscreen="true"]):not([zen-right-side="true"]) #zen-tabbox-wrapper,
+:root:not([inDOMFullscreen="true"])[zen-right-side="true"] #zen-tabbox-wrapper {
+  margin: var(--zen-element-separation, 8px) !important;
+}
+
+:root[inDOMFullscreen="true"] #zen-tabbox-wrapper,
+:root[inDOMFullscreen="true"] #tabbrowser-tabbox,
+:root[inDOMFullscreen="true"] #tabbrowser-tabbox #tabbrowser-tabpanels .browserSidebarContainer {
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Framed Web Content Container (Signature 'Video' panel styling from rice) */
+:root:not([inDOMFullscreen="true"]) #tabbrowser-tabbox #tabbrowser-tabpanels .browserSidebarContainer {
+  border: 1px solid var(--matugen-border) !important;
+  border-radius: 10px !important;
+  overflow: clip !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+:root:not([inDOMFullscreen="true"]) #tabbrowser-tabbox #tabbrowser-tabpanels .browserSidebarContainer:focus-within {
+  border-color: var(--matugen-border-highlight) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.55), var(--matugen-accent-glow) !important;
+}
+
+#tabbrowser-tabpanels,
+.browserStack,
+browser[type="content"] {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Compact mode toolbar background */
+.zen-toolbar-background {
+  background: var(--matugen-bg-surface) !important;
+  border: 1px solid var(--matugen-border-subtle) !important;
+  border-radius: 10px !important;
+}
+
+/* ==========================================================================
+   URL Bar (Framed search pill inspired by the screenshot's Nav bar)
+   ========================================================================== */
+
+#urlbar-container {
+  padding-block: 2px !important;
+}
+
+#urlbar {
+  --toolbarbutton-border-radius: 8px !important;
+}
+
+.urlbar-background,
+#urlbar-background {
+  background: var(--matugen-bg-card) !important;
+  background-color: var(--matugen-bg-card) !important;
+  border: 1px solid var(--matugen-border) !important;
+  border-radius: 9px !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+#urlbar:hover .urlbar-background,
+#urlbar:hover #urlbar-background {
+  border-color: var(--matugen-border-highlight) !important;
+  background-color: var(--matugen-bg-card-hover) !important;
+}
+
+#urlbar[focused="true"] .urlbar-background,
+#urlbar[focused="true"] #urlbar-background {
+  border-color: var(--matugen-accent) !important;
+  background-color: var(--matugen-bg-surface) !important;
+  box-shadow: 0 0 0 1px var(--matugen-accent), var(--matugen-accent-glow) !important;
+}
+
+#urlbar-input {
+  color: var(--matugen-fg) !important;
+  font-size: 13px !important;
+}
+
+#urlbar-input::selection {
+  background-color: var(--matugen-accent) !important;
+  color: #141110 !important;
+}
+
+#urlbar-input::placeholder {
+  color: var(--matugen-fg-muted) !important;
+}
+
+/* URL bar buttons / page actions */
+#urlbar .urlbar-page-action,
+#urlbar .identity-box-button,
+#tracking-protection-icon-container,
+#identity-permission-box {
+  border-radius: 6px !important;
+  transition: background-color 0.15s ease !important;
+}
+
+#urlbar .urlbar-page-action:hover,
+#urlbar .identity-box-button:hover {
+  background-color: var(--matugen-accent-soft) !important;
+}
+
+/* Autocomplete Popup */
+.urlbarView {
+  background-color: var(--matugen-bg-surface) !important;
+  border: 1px solid var(--matugen-border) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6) !important;
+  margin-top: 4px !important;
+}
+
+.urlbarView-row {
+  border-radius: 6px !important;
+  margin: 2px 4px !important;
+  transition: background-color 0.15s ease !important;
+}
+
+.urlbarView-row[selected],
+.urlbarView-row:hover {
+  background-color: var(--matugen-bg-card-hover) !important;
+  border-left: 3px solid var(--matugen-accent) !important;
+}
+
+.urlbarView-row[selected] .urlbarView-title,
+.urlbarView-row:hover .urlbarView-title {
+  color: var(--matugen-fg-bright) !important;
+}
+
+.urlbarView-url {
+  color: var(--matugen-accent-bright) !important;
+}
+
+/* ==========================================================================
+   Zen Sidebar & Vertical Tabs
+   ========================================================================== */
+
+#sidebar-box,
+#sidebar-main,
+#zen-sidebar-box {
+  background-color: var(--matugen-bg-darker) !important;
+  border-right: 1px solid var(--matugen-border-subtle) !important;
+}
+
+/* Tab Cards */
+.tabbrowser-tab {
+  margin: 3px 6px !important;
+  border-radius: 8px !important;
+}
+
+.tabbrowser-tab .tab-background {
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.tabbrowser-tab:hover:not([selected]) .tab-background {
+  background-color: var(--matugen-bg-card) !important;
+  border-color: var(--matugen-border-subtle) !important;
+}
+
+.tabbrowser-tab[selected] .tab-background {
+  background-color: var(--matugen-bg-card-active) !important;
+  border: 1px solid var(--matugen-border-active) !important;
+  box-shadow: 0 2px 10px var(--matugen-accent-soft) !important;
+}
+
+/* Active tab left glowing accent */
+.tabbrowser-tab[selected] .tab-background::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 20%;
+  height: 60%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background-color: var(--matugen-accent-bright);
+  box-shadow: 0 0 8px var(--matugen-accent);
+}
+
+.tabbrowser-tab .tab-label {
+  color: var(--matugen-fg-muted) !important;
+  transition: color 0.15s ease !important;
+}
+
+.tabbrowser-tab:hover .tab-label {
+  color: var(--matugen-fg) !important;
+}
+
+.tabbrowser-tab[selected] .tab-label {
+  color: var(--matugen-fg-bright) !important;
+  font-weight: 600 !important;
+}
+
+.tabbrowser-tab .tab-close-button {
+  border-radius: 4px !important;
+  transition: all 0.15s ease !important;
+}
+
+.tabbrowser-tab .tab-close-button:hover {
+  background-color: var(--matugen-accent-soft) !important;
+  color: var(--matugen-accent-bright) !important;
+}
+
+/* ==========================================================================
+   Zen Workspaces & Sidebar Footer (Pill Design)
+   ========================================================================== */
+
+.zen-workspace-button,
+#zen-workspaces-button toolbarbutton,
+#zen-sidebar-foot-buttons toolbarbutton {
+  border: 1px solid var(--matugen-border-subtle) !important;
+  background-color: var(--matugen-bg-card) !important;
+  border-radius: 14px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.zen-workspace-button:hover,
+#zen-workspaces-button toolbarbutton:hover,
+#zen-sidebar-foot-buttons toolbarbutton:hover {
+  border-color: var(--matugen-border-highlight) !important;
+  background-color: var(--matugen-bg-card-hover) !important;
+  transform: translateY(-1px) !important;
+}
+
+.zen-workspace-button[active="true"],
+#zen-workspaces-button toolbarbutton[active="true"] {
+  border-color: var(--matugen-accent) !important;
+  background-color: var(--matugen-accent) !important;
+  color: var(--matugen-pill-fg) !important;
+  font-weight: 700 !important;
+  box-shadow: var(--matugen-accent-glow) !important;
+}
+
+.zen-workspace-indicator {
+  fill: var(--matugen-accent) !important;
+}
+
+/* Sidebar Top Action Buttons */
+#zen-sidebar-top-buttons toolbarbutton {
+  border-radius: 8px !important;
+  transition: background-color 0.15s ease !important;
+}
+
+#zen-sidebar-top-buttons toolbarbutton:hover {
+  background-color: var(--matugen-accent-soft) !important;
+}
+
+/* ==========================================================================
+   Split View & Popups
+   ========================================================================== */
+
+#zen-split-views-box {
+  background-color: var(--matugen-border-subtle) !important;
+}
+
+.zen-split-view-modifier {
+  border: 1px solid var(--matugen-border) !important;
+}
+
+/* Context Menus & Panels */
+menupopup,
+panel {
+  --panel-background: var(--matugen-bg-surface) !important;
+  --panel-border-color: var(--matugen-border) !important;
+  --panel-color: var(--matugen-fg) !important;
+  border-radius: 8px !important;
+}
+
+menupopup menuitem,
+menupopup menu {
+  border-radius: 6px !important;
+  color: var(--matugen-fg) !important;
+}
+
+menupopup menuitem:hover,
+menupopup menu:hover,
+menupopup menuitem[_moz-menuactive="true"] {
+  background-color: var(--matugen-bg-card-hover) !important;
+  color: var(--matugen-accent-bright) !important;
+}
+
+/* Findbar */
+findbar {
+  background-color: var(--matugen-bg-surface) !important;
+  border-top: 1px solid var(--matugen-border) !important;
+  color: var(--matugen-fg) !important;
+  border-radius: 8px 8px 0 0 !important;
+}
+
+findbar .findbar-textbox {
+  background-color: var(--matugen-bg-card) !important;
+  border: 1px solid var(--matugen-border) !important;
+  border-radius: 6px !important;
+  color: var(--matugen-fg) !important;
+}
+
+findbar .findbar-textbox:focus {
+  border-color: var(--matugen-accent) !important;
+}
+
+/* ==========================================================================
+   Top Toolbar & Sidebar UI Buttons (Theme Green Styling)
+   Fixes white buttons on light/cream backgrounds
+   ========================================================================== */
+
+#navigator-toolbox,
+#nav-bar,
+#zen-sidebar-top-buttons,
+#zen-sidebar-foot-buttons,
+#zen-workspaces-button,
+.zen-current-workspace-indicator {
+  --toolbarbutton-icon-fill: var(--matugen-icon-color) !important;
+  --toolbarbutton-icon-fill-opacity: 1 !important;
+  --toolbar-color: var(--matugen-icon-color) !important;
+  --zen-sidebar-themed-icon-fill: var(--matugen-icon-color) !important;
+  color: var(--matugen-icon-color) !important;
+  fill: var(--matugen-icon-color) !important;
+}
+
+/* Top Navigation & Sidebar Buttons (Back, Forward, Refresh, Menu, Close, etc.) */
+#back-button,
+#forward-button,
+#reload-button,
+#stop-button,
+#stop-reload-button,
+#PanelUI-menu-button,
+.titlebar-button,
+.titlebar-min,
+.titlebar-max,
+.titlebar-restore,
+.titlebar-close,
+#zen-toggle-compact-mode,
+#zen-compact-mode-button,
+#zen-sidebar-top-buttons toolbarbutton,
+#zen-sidebar-foot-buttons toolbarbutton,
+#zen-workspaces-button toolbarbutton,
+#tabs-newtab-button,
+#new-tab-button,
+#zen-tabs-newtab-button,
+#downloads-button,
+#zen-create-new-button,
+#unified-extensions-button,
+#identity-box,
+#tracking-protection-icon-container,
+.urlbar-icon,
+.urlbar-page-action,
+.tab-close-button,
+.toolbarbutton-1,
+toolbarbutton {
+  -moz-context-properties: fill, fill-opacity, stroke !important;
+  color: var(--matugen-icon-color) !important;
+  fill: var(--matugen-icon-color) !important;
+}
+
+/* Ensure inner SVG icons, images, and labels take the theme green */
+#back-button .toolbarbutton-icon,
+#forward-button .toolbarbutton-icon,
+#reload-button .toolbarbutton-icon,
+#stop-button .toolbarbutton-icon,
+#stop-reload-button .toolbarbutton-icon,
+#PanelUI-menu-button .toolbarbutton-icon,
+.titlebar-button image,
+.titlebar-button .toolbarbutton-icon,
+#zen-toggle-compact-mode image,
+#zen-toggle-compact-mode .toolbarbutton-icon,
+#zen-sidebar-top-buttons toolbarbutton .toolbarbutton-icon,
+#zen-sidebar-top-buttons toolbarbutton image,
+#zen-sidebar-foot-buttons toolbarbutton .toolbarbutton-icon,
+#zen-sidebar-foot-buttons toolbarbutton image,
+#zen-workspaces-button toolbarbutton .toolbarbutton-icon,
+#zen-workspaces-button toolbarbutton image,
+#zen-workspaces-button toolbarbutton label,
+#tabs-newtab-button .toolbarbutton-icon,
+#new-tab-button .toolbarbutton-icon,
+#zen-tabs-newtab-button .toolbarbutton-icon,
+#downloads-button .toolbarbutton-icon,
+#zen-create-new-button .toolbarbutton-icon,
+#unified-extensions-button .toolbarbutton-icon,
+.tab-close-button image,
+.tab-close-button .toolbarbutton-icon,
+.urlbar-icon image,
+.urlbar-page-action image,
+toolbarbutton .toolbarbutton-icon,
+toolbarbutton image {
+  -moz-context-properties: fill, fill-opacity, stroke !important;
+  color: var(--matugen-icon-color) !important;
+  fill: var(--matugen-icon-color) !important;
+}
+
+/* Enabled UI buttons: full opacity so they are sharp and visible */
+#nav-bar toolbarbutton:not([disabled="true"]),
+#nav-bar toolbarbutton:not([disabled="true"]) .toolbarbutton-icon,
+#nav-bar toolbarbutton:not([disabled="true"]) image,
+#zen-sidebar-top-buttons toolbarbutton:not([disabled="true"]),
+#zen-sidebar-top-buttons toolbarbutton:not([disabled="true"]) image,
+#zen-sidebar-top-buttons toolbarbutton:not([disabled="true"]) .toolbarbutton-icon,
+#zen-sidebar-foot-buttons toolbarbutton:not([disabled="true"]),
+#zen-sidebar-foot-buttons toolbarbutton:not([disabled="true"]) image,
+#zen-sidebar-foot-buttons toolbarbutton:not([disabled="true"]) .toolbarbutton-icon,
+.titlebar-button:not([disabled="true"]),
+.titlebar-button:not([disabled="true"]) image,
+#PanelUI-menu-button {
+  opacity: 1 !important;
+  fill-opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Disabled buttons (e.g. back/forward when no history): visible green shade */
+#nav-bar toolbarbutton[disabled="true"],
+#nav-bar toolbarbutton[disabled="true"] .toolbarbutton-icon,
+#nav-bar toolbarbutton[disabled="true"] image,
+toolbarbutton[disabled="true"],
+toolbarbutton[disabled="true"] .toolbarbutton-icon,
+toolbarbutton[disabled="true"] image {
+  opacity: 0.55 !important;
+  fill-opacity: 0.55 !important;
+  color: var(--matugen-icon-color) !important;
+  fill: var(--matugen-icon-color) !important;
+}
+
+/* Workspace Buttons & Current Workspace Indicator (e.g. "S" letter & label) */
+.zen-current-workspace-indicator,
+.zen-current-workspace-indicator *,
+.zen-current-workspace-indicator-icon,
+.zen-current-workspace-indicator-icon *,
+.zen-current-workspace-indicator-name,
+.zen-current-workspace-indicator-chevron,
+.zen-current-workspace-indicator-stack,
+#zen-workspaces-button,
+#zen-workspaces-button *,
+.zen-workspace-button,
+.zen-workspace-button *,
+.zen-workspace-icon,
+.zen-workspace-sidebar-name,
+.zen-workspace-sidebar-icon,
+.zen-workspace-sidebar-wrapper,
+zen-workspace-icons,
+zen-workspace-icons * {
+  -moz-context-properties: fill, fill-opacity, stroke !important;
+  color: var(--matugen-icon-color) !important;
+  fill: var(--matugen-icon-color) !important;
+  opacity: 1 !important;
+  fill-opacity: 1 !important;
+  filter: none !important;
+}
+
+.zen-workspace-button[active="true"],
+#zen-workspaces-button toolbarbutton[active="true"] {
+  background-color: var(--matugen-accent) !important;
+  border-color: var(--matugen-accent) !important;
+  color: var(--matugen-pill-fg) !important;
+}
+
+.zen-workspace-button[active="true"] *,
+#zen-workspaces-button toolbarbutton[active="true"] * {
+  color: var(--matugen-pill-fg) !important;
+  fill: var(--matugen-pill-fg) !important;
+}
+
+/* Button Hover & Active States */
+#back-button:hover,
+#forward-button:hover,
+#reload-button:hover,
+#stop-button:hover,
+#stop-reload-button:hover,
+#PanelUI-menu-button:hover,
+.titlebar-button:hover,
+#zen-toggle-compact-mode:hover,
+#zen-sidebar-top-buttons toolbarbutton:hover,
+#zen-sidebar-foot-buttons toolbarbutton:hover,
+#zen-workspaces-button toolbarbutton:hover,
+.zen-current-workspace-indicator:hover,
+#tabs-newtab-button:hover,
+#new-tab-button:hover,
+#zen-tabs-newtab-button:hover,
+#downloads-button:hover,
+toolbarbutton:hover {
+  color: var(--matugen-icon-color-hover) !important;
+  fill: var(--matugen-icon-color-hover) !important;
+}
+
+#back-button:hover .toolbarbutton-icon,
+#forward-button:hover .toolbarbutton-icon,
+#reload-button:hover .toolbarbutton-icon,
+#stop-button:hover .toolbarbutton-icon,
+#stop-reload-button:hover .toolbarbutton-icon,
+#PanelUI-menu-button:hover .toolbarbutton-icon,
+.titlebar-button:hover image,
+#zen-toggle-compact-mode:hover image,
+#zen-sidebar-top-buttons toolbarbutton:hover image,
+#zen-sidebar-foot-buttons toolbarbutton:hover image,
+#zen-workspaces-button toolbarbutton:hover label,
+toolbarbutton:hover .toolbarbutton-icon,
+toolbarbutton:hover image {
+  color: var(--matugen-icon-color-hover) !important;
+  fill: var(--matugen-icon-color-hover) !important;
+}
+

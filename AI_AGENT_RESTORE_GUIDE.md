@@ -78,7 +78,10 @@ This repository contains the full snapshot of user customizations:
 - `aetheria`, `artzen`, `harbor`, `harbordark`, `moodpeak`, `purple-moon`, `quattrocento-light`, `aether`.
 
 ### E. Shell Plugins (`plugins/` -> `~/.config/omarchy/plugins/`)
-20 plugins included with complete source code:
+22 plugins included with complete source code:
+- **`kenny.nightlight`**: Night light color temperature bar control widget.
+- **`mryll.printbar`**: Printer hardware status and G2060 maintenance panel (includes custom patch).
+- **`soham.agents`**: Bespoke user-forked Omarchy agents selector.
 - **`mahmoodkhalil57.qrgen`**: QR generator bar widget with dynamic theme foreground/background adaptation (includes custom patch).
 - **`reomarchy.workspace-switcher`**: Visual workspace switcher with hold-Super activation, live screencopy previews, and digit jumping (includes custom patch).
 - **`io.github.adamcbrewer.voxtype-aura`**: Native audio recording OSD for Voxtype dictation.
@@ -151,6 +154,14 @@ This repository contains the full snapshot of user customizations:
    - `bin/discord` and `desktop-entries/`: Desktop app launchers.
    - Flatpaks: `com.stremio.Stremio` tracked in `meta/flatpak-packages.txt`.
    - `lavish-axi` repository tracked in `meta/external-repos.json`, with skills `lavish` and `lavish-design` in `agents/skills/`.
+
+
+11. **Zen Browser Customization & Theming Engine**:
+   - `configs/zen/chrome/` contains `userChrome.css`, `userContent.css`, `matugen-retro.css`, and `matugen-retro-content.css`.
+   - `bin/omarchy-sync-zen` compiles active theme palette into `omarchy-theme.css`.
+   - `restore.sh` distributes stylesheets to all Zen profiles and runs the sync engine.
+12. **Printer Suite**:
+   - `bin/printer` & `bin/printbar` provide complete hardware monitoring for Canon PIXMA G2060.
 
 ## 3. Fast Restoration (Automated)
 

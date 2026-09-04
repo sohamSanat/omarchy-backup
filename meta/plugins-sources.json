@@ -42,12 +42,6 @@
       "?? BarWidget.qml.bak.1788189441"
     ]
   },
-  "io.github.elevate08.qs-bitwarden-cli": {
-    "remote": "https://github.com/Elevate08/qs-bitwarden-cli.git",
-    "commit": "3b1348cbd2531f5c2ecb48e28612abef83b0fe07",
-    "has_local_changes": false,
-    "dirty_files": []
-  },
   "io.github.nilszeilon.omarchy-sensei": {
     "remote": "https://github.com/nilszeilon/omarchy-sensei.git",
     "commit": "f8817e9a84478304eb4409103983d11f05c419e4",
@@ -90,6 +84,12 @@
     "has_local_changes": false,
     "dirty_files": []
   },
+  "kenny.nightlight": {
+    "remote": "https://github.com/key-tone/omarchy-nightlight.git",
+    "commit": "585b63771f64acb0d7c5bed52719e983f8b20f8d",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
   "krall.switchboard": {
     "remote": "https://github.com/krall12/omarchy-switchboard.git",
     "commit": "fa9b45af82658306148dbd2240c970dafcb5d252",
@@ -112,6 +112,15 @@
     "has_local_changes": false,
     "dirty_files": []
   },
+  "mryll.printbar": {
+    "remote": "https://github.com/mryll/printbar.git",
+    "commit": "94d482fd5d1bd9dfdd73c51b6b562f0d7ca353cd",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M manifest.json",
+      "M omarchy/Panel.qml"
+    ]
+  },
   "omaconnect": {
     "remote": "https://github.com/jitendradara12/omaconnect.git",
     "commit": "f44454e710876d9578822c1ad2039c59d0d9ca0e",
@@ -132,6 +141,13 @@
       "M WorkspaceSwitcher.qml",
       "M bindings.lua"
     ]
+  },
+  "soham.agents": {
+    "remote": null,
+    "commit": null,
+    "has_local_changes": false,
+    "dirty_files": [],
+    "note": "User customized fork of omarchy.agents"
   },
   "soham.power": {
     "remote": null,

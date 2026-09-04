@@ -1,0 +1,2826 @@
+/* ==========================================================================
+   Zen Browser - Matugen Retro Lo-Fi Web & NewTab Styles
+   ========================================================================== */
+
+:root {
+  --matugen-bg: var(--omarchy-bg, #141110);
+  --matugen-bg-surface: var(--omarchy-bg-surface, #1a1513);
+  --matugen-bg-card: var(--omarchy-bg-card, #221b18);
+  --matugen-bg-card-hover: var(--omarchy-bg-card-hover, #2b221f);
+  --matugen-border: var(--omarchy-border, #5e3f36);
+  --matugen-border-subtle: var(--omarchy-border-subtle, #382823);
+  --matugen-border-highlight: var(--omarchy-border-highlight, #8c5a4d);
+  --matugen-accent: var(--omarchy-accent, #e07a5f);
+  --matugen-accent-bright: var(--omarchy-accent-bright, #f49d85);
+  --matugen-accent-soft: var(--omarchy-accent-soft, rgba(224, 122, 95, 0.16));
+  --matugen-accent-glow: var(--omarchy-accent-glow, 0 0 12px rgba(224, 122, 95, 0.28));
+  --matugen-fg: var(--omarchy-fg, #f5ebe0);
+  --matugen-fg-bright: var(--omarchy-fg-bright, #fff6ee);
+  --matugen-fg-muted: var(--omarchy-fg-muted, #a89388);
+  --matugen-pill-fg: var(--omarchy-pill-fg, #141110);
+  --matugen-btn-bg: var(--omarchy-btn-bg, color-mix(in srgb, var(--matugen-fg) 8%, transparent));
+  --matugen-btn-bg-hover: var(--omarchy-btn-bg-hover, color-mix(in srgb, var(--matugen-fg) 16%, transparent));
+  --matugen-btn-border: var(--omarchy-btn-border, color-mix(in srgb, var(--matugen-fg) 12%, transparent));
+}
+
+/* Global scrollbars */
+* {
+  scrollbar-color: var(--matugen-border) var(--matugen-bg) !important;
+  scrollbar-width: thin !important;
+}
+
+/* ==========================================================================
+   Global Website Theming (Matches Omarchy Theme Palette across all websites)
+   Transforms harsh white backgrounds to the harmonious Omarchy theme background
+   ========================================================================== */
+@-moz-document url-prefix("http://"), url-prefix("https://") {
+  :root,
+  [data-color-mode],
+  [data-theme],
+  [data-theme="light"],
+  [data-color-mode="light"] {
+    --bgColor-default: var(--matugen-bg) !important;
+    --bgColor-muted: var(--matugen-bg-surface) !important;
+    --bgColor-inset: var(--matugen-bg-card) !important;
+    --color-canvas-default: var(--matugen-bg) !important;
+    --color-canvas-subtle: var(--matugen-bg-surface) !important;
+    --color-canvas-inset: var(--matugen-bg-card) !important;
+    --color-page-header-bg: var(--matugen-bg-surface) !important;
+    --color-header-bg: var(--matugen-bg-surface) !important;
+    --color-scale-gray-0: var(--matugen-bg) !important;
+    --color-scale-gray-1: var(--matugen-bg-surface) !important;
+    --color-scale-gray-2: var(--matugen-bg-card) !important;
+    --fgColor-default: var(--matugen-fg) !important;
+    --fgColor-muted: var(--matugen-fg-muted) !important;
+    --color-fg-default: var(--matugen-fg) !important;
+    --color-fg-muted: var(--matugen-fg-muted) !important;
+    --color-border-default: var(--matugen-border-subtle) !important;
+    --color-border-muted: var(--matugen-border-subtle) !important;
+    --borderColor-default: var(--matugen-border-subtle) !important;
+    --borderColor-muted: var(--matugen-border-subtle) !important;
+
+    /* Bootstrap variables */
+    --bs-body-bg: var(--matugen-bg) !important;
+    --bs-body-color: var(--matugen-fg) !important;
+    --bs-card-bg: var(--matugen-bg-card) !important;
+    --bs-tertiary-bg: var(--matugen-bg-surface) !important;
+    --bs-secondary-bg: var(--matugen-bg-surface) !important;
+    --bs-border-color: var(--matugen-border-subtle) !important;
+    --bs-link-color: var(--matugen-accent) !important;
+
+    /* MediaWiki / Codex design variables */
+    --background-color-base: var(--matugen-bg) !important;
+    --background-color-base-fixed: var(--matugen-bg) !important;
+    --background-color-neutral: var(--matugen-bg-card) !important;
+    --background-color-neutral-subtle: var(--matugen-bg-surface) !important;
+    --background-color-interactive: var(--matugen-bg-surface) !important;
+    --background-color-interactive-subtle: var(--matugen-bg-surface) !important;
+    --color-base: var(--matugen-fg) !important;
+    --color-base-fixed: var(--matugen-fg) !important;
+    --color-emphasized: var(--matugen-fg-bright) !important;
+    --color-subtle: var(--matugen-fg-muted) !important;
+    --color-progressive: var(--matugen-accent) !important;
+    --color-visited: color-mix(in srgb, var(--matugen-accent) 70%, #6b4ba1) !important;
+    --border-color-base: var(--matugen-border-subtle) !important;
+    --border-color-subtle: var(--matugen-border-subtle) !important;
+  }
+
+  /* Universal page background */
+  html,
+  body {
+    background-color: var(--matugen-bg) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* Main content layout containers */
+  main,
+  [role="main"],
+  article,
+  .application-main,
+  #main-content,
+  #content:not(.style-scope):not([class*="yt-"]):not([class*="chat"]):not(yt-live-chat-text-message-renderer *),
+  #app,
+  #root,
+  .page-content,
+  .site-content,
+  .container-main,
+  .mw-body,
+  #mw-page-base,
+  #mw-head-base {
+    background-color: var(--matugen-bg) !important;
+  }
+
+  /* Headers, navigation bars, and toolbars */
+  header:not([class*="player"]):not([class*="video"]):not([class*="yt"]):not(ytd-masthead),
+  nav:not([class*="player"]):not([class*="video"]),
+  [role="navigation"],
+  .AppHeader,
+  .site-header,
+  .top-bar,
+  .navbar,
+  .navigation {
+    background-color: var(--matugen-bg-surface) !important;
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  /* Sidebars and secondary columns */
+  aside:not(#secondary):not([class*="player"]):not([class*="video"]):not([class*="yt"]),
+  [role="complementary"],
+  .sidebar,
+  .feed-left-sidebar,
+  .dashboard-sidebar {
+    background-color: var(--matugen-bg-surface) !important;
+  }
+
+  /* Cards, dialogue boxes, panels, and feed items */
+  .Box:not(#secondary),
+  .card,
+  .panel,
+  .tile,
+  .feed-item-card,
+  dialog,
+  [role="dialog"],
+  [role="alertdialog"],
+  .modal,
+  .modal-content,
+  .popover {
+    background-color: var(--matugen-bg-card) !important;
+    border-color: var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* Universal Harmonious Links (Avoids electric royal blue clashing on retro theme) */
+  a:link,
+  a:any-link {
+    color: var(--matugen-accent) !important;
+  }
+
+  a:visited {
+    color: color-mix(in srgb, var(--matugen-accent) 70%, #6b4ba1) !important;
+  }
+
+  a:hover {
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  /* Non-underlined buttons, tabs and badges that are links */
+  a.btn,
+  a.button,
+  a[role="button"],
+  .btn a,
+  .button a,
+  a[class*="button"],
+  a[class*="btn"],
+  a[class*="badge"],
+  a[class*="pill"] {
+    text-decoration: none !important;
+  }
+
+  /* Tables & Data */
+  table {
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  th {
+    background-color: var(--matugen-bg-surface) !important;
+    color: var(--matugen-fg-bright) !important;
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  td {
+    border-color: var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  tr:nth-child(even) td {
+    background-color: color-mix(in srgb, var(--matugen-bg-surface) 35%, transparent) !important;
+  }
+
+  /* Code & Preformatted text */
+  pre,
+  code,
+  kbd,
+  samp {
+    background-color: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  /* Quotes, alerts & banners */
+  blockquote,
+  .callout,
+  .alert,
+  [class*="banner"]:not([class*="player"]):not([class*="video"]):not([class*="yt"]),
+  [class*="Banner"]:not([class*="player"]):not([class*="video"]):not([class*="yt"]) {
+    background-color: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  /* Input fields and textareas */
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not([type="button"]):not([type="reset"]), textarea, select) {
+    background-color: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 6px !important;
+  }
+
+  :where(input:focus, textarea:focus, select:focus) {
+    border-color: var(--matugen-accent) !important;
+  }
+
+  /* General buttons - exclude specialized web components, plain/borderless buttons, join buttons, vote buttons, Reddit buttons, and video players */
+  :where(
+    button:not([class*="plain"]):not([class*="border-none"]):not([class*="bg-transparent"]):not([class*="join"]):not([slot="join-button"]):not([rpl]):not([upvote]):not([downvote]):not([data-action-bar-action]):not([class*="vote"]):not([aria-label*="upvote" i]):not([aria-label*="downvote" i]):not([class*="player"]):not([class*="video"]):not([class*="yt"]):not(.btn-primary):not([class*="Clear"]):not([class*="clear"]):not(recent-posts button):not(reddit-recent-pages button):not(shreddit-join-button button):not([noun*="clear"] button):not(rpl-vote-button-group button):not(shreddit-post-share-button button):not(shreddit-comment-share-button button):not(award-button button):not(shreddit-sort-dropdown button):not(feed-layout-controller button):not(shreddit-post-overflow-menu button):not(faceplate-dropdown-menu button):not([slot*="action"]):not([slot*="credit"]):not(shreddit-app button):not(reddit-header-large button),
+    input[type="button"],
+    input[type="submit"],
+    .btn:not(.btn-primary)
+  ) {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-bg-surface) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 6px !important;
+  }
+
+  :where(
+    button:not([class*="plain"]):not([class*="border-none"]):not([class*="bg-transparent"]):not([class*="join"]):not([slot="join-button"]):not([rpl]):not([upvote]):not([downvote]):not([data-action-bar-action]):not([class*="vote"]):not([aria-label*="upvote" i]):not([aria-label*="downvote" i]):not([class*="player"]):not([class*="video"]):not([class*="yt"]):not(.btn-primary):not([class*="Clear"]):not([class*="clear"]):not(recent-posts button):not(reddit-recent-pages button):not(shreddit-join-button button):not([noun*="clear"] button):not(rpl-vote-button-group button):not(shreddit-post-share-button button):not(shreddit-comment-share-button button):not(award-button button):not(shreddit-sort-dropdown button):not(feed-layout-controller button):not(shreddit-post-overflow-menu button):not(faceplate-dropdown-menu button):not([slot*="action"]):not([slot*="credit"]):not(shreddit-app button):not(reddit-header-large button):hover,
+    input[type="button"]:hover,
+    input[type="submit"]:hover,
+    .btn:not(.btn-primary):hover
+  ) {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-bg-card-hover) !important;
+    border-color: var(--matugen-border) !important;
+  }
+
+  /* Checkboxes & Radios */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--matugen-accent) !important;
+  }
+}
+
+/* Internal / New Tab pages: transparent glass */
+@-moz-document url("about:blank"), url("about:newtab"), url("about:home"), url("about:zen-welcome"), url("about:privatebrowsing"), url("chrome://browser/content/blanktab.html") {
+  :root,
+  html,
+  body,
+  #newtab-window,
+  .outer-wrapper,
+  .body-wrapper,
+  main {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  .top-site-outer .tile {
+    background-color: rgba(26, 21, 19, 0.65) !important;
+    backdrop-filter: blur(16px) !important;
+    border: 1px solid var(--matugen-border) !important;
+    border-radius: 10px !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .top-site-outer:hover .tile {
+    border-color: var(--matugen-accent) !important;
+    background-color: rgba(44, 34, 31, 0.75) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 14px var(--matugen-accent-soft) !important;
+  }
+
+  .top-site-outer .title span {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  .search-inner-wrapper {
+    border: 1px solid var(--matugen-border) !important;
+    border-radius: 12px !important;
+    background-color: rgba(26, 21, 19, 0.65) !important;
+    backdrop-filter: blur(20px) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  .search-inner-wrapper:hover,
+  .search-inner-wrapper:focus-within {
+    border-color: var(--matugen-accent) !important;
+    box-shadow: var(--matugen-accent-glow) !important;
+  }
+}
+
+/* YouTube custom styling matching the exact rice from the reference screenshot */
+@-moz-document domain("youtube.com") {
+  html, body, ytd-app {
+    background-color: var(--matugen-bg) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* Masthead / Top Navigation Bar (Framed box from screenshot) */
+  #masthead-container,
+  ytd-masthead {
+    background-color: var(--matugen-bg-surface) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  /* YouTube Search Bar (Both modern yt-searchbox & legacy ytd-searchbox) */
+  yt-searchbox,
+  yt-searchbox .ytSearchboxComponentInputWrapper,
+  yt-searchbox .ytSearchboxComponentInputContainer,
+  ytd-searchbox {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  yt-searchbox .ytSearchboxComponentInputBox,
+  ytd-searchbox #container.ytd-searchbox {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-right: none !important;
+    border-radius: 24px 0 0 24px !important;
+    box-shadow: none !important;
+  }
+
+  yt-searchbox .ytSearchboxComponentInputBox:focus-within,
+  yt-searchbox .ytSearchboxComponentInputBox.ytSearchboxComponentInputBoxFocused,
+  ytd-searchbox #container.ytd-searchbox:focus-within {
+    border-color: var(--matugen-border-highlight) !important;
+    box-shadow: 0 0 0 1px var(--matugen-border-highlight) !important;
+  }
+
+  /* Neutralize nested input element inside search bar */
+  yt-searchbox input,
+  yt-searchbox input.ytSearchboxComponentInput,
+  yt-searchbox .yt-searchbox-input,
+  yt-searchbox form.ytSearchboxComponentSearchForm,
+  ytd-searchbox input#search,
+  ytd-searchbox form#search-form {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    color: var(--matugen-fg) !important;
+    outline: none !important;
+  }
+
+  /* YouTube Search Button (Right magnifying glass area) */
+  yt-searchbox button.ytSearchboxComponentSearchButton,
+  #search-icon-legacy.ytd-searchbox,
+  ytd-searchbox #search-icon-legacy {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-bg-surface) !important;
+    background: var(--matugen-bg-surface) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 0 24px 24px 0 !important;
+    box-shadow: none !important;
+    color: var(--matugen-fg) !important;
+    cursor: pointer !important;
+  }
+
+  yt-searchbox button.ytSearchboxComponentSearchButton:hover,
+  #search-icon-legacy.ytd-searchbox:hover,
+  ytd-searchbox #search-icon-legacy:hover {
+    background-color: var(--matugen-bg-card-hover) !important;
+    border-color: var(--matugen-border) !important;
+  }
+
+  yt-searchbox button.ytSearchboxComponentSearchButton svg,
+  yt-searchbox button.ytSearchboxComponentSearchButton path,
+  #search-icon-legacy.ytd-searchbox yt-icon,
+  #search-icon-legacy.ytd-searchbox svg {
+    fill: var(--matugen-fg) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* Clear button */
+  yt-searchbox .ytSearchboxComponentClearButton,
+  yt-searchbox button[aria-label="Clear search query"],
+  #clear-button.ytd-searchbox {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--matugen-fg-muted) !important;
+    fill: var(--matugen-fg-muted) !important;
+  }
+
+  /* Voice Search Button */
+  #voice-search-button,
+  #voice-search-button yt-button-shape,
+  #voice-search-button button,
+  ytd-masthead #voice-search-button button,
+  yt-icon-button#search-button-narrow {
+    background-color: var(--matugen-bg-surface) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 50% !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  #voice-search-button button:hover,
+  ytd-masthead #voice-search-button button:hover {
+    background-color: var(--matugen-bg-card-hover) !important;
+    border-color: var(--matugen-border) !important;
+  }
+
+  #voice-search-button svg,
+  #voice-search-button path {
+    fill: var(--matugen-fg) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* Search Suggestions / Autocomplete Dropdown */
+  .ytSearchboxComponentSuggestionsContainer,
+  .sbsb_a,
+  .sbdd_a,
+  ul.sbsb_b {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  .ytSearchboxComponentSuggestionsContainer *,
+  .sbsb_c,
+  .sbqs_c,
+  .sbpqs_a {
+    color: var(--matugen-fg) !important;
+  }
+
+  .ytSearchboxComponentSuggestionsContainer li:hover,
+  .ytSearchboxComponentSuggestionsContainer div[role="option"]:hover,
+  .sbsb_c:hover,
+  .sbsb_d {
+    background-color: var(--matugen-bg-card-hover) !important;
+  }
+
+  /* Category pills / filter chips ("All", "From A.MeloFi", "Lo-fi" in screenshot) */
+  yt-chip-cloud-chip-renderer {
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 16px !important;
+    background-color: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  yt-chip-cloud-chip-renderer[selected] {
+    background-color: var(--matugen-accent) !important;
+    border-color: var(--matugen-accent) !important;
+    color: var(--matugen-pill-fg) !important;
+    font-weight: bold !important;
+  }
+
+  /* Video player container framed */
+  #player-container-outer,
+  #player-container,
+  ytd-watch-flexy #player {
+    border-radius: 10px !important;
+  }
+
+  .html5-video-player {
+    border-radius: 10px !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  /* Secondary / Recommended video sidebar (clean and transparent, no dark shade) */
+  #secondary.ytd-watch-flexy {
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  ytd-compact-video-renderer #thumbnail {
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  /* Buttons & Badges */
+  ytd-button-renderer yt-button-shape button {
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 8px !important;
+  }
+
+  ytd-button-renderer yt-button-shape button:hover {
+    border-color: var(--matugen-border-highlight) !important;
+  }
+
+  /* ==========================================================================
+     YouTube Live Chat Theming & Harmonization
+     Eliminates out-of-place message background blocks and integrates live chat
+     with the dynamic Omarchy OS theme palette.
+     ========================================================================== */
+
+  /* Live chat outer frame in YouTube watch page */
+  ytd-live-chat-frame,
+  ytd-live-chat-frame#chat,
+  #chat.ytd-watch-flexy,
+  #chat-container,
+  iframe#chatframe {
+    background-color: var(--matugen-bg-surface) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+  }
+
+  /* Live chat iframe root & renderer */
+  yt-live-chat-app,
+  yt-live-chat-renderer {
+    background-color: var(--matugen-bg-surface) !important;
+    background: var(--matugen-bg-surface) !important;
+    color: var(--matugen-fg) !important;
+    --yt-live-chat-background-color: var(--matugen-bg-surface) !important;
+    --yt-live-chat-action-panel-background-color: var(--matugen-bg-surface) !important;
+    --yt-live-chat-secondary-background-color: var(--matugen-bg-card) !important;
+    --yt-live-chat-primary-text-color: var(--matugen-fg) !important;
+    --yt-live-chat-secondary-text-color: var(--matugen-fg-muted) !important;
+    --yt-live-chat-tertiary-text-color: var(--matugen-fg-muted) !important;
+    --yt-live-chat-author-name-color: var(--matugen-fg-bright) !important;
+    --yt-live-chat-message-highlight-background-color: var(--matugen-bg-card-hover) !important;
+    --yt-live-chat-banner-gradient-scrim: none !important;
+    --yt-live-chat-text-input-field-suggestion-background-color: var(--matugen-bg-card) !important;
+    --yt-live-chat-text-input-field-suggestion-background-color-hover: var(--matugen-bg-card-hover) !important;
+    --yt-spec-base-background: var(--matugen-bg-surface) !important;
+    --yt-spec-raised-background: var(--matugen-bg-card) !important;
+    --yt-spec-menu-background: var(--matugen-bg-card) !important;
+    --yt-spec-text-primary: var(--matugen-fg) !important;
+    --yt-spec-text-secondary: var(--matugen-fg-muted) !important;
+  }
+
+  /* Chat Header */
+  yt-live-chat-header-renderer {
+    background-color: var(--matugen-bg-surface) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  yt-live-chat-header-renderer #primary-content,
+  yt-live-chat-header-renderer #title,
+  yt-live-chat-header-renderer #view-selector {
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  yt-live-chat-header-renderer yt-icon,
+  yt-live-chat-header-renderer yt-icon-button,
+  yt-live-chat-header-renderer button {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+    background: transparent !important;
+    border: none !important;
+  }
+
+  yt-live-chat-header-renderer #viewer-leaderboard-entry-point yt-button-shape button,
+  yt-live-chat-header-renderer #viewer-leaderboard-entry-point button {
+    background-color: var(--matugen-btn-bg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 16px !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* Dropdown Menus in Chat */
+  yt-live-chat-renderer tp-yt-paper-listbox,
+  yt-live-chat-renderer tp-yt-paper-item,
+  yt-live-chat-renderer ytd-menu-popup-renderer {
+    background-color: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  /* Live chat item list */
+  yt-live-chat-item-list-renderer,
+  yt-live-chat-item-list-renderer #item-list,
+  yt-live-chat-item-list-renderer #item-scroller,
+  yt-live-chat-item-list-renderer #item-offset,
+  yt-live-chat-item-list-renderer #items,
+  yt-live-chat-item-list-renderer #contents {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* CRITICAL: Messages must NEVER have individual isolated background blocks */
+  yt-live-chat-text-message-renderer,
+  yt-live-chat-text-message-renderer #content,
+  yt-live-chat-text-message-renderer #message-container,
+  yt-live-chat-text-message-renderer #message,
+  yt-live-chat-text-message-renderer yt-live-chat-author-chip,
+  yt-live-chat-text-message-renderer #author-name,
+  yt-live-chat-text-message-renderer #before-content-buttons {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Message text styling */
+  yt-live-chat-text-message-renderer #message {
+    color: var(--matugen-fg) !important;
+  }
+
+  yt-live-chat-text-message-renderer #author-name {
+    color: var(--matugen-fg-bright) !important;
+    font-weight: 500 !important;
+  }
+
+  yt-live-chat-text-message-renderer[author-type="owner"] yt-live-chat-author-chip #author-name {
+    color: var(--matugen-accent) !important;
+    font-weight: 600 !important;
+  }
+
+  yt-live-chat-text-message-renderer[author-type="moderator"] yt-live-chat-author-chip #author-name {
+    color: var(--matugen-green) !important;
+    font-weight: 600 !important;
+  }
+
+  yt-live-chat-text-message-renderer #timestamp {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  /* Smooth message hover */
+  yt-live-chat-text-message-renderer:hover {
+    background-color: var(--matugen-bg-card-hover) !important;
+    border-radius: 6px !important;
+  }
+
+  yt-live-chat-text-message-renderer #menu yt-icon-button,
+  yt-live-chat-text-message-renderer #menu yt-icon {
+    color: var(--matugen-fg-muted) !important;
+    fill: var(--matugen-fg-muted) !important;
+  }
+
+  /* Ticker / Pinned Sponsor & Donation Items */
+  yt-live-chat-ticker-renderer {
+    background-color: var(--matugen-bg-surface) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  yt-live-chat-ticker-paid-message-item-renderer #container,
+  yt-live-chat-ticker-sponsor-item-renderer #container {
+    background-color: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 18px !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  yt-live-chat-ticker-paid-message-item-renderer #content,
+  yt-live-chat-ticker-sponsor-item-renderer #content {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* Pinned Banner */
+  yt-live-chat-banner-renderer {
+    background-color: var(--matugen-bg-card) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* Polls & Engagement Cards */
+  yt-live-chat-poll-renderer,
+  yt-live-chat-viewer-engagement-message-renderer #card,
+  yt-live-chat-membership-item-renderer #card {
+    background-color: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 12px !important;
+    color: var(--matugen-fg) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  yt-live-chat-poll-renderer #header,
+  yt-live-chat-poll-renderer #header * {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  yt-live-chat-poll-choice,
+  yt-live-chat-poll-choice #endpoint {
+    background: transparent !important;
+  }
+
+  yt-live-chat-poll-choice tp-yt-paper-item#content,
+  yt-live-chat-poll-choice #content {
+    background-color: var(--matugen-bg-surface) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 20px !important;
+    color: var(--matugen-fg) !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease !important;
+  }
+
+  yt-live-chat-poll-choice tp-yt-paper-item#content:hover,
+  yt-live-chat-poll-choice #content:hover {
+    background-color: var(--matugen-bg-card-hover) !important;
+    border-color: var(--matugen-border) !important;
+  }
+
+  yt-live-chat-poll-choice #label-text,
+  yt-live-chat-poll-choice #vote-percentage-text {
+    color: var(--matugen-fg) !important;
+  }
+
+  yt-live-chat-poll-choice #vote-percentage-bar {
+    background-color: var(--matugen-accent-soft) !important;
+  }
+
+  /* Chat Input Area / Bottom Bar */
+  yt-live-chat-message-input-renderer {
+    background-color: var(--matugen-bg-surface) !important;
+    border-top: 1px solid var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  yt-live-chat-message-input-renderer #input-container,
+  yt-live-chat-message-input-renderer div#input[contenteditable],
+  yt-live-chat-text-input-field-renderer #input {
+    background-color: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 20px !important;
+    color: var(--matugen-fg) !important;
+    outline: none !important;
+  }
+
+  yt-live-chat-message-input-renderer div#input[contenteditable]:focus-within {
+    border-color: var(--matugen-border-highlight) !important;
+  }
+
+  yt-live-chat-message-input-renderer #label {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  yt-live-chat-message-input-renderer yt-icon,
+  yt-live-chat-message-input-renderer yt-icon-button,
+  yt-live-chat-message-input-renderer button {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+    background: transparent !important;
+    border: none !important;
+  }
+
+  yt-live-chat-message-input-renderer yt-icon-button:hover,
+  yt-live-chat-message-input-renderer button:hover {
+    color: var(--matugen-accent) !important;
+    fill: var(--matugen-accent) !important;
+  }
+
+  /* Action panel */
+  yt-live-chat-action-panel-renderer {
+    background-color: var(--matugen-bg-surface) !important;
+    border-top: 1px solid var(--matugen-border-subtle) !important;
+  }
+}
+
+/* ==========================================================================
+   GitHub - Polished Omarchy Theme Integration
+   ========================================================================== */
+@-moz-document domain("github.com") {
+  html,
+  body,
+  .application-main,
+  #js-pjax-container,
+  [data-color-mode] {
+    background-color: var(--matugen-bg) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  .AppHeader,
+  header.Header,
+  header {
+    background-color: var(--matugen-bg-surface) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  .feed-left-sidebar,
+  .dashboard-sidebar,
+  aside {
+    background-color: var(--matugen-bg-surface) !important;
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  .Box,
+  .timeline-comment,
+  .feed-item-card,
+  article,
+  fieldset {
+    background-color: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  .Box-header {
+    background-color: var(--matugen-bg-surface) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  /* Buttons & badges */
+  .btn:not(.btn-primary) {
+    background-color: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  .btn:not(.btn-primary):hover {
+    background-color: var(--matugen-bg-card-hover) !important;
+    border-color: var(--matugen-accent) !important;
+  }
+
+  /* Form controls and inputs */
+  input[type="text"],
+  input[type="search"],
+  textarea {
+    background-color: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  /* Tooltips, Popovers & Banners */
+  .Popover-message,
+  div[role="tooltip"],
+  [class*="banner"],
+  [class*="Banner"] {
+    background-color: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+  }
+}
+
+/* ==========================================================================
+   Google, Wikipedia, Reddit, DuckDuckGo
+   ========================================================================== */
+/* ==========================================================================
+   Google Search - Harmonious Theming (Sticky Header, Footer, Chips & Results)
+   ========================================================================== */
+@-moz-document domain("google.com") {
+  /* 1. Page Body & Background */
+  html,
+  body,
+  #main,
+  #cnt,
+  #center_col,
+  #rcnt,
+  .g,
+  #search,
+  .mw,
+  #hdtb,
+  #rso {
+    background-color: var(--matugen-bg) !important;
+    background: var(--matugen-bg) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* 2. Top Header & Sticky Header when scrolling */
+  header,
+  #searchform,
+  #searchform.minidiv,
+  .minidiv,
+  .sfbg,
+  .sbc,
+  #sfcnt,
+  .tsf,
+  #header,
+  #top_nav,
+  #hdtb,
+  #hdtbSum,
+  #appbar,
+  .appbar,
+  .vdLsw,
+  .yg51tc,
+  .Cv108,
+  .Q3A19,
+  .Xx7Mif,
+  .E5eFb,
+  .CTOaxb,
+  .zLSRge,
+  .CvDJxb,
+  .NDnoQ,
+  .P3mIxe,
+  header#gb,
+  div[role="navigation"] {
+    background-color: var(--matugen-bg-surface) !important;
+    background: var(--matugen-bg-surface) !important;
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  /* Solid bottom border for sticky bar when scrolling */
+  .Xx7Mif,
+  .E5eFb,
+  .minidiv,
+  #searchform.minidiv {
+    width: 100% !important;
+    min-width: 100vw !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* Navigation filter tabs (All, Images, Videos, News...) */
+  .EDblX,
+  .HTOhZ,
+  .YNk70c,
+  .Fgyi2e,
+  .rZj61,
+  .GG4mbd,
+  .h5JSWd,
+  .rQTE8b,
+  .beZ0tf {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  .EDblX a,
+  .HTOhZ a,
+  .YNk70c a,
+  .mXwfNd a,
+  div[role="navigation"] a {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  .EDblX a:hover,
+  .HTOhZ a:hover,
+  .YNk70c a:hover {
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  .YmvwI,
+  .EDblX[aria-current="page"],
+  .HTOhZ[aria-current="page"],
+  div[role="tab"][aria-selected="true"] {
+    color: var(--matugen-accent) !important;
+    border-bottom-color: var(--matugen-accent) !important;
+  }
+
+  /* 3. Search Bar Container & Input Field */
+  .RNNXgb,
+  .em4d2b,
+  form[role="search"] .A8SBwf {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 24px !important;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08) !important;
+  }
+
+  .RNNXgb:hover,
+  .RNNXgb:focus-within {
+    border-color: var(--matugen-border-highlight) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16) !important;
+  }
+
+  /* Neutralize inner containers and textareas inside the Google search pill */
+  .RNNXgb input,
+  .RNNXgb textarea,
+  .SDkEP,
+  .SDkEP input,
+  .SDkEP textarea,
+  textarea.gLFyf,
+  input.gLFyf,
+  .a4bIc,
+  .a4bIc input,
+  .a4bIc textarea,
+  .OVWmAd {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--matugen-fg) !important;
+    outline: none !important;
+  }
+
+  /* Search button and icons inside the bar */
+  form[role="search"] button,
+  form.tsf button,
+  .RNNXgb button,
+  .SDkEP button,
+  .dRYYxd button,
+  button.Tg7LZd,
+  button.HZVG1b,
+  button[aria-label="Search"],
+  button.Tg7LZd.HZVG1b,
+  .Tg7LZd,
+  .HZVG1b,
+  .BKRP7b,
+  .XDyW0e,
+  .ExCKkf,
+  .M2vV3,
+  .dRYYxd,
+  .voyQNc,
+  .v1RhKc,
+  .GIZBe {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  .RNNXgb button:hover,
+  .SDkEP button:hover,
+  button.Tg7LZd:hover,
+  button.HZVG1b:hover {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .RNNXgb svg,
+  .SDkEP svg,
+  button.Tg7LZd svg {
+    fill: var(--matugen-fg) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* Search Suggestion / Autocomplete Dropdown */
+  .aajZCb,
+  .erkvQe,
+  .OBMEnb,
+  ul.G43f7e {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border) !important;
+    border-radius: 0 0 20px 20px !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18) !important;
+  }
+
+  li.sbct,
+  li.sbct span,
+  li.sbct div {
+    color: var(--matugen-fg) !important;
+  }
+
+  li.sbct:hover,
+  li.sbhl {
+    background-color: var(--matugen-bg-card-hover) !important;
+  }
+
+  /* 4. "People also search for" Chips, Cards & Carousels */
+  .s75Ffe,
+  .k820oc,
+  .wQ4G4d,
+  .x48A0,
+  .cbphWd,
+  .EIaa9,
+  .EIaa9b,
+  .b2Rnsc,
+  div[data-initq],
+  a.k820oc,
+  .M3014c,
+  .WlydOe,
+  .q8U8x,
+  .fG8Fp,
+  .oTWEpb {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 12px !important;
+  }
+
+  /* Remove duplicate nested borders inside search chips */
+  .b2Rnsc *,
+  .EIaa9b *,
+  .qR29te,
+  a.ngTNl,
+  a.ngTNl * {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  .s75Ffe:hover,
+  a.k820oc:hover,
+  .x48A0:hover,
+  .cbphWd:hover,
+  .WlydOe:hover,
+  .b2Rnsc:hover,
+  a.ngTNl:hover {
+    background-color: var(--matugen-bg-card-hover) !important;
+    border-color: var(--matugen-border) !important;
+  }
+
+  /* 5. Pagination ("Goooooooogle" 1 2 3 ... Next) */
+  #navcnt,
+  table.AaVjTc,
+  .AaVjTc,
+  #botstuff,
+  .GN75c {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+  }
+
+  table.AaVjTc td {
+    background: transparent !important;
+    border: none !important;
+  }
+
+  #navcnt a,
+  .AaVjTc a {
+    color: var(--matugen-accent) !important;
+  }
+
+  /* 6. Footer (Personalisation note, location, Terms & Privacy) */
+  #fbar,
+  #fbarcnt,
+  #footcnt,
+  .fbar,
+  .b2hzT,
+  .b2hzbe,
+  .c93Gbe,
+  .kEjm2c,
+  .smiUbb,
+  #CE62Bb,
+  .f6F9Be,
+  .TrMVnc,
+  .K200hd,
+  .f47Dvd,
+  .B99Flag,
+  .p64x9c,
+  .Ev1KRY,
+  .wUrVib,
+  .u73qOd,
+  footer,
+  #botstuff,
+  .W9Ltvf,
+  .SS70df {
+    background-color: var(--matugen-bg-surface) !important;
+    background: var(--matugen-bg-surface) !important;
+    color: var(--matugen-fg-muted) !important;
+    border-top: 1px solid var(--matugen-border-subtle) !important;
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  #fbar *,
+  #fbarcnt *,
+  #footcnt *,
+  .fbar *,
+  footer * {
+    background: transparent !important;
+    background-color: transparent !important;
+    border-color: var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  #footcnt a,
+  #fbar a,
+  .fbar a,
+  footer a,
+  #footcnt a:link,
+  #fbar a:link,
+  #footcnt a:visited,
+  #fbar a:visited,
+  #footcnt [role="button"],
+  #fbar [role="button"],
+  update-location,
+  update-location *,
+  .VtPCGb,
+  .xSQxL,
+  .HDOrGf,
+  .p64x9c a,
+  .Ev1KRY a,
+  .u73qOd a,
+  .W9Ltvf a,
+  #footcnt span,
+  #fbar span,
+  .fbar span,
+  footer span,
+  .GeEc1b,
+  .DYidfe,
+  .g0F6u,
+  .KwU3F,
+  .GNm3Qb,
+  .b2hzT span,
+  .smiUbb span,
+  .kEjm2c span {
+    color: var(--matugen-fg-muted) !important;
+    text-decoration: none !important;
+  }
+
+  #footcnt a:hover,
+  #fbar a:hover,
+  .fbar a:hover,
+  footer a:hover,
+  #footcnt [role="button"]:hover,
+  #fbar [role="button"]:hover,
+  update-location:hover,
+  update-location *:hover,
+  .VtPCGb:hover,
+  .W9Ltvf a:hover,
+  .GeEc1b:hover,
+  .DYidfe:hover,
+  .KwU3F:hover {
+    color: var(--matugen-fg-bright) !important;
+    text-decoration: underline !important;
+  }
+
+  .wUrVib,
+  .p64x9c span {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  /* 7. AI Overview & Expander Gradient Masks */
+  .OKWFbd,
+  .Zze5V,
+  .RDmXvc,
+  .Jzkafd,
+  .LrrQLb {
+    background: linear-gradient(rgba(0, 0, 0, 0) 0%, var(--matugen-bg-card) 100%) !important;
+  }
+
+  .zNsLfb,
+  .ZFiwCf,
+  .in7vHe,
+  .btku5b {
+    background-color: var(--matugen-bg-surface) !important;
+    border-color: var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* 7. Knowledge Panels & Result Cards */
+  .kp-blk,
+  .I6txqe,
+  .g-blk,
+  .xpdopen,
+  .Ww4FFb {
+    background-color: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 12px !important;
+  }
+
+  /* 8. Links and Citations */
+  a:link,
+  .yuRUbf a {
+    color: color-mix(in srgb, var(--matugen-accent) 65%, var(--matugen-fg) 35%) !important;
+  }
+
+  a:visited {
+    color: color-mix(in srgb, var(--matugen-accent) 55%, #554477 45%) !important;
+  }
+
+  cite,
+  cite *,
+  .byrV5b,
+  .VuuXrf {
+    color: var(--matugen-fg-muted) !important;
+  }
+}
+
+@-moz-document domain("wikipedia.org") {
+  /* 1. Override MediaWiki Codex and Vector 2022 CSS Custom Properties */
+  :root,
+  html,
+  body,
+  .skin-vector-2022,
+  .mw-page-container,
+  .mw-body {
+    --background-color-base: var(--matugen-bg) !important;
+    --background-color-base-fixed: var(--matugen-bg) !important;
+    --background-color-neutral: var(--matugen-bg-card) !important;
+    --background-color-neutral-subtle: var(--matugen-bg-surface) !important;
+    --background-color-interactive: var(--matugen-bg-surface) !important;
+    --background-color-interactive-subtle: var(--matugen-bg-surface) !important;
+    --background-color-interactive--hover: var(--matugen-bg-card-hover) !important;
+    --background-color-interactive-subtle--hover: var(--matugen-bg-card-hover) !important;
+    --background-color-disabled: var(--matugen-bg-card) !important;
+    --background-color-disabled-subtle: var(--matugen-bg-surface) !important;
+    --background-color-progressive: var(--matugen-accent) !important;
+    --background-color-progressive--hover: var(--matugen-border-highlight) !important;
+    --background-color-progressive--active: var(--matugen-accent) !important;
+    --background-color-progressive-subtle: var(--matugen-accent-soft) !important;
+    --background-color-input-binary--checked: var(--matugen-accent) !important;
+    --background-color-tab-list-item-framed--active: var(--matugen-bg-surface) !important;
+    --background-color-tab-list-item-framed--hover: var(--matugen-bg-card-hover) !important;
+
+    --color-base: var(--matugen-fg) !important;
+    --color-base-fixed: var(--matugen-fg) !important;
+    --color-base--hover: var(--matugen-fg-bright) !important;
+    --color-emphasized: var(--matugen-fg-bright) !important;
+    --color-subtle: var(--matugen-fg-muted) !important;
+    --color-placeholder: var(--matugen-fg-muted) !important;
+    --color-disabled: var(--matugen-fg-muted) !important;
+    --color-progressive: var(--matugen-accent) !important;
+    --color-progressive--hover: color-mix(in srgb, var(--matugen-accent) 80%, black) !important;
+    --color-progressive--active: var(--matugen-accent) !important;
+    --color-progressive--focus: var(--matugen-accent) !important;
+    --color-icon-progressive: var(--matugen-accent) !important;
+    --color-visited: color-mix(in srgb, var(--matugen-accent) 70%, #6b4ba1) !important;
+    --color-visited--hover: color-mix(in srgb, var(--matugen-accent) 85%, black) !important;
+
+    --border-color-base: var(--matugen-border-subtle) !important;
+    --border-color-subtle: var(--matugen-border-subtle) !important;
+    --border-color-muted: var(--matugen-border-subtle) !important;
+    --border-color-interactive: var(--matugen-border) !important;
+    --border-color-progressive: var(--matugen-accent) !important;
+    --box-shadow-color-base: transparent !important;
+    --box-shadow-color-progressive-selected: var(--matugen-accent) !important;
+  }
+
+  /* 2. Page & Layout containers */
+  body,
+  #content,
+  .mw-body,
+  #mw-page-base,
+  #mw-head-base,
+  .mw-page-container,
+  .mw-page-container-inner,
+  .vector-column-start,
+  .vector-column-end,
+  .vector-main-menu-container,
+  .vector-toc-container {
+    background-color: var(--matugen-bg) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* 3. Site Notices & CentralNotice ("Wiki Loves Monuments", fundraising banners, etc.) */
+  .vector-sitenotice-container,
+  #siteNotice {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin-bottom: 12px !important;
+  }
+
+  #centralNotice,
+  .cnotice,
+  .cn-box,
+  .cnotice-main,
+  .cnotice-banner,
+  .cnotice-full-banner {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
+    overflow: hidden !important;
+  }
+
+  /* Neutralize any bright red, dark, or white borders/backgrounds injected by campaigns */
+  #centralNotice *,
+  .cnotice * {
+    border-color: var(--matugen-border-subtle) !important;
+    background-color: transparent !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* Notice close button */
+  .cnotice-close-button,
+  .cn-close-button,
+  #cnotice-toggle-box,
+  .cnotice a.cnotice-close-button,
+  .cnotice .close,
+  #centralNotice button {
+    background-color: var(--matugen-bg-surface) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 50% !important;
+  }
+
+  /* 4. Infoboxes, Wikitables, Thumbnails & Media */
+  .infobox,
+  .infobox th,
+  .infobox td,
+  .thumbinner,
+  figure[typeof~='mw:File/Thumb'],
+  figure[typeof~='mw:File/Frame'],
+  table.wikitable {
+    background-color: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  .infobox {
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+    overflow: hidden !important;
+  }
+
+  .infobox-header,
+  .infobox-above,
+  .infobox-below,
+  .infobox-subheader,
+  table.wikitable th,
+  .infobox th {
+    background-color: var(--matugen-bg-surface) !important;
+    color: var(--matugen-fg-bright) !important;
+    font-weight: 600 !important;
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  .infobox-title {
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  .thumbcaption,
+  figcaption {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  /* 5. Search Bar & Form Controls */
+  .cdx-search-input,
+  .cdx-search-input__input-wrapper,
+  .cdx-text-input,
+  .cdx-text-input input,
+  .cdx-text-input__input,
+  input.cdx-text-input__input,
+  input.mw-searchInput,
+  #simpleSearch,
+  #searchInput {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 8px 0 0 8px !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+  }
+
+  .cdx-text-input__icon {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  .cdx-search-input__end-button,
+  #searchButton {
+    background-color: var(--matugen-bg-surface) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 0 8px 8px 0 !important;
+  }
+
+  .cdx-button,
+  .mw-ui-button {
+    background-color: var(--matugen-bg-surface) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 6px !important;
+  }
+
+  .cdx-button:hover,
+  .mw-ui-button:hover {
+    background-color: var(--matugen-bg-card-hover) !important;
+    border-color: var(--matugen-border) !important;
+  }
+
+  /* 6. Disambiguation, Hatnotes & Alerts */
+  .hatnote,
+  .dablink,
+  .relarticle {
+    background-color: transparent !important;
+    color: var(--matugen-fg-muted) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+    padding: 6px 0 !important;
+    font-style: italic !important;
+  }
+
+  /* 7. Right-side Appearance Panel & Dropdowns */
+  .vector-appearance-panel,
+  .vector-dropdown-content,
+  .vector-menu-content,
+  .vector-popup-notification,
+  .cdx-menu {
+    background-color: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border: 1px solid var(--matugen-border) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .vector-appearance-panel fieldset,
+  .vector-appearance-panel .cdx-radio,
+  .vector-appearance-panel legend {
+    background-color: transparent !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* 8. Tabs, Toolbars & Sticky Header */
+  .vector-header-container,
+  .vector-sticky-header,
+  .vector-page-toolbar,
+  #mw-head {
+    background-color: var(--matugen-bg-surface) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  .vector-user-links,
+  .vector-user-links-main,
+  #p-vector-user-menu-overflow,
+  #p-personal {
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  .vector-menu-tabs,
+  .vector-menu-tabs-legacy {
+    border-bottom-color: var(--matugen-border-subtle) !important;
+  }
+
+  .vector-tab-noicon a,
+  .vector-menu-tabs li a {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  .vector-tab-noicon.selected a,
+  .vector-menu-tabs li.selected a {
+    color: var(--matugen-fg-bright) !important;
+    font-weight: bold !important;
+    border-bottom: 2px solid var(--matugen-accent) !important;
+  }
+
+  /* 9. All Links on Wikipedia */
+  a,
+  a:link,
+  .mw-parser-output a:link,
+  .vector-toc-link,
+  .vector-menu-content-list a,
+  #p-personal a,
+  #p-views a,
+  #p-cactions a,
+  .vector-dropdown-content a {
+    color: color-mix(in srgb, var(--matugen-accent) 65%, var(--matugen-fg) 35%) !important;
+  }
+
+  a:visited,
+  .mw-parser-output a:visited {
+    color: color-mix(in srgb, var(--matugen-accent) 55%, #554477 45%) !important;
+  }
+
+  a:hover,
+  .mw-parser-output a:hover,
+  .vector-toc-link:hover,
+  #p-personal a:hover {
+    color: var(--matugen-fg-bright) !important;
+    text-decoration: underline !important;
+  }
+
+  a.new {
+    color: color-mix(in srgb, #e06c75 75%, var(--matugen-fg)) !important;
+  }
+
+  sup.reference a,
+  .mw-ref a {
+    color: color-mix(in srgb, var(--matugen-accent) 70%, var(--matugen-fg) 30%) !important;
+    font-weight: 500 !important;
+  }
+}
+
+@-moz-document domain("reddit.com") {
+  /* 1. Map all Reddit & RPL design tokens to Omarchy theme on all elements and custom hosts */
+  *,
+  *::before,
+  *::after,
+  :root,
+  :host,
+  html,
+  body,
+  shreddit-app,
+  shreddit-post,
+  shreddit-feed,
+  reddit-feed,
+  rpl-action-bar,
+  rpl-vote-button-group,
+  shreddit-post-share-button,
+  shreddit-comment-share-button,
+  award-button,
+  recent-posts,
+  reddit-recent-pages,
+  community-bookmarks,
+  shreddit-comment,
+  shreddit-comment-tree,
+  shreddit-comment-action-row,
+  shreddit-sort-dropdown,
+  shreddit-sort-dropdown-with-suggested,
+  faceplate-dropdown-menu,
+  shreddit-comment-composer,
+  faceplate-textarea-input,
+  faceplate-text-input,
+  faceplate-search-input,
+  shreddit-post-overflow-menu,
+  reddit-header-large,
+  flex-left-nav-container,
+  reddit-sidebar-nav,
+  #right-sidebar-container,
+  #right-sidebar-contents,
+  .theme-beta,
+  .theme-light,
+  .theme-dark,
+  .theme-rpl,
+  [class*="theme-"],
+  [data-color-mode],
+  [data-theme] {
+    --color-neutral-background-canvas: var(--matugen-bg) !important;
+    --color-neutral-background: var(--matugen-bg-card) !important;
+    --color-neutral-background-hover: var(--matugen-bg-card-hover) !important;
+    --color-neutral-background-container: var(--matugen-bg-card) !important;
+    --color-neutral-background-container-hover: var(--matugen-bg-card-hover) !important;
+    --color-neutral-background-container-strong: var(--matugen-bg-surface) !important;
+    --color-neutral-background-container-strong-hover: var(--matugen-bg-card-hover) !important;
+    --color-neutral-background-weak: var(--matugen-btn-bg) !important;
+    --color-neutral-background-weak-hover: var(--matugen-btn-bg-hover) !important;
+    --color-neutral-background-medium: var(--matugen-bg-surface) !important;
+    --color-neutral-background-strong: var(--matugen-bg-card) !important;
+    --color-neutral-background-strong-hover: var(--matugen-bg-card-hover) !important;
+    --color-neutral-background-selected: var(--matugen-bg-card-hover) !important;
+    --color-neutral-border: var(--matugen-border-subtle) !important;
+    --color-neutral-border-weak: var(--matugen-border-subtle) !important;
+    --color-neutral-border-medium: var(--matugen-border) !important;
+    --color-neutral-border-strong: var(--matugen-border-highlight) !important;
+    --color-neutral-border-divider: var(--matugen-border-subtle) !important;
+    --color-neutral-content: var(--matugen-fg) !important;
+    --color-neutral-content-strong: var(--matugen-fg-bright) !important;
+    --color-neutral-content-weak: var(--matugen-fg-muted) !important;
+
+    /* Secondary backgrounds & inputs */
+    --color-secondary-background: var(--matugen-btn-bg) !important;
+    --color-secondary-background-hover: var(--matugen-btn-bg-hover) !important;
+    --color-secondary-background-selected: var(--matugen-btn-bg-hover) !important;
+    --color-secondary-plain: var(--matugen-fg) !important;
+    --color-secondary-plain-hover: var(--matugen-fg-bright) !important;
+    --color-secondary-plain-weak: var(--matugen-fg-muted) !important;
+    --color-secondary-weak: var(--matugen-fg-muted) !important;
+    --color-secondary: var(--matugen-fg) !important;
+    --color-secondary-onBackground: var(--matugen-fg) !important;
+
+    /* Buttons: cohesive soft pills that blend into cards */
+    --button-color-background: var(--matugen-btn-bg) !important;
+    --button-color-background-default: var(--matugen-btn-bg) !important;
+    --button-color-background-hover: var(--matugen-btn-bg-hover) !important;
+    --button-color-background-active: var(--matugen-btn-bg-hover) !important;
+    --button-color-background-focus: var(--matugen-btn-bg) !important;
+    --button-color-text: var(--matugen-fg) !important;
+    --button-color-text-default: var(--matugen-fg) !important;
+    --button-color-text-hover: var(--matugen-fg-bright) !important;
+    --button-border-color: var(--matugen-btn-border) !important;
+    --button-border-color-default: var(--matugen-btn-border) !important;
+    --button-border-color-hover: var(--matugen-border-subtle) !important;
+
+    --color-button-secondary-background: var(--matugen-btn-bg) !important;
+    --color-button-secondary-background-hover: var(--matugen-btn-bg-hover) !important;
+    --color-button-secondary-text: var(--matugen-fg) !important;
+    --color-button-tertiary-background: transparent !important;
+    --color-button-tertiary-background-hover: var(--matugen-btn-bg) !important;
+    --color-button-tertiary-text: var(--matugen-fg) !important;
+    --color-button-plain-background: transparent !important;
+    --color-button-plain-background-hover: var(--matugen-btn-bg) !important;
+    --color-button-plain-text: var(--matugen-fg) !important;
+    --color-button-plain-text-hover: var(--matugen-fg-bright) !important;
+
+    /* Primary & Brand Button Tokens */
+    --color-primary: var(--matugen-accent) !important;
+    --color-primary-background: var(--matugen-accent) !important;
+    --color-primary-background-hover: var(--matugen-accent-bright) !important;
+    --color-primary-text: #ffffff !important;
+    --color-button-primary-background: var(--matugen-accent) !important;
+    --color-button-primary-background-hover: var(--matugen-accent-bright) !important;
+    --color-button-primary-text: #ffffff !important;
+    --color-button-primary-text-hover: #ffffff !important;
+    --color-button-brand-background: var(--matugen-accent) !important;
+    --color-button-brand-background-hover: var(--matugen-accent-bright) !important;
+    --color-button-brand-text: #ffffff !important;
+    --color-interactive-primary: var(--matugen-accent) !important;
+    --color-interactive-primary-hover: var(--matugen-accent-bright) !important;
+    --color-interactive-primary-background: var(--matugen-accent) !important;
+    --button-border-radius: 9999px !important;
+
+    /* Tone mapping */
+    --color-tone-1: var(--matugen-fg-bright) !important;
+    --color-tone-2: var(--matugen-fg) !important;
+    --color-tone-3: var(--matugen-fg-muted) !important;
+    --color-tone-4: var(--matugen-bg-surface) !important;
+    --color-tone-5: var(--matugen-bg-card) !important;
+    --color-tone-6: var(--matugen-bg-card-hover) !important;
+    --color-tone-7: var(--matugen-bg) !important;
+
+    /* Upvote & Action */
+    --color-action-upvote: #d9534f !important;
+    --color-action-downvote: #5e81ac !important;
+    --vote-button-label-color: var(--matugen-fg) !important;
+    --shreddit-content-background: transparent !important;
+    --shreddit-post-background: var(--matugen-bg-card) !important;
+    --shreddit-post-background-hover: var(--matugen-bg-card-hover) !important;
+    --color-ui-canvas: var(--matugen-bg) !important;
+    --color-ui-modalbackground: var(--matugen-bg-card) !important;
+  }
+
+  /* ========================================================================
+     Universal Button Appearance Reset for Reddit
+     Strips native Linux GTK form widget engine on all button elements & parts
+     ======================================================================== */
+  button,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  [role="button"],
+  *::part(button),
+  *::part(upvote-button),
+  *::part(downvote-button),
+  *::part(upvote),
+  *::part(downvote) {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    box-shadow: none !important;
+  }
+
+  /* 2. Universal link styling in Reddit: legible retro text, not neon blue */
+  a,
+  a:link,
+  a:any-link,
+  a:visited {
+    color: var(--matugen-fg) !important;
+  }
+
+  a:hover {
+    color: var(--matugen-accent) !important;
+  }
+
+  /* 3. Global Containers & Body */
+  html,
+  body,
+  shreddit-app,
+  #main-content,
+  reddit-feed,
+  .grid-container,
+  [data-testid="frontpage-sidebar"],
+  shreddit-feed {
+    background-color: var(--matugen-bg) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* 4. Top Header / Masthead */
+  reddit-header-large,
+  shreddit-header,
+  header[role="banner"],
+  #reddit-header {
+    background-color: var(--matugen-bg-surface) !important;
+    background: var(--matugen-bg-surface) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  /* Header action buttons (Create, Chat, Bell, Profile) */
+  header a[href="/"],
+  reddit-header-large a[href="/"],
+  header button,
+  reddit-header-large button,
+  reddit-header-action-items button,
+  shreddit-header button {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 9999px !important;
+    color: var(--matugen-fg) !important;
+    cursor: pointer !important;
+  }
+
+  header button:hover,
+  reddit-header-large button:hover,
+  reddit-header-action-items button:hover,
+  shreddit-header button:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg) !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  reddit-header-action-items a[href*="/submit"],
+  reddit-header-large a[href*="/submit"],
+  reddit-header-large a[href*="/submit"] button,
+  faceplate-tracker[noun="create_post"] a,
+  faceplate-tracker[noun="create_post"] button,
+  button[aria-label*="Create" i],
+  a[href*="/submit"] {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg) !important;
+    background: var(--matugen-btn-bg) !important;
+    border: 1px solid var(--matugen-btn-border) !important;
+    border-radius: 9999px !important;
+    color: var(--matugen-fg) !important;
+    padding: 4px 14px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+  }
+
+  reddit-header-action-items a[href*="/submit"]:hover,
+  reddit-header-large a[href*="/submit"]:hover,
+  reddit-header-large a[href*="/submit"] button:hover,
+  faceplate-tracker[noun="create_post"] a:hover,
+  faceplate-tracker[noun="create_post"] button:hover,
+  button[aria-label*="Create" i]:hover,
+  a[href*="/submit"]:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    border-color: var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  /* 5. Reddit Search Bar */
+  reddit-search-large,
+  faceplate-search-input {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  reddit-search-large form,
+  form.reddit-search-bar,
+  faceplate-search-input form,
+  .search-input {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 9999px !important;
+    box-shadow: none !important;
+    transition: all 0.2s ease !important;
+  }
+
+  reddit-search-large form:hover,
+  reddit-search-large form:focus-within,
+  form.reddit-search-bar:hover,
+  form.reddit-search-bar:focus-within,
+  faceplate-search-input:focus-within {
+    border-color: var(--matugen-border-highlight) !important;
+    box-shadow: 0 0 0 1px var(--matugen-border-highlight) !important;
+  }
+
+  /* Neutralize inner container and input element inside Reddit Search */
+  reddit-search-large input,
+  reddit-search-large input[name="q"],
+  form.reddit-search-bar input,
+  form.reddit-search-bar .search-input,
+  faceplate-search-input input {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    color: var(--matugen-fg) !important;
+    outline: none !important;
+  }
+
+  reddit-search-large input::placeholder,
+  form.reddit-search-bar input::placeholder,
+  faceplate-search-input input::placeholder {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  /* 6. Post Cards */
+  shreddit-post,
+  article[data-testid="post-container"],
+  div[data-testid="post-container"] {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 12px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+    transition: all 0.15s ease !important;
+    position: relative !important;
+  }
+
+  shreddit-post:hover,
+  article[data-testid="post-container"]:hover,
+  div[data-testid="post-container"]:hover {
+    background-color: var(--matugen-bg-card-hover) !important;
+    background: var(--matugen-bg-card-hover) !important;
+    border-color: var(--matugen-border) !important;
+  }
+
+  /* Full Post Link Overlay: must NEVER have a background or occlude text on hover */
+  shreddit-post a[slot="full-post-link"],
+  a[slot="full-post-link"],
+  shreddit-post a[slot="full-post-link"]:hover,
+  shreddit-post a[slot="full-post-link"]:focus,
+  shreddit-post a[slot="full-post-link"]:active,
+  a[slot="full-post-link"]:hover,
+  a[slot="full-post-link"]:focus,
+  a[slot="full-post-link"]:active {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    opacity: 0 !important;
+    pointer-events: auto !important;
+  }
+
+  /* Post Headlines & Links */
+  shreddit-post a[slot="title"],
+  shreddit-post [slot="title"],
+  shreddit-post [id*="post-title-"],
+  shreddit-post h2 a,
+  shreddit-post h1,
+  shreddit-post [slot="title"] * {
+    color: var(--matugen-fg-bright) !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    position: relative !important;
+    z-index: 2 !important;
+  }
+
+  shreddit-post a[slot="title"]:hover,
+  shreddit-post [slot="title"]:hover,
+  shreddit-post [id*="post-title-"]:hover,
+  shreddit-post [slot="title"] a:hover {
+    color: var(--matugen-accent) !important;
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* Post text body */
+  shreddit-post-text-body,
+  shreddit-post [slot="text-body"],
+  shreddit-post [slot="text-body"] *,
+  shreddit-post-text-body * {
+    color: var(--matugen-fg) !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    position: relative !important;
+    z-index: 2 !important;
+  }
+
+  /* Post metadata / credit bar */
+  shreddit-post [slot="credit-bar"],
+  shreddit-post [slot="credit-bar"] * {
+    color: var(--matugen-fg-muted) !important;
+    position: relative !important;
+    z-index: 2 !important;
+  }
+
+  shreddit-post [slot="credit-bar"] a,
+  shreddit-post [slot="credit-bar"] button,
+  shreddit-post a[href*="/r/"]:not([slot="title"]):not([id*="post-title"]):not([slot="full-post-link"]),
+  a.subreddit-name,
+  [data-testid="subreddit-name"] {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  shreddit-post [slot="credit-bar"] a:hover {
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  /* 7. Action Pills (Upvote/Downvote, Comments, Repost, Share, Sort, Menu) */
+
+  /* Make custom element hosts and containers transparent so they never form nested boxes */
+  shreddit-post [slot="action-row"],
+  shreddit-post rpl-action-bar,
+  rpl-action-bar,
+  feed-actions-carousel,
+  [data-testid="action-row"],
+  shreddit-post [class*="action"],
+  shreddit-post-share-button,
+  shreddit-comment-share-button,
+  award-button,
+  shreddit-post-overflow-menu,
+  [data-action-bar-action="repost-button"],
+  [data-action-bar-action="repost"],
+  [data-action-bar-action="share"],
+  [data-action-bar-action="award-button"] {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    position: relative !important;
+    z-index: 2 !important;
+  }
+
+  /* Vote pill group: seamless retro pill that blends into the card */
+  rpl-vote-button-group,
+  .rpl-vote-button-group,
+  span.rpl-vote-button-group,
+  [class*="vote-button-group"],
+  shreddit-post [slot="action-row"] [class*="vote"],
+  shreddit-comment [slot="action-row"] [class*="vote"] {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg) !important;
+    background: var(--matugen-btn-bg) !important;
+    border: 1px solid var(--matugen-btn-border) !important;
+    border-radius: 9999px !important;
+    box-shadow: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    transition: all 0.15s ease !important;
+    --button-color-background: transparent !important;
+    --button-border-color: transparent !important;
+    --button-shadow: none !important;
+  }
+
+  rpl-vote-button-group:hover,
+  .rpl-vote-button-group:hover,
+  span.rpl-vote-button-group:hover,
+  [class*="vote-button-group"]:hover {
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  /* Action buttons and pills across Reddit feed & posts (Comments, Share, Repost, Awards) */
+  shreddit-post [slot="action-row"] a[href*="/comments/"],
+  rpl-action-bar a[href*="/comments/"],
+  shreddit-post a[href*="/comments/"]:not([slot="full-post-link"]):not([slot="title"]):not([id*="post-title"]):not([class*="post-link"]):not([class*="absolute"]),
+  rpl-action-bar button:not([upvote]):not([downvote]):not([slot="join-button"]):not(.join-btn):not(.button-primary):not([class*="Clear"]):not([class*="clear"]),
+  shreddit-post-share-button button,
+  shreddit-post-share-button::part(button),
+  shreddit-comment-share-button button,
+  shreddit-comment-share-button::part(button),
+  award-button button,
+  award-button::part(button),
+  button[data-action-bar-action="repost"],
+  button[data-action-bar-action="repost-button"],
+  button[aria-label*="share" i],
+  button[aria-label*="repost" i] {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg) !important;
+    background: var(--matugen-btn-bg) !important;
+    border: 1px solid var(--matugen-btn-border) !important;
+    border-radius: 9999px !important;
+    color: var(--matugen-fg) !important;
+    box-shadow: none !important;
+    transition: all 0.15s ease !important;
+    padding: 4px 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+
+  /* Hover state for buttons and pills */
+  shreddit-post [slot="action-row"] a[href*="/comments/"]:hover,
+  rpl-action-bar a[href*="/comments/"]:hover,
+  shreddit-post a[href*="/comments/"]:not([slot="full-post-link"]):not([slot="title"]):not([id*="post-title"]):not([class*="post-link"]):not([class*="absolute"]):hover,
+  rpl-action-bar button:not([upvote]):not([downvote]):not([slot="join-button"]):not(.join-btn):not(.button-primary):not([class*="Clear"]):not([class*="clear"]):hover,
+  shreddit-post-share-button button:hover,
+  shreddit-post-share-button::part(button):hover,
+  shreddit-comment-share-button button:hover,
+  shreddit-comment-share-button::part(button):hover,
+  award-button button:hover,
+  award-button::part(button):hover,
+  button[data-action-bar-action="repost"]:hover,
+  button[aria-label*="share" i]:hover,
+  button[aria-label*="repost" i]:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    border-color: var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  /* Feed Sort Dropdowns & View Mode Switcher */
+  shreddit-sort-dropdown,
+  shreddit-sort-dropdown button,
+  shreddit-sort-dropdown::part(button),
+  shreddit-sort-dropdown-with-suggested,
+  shreddit-sort-dropdown-with-suggested button,
+  shreddit-sort-dropdown-with-suggested::part(button),
+  feed-layout-controller,
+  feed-layout-controller button,
+  feed-layout-controller::part(button),
+  faceplate-dropdown-menu button,
+  faceplate-dropdown-menu::part(button),
+  [data-testid="sort-dropdown"] button,
+  [data-testid="feed-view-dropdown"] button {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg) !important;
+    background: var(--matugen-btn-bg) !important;
+    border: 1px solid var(--matugen-btn-border) !important;
+    border-radius: 9999px !important;
+    color: var(--matugen-fg) !important;
+    box-shadow: none !important;
+    padding: 4px 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+  }
+
+  shreddit-sort-dropdown button:hover,
+  shreddit-sort-dropdown::part(button):hover,
+  shreddit-sort-dropdown-with-suggested button:hover,
+  shreddit-sort-dropdown-with-suggested::part(button):hover,
+  feed-layout-controller button:hover,
+  feed-layout-controller::part(button):hover,
+  faceplate-dropdown-menu button:hover,
+  faceplate-dropdown-menu::part(button):hover,
+  [data-testid="sort-dropdown"] button:hover,
+  [data-testid="feed-view-dropdown"] button:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    border-color: var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  /* Post & Comment Overflow Menu (3-dots) */
+  shreddit-post-overflow-menu,
+  shreddit-post-overflow-menu button,
+  shreddit-post-overflow-menu::part(button),
+  shreddit-post [slot="action-row"] shreddit-post-overflow-menu button,
+  shreddit-comment [slot="action-row"] shreddit-post-overflow-menu button,
+  button[aria-label*="more options" i],
+  button[aria-label*="overflow" i],
+  button[aria-label*="user actions" i] {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 9999px !important;
+    color: var(--matugen-fg-muted) !important;
+    cursor: pointer !important;
+    padding: 4px 8px !important;
+  }
+
+  shreddit-post-overflow-menu button:hover,
+  shreddit-post-overflow-menu::part(button):hover,
+  shreddit-post [slot="action-row"] shreddit-post-overflow-menu button:hover,
+  shreddit-comment [slot="action-row"] shreddit-post-overflow-menu button:hover,
+  button[aria-label*="more options" i]:hover,
+  button[aria-label*="overflow" i]:hover,
+  button[aria-label*="user actions" i]:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: var(--matugen-btn-bg) !important;
+    background-color: var(--matugen-btn-bg) !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  /* Comment Section Action Buttons (Reply, Upvote, etc.) */
+  shreddit-comment [slot="action-row"] button,
+  shreddit-comment-action-row button,
+  button[data-action-bar-action="reply"],
+  button[aria-label*="reply" i] {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg) !important;
+    background: var(--matugen-btn-bg) !important;
+    border: 1px solid var(--matugen-btn-border) !important;
+    border-radius: 9999px !important;
+    color: var(--matugen-fg) !important;
+    box-shadow: none !important;
+    padding: 2px 10px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+  }
+
+  shreddit-comment [slot="action-row"] button:hover,
+  shreddit-comment-action-row button:hover,
+  button[data-action-bar-action="reply"]:hover,
+  button[aria-label*="reply" i]:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    border-color: var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  /* Neutralize inner elements inside vote button group: 100% borderless, transparent, seamless pill */
+  .rpl-vote-button-group button,
+  span.rpl-vote-button-group button,
+  rpl-vote-button-group button,
+  rpl-vote-button-group::part(button),
+  rpl-vote-button-group::part(upvote),
+  rpl-vote-button-group::part(downvote),
+  rpl-vote-button-group::part(upvote-button),
+  rpl-vote-button-group::part(downvote-button),
+  shreddit-vote-animations button,
+  [class*="vote-button-group"] button,
+  button[upvote],
+  button[downvote],
+  button[rpl][upvote],
+  button[rpl][downvote],
+  button[data-action-bar-action="upvote"],
+  button[data-action-bar-action="downvote"],
+  button[aria-label="Upvote"],
+  button[aria-label="Downvote"],
+  button[aria-label*="upvote" i],
+  button[aria-label*="downvote" i],
+  .rpl-vote-button-group-divider {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    color: var(--matugen-fg) !important;
+    padding: 0 4px !important;
+    margin: 0 !important;
+    outline: none !important;
+  }
+
+  .rpl-vote-button-group button:hover,
+  span.rpl-vote-button-group button:hover,
+  rpl-vote-button-group button:hover,
+  rpl-vote-button-group::part(button):hover,
+  rpl-vote-button-group::part(upvote):hover,
+  rpl-vote-button-group::part(downvote):hover,
+  rpl-vote-button-group::part(upvote-button):hover,
+  rpl-vote-button-group::part(downvote-button):hover,
+  shreddit-vote-animations button:hover,
+  button[upvote]:hover,
+  button[downvote]:hover,
+  button[rpl][upvote]:hover,
+  button[rpl][downvote]:hover,
+  button[data-action-bar-action="upvote"]:hover,
+  button[data-action-bar-action="downvote"]:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--matugen-accent) !important;
+  }
+
+  /* Score text inside vote button group */
+  rpl-vote-button-group faceplate-number,
+  rpl-vote-button-group rpl-number,
+  rpl-vote-button-group [part*="score"],
+  rpl-vote-button-group [part*="label"],
+  rpl-vote-button-group span,
+  .rpl-vote-button-group-label {
+    color: var(--matugen-fg) !important;
+    font-weight: 600 !important;
+    padding: 0 4px !important;
+  }
+
+  /* Video Player Controls Reset: absolutely no boxes or borders on video controls */
+  shreddit-player button,
+  shreddit-player [role="button"],
+  shreddit-player input,
+  [data-testid="video-player"] button,
+  lite-youtube button,
+  video + div button,
+  div:has(> video) button,
+  button:has(svg[icon-name*="play"]),
+  button:has(svg[icon-name*="pause"]),
+  button:has(svg[icon-name*="replay"]),
+  button:has(svg[icon-name*="volume"]),
+  button:has(svg[icon-name*="mute"]),
+  button:has(svg[icon-name*="fullscreen"]),
+  button:has(svg[icon-name*="setting"]),
+  button:has(svg[icon-name*="caption"]),
+  button[aria-label*="Play" i],
+  button[aria-label*="Pause" i],
+  button[aria-label*="Replay" i],
+  button[aria-label*="Mute" i],
+  button[aria-label*="Volume" i],
+  button[aria-label*="Fullscreen" i],
+  button[aria-label*="Settings" i],
+  button[aria-label*="Captions" i] {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    color: #ffffff !important;
+  }
+
+  /* Left nav drawer / hamburger toggle button */
+  left-nav-drawer-controller button,
+  shreddit-drawer-controller button,
+  button[aria-label*="navigation" i],
+  button[aria-label*="drawer" i],
+  button[aria-label*="sidebar" i],
+  button[aria-label*="Open navigation" i],
+  button:has(svg[icon-name*="menu"]),
+  button:has(svg[icon-name*="drawer"]),
+  button:has(svg[icon-name*="bars"]) {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 8px !important;
+    color: var(--matugen-fg) !important;
+    box-shadow: none !important;
+  }
+
+  left-nav-drawer-controller button:hover,
+  shreddit-drawer-controller button:hover,
+  button[aria-label*="navigation" i]:hover,
+  button[aria-label*="drawer" i]:hover,
+  button:has(svg[icon-name*="menu"]):hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-bg-card-hover) !important;
+    border-color: var(--matugen-border) !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  /* Join Community Button & Primary Buttons: stylish theme accent pill */
+  shreddit-join-button {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    border-radius: 9999px !important;
+    overflow: hidden !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    --button-color-background: var(--matugen-accent) !important;
+    --button-color-background-default: var(--matugen-accent) !important;
+    --button-color-background-hover: var(--matugen-accent-bright) !important;
+    --button-color-text: #ffffff !important;
+    --button-color-text-default: #ffffff !important;
+    --button-color-text-hover: #ffffff !important;
+    --button-border-color: var(--matugen-accent) !important;
+    --color-primary-background: var(--matugen-accent) !important;
+    --color-primary-background-hover: var(--matugen-accent-bright) !important;
+    --color-button-primary-background: var(--matugen-accent) !important;
+    --color-button-primary-background-hover: var(--matugen-accent-bright) !important;
+    --color-button-secondary-background: var(--matugen-accent) !important;
+    --color-button-secondary-text: #ffffff !important;
+    --color-interactive-primary: var(--matugen-accent) !important;
+  }
+
+  shreddit-join-button::part(button),
+  shreddit-join-button button,
+  button.join-btn,
+  button.button-primary,
+  .button-primary,
+  button[data-post-click-location="join"],
+  button[slot="join-button"],
+  button[aria-label="Join"],
+  button[aria-label*="Join " i],
+  .button-brand {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-accent) !important;
+    background: var(--matugen-accent) !important;
+    border: 1px solid var(--matugen-accent) !important;
+    border-radius: 9999px !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    padding: 4px 16px !important;
+    box-shadow: none !important;
+    cursor: pointer !important;
+  }
+
+  shreddit-join-button:hover::part(button),
+  shreddit-join-button button:hover,
+  button.join-btn:hover,
+  button.button-primary:hover,
+  button[data-post-click-location="join"]:hover,
+  button[slot="join-button"]:hover,
+  button[aria-label="Join"]:hover,
+  button[aria-label*="Join " i]:hover,
+  .button-brand:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-accent-bright) !important;
+    background: var(--matugen-accent-bright) !important;
+    border-color: var(--matugen-accent-bright) !important;
+    color: #ffffff !important;
+  }
+
+  /* Joined state: clean subtle outline instead of loud solid pill */
+  shreddit-join-button[aria-label*="Joined"],
+  shreddit-join-button[joined] {
+    --button-color-background: transparent !important;
+    --button-color-text: var(--matugen-fg) !important;
+    --button-border-color: var(--matugen-border-subtle) !important;
+  }
+
+  shreddit-join-button[aria-label*="Joined"]::part(button),
+  shreddit-join-button[joined]::part(button),
+  shreddit-join-button[aria-label*="Joined"] button,
+  shreddit-join-button[joined] button,
+  button[aria-label="Joined"],
+  button[aria-label*="Joined" i] {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: transparent !important;
+    background: transparent !important;
+    border: 1px solid var(--matugen-btn-border) !important;
+    color: var(--matugen-fg) !important;
+    padding: 4px 16px !important;
+    cursor: pointer !important;
+  }
+
+  shreddit-join-button[aria-label*="Joined"]:hover::part(button),
+  shreddit-join-button[joined]:hover::part(button),
+  shreddit-join-button[aria-label*="Joined"] button:hover,
+  button[aria-label="Joined"]:hover,
+  button[aria-label*="Joined" i]:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg) !important;
+    background: var(--matugen-btn-bg) !important;
+    border-color: var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  /* Suggested Communities Carousel Cards & Buttons */
+  [class*="community-recommendation"],
+  [data-testid*="community-recommendation"] {
+    background-color: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 12px !important;
+  }
+
+  [class*="community-recommendation"] shreddit-join-button,
+  [data-testid*="community-recommendation"] shreddit-join-button {
+    width: 100% !important;
+    display: block !important;
+    border-radius: 9999px !important;
+    overflow: hidden !important;
+    background: transparent !important;
+  }
+
+  [class*="community-recommendation"] button,
+  [data-testid*="community-recommendation"] button,
+  shreddit-join-button button {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    width: 100% !important;
+    border-radius: 9999px !important;
+    background-color: var(--matugen-accent) !important;
+    border: 1px solid var(--matugen-accent) !important;
+    color: #ffffff !important;
+  }
+
+  shreddit-join-button svg,
+  shreddit-join-button canvas {
+    display: none !important;
+  }
+
+  /* Clear Button in Recent Posts & Sidebar: clean, borderless text button */
+  recent-posts {
+    --button-color-background: transparent !important;
+    --button-border-width: 0 !important;
+    --button-shadow: none !important;
+    --color-button-plain-background: transparent !important;
+    --color-button-plain-background-hover: transparent !important;
+  }
+
+  recent-posts button,
+  recent-posts::part(button),
+  reddit-recent-pages button,
+  reddit-recent-pages::part(button),
+  #right-sidebar-container button[class*="Clear"],
+  #right-sidebar-container button[class*="clear"],
+  #right-sidebar-container button[aria-label*="Clear" i],
+  faceplate-tracker[noun="clear_recent_module"] button,
+  [noun="clear_recent_module"] button,
+  [noun*="clear"] button,
+  button.button-plain,
+  button.button-small.border-none,
+  button.border-none.bg-transparent,
+  button[class*="button-plain"],
+  button[class*="border-none"],
+  button.text-primary.button-plain,
+  button[class*="Clear"],
+  button[class*="clear"],
+  button[aria-label*="Clear" i] {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 4px !important;
+    color: var(--matugen-fg-muted) !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    cursor: pointer !important;
+    padding: 2px 8px !important;
+  }
+
+  recent-posts button:hover,
+  recent-posts::part(button):hover,
+  reddit-recent-pages button:hover,
+  reddit-recent-pages::part(button):hover,
+  #right-sidebar-container button[class*="Clear"]:hover,
+  #right-sidebar-container button[class*="clear"]:hover,
+  #right-sidebar-container button[aria-label*="Clear" i]:hover,
+  faceplate-tracker[noun="clear_recent_module"] button:hover,
+  [noun="clear_recent_module"] button:hover,
+  [noun*="clear"] button:hover,
+  button.button-plain:hover,
+  button.button-small.border-none:hover,
+  button.border-none.bg-transparent:hover,
+  button[class*="button-plain"]:hover,
+  button[class*="border-none"]:hover,
+  button.text-primary.button-plain:hover,
+  button[class*="Clear"]:hover,
+  button[class*="clear"]:hover,
+  button[aria-label*="Clear" i]:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    color: var(--matugen-accent) !important;
+    background: var(--matugen-btn-bg) !important;
+    background-color: var(--matugen-btn-bg) !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Comment composer / Comment box ("Join the conversation") */
+  shreddit-comment-composer,
+  faceplate-textarea-input,
+  faceplate-text-input,
+  .label-container,
+  [placeholder*="Join the conversation" i],
+  [data-testid*="comment-composer" i] {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 9999px !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  [placeholder*="Join the conversation" i]::placeholder {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  /* Icons and labels inside pills */
+  svg[icon-name],
+  svg.icon,
+  [data-action-bar-action] svg,
+  rpl-vote-button-group svg,
+  button svg,
+  a svg {
+    color: var(--matugen-fg) !important;
+    fill: currentColor !important;
+  }
+
+  svg[icon-name] path,
+  svg.icon path,
+  [data-action-bar-action] path,
+  rpl-vote-button-group path,
+  button path,
+  a path {
+    fill: currentColor !important;
+  }
+
+  rpl-number,
+  faceplate-number,
+  .rpl-vote-button-group-label,
+  [data-action-bar-action] span,
+  [data-action-bar-action] faceplate-number,
+  shreddit-post-share-button span,
+  award-button span {
+    color: var(--matugen-fg) !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+  }
+
+  /* 8. Right Sidebar ("RECENT POSTS" and widgets) */
+  aside,
+  reddit-sidebar-nav,
+  [slot="secondary"],
+  #right-sidebar-container,
+  #right-sidebar-contents,
+  .right-sidebar {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* Sidebar widgets / sections */
+  reddit-recent-pages,
+  recent-posts,
+  community-bookmarks,
+  #right-sidebar-container section,
+  #right-sidebar-container aside,
+  #right-sidebar-container > div > div,
+  #right-sidebar-container [class*="recent"],
+  #right-sidebar-container [class*="popular"],
+  aside section,
+  aside > div > div,
+  aside .sidebar-grid {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+  }
+
+  /* Headers in sidebar */
+  aside h2,
+  aside h3,
+  aside p.text-12,
+  #right-sidebar-container h2,
+  #right-sidebar-container h3,
+  reddit-recent-pages h2,
+  reddit-recent-pages h3 {
+    color: var(--matugen-fg-muted) !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.05em !important;
+  }
+
+  /* Recent post item titles & metadata in sidebar: legible retro dark green typography */
+  recent-posts,
+  recent-posts a,
+  recent-posts li a,
+  recent-posts li a span,
+  recent-posts li a p,
+  recent-posts [class*="title"],
+  reddit-recent-pages,
+  reddit-recent-pages a,
+  reddit-recent-pages li a,
+  #right-sidebar-container,
+  #right-sidebar-container a,
+  #right-sidebar-container li a,
+  #right-sidebar-container li a span,
+  #right-sidebar-container li a p,
+  #right-sidebar-contents a,
+  .right-sidebar a,
+  aside li a {
+    color: var(--matugen-fg) !important;
+    text-decoration: none !important;
+  }
+
+  recent-posts li a > span > span:first-child,
+  recent-posts li a .text-body-2,
+  recent-posts li a [class*="text-body"],
+  recent-posts p.font-semibold,
+  recent-posts a p,
+  reddit-recent-pages p.font-semibold,
+  #right-sidebar-container p.font-semibold,
+  #right-sidebar-container a p,
+  aside li p {
+    color: var(--matugen-fg-bright) !important;
+    font-weight: 600 !important;
+  }
+
+  recent-posts a:hover,
+  recent-posts a:hover *,
+  recent-posts li a:hover,
+  recent-posts li a:hover *,
+  reddit-recent-pages a:hover,
+  #right-sidebar-container a:hover,
+  #right-sidebar-container a:hover *,
+  #right-sidebar-contents a:hover,
+  .right-sidebar a:hover,
+  aside li a:hover {
+    color: var(--matugen-accent) !important;
+  }
+
+  /* Metadata in recent posts (upvotes, comments count, timestamps) */
+  recent-posts [class*="text-12"],
+  recent-posts [class*="caption"],
+  recent-posts span.text-12,
+  recent-posts p.text-12,
+  recent-posts p[class*="text-neutral-content-weak"],
+  #right-sidebar-container [class*="text-12"],
+  aside [class*="text-12"] {
+    color: var(--matugen-fg-muted) !important;
+    font-weight: normal !important;
+  }
+
+  /* Thumbnails in sidebar */
+  recent-posts [class*="bg-neutral-background"],
+  recent-posts img,
+  #right-sidebar-container [class*="bg-neutral-background"],
+  #right-sidebar-container img {
+    background-color: var(--matugen-bg-surface) !important;
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  #right-sidebar-container li,
+  reddit-recent-pages li,
+  aside li {
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  #right-sidebar-container li:last-child,
+  reddit-recent-pages li:last-child,
+  aside li:last-child {
+    border-bottom: none !important;
+  }
+
+  /* 9. Left Navigation Sidebar */
+  reddit-sidebar-nav,
+  flex-left-nav-container,
+  #left-sidebar-container {
+    background-color: var(--matugen-bg) !important;
+    border-right: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  reddit-sidebar-nav a,
+  reddit-sidebar-nav button {
+    color: var(--matugen-fg) !important;
+  }
+
+  reddit-sidebar-nav a:hover,
+  reddit-sidebar-nav button:hover {
+    background-color: var(--matugen-bg-surface) !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  /* 10. Menus, Dropdowns, Hovercards & Dialogs */
+  faceplate-menu,
+  faceplate-dropdown-menu,
+  rpl-dropdown,
+  rpl-menu,
+  rpl-hovercard,
+  rpl-tooltip,
+  shreddit-post-overflow-menu [slot="menu"],
+  shreddit-sort-dropdown faceplate-menu,
+  dialog,
+  [role="dialog"] {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  faceplate-menu li:hover,
+  faceplate-menu [role="menuitem"]:hover,
+  rpl-menu-item:hover {
+    background-color: var(--matugen-bg-card-hover) !important;
+  }
+
+  /* 11. Comments Thread */
+  shreddit-comment,
+  shreddit-comment-tree {
+    background-color: transparent !important;
+  }
+
+  shreddit-comment [slot="comment"] {
+    color: var(--matugen-fg) !important;
+  }
+}
+
+@-moz-document domain("duckduckgo.com") {
+  body, .site-wrapper, .results, .header-wrap {
+    background-color: var(--matugen-bg) !important;
+    color: var(--matugen-fg) !important;
+  }
+}
+

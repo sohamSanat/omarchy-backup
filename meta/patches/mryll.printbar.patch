@@ -1,0 +1,396 @@
+diff --git i/manifest.json w/manifest.json
+index 21e5571..c0e6591 100644
+--- i/manifest.json
++++ w/manifest.json
+@@ -7,10 +7,13 @@
+   "license": "MIT",
+   "description": "Printer status, supplies, trays and jobs (printbar) in the Omarchy bar.",
+   "kinds": [
++    "panel",
+     "bar-widget"
+   ],
++  "keepLoaded": true,
+   "entryPoints": {
+-    "barWidget": "omarchy/BarWidget.qml"
++    "barWidget": "omarchy/BarWidget.qml",
++    "panel": "omarchy/Panel.qml"
+   },
+   "barWidget": {
+     "displayName": "Printer",
+diff --git i/omarchy/Panel.qml w/omarchy/Panel.qml
+index 6cee213..ddaa103 100644
+--- i/omarchy/Panel.qml
++++ w/omarchy/Panel.qml
+@@ -1,6 +1,8 @@
+ pragma ComponentBehavior: Bound
+ import QtQuick
++import Quickshell
+ import Quickshell.Io
++import Quickshell.Wayland
+ import qs.Commons
+ import qs.Ui
+ 
+@@ -34,6 +36,7 @@ Panel {
+ 
+   property var anchorItem: null
+   property bool openedFromHotkey: false
++  property var shell: null
+ 
+   // The bar tracks the widget mounted in its slot — BarWidget.qml — not this
+   // nested panel, so everything the bar identifies a panel by must be that
+@@ -48,6 +51,8 @@ Panel {
+   property var report: null
+   property string errorText: ""
+   property string updatedText: ""
++  property bool showMaintenance: false
++  property string actionNotice: ""
+ 
+   readonly property string printerName: String(setting("printerName", "office"))
+   readonly property string configPath: String(setting("configPath", ""))
+@@ -500,6 +505,13 @@ Panel {
+     onTriggered: root.refresh()
+   }
+ 
++  Timer {
++    id: noticeTimer
++    interval: 3500
++    repeat: false
++    onTriggered: root.actionNotice = ""
++  }
++
+   // Settings changes (printer name, config path) take effect on the next poll;
+   // kick one immediately so the panel doesn't show the old printer meanwhile.
+   onPrinterNameChanged: Qt.callLater(refresh)
+@@ -558,6 +570,9 @@ Panel {
+   function close() {
+     setCenterHoverRevealSuppressed(false)
+     root.controller.hide()
++    if (root.shell && typeof root.shell.hide === "function" && !root.anchorItem) {
++      root.shell.hide("mryll.printbar")
++    }
+   }
+ 
+   function toggle() {
+@@ -584,27 +599,21 @@ Panel {
+     target: root.ipcTarget
+ 
+     function open(): void { root.openFromHotkey() }
+-    function close(): void { root.close() }
++    function close(): void { root.controller.hide() }
+     function show(): void { root.openFromHotkey() }
+-    function hide(): void { root.close() }
++    function hide(): void { root.controller.hide() }
+     function toggle(): void { root.toggle() }
+     function refresh(): void { root.refresh() }
+   }
+ 
+   // ---- panel UI ----------------------------------------------------------------
+ 
+-  KeyboardPanel {
+-    id: panel
+-    anchorItem: root.anchorItem
+-    owner: root.barIdentity
+-    bar: root.bar
+-    open: root.opened
+-    focusTarget: keyCatcher
+-    contentWidth: panel.fittedContentWidth(Style.space(360))
+-    contentHeight: panel.fittedContentHeight(contentColumn.implicitHeight)
++  Component {
++    id: panelContentComponent
+ 
+     PanelKeyCatcher {
+       id: keyCatcher
++      property real contentImplicitHeight: contentColumn.implicitHeight
+       anchors.fill: parent
+       onCloseRequested: root.close()
+       onTabRequested: function(direction) { root.switchPanel(direction) }
+@@ -1097,6 +1106,208 @@ Panel {
+             }
+           }
+ 
++          // ---- Actions / Maintenance / Settings
++          PanelSeparator {
++            foreground: root.fg
++          }
++
++          PanelSectionHeader {
++            text: "ACTIONS & TOOLS"
++            foreground: root.fg
++            fontFamily: root.family
++          }
++
++          Row {
++            width: parent.width
++            spacing: Style.space(6)
++
++            Button {
++              id: testBtn
++              width: Math.floor((parent.width - Style.space(12)) / 3)
++              text: "Test Page"
++              iconText: "󰐪"
++              tooltipText: "Print CUPS test page to Canon G2060"
++              fontSize: Style.font.caption
++              foreground: root.fg
++              fontFamily: root.family
++              bordered: true
++              horizontalPadding: Style.space(4)
++              verticalPadding: Style.space(6)
++              onClicked: {
++                root.actionNotice = "Submitting test page..."
++                noticeTimer.restart()
++                Util.execDetached("/home/soham/.local/bin/printer test")
++              }
++            }
++
++            Button {
++              id: maintBtn
++              width: Math.floor((parent.width - Style.space(12)) / 3)
++              text: "Maint"
++              iconText: "󰛢"
++              tooltipText: "Hardware maintenance & cleaning guide"
++              fontSize: Style.font.caption
++              foreground: root.fg
++              fontFamily: root.family
++              bordered: true
++              active: root.showMaintenance
++              horizontalPadding: Style.space(4)
++              verticalPadding: Style.space(6)
++              onClicked: {
++                root.showMaintenance = !root.showMaintenance
++              }
++            }
++
++            Button {
++              id: configBtn
++              width: Math.floor((parent.width - Style.space(12)) / 3)
++              text: "Config"
++              iconText: "󰒓"
++              tooltipText: "Open printer properties (system-config-printer)"
++              fontSize: Style.font.caption
++              foreground: root.fg
++              fontFamily: root.family
++              bordered: true
++              horizontalPadding: Style.space(4)
++              verticalPadding: Style.space(6)
++              onClicked: {
++                root.actionNotice = "Opening printer config..."
++                noticeTimer.restart()
++                Util.execDetached("/home/soham/.local/bin/printer config")
++              }
++            }
++          }
++
++          Rectangle {
++            visible: root.actionNotice !== ""
++            width: parent.width
++            implicitHeight: actionNoticeLabel.implicitHeight + Style.space(10)
++            radius: Style.cornerRadius
++            color: root.alphaColor(root.accent, 0.12)
++            border.width: 1
++            border.color: root.alphaColor(root.accent, 0.35)
++
++            Text {
++              id: actionNoticeLabel
++              anchors.centerIn: parent
++              text: root.actionNotice
++              textFormat: Text.PlainText
++              color: root.accent
++              font.family: root.family
++              font.pixelSize: Style.font.caption
++              font.bold: true
++            }
++          }
++
++          Rectangle {
++            id: maintCard
++            visible: root.showMaintenance
++            width: parent.width
++            implicitHeight: maintCol.implicitHeight + Style.space(20)
++            radius: Style.cornerRadius
++            color: root.alphaColor(root.fg, 0.05)
++            border.width: 1
++            border.color: root.alphaColor(root.fg, 0.18)
++
++            Column {
++              id: maintCol
++              x: Style.space(10)
++              y: Style.space(10)
++              width: parent.width - Style.space(20)
++              spacing: Style.space(6)
++
++              Row {
++                spacing: Style.space(6)
++                Text {
++                  text: "󰛢"
++                  textFormat: Text.PlainText
++                  color: root.brandColor
++                  font.family: root.family
++                  font.pixelSize: Style.font.bodySmall
++                }
++                Text {
++                  text: "G2060 Hardware Maintenance"
++                  textFormat: Text.PlainText
++                  color: root.brandColor
++                  font.family: root.family
++                  font.pixelSize: Style.font.caption
++                  font.bold: true
++                }
++              }
++
++              Text {
++                width: parent.width
++                text: "• Nozzle Check: Setup (󰛢) → Maintenance → Nozzle check → OK"
++                textFormat: Text.PlainText
++                color: root.fg
++                font.family: root.family
++                font.pixelSize: Style.font.caption
++                wrapMode: Text.Wrap
++              }
++
++              Text {
++                width: parent.width
++                text: "• Cleaning: Setup → Maintenance → Cleaning → OK (or hold Cancel 1 flash)"
++                textFormat: Text.PlainText
++                color: root.fg
++                font.family: root.family
++                font.pixelSize: Style.font.caption
++                wrapMode: Text.Wrap
++              }
++
++              Text {
++                width: parent.width
++                text: "• Deep Cleaning: Setup → Maintenance → Deep cleaning → OK (or hold Cancel 2 flashes)"
++                textFormat: Text.PlainText
++                color: root.fg
++                font.family: root.family
++                font.pixelSize: Style.font.caption
++                wrapMode: Text.Wrap
++              }
++
++              Text {
++                width: parent.width
++                text: "• Head Alignment: Setup → Maintenance → Head alignment → OK"
++                textFormat: Text.PlainText
++                color: Qt.darker(root.fg, 1.25)
++                font.family: root.family
++                font.pixelSize: Style.font.caption
++                wrapMode: Text.Wrap
++              }
++
++              Row {
++                spacing: Style.space(8)
++                topPadding: Style.space(4)
++
++                Button {
++                  text: "CUPS Web"
++                  iconText: "󰏪"
++                  tooltipText: "Open CUPS web administration"
++                  fontSize: Style.font.caption
++                  foreground: root.fg
++                  fontFamily: root.family
++                  bordered: true
++                  horizontalPadding: Style.space(8)
++                  verticalPadding: Style.space(4)
++                  onClicked: Util.execDetached("/home/soham/.local/bin/printer cups")
++                }
++
++                Button {
++                  text: "Terminal Guide"
++                  iconText: "󰞷"
++                  tooltipText: "Open maintenance guide in terminal"
++                  fontSize: Style.font.caption
++                  foreground: root.fg
++                  fontFamily: root.family
++                  bordered: true
++                  horizontalPadding: Style.space(8)
++                  verticalPadding: Style.space(4)
++                  onClicked: Util.execDetached("ghostty -e /home/soham/.local/bin/printer maint")
++                }
++              }
++            }
++          }
++
+           // ---- Freshness footer: when the data is from, plus an inline
+           //      refresh. The button re-runs the CLI right now — the same
+           //      forced refresh the bar's middle-click does — so a stale panel
+@@ -1150,4 +1361,80 @@ Panel {
+       }
+     }
+   }
++
++  Loader {
++    id: barPanelLoader
++    active: root.anchorItem !== null
++    sourceComponent: Component {
++      KeyboardPanel {
++        id: panel
++        anchorItem: root.anchorItem
++        owner: root.barIdentity
++        bar: root.bar
++        open: root.opened
++        focusTarget: barContentLoader.item
++        contentWidth: panel.fittedContentWidth(Style.space(360))
++        contentHeight: panel.fittedContentHeight(barContentLoader.item ? barContentLoader.item.contentImplicitHeight : Style.space(400))
++
++        Loader {
++          id: barContentLoader
++          anchors.fill: parent
++          sourceComponent: panelContentComponent
++        }
++      }
++    }
++  }
++
++  Loader {
++    id: standalonePanelLoader
++    active: root.anchorItem === null
++    sourceComponent: Component {
++      PanelWindow {
++        id: standaloneWindow
++        visible: root.opened
++        anchors { top: true; bottom: true; left: true; right: true }
++        color: "transparent"
++        exclusionMode: ExclusionMode.Ignore
++
++        WlrLayershell.namespace: "omarchy-printer"
++        WlrLayershell.layer: WlrLayer.Overlay
++        WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
++
++        Rectangle {
++          anchors.fill: parent
++          color: Qt.rgba(0, 0, 0, 0.55)
++
++          MouseArea {
++            anchors.fill: parent
++            onClicked: root.close()
++          }
++        }
++
++        BorderSurface {
++          id: standaloneCard
++          anchors.centerIn: parent
++          width: Math.min(Style.space(380), standaloneWindow.width - Style.space(32))
++          height: Math.min(standaloneContentLoader.item ? standaloneContentLoader.item.contentImplicitHeight + Style.spacing.popupPadding * 2 + Style.space(16) : Style.space(400), standaloneWindow.height - Style.space(64))
++          color: Color.popups.background
++          borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
++          padding: Style.spacing.popupPadding
++          radius: Style.cornerRadius
++
++          MouseArea {
++            anchors.fill: parent
++            onClicked: {}
++          }
++
++          Loader {
++            id: standaloneContentLoader
++            anchors.fill: parent
++            sourceComponent: panelContentComponent
++            onLoaded: {
++              if (item) Qt.callLater(function() { item.forceActiveFocus() })
++            }
++          }
++        }
++      }
++    }
++  }
+ }

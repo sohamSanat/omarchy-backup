@@ -1,0 +1,16 @@
+@import "omarchy-theme.css";
+@import "matugen-retro-content.css";
+
+/* Transparent glass default / new tab pages */
+@-moz-document url("about:blank"), url("about:newtab"), url("about:home"), url("about:zen-welcome"), url("about:privatebrowsing"), url("chrome://browser/content/blanktab.html") {
+  :root,
+  html,
+  body,
+  #newtab-window,
+  .outer-wrapper,
+  .body-wrapper,
+  main {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+}

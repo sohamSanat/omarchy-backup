@@ -1,0 +1,114 @@
+#!/bin/bash
+# printer - launch or control the Omarchy printer plugin and maintenance
+
+action="${1:-toggle}"
+
+case "$action" in
+  -h|--help|help)
+    cat <<HELP
+Usage: printer [open|close|toggle|refresh|status|test|maint|config|cups]
+
+Launch or control the printer plugin panel and maintenance tools.
+
+Commands:
+  printer          Toggle the printer UI panel
+  printer open     Open the printer UI panel
+  printer close    Close the printer UI panel
+  printer refresh  Refresh printer data in UI
+  printer status   Show live hardware ink levels & status in terminal
+  printer test     Print a test page to Canon G2060
+  printer maint    Display hardware maintenance guide (nozzle check, cleaning)
+  printer config   Open printer settings GUI (system-config-printer)
+  printer cups     Open CUPS web administration interface in browser
+HELP
+    exit 0
+    ;;
+  open|show)
+    omarchy-shell shell summon mryll.printbar '{}' 2>/dev/null || omarchy-shell mryll.printbar open
+    ;;
+  close|hide)
+    omarchy-shell shell hide mryll.printbar 2>/dev/null || omarchy-shell mryll.printbar close
+    ;;
+  refresh)
+    omarchy-shell mryll.printbar refresh 2>/dev/null || omarchy-shell shell call mryll.printbar refresh ''
+    ;;
+  status)
+    python3 -c '
+import subprocess
+try:
+    res = subprocess.run(["ipptool", "-v", "-t", "ipp://localhost:60000/ipp/print", "get-printer-attributes.test"], capture_output=True, text=True, timeout=5)
+    names, levels, reasons = [], [], "none"
+    for line in res.stdout.splitlines():
+        line = line.strip()
+        if line.startswith("marker-names"):
+            names = [x.strip() for x in line.split("=", 1)[1].split(",")]
+        elif line.startswith("marker-levels"):
+            levels = [x.strip() for x in line.split("=", 1)[1].split(",")]
+        elif line.startswith("printer-state-reasons"):
+            reasons = line.split("=", 1)[1].strip() or "none"
+    print("\033[1;36m=== Canon PIXMA G2060 Status ===\033[0m")
+    print(f"Status: \033[1;32mOnline\033[0m (reasons: {reasons})")
+    print("\033[1mInk & Cartridge Levels:\033[0m")
+    for n, l in zip(names, levels):
+        try:
+            val = int(l)
+            bar_len = val // 5
+            bar = "█" * bar_len + "░" * (20 - bar_len)
+        except ValueError:
+            bar = ""
+        print(f"  {n:<15} [{bar}] {l}%")
+except Exception as e:
+    print("\033[1;31mCould not reach printer on ipp-usb:\033[0m", e)
+'
+    ;;
+  test)
+    echo "Sending test page to Canon_G2060..."
+    job_msg=$(lp -d Canon_G2060 /usr/share/cups/data/testprint 2>&1)
+    echo "$job_msg"
+    notify-send -a "Printer" -i "printer" "Test Page Sent" "$job_msg" 2>/dev/null || true
+    ;;
+  maint)
+    cat <<'MAINT'
+=== Canon PIXMA G2060 Hardware Maintenance Guide ===
+
+Because the Windows Assistant Tool (.exe) cannot communicate with Linux hardware,
+Canon designed the G2060 with direct on-device hardware maintenance functions.
+
+1. Nozzle Check Pattern:
+   • Press the [Setup] button (wrench / gear icon) on the printer.
+   • Use the Arrow buttons to select "Maintenance" and press [OK].
+   • Select "Nozzle check" and press [OK]. Check for missing lines or streaks.
+
+2. Print Head Cleaning (Standard):
+   • Method A: Press [Setup] -> "Maintenance" -> "Cleaning" -> [OK] -> "Yes".
+   • Method B: Hold the [Resume/Cancel] button (triangle) until the Power lamp
+     flashes ONCE, then release immediately.
+
+3. Deep Cleaning (Heavy ink clogs):
+   • Method A: Press [Setup] -> "Maintenance" -> "Deep cleaning" -> [OK] -> "Yes".
+   • Method B: Hold the [Resume/Cancel] button until the Power lamp
+     flashes TWICE, then release immediately.
+
+4. Print Head Alignment:
+   • Press [Setup] -> "Maintenance" -> "Head alignment" -> [OK].
+
+5. Ink System Flush / Roller / Bottom Plate Cleaning:
+   • Available under [Setup] -> "Maintenance" -> select operation -> [OK].
+MAINT
+    if [ -t 0 ] && [ -t 1 ]; then
+      echo ""
+      read -n 1 -s -r -p "Press any key to exit..."
+      echo ""
+    fi
+    ;;
+  config)
+    notify-send -a "Printer" -i "printer" "Printer Settings" "Opening printer configuration window..." 2>/dev/null || true
+    system-config-printer >/dev/null 2>&1 &
+    ;;
+  cups)
+    xdg-open http://localhost:631/printers/Canon_G2060 >/dev/null 2>&1 &
+    ;;
+  toggle|*)
+    omarchy-shell shell toggle mryll.printbar '{}' 2>/dev/null || omarchy-shell mryll.printbar toggle
+    ;;
+esac

@@ -11,10 +11,10 @@
           "verticalFormat": "HH\n—\nmm"
         },
         {
-          "id": "omarchy.keyboard-layout"
+          "id": "mryll.meteobar"
         },
         {
-          "id": "mryll.meteobar"
+          "id": "kenny.nightlight"
         },
         {
           "id": "io.github.diegopluna.argus"
@@ -31,7 +31,7 @@
           "id": "omarchy.workspaces"
         },
         {
-          "id": "omarchy.agents"
+          "id": "soham.agents"
         },
         {
           "id": "krall.switchboard"
@@ -46,11 +46,6 @@
         },
         {
           "id": "jkoestinger.vpn"
-        },
-        {
-          "clearClipboardSec": 60,
-          "fingerprintUnlock": true,
-          "id": "io.github.elevate08.qs-bitwarden-cli"
         },
         {
           "id": "io.github.nilszeilon.omarchy-sensei"
@@ -92,7 +87,7 @@
         },
         {
           "id": "jrmmhm.pocket",
-          "members": "omaconnect, jkoestinger.vpn, io.github.elevate08.qs-bitwarden-cli, io.github.nilszeilon.omarchy-sensei, omamail, io.github.ricky.whatsapp, io.github.r-witz.nothing-ear, mahmoodkhalil57.qrgen"
+          "members": "omaconnect, jkoestinger.vpn, io.github.nilszeilon.omarchy-sensei, omamail, io.github.ricky.whatsapp, io.github.r-witz.nothing-ear, mahmoodkhalil57.qrgen, io.github.elevate08.qs-bitwarden-cli"
         },
         {
           "id": "omarchy.bluetooth"
@@ -115,16 +110,21 @@
     "transparent": false
   },
   "cloneSourceRestores": [
-    "krall.switchboard"
+    "krall.switchboard",
+    "kenny.nightlight"
   ],
   "disabledPlugins": [
-    "omarchy.menu"
+    "omarchy.menu",
+    "omarchy.nightlight"
   ],
   "idle": {
     "lock": 750,
     "screensaver": 150
   },
   "plugins": [
+    {
+      "id": "mryll.printbar"
+    },
     {
       "id": "io.github.calebhat.themebook"
     },

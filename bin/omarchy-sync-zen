@@ -2,22 +2,64 @@
 set -euo pipefail
 
 # ==============================================================================
-# Omarchy -> Zen Browser Color Palette Sync Script
+# Omarchy -> Zen Browser Dynamic Color Palette & Glass Sync Script
 # Dynamically synchronizes Zen Browser with the active Omarchy system theme.
 # ==============================================================================
 
-CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
-ZEN_CSS_SOURCE="$CURRENT_THEME_DIR/zen.css"
+declare -A THEME_COLORS=()
 
-# If theme directory or zen.css is missing, trigger omarchy template generation
-if [[ ! -f "$ZEN_CSS_SOURCE" ]]; then
-  if command -v omarchy-theme-set-templates >/dev/null 2>&1; then
-    omarchy-theme-set-templates 2>/dev/null || true
-  fi
+# 1. Extract active Omarchy theme colors
+if command -v omarchy-theme-color >/dev/null 2>&1; then
+  while IFS=$'\t' read -r key value; do
+    [[ -n "$key" && -n "$value" ]] && THEME_COLORS["$key"]="$value"
+  done < <(omarchy-theme-color --all 2>/dev/null || true)
 fi
 
-if [[ ! -f "$ZEN_CSS_SOURCE" ]]; then
-  exit 0
+# Fallback to colors.toml if needed
+COLORS_TOML="$HOME/.local/state/omarchy/current/theme/colors.toml"
+if [[ -f "$COLORS_TOML" ]]; then
+  while IFS='=' read -r key value; do
+    key=$(echo "$key" | tr -d ' "[:space:]')
+    value=$(echo "$value" | tr -d ' "[:space:]')
+    if [[ -n "$key" && -n "$value" && -z "${THEME_COLORS[$key]:-}" ]]; then
+      THEME_COLORS["$key"]="$value"
+    fi
+  done < "$COLORS_TOML"
+fi
+
+ACCENT="${THEME_COLORS[accent]:-#5e81ac}"
+BG="${THEME_COLORS[background]:-${THEME_COLORS[bg]:-#141110}}"
+FG="${THEME_COLORS[foreground]:-${THEME_COLORS[fg]:-#f5ebe0}}"
+MUTED="${THEME_COLORS[muted]:-#7d8794}"
+COLOR3="${THEME_COLORS[color3]:-$ACCENT}"
+COLOR4="${THEME_COLORS[color4]:-$ACCENT}"
+BORDER="${THEME_COLORS[accent]:-$COLOR3}"
+MODE="${THEME_COLORS[mode]:-${THEME_COLORS[theme_type]:-dark}}"
+SELECTION_FG="${THEME_COLORS[selection_foreground]:-#ffffff}"
+
+# Theme Green & Icon colors
+GREEN="${THEME_COLORS[green]:-${THEME_COLORS[color2]:-#556753}}"
+DARK_GREEN="${THEME_COLORS[foreground]:-#1c2d28}"
+
+if [[ "$MODE" == "light" ]]; then
+  BG_DARKER="color-mix(in srgb, $BG 92%, black)"
+  BG_SURFACE="color-mix(in srgb, $BG 96%, black)"
+  BG_CARD="color-mix(in srgb, $BG 90%, black)"
+  BG_CARD_HOVER="color-mix(in srgb, $BG 84%, black)"
+  BG_CARD_ACTIVE="color-mix(in srgb, $BG 78%, black)"
+  PILL_FG="#ffffff"
+  # In light mode with light background, blend theme green with deep foreground green for crisp readability
+  ICON_COLOR="color-mix(in srgb, ${GREEN} 75%, ${DARK_GREEN} 25%)"
+  ICON_COLOR_HOVER="${ACCENT}"
+else
+  BG_DARKER="color-mix(in srgb, $BG 80%, black)"
+  BG_SURFACE="color-mix(in srgb, $BG 90%, white 10%)"
+  BG_CARD="color-mix(in srgb, $BG 85%, white 15%)"
+  BG_CARD_HOVER="color-mix(in srgb, $BG 75%, white 25%)"
+  BG_CARD_ACTIVE="color-mix(in srgb, $BG 68%, white 32%)"
+  PILL_FG="#141110"
+  ICON_COLOR="${GREEN}"
+  ICON_COLOR_HOVER="${ACCENT}"
 fi
 
 # Candidate directories where Zen Browser profiles may live
@@ -46,7 +88,6 @@ for base_dir in "${ZEN_BASE_DIRS[@]}"; do
   # 2. Fallback / supplementary: find any profile directories with prefs.js or times.json
   for candidate in "$base_dir"/*; do
     if [[ -d "$candidate" ]] && [[ -f "$candidate/prefs.js" || -f "$candidate/times.json" || -f "$candidate/compatibility.ini" ]]; then
-      # Avoid duplicates
       already_added=0
       for p in "${PROFILES[@]}"; do
         if [[ "$p" == "$candidate" ]]; then
@@ -87,26 +128,77 @@ for profile_dir in "${PROFILES[@]}"; do
     fi
   done
 
-  # 2. Symlink/copy omarchy-theme.css into chrome/
+  # 2. Write dynamic omarchy-theme.css
   dest_css="$chrome_dir/omarchy-theme.css"
-  ln -nsf "$ZEN_CSS_SOURCE" "$dest_css"
+  rm -f "$dest_css"
+  cat << THEME_EOF > "$dest_css"
+/* ==========================================================================
+   Dynamically Generated Omarchy Theme Palette for Zen Browser
+   Automatically updated via Omarchy theme hooks
+   ========================================================================== */
 
-  # 3. Ensure userChrome.css imports omarchy-theme.css
+:root {
+  /* Omarchy Accent & Borders */
+  --omarchy-accent: ${ACCENT};
+  --omarchy-accent-bright: color-mix(in srgb, ${ACCENT} 75%, white);
+  --omarchy-accent-soft: color-mix(in srgb, ${ACCENT} 18%, transparent);
+  --omarchy-accent-glow: 0 0 12px color-mix(in srgb, ${ACCENT} 35%, transparent);
+
+  /* Framed Borders dynamically mapped to Omarchy Theme */
+  --omarchy-border: ${BORDER};
+  --omarchy-border-subtle: color-mix(in srgb, ${BORDER} 45%, transparent);
+  --omarchy-border-highlight: color-mix(in srgb, ${ACCENT} 80%, white);
+  --omarchy-border-active: ${ACCENT};
+
+  /* Surfaces, Backgrounds & Typography */
+  --omarchy-bg: ${BG};
+  --omarchy-bg-darker: ${BG_DARKER};
+  --omarchy-bg-surface: ${BG_SURFACE};
+  --omarchy-bg-card: ${BG_CARD};
+  --omarchy-bg-card-hover: ${BG_CARD_HOVER};
+  --omarchy-bg-card-active: ${BG_CARD_ACTIVE};
+
+  --omarchy-fg: ${FG};
+  --omarchy-fg-bright: color-mix(in srgb, ${FG} 90%, white);
+  --omarchy-fg-muted: ${MUTED};
+  --omarchy-fg-dark: color-mix(in srgb, ${FG} 40%, black);
+
+  /* Soft Button UI Tokens */
+  --omarchy-btn-bg: color-mix(in srgb, ${FG} 8%, transparent);
+  --omarchy-btn-bg-hover: color-mix(in srgb, ${FG} 16%, transparent);
+  --omarchy-btn-border: color-mix(in srgb, ${FG} 12%, transparent);
+
+  /* Green Theme Colors & UI Button Palette */
+  --omarchy-green: ${GREEN};
+  --omarchy-icon-color: ${ICON_COLOR};
+  --omarchy-icon-color-hover: ${ICON_COLOR_HOVER};
+  --omarchy-fg-green: ${DARK_GREEN};
+
+  --omarchy-pill-bg: ${ACCENT};
+  --omarchy-pill-fg: ${PILL_FG};
+}
+THEME_EOF
+
+  # 3. Ensure userChrome.css imports omarchy-theme.css and matugen-retro.css
   user_chrome="$chrome_dir/userChrome.css"
-  import_statement='@import "omarchy-theme.css";'
-
   if [[ ! -f "$user_chrome" ]]; then
-    echo "$import_statement" > "$user_chrome"
-  elif ! grep -q "omarchy-theme.css" "$user_chrome"; then
-    tmp_file=$(mktemp)
-    echo "$import_statement" > "$tmp_file"
-    cat "$user_chrome" >> "$tmp_file"
-    mv "$tmp_file" "$user_chrome"
+    cat << 'CHROME_EOF' > "$user_chrome"
+@import "omarchy-theme.css";
+@import "matugen-retro.css";
+CHROME_EOF
+  else
+    if ! grep -q "omarchy-theme.css" "$user_chrome"; then
+      sed -i '1i @import "omarchy-theme.css";' "$user_chrome"
+    fi
+    if ! grep -q "matugen-retro.css" "$user_chrome"; then
+      echo '@import "matugen-retro.css";' >> "$user_chrome"
+    fi
   fi
 
-  # 4. Ensure userContent.css imports omarchy-theme.css and transparent rules
+  # 4. Ensure userContent.css imports omarchy-theme.css, matugen-retro-content.css and glass rules
   user_content="$chrome_dir/userContent.css"
   content_rules='@import "omarchy-theme.css";
+@import "matugen-retro-content.css";
 
 /* Transparent glass default / new tab pages */
 @-moz-document url("about:blank"), url("about:newtab"), url("about:home"), url("about:zen-welcome"), url("about:privatebrowsing"), url("chrome://browser/content/blanktab.html") {
@@ -121,12 +213,23 @@ for profile_dir in "${PROFILES[@]}"; do
     background: transparent !important;
   }
 }'
-  if [[ ! -f "$user_content" ]] || ! grep -q "about:blank" "$user_content"; then
+  if [[ ! -f "$user_content" ]]; then
     echo "$content_rules" > "$user_content"
+  else
+    if ! grep -q "omarchy-theme.css" "$user_content"; then
+      sed -i '1i @import "omarchy-theme.css";' "$user_content"
+    fi
+    if ! grep -q "matugen-retro-content.css" "$user_content"; then
+      sed -i '2i @import "matugen-retro-content.css";' "$user_content"
+    fi
+  fi
+
+  # 5. Sync matugen retro stylesheets to all discovered profiles
+  if [[ -f "$HOME/.config/zen/agmdnjeb.Default (release)/chrome/matugen-retro.css" && "$chrome_dir" != "$HOME/.config/zen/agmdnjeb.Default (release)/chrome" ]]; then
+    cp -f "$HOME/.config/zen/agmdnjeb.Default (release)/chrome/matugen-retro.css" "$chrome_dir/matugen-retro.css" 2>/dev/null || true
+  fi
+  if [[ -f "$HOME/.config/zen/agmdnjeb.Default (release)/chrome/matugen-retro-content.css" && "$chrome_dir" != "$HOME/.config/zen/agmdnjeb.Default (release)/chrome" ]]; then
+    cp -f "$HOME/.config/zen/agmdnjeb.Default (release)/chrome/matugen-retro-content.css" "$chrome_dir/matugen-retro-content.css" 2>/dev/null || true
   fi
 done
 
-# If pywalfox is available, update it as well
-if command -v pywalfox >/dev/null 2>&1; then
-  pywalfox update 2>/dev/null || true
-fi

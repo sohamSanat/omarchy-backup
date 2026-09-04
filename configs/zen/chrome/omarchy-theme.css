@@ -1,0 +1,45 @@
+/* ==========================================================================
+   Dynamically Generated Omarchy Theme Palette for Zen Browser
+   Automatically updated via Omarchy theme hooks
+   ========================================================================== */
+
+:root {
+  /* Omarchy Accent & Borders */
+  --omarchy-accent: #BE3F50;
+  --omarchy-accent-bright: color-mix(in srgb, #BE3F50 75%, white);
+  --omarchy-accent-soft: color-mix(in srgb, #BE3F50 18%, transparent);
+  --omarchy-accent-glow: 0 0 12px color-mix(in srgb, #BE3F50 35%, transparent);
+
+  /* Framed Borders dynamically mapped to Omarchy Theme */
+  --omarchy-border: #BE3F50;
+  --omarchy-border-subtle: color-mix(in srgb, #BE3F50 45%, transparent);
+  --omarchy-border-highlight: color-mix(in srgb, #BE3F50 80%, white);
+  --omarchy-border-active: #BE3F50;
+
+  /* Surfaces, Backgrounds & Typography */
+  --omarchy-bg: #0e091d;
+  --omarchy-bg-darker: color-mix(in srgb, #0e091d 80%, black);
+  --omarchy-bg-surface: color-mix(in srgb, #0e091d 90%, white 10%);
+  --omarchy-bg-card: color-mix(in srgb, #0e091d 85%, white 15%);
+  --omarchy-bg-card-hover: color-mix(in srgb, #0e091d 75%, white 25%);
+  --omarchy-bg-card-active: color-mix(in srgb, #0e091d 68%, white 32%);
+
+  --omarchy-fg: #14B9B5;
+  --omarchy-fg-bright: color-mix(in srgb, #14B9B5 90%, white);
+  --omarchy-fg-muted: #c53253;
+  --omarchy-fg-dark: color-mix(in srgb, #14B9B5 40%, black);
+
+  /* Soft Button UI Tokens */
+  --omarchy-btn-bg: color-mix(in srgb, #14B9B5 8%, transparent);
+  --omarchy-btn-bg-hover: color-mix(in srgb, #14B9B5 16%, transparent);
+  --omarchy-btn-border: color-mix(in srgb, #14B9B5 12%, transparent);
+
+  /* Green Theme Colors & UI Button Palette */
+  --omarchy-green: #E20342;
+  --omarchy-icon-color: #E20342;
+  --omarchy-icon-color-hover: #BE3F50;
+  --omarchy-fg-green: #14B9B5;
+
+  --omarchy-pill-bg: #BE3F50;
+  --omarchy-pill-fg: #141110;
+}
