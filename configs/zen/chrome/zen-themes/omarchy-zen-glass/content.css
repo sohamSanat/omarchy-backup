@@ -1,0 +1,95 @@
+/* ==============================================================================
+ * Omarchy Glass Theme for Zen Browser (Content Stylesheet)
+ * ------------------------------------------------------------------------------
+ * Template: ~/.config/omarchy/themed/zen-content.css.tpl
+ * Target: about:blank, about:newtab, about:home
+ * Compiled to: ~/.local/state/omarchy/current/theme/zen-content.css
+ *
+ * NOTE FOR AI AGENTS & DEVELOPERS:
+ * - This file styles Zen Browser's default / new tab content area (when no website is open).
+ * - Webpages on the internet (e.g. github.com, google.com) are strictly untouched.
+ * - Variables are populated dynamically from Omarchy's active theme.
+ * ============================================================================== */
+
+@-moz-document url("about:blank"), url("about:newtab"), url("about:home"), url-prefix("about:newtab"), url-prefix("about:home"), url-prefix("chrome://newtab/") {
+  :root {
+    --newtab-background-color: transparent !important;
+    --newtab-background-color-secondary: transparent !important;
+    --newtab-text-primary-color: #4d2e1a !important;
+    --newtab-text-secondary-color: color-mix(in srgb, #4d2e1a 70%, transparent) !important;
+    --newtab-primary-action-background: #a32f1a !important;
+    --newtab-element-secondary-color: color-mix(in srgb, #4d2e1a 10%, transparent) !important;
+    --newtab-element-secondary-hover-color: color-mix(in srgb, #4d2e1a 18%, transparent) !important;
+  }
+
+  html,
+  body,
+  #root,
+  .outer-wrapper,
+  .activity-stream,
+  .body-wrapper,
+  .home-section,
+  main,
+  section {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* Activity stream search box & inputs on about:home / about:newtab */
+  .search-inner-wrapper,
+  .search-handoff-button {
+    background-color: color-mix(in srgb, #f3e4cb 70%, transparent) !important;
+    border: 1px solid color-mix(in srgb, #4d2e1a 18%, transparent) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.1) !important;
+    border-radius: 14px !important;
+    color: #4d2e1a !important;
+  }
+
+  .search-handoff-button:hover,
+  .search-inner-wrapper:hover {
+    background-color: color-mix(in srgb, #f3e4cb 60%, transparent) !important;
+    border-color: color-mix(in srgb, #4d2e1a 28%, transparent) !important;
+  }
+
+  .search-handoff-button:focus,
+  .search-inner-wrapper:focus-within {
+    border-color: #a32f1a !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, #a32f1a 40%, transparent), 0 12px 36px 0 rgba(0, 0, 0, 0.45) !important;
+  }
+
+  .fake-caret {
+    background-color: #a32f1a !important;
+  }
+
+  /* Top sites / pinned shortcut cards */
+  .top-site-outer .tile {
+    background-color: color-mix(in srgb, #f3e4cb 65%, transparent) !important;
+    border: 1px solid color-mix(in srgb, #4d2e1a 15%, transparent) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.25) !important;
+    border-radius: 12px !important;
+  }
+
+  .top-site-outer:is(:hover, :focus-within) .tile {
+    background-color: color-mix(in srgb, #f3e4cb 50%, transparent) !important;
+    border-color: #a32f1a !important;
+    box-shadow: 0 6px 20px 0 rgba(0, 0, 0, 0.35) !important;
+    transform: translateY(-2px);
+    transition: transform 0.15s ease, background-color 0.15s ease;
+  }
+
+  .top-site-outer .title {
+    color: #4d2e1a !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  }
+
+  /* De-emphasize or remove clutter headers on newtab */
+  .wordmark,
+  .logo-and-wordmark {
+    fill: #4d2e1a !important;
+    color: #4d2e1a !important;
+  }
+}

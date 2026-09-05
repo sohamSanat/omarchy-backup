@@ -165,17 +165,25 @@ if [[ -d "${SCRIPT_DIR}/configs/fcitx5" ]]; then
   cp -a "${SCRIPT_DIR}/configs/fcitx5/." "${USER_HOME}/.config/fcitx5/"
 fi
 if [[ -d "${SCRIPT_DIR}/configs/zen" ]]; then
-  echo "  -> Restoring Zen Browser customizations & styles..."
+  echo "  -> Restoring Zen Browser customizations, Dark Reader mod & styles..."
   mkdir -p "${USER_HOME}/.config/zen"
+  if [[ -d "${SCRIPT_DIR}/configs/zen/mods/darkreader" ]]; then
+    mkdir -p "${USER_HOME}/.config/zen/mods/darkreader"
+    cp -a "${SCRIPT_DIR}/configs/zen/mods/darkreader/." "${USER_HOME}/.config/zen/mods/darkreader/"
+  fi
   for profile_dir in "${USER_HOME}/.config/zen"/*; do
     if [[ -d "$profile_dir" && ( "$profile_dir" == *"Default"* || -f "$profile_dir/prefs.js" ) ]]; then
       mkdir -p "$profile_dir/chrome"
       cp -a "${SCRIPT_DIR}/configs/zen/chrome/." "$profile_dir/chrome/"
       cp -a "${SCRIPT_DIR}/configs/zen/user.js" "$profile_dir/user.js" 2>/dev/null || true
       cp -a "${SCRIPT_DIR}/configs/zen/"*.json "$profile_dir/" 2>/dev/null || true
+      if [[ -f "${SCRIPT_DIR}/configs/zen/extensions/addon@darkreader.org.xpi" ]]; then
+        mkdir -p "$profile_dir/extensions"
+        cp -a "${SCRIPT_DIR}/configs/zen/extensions/addon@darkreader.org.xpi" "$profile_dir/extensions/"
+      fi
     fi
   done
-  echo "  [OK] Zen Browser chrome CSS, shortcuts, and preferences restored."
+  echo "  [OK] Zen Browser chrome CSS, Dark Reader mod, shortcuts, and preferences restored."
 fi
 if [[ -d "${SCRIPT_DIR}/configs/herdr" ]]; then
   mkdir -p "${USER_HOME}/.config/herdr"
@@ -310,8 +318,8 @@ fi
 echo ""
 echo "==> Step 11: Applying customizations and restarting components..."
 if command -v omarchy >/dev/null 2>&1; then
-  echo "  -> Setting theme: Aetheria"
-  omarchy theme set "Aetheria" || true
+  echo "  -> Setting theme: Akaito"
+  omarchy theme set "Akaito" || true
 
   
   if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-zen" ]]; then
@@ -339,7 +347,7 @@ fi
 echo ""
 echo "========================================================"
 echo "  Customizations Restored Successfully!"
-echo "  - Current theme: Aetheria"
+echo "  - Current theme: Akaito"
 echo "  - Current font: JetBrainsMono Nerd Font"
 echo "  - Bar Layout: Custom floating bar with 14 plugins"
 echo "  - Window Manager: Hyprland with blur, scale 2, and custom bindings"

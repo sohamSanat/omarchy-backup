@@ -1,2 +1,10 @@
-@import "omarchy-theme.css";
-@import "matugen-retro.css";
+/* ==============================================================================
+ * Zen Browser - User Stylesheet Entrypoint
+ * ------------------------------------------------------------------------------
+ * Managed by Omarchy Linux (omarchy-sync-zen).
+ * This file imports the dynamic Omarchy system theme.
+ * ============================================================================== */
+
+@import url("zen-omarchy-theme.css");
+
+/* Add any custom user-specific CSS rules below */

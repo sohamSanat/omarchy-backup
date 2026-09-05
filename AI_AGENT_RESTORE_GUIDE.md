@@ -163,6 +163,13 @@ This repository contains the full snapshot of user customizations:
 12. **Printer Suite**:
    - `bin/printer` & `bin/printbar` provide complete hardware monitoring for Canon PIXMA G2060.
 
+
+13. **Omarchy Dark Reader Mod for Zen Browser**:
+   - Source: `configs/zen/mods/darkreader/`
+   - Prebuilt XPI: `configs/zen/extensions/addon@darkreader.org.xpi`
+   - Templates: `configs/omarchy/themed/zen-darkreader*.tpl`
+   - Synced via `omarchy-sync-zen --sync` and auto-hooked to theme switches.
+
 ## 3. Fast Restoration (Automated)
 
 To apply everything at once, simply clone this repository onto the target Omarchy machine and execute:
@@ -264,7 +271,7 @@ cp -a configs/shell/bash_profile ~/.bash_profile
 ### Step 7: Apply Theming & Restart Services
 ```bash
 # 1. Apply theme and font
-omarchy theme set "Aetheria"
+omarchy theme set "Akaito"
 omarchy font set "JetBrainsMono Nerd Font"
 
 # 2. Rescan plugins and restart quickshell
@@ -285,7 +292,7 @@ Run these commands after restoration to verify system health:
 
 | Component | Verification Command | Expected Outcome |
 |-----------|----------------------|------------------|
-| **Theme** | `omarchy theme current` | Prints `Aetheria` |
+| **Theme** | `omarchy theme current` | Prints `Akaito` |
 | **Font** | `omarchy font current` | Prints `JetBrainsMono Nerd Font` |
 | **Hyprland** | `hyprctl configerrors` | Prints `ok` (no syntax errors) |
 | **Default Agent** | `omarchy-default-agent` | Prints `antigravity` |

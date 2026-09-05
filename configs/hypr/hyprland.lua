@@ -43,5 +43,20 @@ o.window("(io\\.github\\.lgse\\.Strata|strata|org\\.gnome\\.Nautilus|nautilus)",
   opacity = "0.82 0.75",
 })
 
+-- Window opacity for Zen Browser is disabled so loaded websites remain 100% opaque.
+-- Zen native Wayland transparency handles default tab glass rendering.
+-- o.window("(zen|zen-bin|zen-alpha)", {
+--   tag = "-default-opacity",
+--   opacity = "0.85 0.78",
+-- })
+
+-- Thin visible border for terminal windows (dynamically follows Omarchy theme)
+o.window({ tag = "terminal" }, {
+  border_size = 1,
+})
+o.window("(Alacritty|alacritty|kitty|com\\.mitchellh\\.ghostty|ghostty|foot|wezterm|org\\.omarchy\\..*|TUI\\..*)", {
+  border_size = 1,
+})
+
 -- wmfeht.border-fx (Omarchy plugin control plane; pcall if the file is missing)
 pcall(require, "hypr.border-fx")

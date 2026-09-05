@@ -1,1 +1,26 @@
-{}
+{
+  "omarchy-theme": {
+    "id": "omarchy-theme",
+    "name": "Omarchy Dynamic System Theme",
+    "description": "Automatically synchronizes Zen Browser with the active Omarchy system theme color palette.",
+    "author": "Omarchy",
+    "homepage": "https://omarchy.org",
+    "enabled": true
+  },
+  "omarchy-zen-glass": {
+    "id": "omarchy-zen-glass",
+    "name": "Omarchy Frosted Glass New Tab",
+    "description": "Transforms the default empty/new tab into a frosted glass pane matching the terminal.",
+    "author": "Omarchy",
+    "homepage": "https://omarchy.org",
+    "enabled": true
+  },
+  "omarchy-darkreader": {
+    "id": "omarchy-darkreader",
+    "name": "Omarchy Dark Reader Integration",
+    "description": "Integrates Dark Reader with dynamic Omarchy system theme tokens and Omarchy toggle control.",
+    "author": "Omarchy",
+    "homepage": "https://omarchy.org",
+    "enabled": true
+  }
+}

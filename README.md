@@ -8,7 +8,7 @@ This repository ensures your desktop setup is completely reproducible, disaster-
 
 ## 🌟 Customization Highlights
 
-- **Active Theme**: `Aetheria` (with custom live-rendered templates and wallpapers).
+- **Active Theme**: `Akaito` (with custom live-rendered templates and wallpapers).
 - **Status Bar**: Top floating bar (`charlieras262.floating-bar`) loaded with 22 modular plugins.
 - **Custom Plugins**: Includes `soham.power` (custom battery limiter & power panel developed by Soham), `chispes.agent-gemini`, `io.github.calebhat.themebook`, `io.github.diegopluna.argus`, `io.github.nilszeilon.omarchy-sensei`, `io.github.ricky.whatsapp`, `mryll.meteobar`, `omamail`, and more.
 - **Theme Sync Engine**: Automated hooks (`theme-set.d`) that instantly propagate active theme colors and transparency into:
@@ -97,6 +97,19 @@ This backup integrates frontier agent tooling and multi-agent fleet operations:
 - **Lavish AXI (`lavish-axi` repo, skills: `lavish`, `lavish-design`)**: Turns complex artifacts, plans, and reports into interactive visual whiteboards and review boards.
 
 
+
+### 🕶️ Omarchy Dark Reader Mod for Zen Browser
+- **Direct Source Code (`configs/zen/mods/darkreader/`)**:
+  - `background/index.js`: Manages dynamic `OmarchyManager`, computes color poles for active light/dark themes, exposes `TOGGLE_OMARCHY_THEME`, and prevents dark web apps from reverting to un-themed colors.
+  - `inject/index.js`: Custom color math engine (`modifyOmarchyDarkSchemeColor`, `modifyOmarchyDarkModeHSL`) and dynamic stylesheet injection for YouTube (`--yt-spec-*`, scrubber buttons, chips) and GitHub (`--bgColor-*`, borders).
+  - `ui/popup/index.js` & `ui/popup/index.html`: Interactive `Omarchy` toggle button with status indicator.
+- **Prebuilt Extension**:
+  - `configs/zen/extensions/addon@darkreader.org.xpi`: Pre-packaged and signed for direct installation into any Zen profile.
+- **Dynamic Theming Templates (`configs/omarchy/themed/`)**:
+  - `zen.css.tpl`: Compiles window and tab transparency rules.
+  - `zen-content.css.tpl`: Compiles frosted glass default new tab content.
+  - `zen-darkreader.css.tpl` & `zen-darkreader-theme.json.tpl`: Compiles active theme tokens into Dark Reader popup styles and background config.
+
 ### 🌐 Zen Browser Custom Glass Engine & Theming
 - **`configs/zen/chrome/`**:
   - `userChrome.css` & `userContent.css`: Imports dynamic Omarchy theme variables and retro styling.
@@ -116,8 +129,8 @@ This backup integrates frontier agent tooling and multi-agent fleet operations:
 
 | Theme | Type | Source / Upstream |
 |-------|------|-------------------|
-| **🌌 Aetheria** *(Active)* | Custom | [JJDizz1L/aetheria](https://github.com/JJDizz1L/aetheria) |
-| **Akaito** | Custom | [stannorbvb-cmd/akaito](https://github.com/stannorbvb-cmd/akaito) |
+| **🌌 Aetheria** | Custom | [JJDizz1L/aetheria](https://github.com/JJDizz1L/aetheria) |
+| **Akaito** *(Active)* | Custom | [stannorbvb-cmd/akaito](https://github.com/stannorbvb-cmd/akaito) |
 | **Amekoji** | Custom | [atif-1402/omarchy-amekoji-theme](https://github.com/atif-1402/omarchy-amekoji-theme) |
 | **City 783** | Custom | [OldJobobo/omarchy-city-783-theme](https://github.com/OldJobobo/omarchy-city-783-theme) |
 | **Synthetica** | Custom | [stannorbvb-cmd/synthetica](https://github.com/stannorbvb-cmd/synthetica) |

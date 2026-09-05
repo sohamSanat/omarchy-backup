@@ -2,234 +2,548 @@
 set -euo pipefail
 
 # ==============================================================================
-# Omarchy -> Zen Browser Dynamic Color Palette & Glass Sync Script
-# Dynamically synchronizes Zen Browser with the active Omarchy system theme.
+# Omarchy -> Zen Browser Dynamic Theme & Mod Sync
+# ------------------------------------------------------------------------------
+# Script: ~/.local/bin/omarchy-sync-zen
+# Purpose: Synchronizes Zen Browser's UI chrome and default new tab content
+#          with the active Omarchy system theme.
+#
+# ARCHITECTURE OVERVIEW:
+# 1. Templates:
+#    - ~/.config/omarchy/themed/zen.css.tpl:
+#      Styles Zen's chrome UI (tabs, toolbars, sidebars, floating search bar).
+#      Window wrappers are transparent to expose Hyprland wallpaper blur on empty tabs.
+#    - ~/.config/omarchy/themed/zen-content.css.tpl:
+#      Styles default tab content (about:blank, about:newtab, about:home) with
+#      transparent backgrounds, glass search boxes, and frosted shortcut cards.
+#
+# 2. Compilation:
+#    Managed by Omarchy's template engine (omarchy-theme-set-templates).
+#    Whenever a theme is set (omarchy theme set <name>), it generates:
+#    - ~/.local/state/omarchy/current/theme/zen.css
+#    - ~/.local/state/omarchy/current/theme/zen-content.css
+#
+# 3. Profile Sync: Discovers all Zen profiles in ~/.config/zen/
+#    - Configures user.js for Wayland transparency & stylesheet loading
+#    - Creates zen-omarchy-theme.css symlinking to zen.css
+#    - Creates zen-omarchy-content.css symlinking to zen-content.css
+#    - Injects imports into userChrome.css and userContent.css
+#    - Registers "omarchy-theme" and "omarchy-zen-glass" in zen-themes.json
+#    - Writes comprehensive README.md in <profile>/chrome/
+#
+# 4. Automation: Hook located at ~/.config/omarchy/hooks/theme-set.d/zen-sync.sh
+#    Automatically invokes this script whenever Omarchy themes change.
 # ==============================================================================
 
-declare -A THEME_COLORS=()
+CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+ZEN_CONFIG_DIR="$HOME/.config/zen"
+USER_CHROME_TEMPLATE="$HOME/.config/omarchy/themed/zen.css.tpl"
+USER_CONTENT_TEMPLATE="$HOME/.config/omarchy/themed/zen-content.css.tpl"
+USER_DARKREADER_TEMPLATE="$HOME/.config/omarchy/themed/zen-darkreader.css.tpl"
+USER_DARKREADER_JSON_TEMPLATE="$HOME/.config/omarchy/themed/zen-darkreader-theme.json.tpl"
+DARKREADER_MOD_SRC="$ZEN_CONFIG_DIR/mods/darkreader/src"
 
-# 1. Extract active Omarchy theme colors
-if command -v omarchy-theme-color >/dev/null 2>&1; then
-  while IFS=$'\t' read -r key value; do
-    [[ -n "$key" && -n "$value" ]] && THEME_COLORS["$key"]="$value"
-  done < <(omarchy-theme-color --all 2>/dev/null || true)
-fi
+# Display CLI usage
+show_help() {
+  cat <<'EOF'
+Usage: omarchy-sync-zen [OPTIONS]
 
-# Fallback to colors.toml if needed
-COLORS_TOML="$HOME/.local/state/omarchy/current/theme/colors.toml"
-if [[ -f "$COLORS_TOML" ]]; then
-  while IFS='=' read -r key value; do
-    key=$(echo "$key" | tr -d ' "[:space:]')
-    value=$(echo "$value" | tr -d ' "[:space:]')
-    if [[ -n "$key" && -n "$value" && -z "${THEME_COLORS[$key]:-}" ]]; then
-      THEME_COLORS["$key"]="$value"
-    fi
-  done < "$COLORS_TOML"
-fi
+Synchronize Zen Browser chrome UI & content stylesheets with the active Omarchy system theme.
 
-ACCENT="${THEME_COLORS[accent]:-#5e81ac}"
-BG="${THEME_COLORS[background]:-${THEME_COLORS[bg]:-#141110}}"
-FG="${THEME_COLORS[foreground]:-${THEME_COLORS[fg]:-#f5ebe0}}"
-MUTED="${THEME_COLORS[muted]:-#7d8794}"
-COLOR3="${THEME_COLORS[color3]:-$ACCENT}"
-COLOR4="${THEME_COLORS[color4]:-$ACCENT}"
-BORDER="${THEME_COLORS[accent]:-$COLOR3}"
-MODE="${THEME_COLORS[mode]:-${THEME_COLORS[theme_type]:-dark}}"
-SELECTION_FG="${THEME_COLORS[selection_foreground]:-#ffffff}"
+Options:
+  --sync       Synchronize all Zen Browser profiles with the current theme (default)
+  --status     Inspect discovered Zen profiles, stylesheet links, and current colors
+  --restart    Gracefully restart Zen Browser to reload stylesheets with active session restored
+  -h, --help   Display this help message
+EOF
+}
 
-# Theme Green & Icon colors
-GREEN="${THEME_COLORS[green]:-${THEME_COLORS[color2]:-#556753}}"
-DARK_GREEN="${THEME_COLORS[foreground]:-#1c2d28}"
+# Compile a specific template if missing or older than template in CURRENT_THEME_DIR
+compile_template_if_needed() {
+  local tpl_path="$1"
+  local out_path="$2"
 
-if [[ "$MODE" == "light" ]]; then
-  BG_DARKER="color-mix(in srgb, $BG 92%, black)"
-  BG_SURFACE="color-mix(in srgb, $BG 96%, black)"
-  BG_CARD="color-mix(in srgb, $BG 90%, black)"
-  BG_CARD_HOVER="color-mix(in srgb, $BG 84%, black)"
-  BG_CARD_ACTIVE="color-mix(in srgb, $BG 78%, black)"
-  PILL_FG="#ffffff"
-  # In light mode with light background, blend theme green with deep foreground green for crisp readability
-  ICON_COLOR="color-mix(in srgb, ${GREEN} 75%, ${DARK_GREEN} 25%)"
-  ICON_COLOR_HOVER="${ACCENT}"
-else
-  BG_DARKER="color-mix(in srgb, $BG 80%, black)"
-  BG_SURFACE="color-mix(in srgb, $BG 90%, white 10%)"
-  BG_CARD="color-mix(in srgb, $BG 85%, white 15%)"
-  BG_CARD_HOVER="color-mix(in srgb, $BG 75%, white 25%)"
-  BG_CARD_ACTIVE="color-mix(in srgb, $BG 68%, white 32%)"
-  PILL_FG="#141110"
-  ICON_COLOR="${GREEN}"
-  ICON_COLOR_HOVER="${ACCENT}"
-fi
-
-# Candidate directories where Zen Browser profiles may live
-ZEN_BASE_DIRS=(
-  "$HOME/.config/zen"
-  "$HOME/.zen"
-  "$HOME/.mozilla/zen"
-  "$HOME/.var/app/app.zen_browser.zen/.config/zen"
-  "$HOME/.var/app/io.github.zen_browser.zen/.config/zen"
-)
-
-PROFILES=()
-
-for base_dir in "${ZEN_BASE_DIRS[@]}"; do
-  [[ -d "$base_dir" ]] || continue
-
-  # 1. Parse profiles.ini if available
-  if [[ -f "$base_dir/profiles.ini" ]]; then
-    while IFS= read -r rel_path; do
-      if [[ -d "$base_dir/$rel_path" ]]; then
-        PROFILES+=("$base_dir/$rel_path")
-      fi
-    done < <(grep -E '^Path=' "$base_dir/profiles.ini" | cut -d= -f2- || true)
+  if [[ -f "$out_path" && "$out_path" -nt "$tpl_path" ]]; then
+    return 0
   fi
 
-  # 2. Fallback / supplementary: find any profile directories with prefs.js or times.json
-  for candidate in "$base_dir"/*; do
-    if [[ -d "$candidate" ]] && [[ -f "$candidate/prefs.js" || -f "$candidate/times.json" || -f "$candidate/compatibility.ini" ]]; then
-      already_added=0
-      for p in "${PROFILES[@]}"; do
-        if [[ "$p" == "$candidate" ]]; then
-          already_added=1
+  if [[ ! -f "$tpl_path" ]]; then
+    echo "[omarchy-sync-zen] Warning: Template $tpl_path not found. Skipping." >&2
+    return 0
+  fi
+
+  local colors_file="$CURRENT_THEME_DIR/colors.toml"
+  if [[ ! -f "$colors_file" ]]; then
+    echo "[omarchy-sync-zen] Warning: $colors_file not found. Cannot compile $(basename "$out_path")." >&2
+    return 1
+  fi
+
+  local sed_script
+  sed_script=$(mktemp)
+  omarchy-theme-color --file "$colors_file" --all 2>/dev/null | awk -F'\t' '{print "s|{{ " $1 " }}|" $2 "|g"}' > "$sed_script"
+
+  sed -f "$sed_script" "$tpl_path" > "$out_path"
+  rm -f "$sed_script"
+  echo "[omarchy-sync-zen] Compiled $(basename "$out_path") successfully."
+}
+
+# Ensure all compiled theme stylesheets exist
+ensure_theme_compiled() {
+  compile_template_if_needed "$USER_CHROME_TEMPLATE" "$CURRENT_THEME_DIR/zen.css"
+  compile_template_if_needed "$USER_CONTENT_TEMPLATE" "$CURRENT_THEME_DIR/zen-content.css"
+  compile_template_if_needed "$USER_DARKREADER_TEMPLATE" "$CURRENT_THEME_DIR/zen-darkreader.css"
+  compile_template_if_needed "$USER_DARKREADER_JSON_TEMPLATE" "$CURRENT_THEME_DIR/zen-darkreader-theme.json"
+}
+
+# Discover all Zen profile directories
+get_zen_profiles() {
+  local profiles=()
+
+  if [[ ! -d "$ZEN_CONFIG_DIR" ]]; then
+    echo "${profiles[@]}"
+    return
+  fi
+
+  # 1. Parse profiles.ini if present
+  local ini_file="$ZEN_CONFIG_DIR/profiles.ini"
+  if [[ -f "$ini_file" ]]; then
+    while IFS= read -r line; do
+      if [[ $line =~ ^Path=(.*)$ ]]; then
+        local p_path="${BASH_REMATCH[1]}"
+        if [[ -d "$ZEN_CONFIG_DIR/$p_path" ]]; then
+          profiles+=("$ZEN_CONFIG_DIR/$p_path")
+        elif [[ -d "$p_path" ]]; then
+          profiles+=("$p_path")
+        fi
+      fi
+    done < "$ini_file"
+  fi
+
+  # 2. Fallback / glob match any profile directory not already added
+  for cand in "$ZEN_CONFIG_DIR"/*.[Dd]efault* "$ZEN_CONFIG_DIR"/*.default; do
+    if [[ -d "$cand" ]]; then
+      local already_found=0
+      for existing in "${profiles[@]}"; do
+        if [[ "$existing" == "$cand" ]]; then
+          already_found=1
           break
         fi
       done
-      if [[ $already_added -eq 0 ]]; then
-        PROFILES+=("$candidate")
+      if [[ $already_found -eq 0 ]]; then
+        profiles+=("$cand")
       fi
     fi
   done
-done
 
-# Sync theme to all discovered Zen profiles
-for profile_dir in "${PROFILES[@]}"; do
-  [[ -d "$profile_dir" ]] || continue
+  # Print unique profile paths separated by newline
+  printf '%s\n' "${profiles[@]}" | sort -u
+}
 
-  chrome_dir="$profile_dir/chrome"
-  mkdir -p "$chrome_dir"
+# Sync Dark Reader extension mod with compiled Omarchy theme tokens
+sync_darkreader() {
+  local profile_dir="$1"
+  local ext_xpi="$profile_dir/extensions/addon@darkreader.org.xpi"
+  local compiled_css="$CURRENT_THEME_DIR/zen-darkreader.css"
+  local compiled_json="$CURRENT_THEME_DIR/zen-darkreader-theme.json"
 
-  # 1. Enable stylesheet customizations and transparency in user.js
-  user_js="$profile_dir/user.js"
-  prefs=(
+  if [[ ! -d "$DARKREADER_MOD_SRC" ]]; then
+    return 0
+  fi
+
+  if [[ -f "$ext_xpi" || -f "$ext_xpi.orig" ]]; then
+    if [[ -f "$compiled_css" ]]; then
+      cp "$compiled_css" "$DARKREADER_MOD_SRC/ui/popup/omarchy-theme.css"
+    fi
+    if [[ -f "$compiled_json" ]]; then
+      mkdir -p "$DARKREADER_MOD_SRC/config"
+      cp "$compiled_json" "$DARKREADER_MOD_SRC/config/omarchy-theme.json"
+    fi
+    mkdir -p "$profile_dir/extensions"
+    (cd "$DARKREADER_MOD_SRC" && zip -q -r9 "$ext_xpi" *)
+    echo "[omarchy-sync-zen] Synced Dark Reader mod for profile: $(basename "$profile_dir")"
+  fi
+}
+
+# Configure a single Zen profile for Omarchy dynamic theming and glass default tab
+sync_profile() {
+  local profile_dir="$1"
+  local chrome_dir="$profile_dir/chrome"
+  local user_js="$profile_dir/user.js"
+  local user_chrome="$chrome_dir/userChrome.css"
+  local user_content="$chrome_dir/userContent.css"
+  local theme_link="$chrome_dir/zen-omarchy-theme.css"
+  local content_link="$chrome_dir/zen-omarchy-content.css"
+  local readme_file="$chrome_dir/README.md"
+  local zen_themes_json="$profile_dir/zen-themes.json"
+  local zen_theme_mod_dir="$chrome_dir/zen-themes/omarchy-theme"
+  local zen_glass_mod_dir="$chrome_dir/zen-themes/omarchy-zen-glass"
+  local zen_themes_css="$chrome_dir/zen-themes.css"
+
+  mkdir -p "$chrome_dir" "$zen_theme_mod_dir" "$zen_glass_mod_dir"
+
+  # 1. Configure user.js
+  # - toolkit.legacyUserProfileCustomizations.stylesheets: enables userChrome.css & userContent.css
+  # - browser.startup.page = 3: restores previous browser session on launch
+  # - zen.widget.linux.transparency = true: enables native Wayland transparent surface buffer
+  # - browser.tabs.allow_transparent_browser = true: permits tab content background transparency
+  local prefs=(
     'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);'
+    'user_pref("browser.startup.page", 3);'
     'user_pref("zen.widget.linux.transparency", true);'
     'user_pref("browser.tabs.allow_transparent_browser", true);'
-    'user_pref("zen.theme.gradient.show-custom-colors", true);'
-    'user_pref("widget.transparent-windows", true);'
+    'user_pref("xpinstall.signatures.required", false);'
+    'user_pref("extensions.experiments.enabled", true);'
   )
-  touch "$user_js"
+
+  if [[ ! -f "$user_js" ]]; then
+    cat >"$user_js" <<EOF
+// ==============================================================================
+// Omarchy Dynamic Theme & Glass Mod Preferences
+// Managed by ~/.local/bin/omarchy-sync-zen
+// ==============================================================================
+EOF
+  fi
+
   for pref in "${prefs[@]}"; do
-    pref_key=$(echo "$pref" | cut -d'"' -f2)
-    if grep -q "$pref_key" "$user_js"; then
-      sed -i "s/user_pref(\"$pref_key\".*/$pref/" "$user_js"
-    else
+    local key
+    key=$(echo "$pref" | cut -d'"' -f2)
+    if ! grep -q "$key" "$user_js"; then
       echo "$pref" >> "$user_js"
     fi
   done
 
-  # 2. Write dynamic omarchy-theme.css
-  dest_css="$chrome_dir/omarchy-theme.css"
-  rm -f "$dest_css"
-  cat << THEME_EOF > "$dest_css"
-/* ==========================================================================
-   Dynamically Generated Omarchy Theme Palette for Zen Browser
-   Automatically updated via Omarchy theme hooks
-   ========================================================================== */
+  # 2. Symlinks to compiled Omarchy stylesheets
+  if [[ -f "$CURRENT_THEME_DIR/zen.css" ]]; then
+    ln -nsf "$CURRENT_THEME_DIR/zen.css" "$theme_link"
+  fi
+  if [[ -f "$CURRENT_THEME_DIR/zen-content.css" ]]; then
+    ln -nsf "$CURRENT_THEME_DIR/zen-content.css" "$content_link"
+  fi
 
-:root {
-  /* Omarchy Accent & Borders */
-  --omarchy-accent: ${ACCENT};
-  --omarchy-accent-bright: color-mix(in srgb, ${ACCENT} 75%, white);
-  --omarchy-accent-soft: color-mix(in srgb, ${ACCENT} 18%, transparent);
-  --omarchy-accent-glow: 0 0 12px color-mix(in srgb, ${ACCENT} 35%, transparent);
-
-  /* Framed Borders dynamically mapped to Omarchy Theme */
-  --omarchy-border: ${BORDER};
-  --omarchy-border-subtle: color-mix(in srgb, ${BORDER} 45%, transparent);
-  --omarchy-border-highlight: color-mix(in srgb, ${ACCENT} 80%, white);
-  --omarchy-border-active: ${ACCENT};
-
-  /* Surfaces, Backgrounds & Typography */
-  --omarchy-bg: ${BG};
-  --omarchy-bg-darker: ${BG_DARKER};
-  --omarchy-bg-surface: ${BG_SURFACE};
-  --omarchy-bg-card: ${BG_CARD};
-  --omarchy-bg-card-hover: ${BG_CARD_HOVER};
-  --omarchy-bg-card-active: ${BG_CARD_ACTIVE};
-
-  --omarchy-fg: ${FG};
-  --omarchy-fg-bright: color-mix(in srgb, ${FG} 90%, white);
-  --omarchy-fg-muted: ${MUTED};
-  --omarchy-fg-dark: color-mix(in srgb, ${FG} 40%, black);
-
-  /* Soft Button UI Tokens */
-  --omarchy-btn-bg: color-mix(in srgb, ${FG} 8%, transparent);
-  --omarchy-btn-bg-hover: color-mix(in srgb, ${FG} 16%, transparent);
-  --omarchy-btn-border: color-mix(in srgb, ${FG} 12%, transparent);
-
-  /* Green Theme Colors & UI Button Palette */
-  --omarchy-green: ${GREEN};
-  --omarchy-icon-color: ${ICON_COLOR};
-  --omarchy-icon-color-hover: ${ICON_COLOR_HOVER};
-  --omarchy-fg-green: ${DARK_GREEN};
-
-  --omarchy-pill-bg: ${ACCENT};
-  --omarchy-pill-fg: ${PILL_FG};
-}
-THEME_EOF
-
-  # 3. Ensure userChrome.css imports omarchy-theme.css and matugen-retro.css
-  user_chrome="$chrome_dir/userChrome.css"
+  # 3. Configure userChrome.css entrypoint
   if [[ ! -f "$user_chrome" ]]; then
-    cat << 'CHROME_EOF' > "$user_chrome"
-@import "omarchy-theme.css";
-@import "matugen-retro.css";
-CHROME_EOF
-  else
-    if ! grep -q "omarchy-theme.css" "$user_chrome"; then
-      sed -i '1i @import "omarchy-theme.css";' "$user_chrome"
-    fi
-    if ! grep -q "matugen-retro.css" "$user_chrome"; then
-      echo '@import "matugen-retro.css";' >> "$user_chrome"
-    fi
+    cat >"$user_chrome" <<'EOF'
+/* ==============================================================================
+ * Zen Browser - User Chrome Stylesheet Entrypoint
+ * ------------------------------------------------------------------------------
+ * Managed by Omarchy Linux (omarchy-sync-zen).
+ * This file imports the dynamic Omarchy system theme.
+ * ============================================================================== */
+
+@import url("zen-omarchy-theme.css");
+
+/* Add any custom user-specific CSS rules below */
+EOF
+  elif ! grep -q "zen-omarchy-theme.css" "$user_chrome"; then
+    local temp_chrome
+    temp_chrome=$(mktemp)
+    cat >"$temp_chrome" <<'EOF'
+@import url("zen-omarchy-theme.css");
+
+EOF
+    cat "$user_chrome" >> "$temp_chrome"
+    mv "$temp_chrome" "$user_chrome"
   fi
 
-  # 4. Ensure userContent.css imports omarchy-theme.css, matugen-retro-content.css and glass rules
-  user_content="$chrome_dir/userContent.css"
-  content_rules='@import "omarchy-theme.css";
-@import "matugen-retro-content.css";
-
-/* Transparent glass default / new tab pages */
-@-moz-document url("about:blank"), url("about:newtab"), url("about:home"), url("about:zen-welcome"), url("about:privatebrowsing"), url("chrome://browser/content/blanktab.html") {
-  :root,
-  html,
-  body,
-  #newtab-window,
-  .outer-wrapper,
-  .body-wrapper,
-  main {
-    background-color: transparent !important;
-    background: transparent !important;
-  }
-}'
+  # 4. Configure userContent.css entrypoint
   if [[ ! -f "$user_content" ]]; then
-    echo "$content_rules" > "$user_content"
+    cat >"$user_content" <<'EOF'
+/* ==============================================================================
+ * Zen Browser - User Content Stylesheet Entrypoint
+ * ------------------------------------------------------------------------------
+ * Managed by Omarchy Linux (omarchy-sync-zen / omarchy-zen-glass).
+ * This file imports the dynamic Omarchy system theme content styles (newtab / glass).
+ * Webpages on the internet (e.g. GitHub, Google) are strictly untouched.
+ * ============================================================================== */
+
+@import url("zen-omarchy-content.css");
+
+/* Add any custom user-specific content rules below */
+EOF
+  elif ! grep -q "zen-omarchy-content.css" "$user_content"; then
+    local temp_content
+    temp_content=$(mktemp)
+    cat >"$temp_content" <<'EOF'
+@import url("zen-omarchy-content.css");
+
+EOF
+    cat "$user_content" >> "$temp_content"
+    mv "$temp_content" "$user_content"
+  fi
+
+  # 5. Integrate with Zen's native Mod System
+  if [[ -f "$CURRENT_THEME_DIR/zen.css" ]]; then
+    ln -nsf "$CURRENT_THEME_DIR/zen.css" "$zen_theme_mod_dir/chrome.css"
+  fi
+  cat >"$zen_theme_mod_dir/readme.md" <<'EOF'
+# Omarchy Dynamic Theme Mod for Zen Browser
+Automatically adapts Zen Browser's UI chrome to match the active Omarchy system theme palette.
+EOF
+
+  if [[ -f "$CURRENT_THEME_DIR/zen-content.css" ]]; then
+    ln -nsf "$CURRENT_THEME_DIR/zen-content.css" "$zen_glass_mod_dir/content.css"
+  fi
+  cat >"$zen_glass_mod_dir/readme.md" <<'EOF'
+# Omarchy Frosted Glass New Tab Mod for Zen Browser
+Gives Zen Browser's default empty/new tab a frosted glass pane matching the terminal,
+keeping normal loaded web pages 100% solid, crisp, and readable.
+EOF
+
+  # Update zen-themes.json
+  local current_mods="{}"
+  if [[ -f "$zen_themes_json" && -s "$zen_themes_json" ]]; then
+    current_mods=$(cat "$zen_themes_json" 2>/dev/null || echo "{}")
+  fi
+  local updated_mods
+  updated_mods=$(echo "$current_mods" | jq '
+    .["omarchy-theme"] = {
+      "id": "omarchy-theme",
+      "name": "Omarchy Dynamic System Theme",
+      "description": "Automatically synchronizes Zen Browser with the active Omarchy system theme color palette.",
+      "author": "Omarchy",
+      "homepage": "https://omarchy.org",
+      "enabled": true
+    } |
+    .["omarchy-zen-glass"] = {
+      "id": "omarchy-zen-glass",
+      "name": "Omarchy Frosted Glass New Tab",
+      "description": "Transforms the default empty/new tab into a frosted glass pane matching the terminal.",
+      "author": "Omarchy",
+      "homepage": "https://omarchy.org",
+      "enabled": true
+    } |
+    .["omarchy-darkreader"] = {
+      "id": "omarchy-darkreader",
+      "name": "Omarchy Dark Reader Integration",
+      "description": "Integrates Dark Reader with dynamic Omarchy system theme tokens and Omarchy toggle control.",
+      "author": "Omarchy",
+      "homepage": "https://omarchy.org",
+      "enabled": true
+    }
+  ' 2>/dev/null || echo "$current_mods")
+  echo "$updated_mods" > "$zen_themes_json"
+
+  # Assemble/update zen-themes.css
+  cat >"$zen_themes_css" <<EOF
+/* Zen Mods - Generated by ZenMods / Omarchy Integration.
+ * DO NOT EDIT THIS FILE DIRECTLY!
+ * Managed dynamically by ~/.local/bin/omarchy-sync-zen
+ */
+
+/* Name: Omarchy Dynamic System Theme */
+/* Description: Automatically synchronizes Zen Browser with the active Omarchy system theme. */
+/* Author: @Omarchy */
+EOF
+  if [[ -f "$CURRENT_THEME_DIR/zen.css" ]]; then
+    cat "$CURRENT_THEME_DIR/zen.css" >> "$zen_themes_css"
+  fi
+  echo -e "\n/* End of Zen Mods */" >> "$zen_themes_css"
+
+  # 6. Write documentation README for AI agents and developers
+  cat >"$readme_file" <<'EOF'
+# Zen Browser Omarchy Theming & Glass Mod Integration
+
+This directory contains the modular styling system connecting **Zen Browser** to **Omarchy Linux**'s dynamic system theme and frosted glass tab effects.
+
+## Architecture
+
+1. **Source Templates**:
+   - `~/.config/omarchy/themed/zen.css.tpl`: Defines chrome UI theme (tabs, toolbars, sidebar, dialogs, floating search bar).
+   - `~/.config/omarchy/themed/zen-content.css.tpl`: Defines default/new tab content styling (`about:blank`, `about:newtab`, `about:home`).
+2. **Current Theme Cache**:
+   - `~/.local/state/omarchy/current/theme/zen.css`
+   - `~/.local/state/omarchy/current/theme/zen-content.css`
+   Compiled automatically whenever the Omarchy theme changes via `omarchy theme set <name>`.
+3. **Symlink Targets**:
+   - `zen-omarchy-theme.css` -> `~/.local/state/omarchy/current/theme/zen.css`
+   - `zen-omarchy-content.css` -> `~/.local/state/omarchy/current/theme/zen-content.css`
+4. **Root Entrypoints**:
+   - `userChrome.css`: Imports `zen-omarchy-theme.css`. Only styles the browser chrome.
+   - `userContent.css`: Imports `zen-omarchy-content.css`. Targets only internal blank/new tabs.
+   - **Crucial Rule**: Normal web pages (Google, GitHub, etc.) are strictly untouched and remain 100% solid.
+5. **Hyprland Glass Blur**:
+   - Configured in `~/.config/hypr/hyprland.lua`:
+     ```lua
+     o.window("(zen|zen-bin|zen-alpha)", {
+       tag = "-default-opacity",
+       opacity = "0.85 0.78",
+     })
+     ```
+6. **Automation Hooks**:
+   - `~/.config/omarchy/hooks/theme-set.d/zen-sync.sh`: Runs on every theme change.
+
+## CLI Tools
+
+- Re-sync theme: `omarchy-sync-zen`
+- Check theme status: `omarchy-sync-zen --status`
+- Manage glass tab mod: `omarchy-zen-glass` (`--status`, `--enable`, `--disable`, `--restart`)
+- Gracefully restart Zen: `omarchy-sync-zen --restart`
+EOF
+
+  sync_darkreader "$profile_dir"
+  echo "[omarchy-sync-zen] Synced profile: $(basename "$profile_dir")"
+}
+
+# Perform synchronization across all profiles
+do_sync() {
+  ensure_theme_compiled || return 1
+
+  local count=0
+  while IFS= read -r profile_dir; do
+    [[ -n "$profile_dir" && -d "$profile_dir" ]] || continue
+    sync_profile "$profile_dir"
+    ((count++)) || true
+  done < <(get_zen_profiles)
+
+  if [[ $count -eq 0 ]]; then
+    echo "[omarchy-sync-zen] Warning: No Zen Browser profiles found in $ZEN_CONFIG_DIR"
   else
-    if ! grep -q "omarchy-theme.css" "$user_content"; then
-      sed -i '1i @import "omarchy-theme.css";' "$user_content"
+    echo "[omarchy-sync-zen] Successfully synced $count Zen Browser profile(s)."
+  fi
+}
+
+# Print status information
+do_status() {
+  echo "=================================================================="
+  echo " Omarchy Zen Browser Theme & Mod Integration Status"
+  echo "=================================================================="
+
+  local current_theme="unknown"
+  if command -v omarchy-theme-current >/dev/null 2>&1; then
+    current_theme=$(omarchy-theme-current)
+  fi
+  echo "Active Omarchy Theme : $current_theme"
+  echo "Current Theme Dir    : $CURRENT_THEME_DIR"
+  echo "Compiled zen.css     : $([[ -f "$CURRENT_THEME_DIR/zen.css" ]] && echo "Present ($(wc -c < "$CURRENT_THEME_DIR/zen.css") bytes)" || echo "Missing")"
+  echo "Compiled content.css : $([[ -f "$CURRENT_THEME_DIR/zen-content.css" ]] && echo "Present ($(wc -c < "$CURRENT_THEME_DIR/zen-content.css") bytes)" || echo "Missing")"
+  echo "Compiled darkreader  : $([[ -f "$CURRENT_THEME_DIR/zen-darkreader.css" ]] && echo "Present ($(wc -c < "$CURRENT_THEME_DIR/zen-darkreader.css") bytes)" || echo "Missing")"
+  echo "Compiled DR json     : $([[ -f "$CURRENT_THEME_DIR/zen-darkreader-theme.json" ]] && echo "Present ($(wc -c < "$CURRENT_THEME_DIR/zen-darkreader-theme.json") bytes)" || echo "Missing")"
+  echo "Chrome Template .tpl : $([[ -f "$USER_CHROME_TEMPLATE" ]] && echo "Present" || echo "Missing")"
+  echo "Content Template .tpl: $([[ -f "$USER_CONTENT_TEMPLATE" ]] && echo "Present" || echo "Missing")"
+  echo "DarkReader .tpl      : $([[ -f "$USER_DARKREADER_TEMPLATE" ]] && echo "Present" || echo "Missing")"
+  echo "DR JSON Template .tpl: $([[ -f "$USER_DARKREADER_JSON_TEMPLATE" ]] && echo "Present" || echo "Missing")"
+  echo ""
+  echo "Discovered Zen Profiles:"
+  local count=0
+  while IFS= read -r profile_dir; do
+    [[ -n "$profile_dir" && -d "$profile_dir" ]] || continue
+    ((count++)) || true
+    local p_name
+    p_name=$(basename "$profile_dir")
+    local has_user_js=$([[ -f "$profile_dir/user.js" ]] && echo "yes" || echo "no")
+    local has_chrome_css=$([[ -f "$profile_dir/chrome/userChrome.css" ]] && echo "yes" || echo "no")
+    local has_content_css=$([[ -f "$profile_dir/chrome/userContent.css" ]] && echo "yes" || echo "no")
+    local has_darkreader=$([[ -f "$profile_dir/extensions/addon@darkreader.org.xpi" ]] && echo "yes (mod active)" || echo "no")
+    local theme_target=""
+    [[ -L "$profile_dir/chrome/zen-omarchy-theme.css" ]] && theme_target=$(readlink -f "$profile_dir/chrome/zen-omarchy-theme.css")
+    local content_target=""
+    [[ -L "$profile_dir/chrome/zen-omarchy-content.css" ]] && content_target=$(readlink -f "$profile_dir/chrome/zen-omarchy-content.css")
+
+    echo "  - Profile: $p_name"
+    echo "    Path: $profile_dir"
+    echo "    user.js configured : $has_user_js"
+    echo "    userChrome.css     : $has_chrome_css"
+    echo "    userContent.css    : $has_content_css"
+    echo "    Dark Reader Mod    : $has_darkreader"
+    echo "    Theme Symlink      : ${theme_target:-None}"
+    echo "    Content Symlink    : ${content_target:-None}"
+  done < <(get_zen_profiles)
+
+  if [[ $count -eq 0 ]]; then
+    echo "  (No profiles found in $ZEN_CONFIG_DIR)"
+  fi
+  echo ""
+  local zen_pid
+  zen_pid=$(pgrep -x zen 2>/dev/null || true)
+  if [[ -n "$zen_pid" ]]; then
+    echo "Zen Browser Process  : Running (PID: $zen_pid)"
+    echo "Note: To apply new stylesheets to existing windows, run 'omarchy-sync-zen --restart'"
+  else
+    echo "Zen Browser Process  : Not running (styles will apply on next launch)"
+  fi
+  echo "=================================================================="
+}
+
+# Restart Zen browser gracefully preserving session
+do_restart() {
+  local zen_bin
+  zen_bin=$(command -v zen || echo "$HOME/.local/bin/zen")
+  local zen_pids
+  zen_pids=$(pgrep -x zen 2>/dev/null || true)
+
+  launch_zen() {
+    if command -v systemd-run >/dev/null 2>&1 && command -v uwsm-app >/dev/null 2>&1; then
+      systemd-run --user --quiet --collect --unit="omarchy-zen-$(date +%s%N)" \
+        --property=StandardOutput=null --property=StandardError=null \
+        uwsm-app -- "$zen_bin"
+    elif command -v gtk-launch >/dev/null 2>&1 && [[ -f "$HOME/.local/share/applications/zen.desktop" ]]; then
+      gtk-launch zen.desktop >/dev/null 2>&1 &
+    else
+      setsid "$zen_bin" </dev/null >/dev/null 2>&1 &
     fi
-    if ! grep -q "matugen-retro-content.css" "$user_content"; then
-      sed -i '2i @import "matugen-retro-content.css";' "$user_content"
-    fi
+  }
+
+  if [[ -z "$zen_pids" ]]; then
+    echo "[omarchy-sync-zen] Zen Browser is not running. Launching Zen..."
+    launch_zen
+    return 0
   fi
 
-  # 5. Sync matugen retro stylesheets to all discovered profiles
-  if [[ -f "$HOME/.config/zen/agmdnjeb.Default (release)/chrome/matugen-retro.css" && "$chrome_dir" != "$HOME/.config/zen/agmdnjeb.Default (release)/chrome" ]]; then
-    cp -f "$HOME/.config/zen/agmdnjeb.Default (release)/chrome/matugen-retro.css" "$chrome_dir/matugen-retro.css" 2>/dev/null || true
-  fi
-  if [[ -f "$HOME/.config/zen/agmdnjeb.Default (release)/chrome/matugen-retro-content.css" && "$chrome_dir" != "$HOME/.config/zen/agmdnjeb.Default (release)/chrome" ]]; then
-    cp -f "$HOME/.config/zen/agmdnjeb.Default (release)/chrome/matugen-retro-content.css" "$chrome_dir/matugen-retro-content.css" 2>/dev/null || true
-  fi
-done
+  echo "[omarchy-sync-zen] Gracefully terminating Zen Browser (PIDs: $zen_pids)..."
+  # Send SIGTERM to allow clean state save
+  kill $zen_pids 2>/dev/null || true
 
+  local waited=0
+  while pgrep -x zen >/dev/null 2>&1 && [[ $waited -lt 25 ]]; do
+    sleep 0.2
+    ((waited++)) || true
+  done
+
+  if pgrep -x zen >/dev/null 2>&1; then
+    echo "[omarchy-sync-zen] Forcing process termination..."
+    kill -9 $(pgrep -x zen) 2>/dev/null || true
+    sleep 0.5
+  fi
+
+  echo "[omarchy-sync-zen] Relaunching Zen Browser..."
+  launch_zen
+  echo "[omarchy-sync-zen] Zen Browser restarted successfully."
+}
+
+# CLI Argument Parsing
+MODE="sync"
+if [[ $# -gt 0 ]]; then
+  case "$1" in
+    --sync)
+      MODE="sync"
+      ;;
+    --status)
+      MODE="status"
+      ;;
+    --restart)
+      MODE="restart"
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      show_help
+      exit 1
+      ;;
+  esac
+fi
+
+case "$MODE" in
+  sync)
+    do_sync
+    ;;
+  status)
+    do_status
+    ;;
+  restart)
+    do_sync
+    do_restart
+    ;;
+esac
