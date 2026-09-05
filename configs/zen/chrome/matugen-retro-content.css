@@ -17,10 +17,13 @@
   --matugen-fg: var(--omarchy-fg, #f5ebe0);
   --matugen-fg-bright: var(--omarchy-fg-bright, #fff6ee);
   --matugen-fg-muted: var(--omarchy-fg-muted, #a89388);
-  --matugen-pill-fg: var(--omarchy-pill-fg, #141110);
-  --matugen-btn-bg: var(--omarchy-btn-bg, color-mix(in srgb, var(--matugen-fg) 8%, transparent));
-  --matugen-btn-bg-hover: var(--omarchy-btn-bg-hover, color-mix(in srgb, var(--matugen-fg) 16%, transparent));
-  --matugen-btn-border: var(--omarchy-btn-border, color-mix(in srgb, var(--matugen-fg) 12%, transparent));
+  --matugen-pill-fg: var(--omarchy-pill-fg, #ffffff);
+  --matugen-btn-bg: transparent !important;
+  --matugen-btn-bg-hover: var(--omarchy-btn-bg-hover, color-mix(in srgb, var(--matugen-fg) 8%, transparent));
+  --matugen-btn-border: var(--omarchy-btn-border, transparent);
+  --matugen-input-bg: var(--omarchy-input-bg, var(--matugen-bg));
+  --matugen-input-bg-focus: var(--omarchy-input-bg-focus, var(--matugen-bg));
+  --matugen-input-border: var(--omarchy-input-border, var(--matugen-border-subtle));
 }
 
 /* Global scrollbars */
@@ -40,16 +43,16 @@
   [data-theme="light"],
   [data-color-mode="light"] {
     --bgColor-default: var(--matugen-bg) !important;
-    --bgColor-muted: var(--matugen-bg-surface) !important;
-    --bgColor-inset: var(--matugen-bg-card) !important;
+    --bgColor-muted: var(--matugen-bg) !important;
+    --bgColor-inset: var(--matugen-bg) !important;
     --color-canvas-default: var(--matugen-bg) !important;
-    --color-canvas-subtle: var(--matugen-bg-surface) !important;
-    --color-canvas-inset: var(--matugen-bg-card) !important;
-    --color-page-header-bg: var(--matugen-bg-surface) !important;
-    --color-header-bg: var(--matugen-bg-surface) !important;
+    --color-canvas-subtle: var(--matugen-bg) !important;
+    --color-canvas-inset: var(--matugen-bg) !important;
+    --color-page-header-bg: var(--matugen-bg) !important;
+    --color-header-bg: var(--matugen-bg) !important;
     --color-scale-gray-0: var(--matugen-bg) !important;
-    --color-scale-gray-1: var(--matugen-bg-surface) !important;
-    --color-scale-gray-2: var(--matugen-bg-card) !important;
+    --color-scale-gray-1: var(--matugen-bg) !important;
+    --color-scale-gray-2: var(--matugen-bg) !important;
     --fgColor-default: var(--matugen-fg) !important;
     --fgColor-muted: var(--matugen-fg-muted) !important;
     --color-fg-default: var(--matugen-fg) !important;
@@ -59,6 +62,42 @@
     --borderColor-default: var(--matugen-border-subtle) !important;
     --borderColor-muted: var(--matugen-border-subtle) !important;
 
+    /* Button and shadow tokens: Theme-matched transparent resting surfaces with subtle borders */
+    --button-default-bgColor-rest: transparent !important;
+    --button-default-bgColor-hover: var(--matugen-btn-bg-hover) !important;
+    --button-default-fgColor-rest: var(--matugen-fg) !important;
+    --button-default-borderColor-rest: var(--matugen-border-subtle) !important;
+    --button-default-shadow-resting: none !important;
+    --button-default-shadow-inset: none !important;
+    --button-primary-bgColor-rest: var(--matugen-accent) !important;
+    --button-primary-bgColor-hover: var(--matugen-accent-bright) !important;
+    --button-primary-fgColor-rest: var(--matugen-pill-fg) !important;
+    --button-primary-borderColor-rest: transparent !important;
+    --button-primary-shadow-resting: none !important;
+    --button-shadow-resting: none !important;
+    --control-transparent-bgColor-rest: transparent !important;
+    --control-subtle-bgColor-rest: transparent !important;
+    --control-subtle-bgColor-hover: var(--matugen-btn-bg-hover) !important;
+    --button-counter-bgColor-rest: transparent !important;
+    --color-btn-shadow: none !important;
+    --color-btn-inset-shadow: none !important;
+    --color-btn-shadow-hover: none !important;
+    --color-btn-shadow-active: none !important;
+    --color-btn-bg: transparent !important;
+    --color-btn-hover-bg: var(--matugen-btn-bg-hover) !important;
+    --color-btn-text: var(--matugen-fg) !important;
+    --color-btn-border: var(--matugen-border-subtle) !important;
+    --color-btn-primary-bg: var(--matugen-accent) !important;
+    --color-btn-primary-hover-bg: var(--matugen-accent-bright) !important;
+    --color-btn-primary-text: var(--matugen-pill-fg) !important;
+    --color-btn-primary-border: transparent !important;
+    --shadow-resting-xsmall: none !important;
+    --shadow-resting-small: none !important;
+    --shadow-resting-medium: none !important;
+    --color-shadow-primary: transparent !important;
+    --color-shadow-medium: transparent !important;
+    --color-shadow-large: transparent !important;
+
     /* Bootstrap variables */
     --bs-body-bg: var(--matugen-bg) !important;
     --bs-body-color: var(--matugen-fg) !important;
@@ -67,6 +106,38 @@
     --bs-secondary-bg: var(--matugen-bg-surface) !important;
     --bs-border-color: var(--matugen-border-subtle) !important;
     --bs-link-color: var(--matugen-accent) !important;
+    --bs-primary: var(--matugen-accent) !important;
+    --bs-btn-bg: transparent !important;
+    --bs-btn-color: var(--matugen-fg) !important;
+    --bs-btn-border-color: var(--matugen-border-subtle) !important;
+    --bs-btn-hover-bg: var(--matugen-btn-bg-hover) !important;
+    --bs-btn-hover-color: var(--matugen-fg-bright) !important;
+    --bs-btn-hover-border-color: var(--matugen-border-subtle) !important;
+    --bs-btn-active-bg: var(--matugen-accent) !important;
+    --bs-btn-active-color: var(--matugen-pill-fg) !important;
+    --bs-form-control-bg: var(--matugen-input-bg) !important;
+    --bs-form-control-disabled-bg: var(--matugen-bg-surface) !important;
+    --bs-form-control-color: var(--matugen-fg) !important;
+    --bs-form-control-border-color: var(--matugen-border-subtle) !important;
+    --bs-form-select-bg: var(--matugen-input-bg) !important;
+    --bs-form-select-disabled-bg: var(--matugen-bg-surface) !important;
+    --bs-form-select-color: var(--matugen-fg) !important;
+    --bs-form-select-border-color: var(--matugen-border-subtle) !important;
+
+    /* Input & form control tokens across design systems (Primer, Tailwind, Shoelace, etc.) */
+    --control-bgColor-rest: var(--matugen-input-bg) !important;
+    --control-bgColor-hover: var(--matugen-bg-card-hover) !important;
+    --control-bgColor-active: var(--matugen-input-bg) !important;
+    --control-bgColor-disabled: var(--matugen-bg-surface) !important;
+    --control-borderColor-rest: var(--matugen-border-subtle) !important;
+    --control-borderColor-emphasis: var(--matugen-accent) !important;
+    --bgColor-white: var(--matugen-input-bg) !important;
+    --bgColor-inset: var(--matugen-input-bg) !important;
+    --color-canvas-inset: var(--matugen-input-bg) !important;
+    --color-input-bg: var(--matugen-input-bg) !important;
+    --color-input-contrast-bg: var(--matugen-input-bg) !important;
+    --color-input-border: var(--matugen-border-subtle) !important;
+    --input-bgColor-rest: var(--matugen-input-bg) !important;
 
     /* MediaWiki / Codex design variables */
     --background-color-base: var(--matugen-bg) !important;
@@ -75,6 +146,12 @@
     --background-color-neutral-subtle: var(--matugen-bg-surface) !important;
     --background-color-interactive: var(--matugen-bg-surface) !important;
     --background-color-interactive-subtle: var(--matugen-bg-surface) !important;
+    --background-color-input: var(--matugen-input-bg) !important;
+    --background-color-input--hover: var(--matugen-bg-card-hover) !important;
+    --background-color-input--focus: var(--matugen-input-bg-focus) !important;
+    --border-color-input: var(--matugen-border-subtle) !important;
+    --color-input: var(--matugen-fg) !important;
+    --color-placeholder: var(--matugen-fg-muted) !important;
     --color-base: var(--matugen-fg) !important;
     --color-base-fixed: var(--matugen-fg) !important;
     --color-emphasized: var(--matugen-fg-bright) !important;
@@ -83,6 +160,13 @@
     --color-visited: color-mix(in srgb, var(--matugen-accent) 70%, #6b4ba1) !important;
     --border-color-base: var(--matugen-border-subtle) !important;
     --border-color-subtle: var(--matugen-border-subtle) !important;
+
+    /* Reddit / Web Component input tokens */
+    --faceplate-input-background: var(--matugen-input-bg) !important;
+    --faceplate-input-color: var(--matugen-fg) !important;
+    --faceplate-input-border-color: var(--matugen-border-subtle) !important;
+    --faceplate-input-placeholder-color: var(--matugen-fg-muted) !important;
+    --faceplate-textarea-background: var(--matugen-input-bg) !important;
   }
 
   /* Universal page background */
@@ -110,7 +194,7 @@
     background-color: var(--matugen-bg) !important;
   }
 
-  /* Headers, navigation bars, and toolbars */
+  /* Headers, navigation bars, and toolbars (Macro layout framing) */
   header:not([class*="player"]):not([class*="video"]):not([class*="yt"]):not(ytd-masthead),
   nav:not([class*="player"]):not([class*="video"]),
   [role="navigation"],
@@ -119,25 +203,46 @@
   .top-bar,
   .navbar,
   .navigation {
-    background-color: var(--matugen-bg-surface) !important;
-    border-color: var(--matugen-border-subtle) !important;
+    background-color: var(--matugen-bg) !important;
+    background: var(--matugen-bg) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
   }
 
-  /* Sidebars and secondary columns */
+  /* Sidebars and secondary columns (Macro layout framing) */
   aside:not(#secondary):not([class*="player"]):not([class*="video"]):not([class*="yt"]),
   [role="complementary"],
   .sidebar,
   .feed-left-sidebar,
   .dashboard-sidebar {
-    background-color: var(--matugen-bg-surface) !important;
+    background-color: var(--matugen-bg) !important;
+    background: var(--matugen-bg) !important;
+    border-right: 1px solid var(--matugen-border-subtle) !important;
   }
 
-  /* Cards, dialogue boxes, panels, and feed items */
-  .Box:not(#secondary),
+  /* Small cards, panels, tiles, feed items & layout sections - Clean unboxed surfaces, ZERO dark box backgrounds */
+  section,
+  [role="region"],
+  div[class*="section" i],
+  div[class*="region" i],
+  div[class*="wrapper" i]:not(.TextInput-wrapper):not([class*="input" i]),
+  div[class*="container" i]:not([class*="input" i]):not(.TextInput-wrapper),
+  div[class*="feed" i],
+  div[class*="shelf" i],
+  div[class*="grid" i],
+  div[class*="carousel" i],
   .card,
   .panel,
   .tile,
-  .feed-item-card,
+  .feed-item-card {
+    background-color: transparent !important;
+    background: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* Floating dialogs, modals and popovers: Retain clean floating window frame */
   dialog,
   [role="dialog"],
   [role="alertdialog"],
@@ -145,7 +250,10 @@
   .modal-content,
   .popover {
     background-color: var(--matugen-bg-card) !important;
-    border-color: var(--matugen-border-subtle) !important;
+    background: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
     color: var(--matugen-fg) !important;
   }
 
@@ -203,10 +311,10 @@
   samp {
     background-color: var(--matugen-bg-card) !important;
     color: var(--matugen-fg) !important;
-    border-color: var(--matugen-border-subtle) !important;
+    border-color: transparent !important;
   }
 
-  /* Quotes, alerts & banners */
+  /* Quotes, alerts & banners - Elegant single left accent, unboxed on other sides */
   blockquote,
   .callout,
   .alert,
@@ -214,48 +322,476 @@
   [class*="Banner"]:not([class*="player"]):not([class*="video"]):not([class*="yt"]) {
     background-color: var(--matugen-bg-card) !important;
     color: var(--matugen-fg) !important;
-    border-color: var(--matugen-border-subtle) !important;
+    border-left: 3px solid var(--matugen-accent) !important;
+    border-top: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
   }
 
-  /* Input fields and textareas */
-  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not([type="button"]):not([type="reset"]), textarea, select) {
-    background-color: var(--matugen-bg-card) !important;
+  /* Universal Text Inputs, Textareas, Selects & Contenteditable Editors (Real Input Elements Only) */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="file"]):not([type="image"]):not([type="color"]):not([type="hidden"]),
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="password"],
+  input[type="url"],
+  input[type="tel"],
+  input[type="number"],
+  input:not([type]),
+  textarea,
+  select,
+  [contenteditable="true"],
+  [contenteditable=""] {
+    background-color: var(--matugen-input-bg) !important;
+    background: var(--matugen-input-bg) !important;
     color: var(--matugen-fg) !important;
     border: 1px solid var(--matugen-border-subtle) !important;
     border-radius: 6px !important;
+    box-shadow: none !important;
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
   }
 
-  :where(input:focus, textarea:focus, select:focus) {
+  /* Universal input focus state */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="file"]):not([type="image"]):not([type="color"]):not([type="hidden"]):focus,
+  input[type="text"]:focus,
+  input[type="search"]:focus,
+  input[type="email"]:focus,
+  input[type="password"]:focus,
+  input[type="url"]:focus,
+  input[type="tel"]:focus,
+  input[type="number"]:focus,
+  input:not([type]):focus,
+  textarea:focus,
+  select:focus,
+  [contenteditable="true"]:focus,
+  [contenteditable=""]:focus {
+    background-color: var(--matugen-input-bg-focus) !important;
+    background: var(--matugen-input-bg-focus) !important;
     border-color: var(--matugen-accent) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 1px var(--matugen-accent) !important;
   }
 
-  /* General buttons - exclude specialized web components, plain/borderless buttons, join buttons, vote buttons, Reddit buttons, and video players */
-  :where(
-    button:not([class*="plain"]):not([class*="border-none"]):not([class*="bg-transparent"]):not([class*="join"]):not([slot="join-button"]):not([rpl]):not([upvote]):not([downvote]):not([data-action-bar-action]):not([class*="vote"]):not([aria-label*="upvote" i]):not([aria-label*="downvote" i]):not([class*="player"]):not([class*="video"]):not([class*="yt"]):not(.btn-primary):not([class*="Clear"]):not([class*="clear"]):not(recent-posts button):not(reddit-recent-pages button):not(shreddit-join-button button):not([noun*="clear"] button):not(rpl-vote-button-group button):not(shreddit-post-share-button button):not(shreddit-comment-share-button button):not(award-button button):not(shreddit-sort-dropdown button):not(feed-layout-controller button):not(shreddit-post-overflow-menu button):not(faceplate-dropdown-menu button):not([slot*="action"]):not([slot*="credit"]):not(shreddit-app button):not(reddit-header-large button),
-    input[type="button"],
-    input[type="submit"],
-    .btn:not(.btn-primary)
-  ) {
+  /* Universal placeholder text styling */
+  ::placeholder,
+  ::-webkit-input-placeholder,
+  ::-moz-placeholder,
+  input::placeholder,
+  textarea::placeholder,
+  [placeholder] {
+    color: var(--matugen-fg-muted) !important;
+    opacity: 0.8 !important;
+  }
+
+  /* Input & Search Wrapper Divs: Completely borderless and transparent so they NEVER create nested boxes */
+  .TextInput-wrapper,
+  .TextInput,
+  [class*="TextInput-wrapper"],
+  [class*="textInput-wrapper"],
+  [class*="input-wrapper"],
+  [class*="InputWrapper"],
+  [class*="input-container"],
+  [class*="InputContainer"],
+  [class*="form-control"],
+  [class*="form-input"],
+  [class*="searchbox"]:not(button):not([role="button"]),
+  [class*="Searchbox"]:not(button):not([role="button"]),
+  [class*="searchBox"]:not(button):not([role="button"]),
+  [class*="SearchBox"]:not(button):not([role="button"]),
+  [class*="search-box"]:not(button):not([role="button"]),
+  [class*="Search-box"]:not(button):not([role="button"]),
+  [class*="search-bar"]:not(button):not([role="button"]),
+  [class*="SearchBar"]:not(button):not([role="button"]),
+  [class*="searchbar"]:not(button):not([role="button"]),
+  .subnav-search {
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* Inputs, Textareas and buttons nested inside search boxes or wrappers: borderless transparent blend */
+  form input,
+  form textarea,
+  [class*="search"] input,
+  [class*="Search"] input,
+  [class*="input"] input,
+  [class*="Input"] input,
+  .TextInput-wrapper input,
+  .TextInput-wrapper textarea,
+  [class*="TextInput"] input,
+  [class*="TextInput"] textarea,
+  [class*="textInput"] input,
+  [class*="textInput"] textarea,
+  [class*="input-wrapper"] input,
+  [class*="input-wrapper"] textarea,
+  [class*="InputWrapper"] input,
+  [class*="InputWrapper"] textarea,
+  [class*="input-container"] input,
+  [class*="input-container"] textarea,
+  [class*="InputContainer"] input,
+  [class*="InputContainer"] textarea,
+  [class*="searchbox"] input,
+  [class*="Searchbox"] input,
+  [class*="searchBox"] input,
+  [class*="SearchBox"] input,
+  [class*="search-box"] input,
+  [class*="Search-box"] input,
+  [class*="search-bar"] input,
+  [class*="SearchBar"] input,
+  [class*="searchbar"] input {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* ==========================================================================
+     Universal Buttons & Controls (Applies to all websites dynamically)
+     Clean, tactile theme-matched surfaces with ZERO harsh borders or div boxing
+     ========================================================================== */
+
+  /* 0. Universal Button Reset: Extinguish native GTK/Gecko widget box and border frames across ALL websites */
+  button,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  [role="button"] {
     appearance: none !important;
     -moz-appearance: none !important;
     -webkit-appearance: none !important;
-    background-color: var(--matugen-bg-surface) !important;
+  }
+
+  /* 1. Universal Icon, Action & Menu Buttons: 100% TRANSPARENT at rest (Zero boxing, Zero borders) */
+  button[class*="icon" i],
+  button[class*="Icon" i],
+  button[class*="ghost" i],
+  button[class*="plain" i],
+  button[class*="borderless" i],
+  button[class*="transparent" i],
+  button[class*="close" i],
+  button[class*="Close" i],
+  button[class*="menu" i],
+  button[class*="Menu" i],
+  button[class*="toggle" i],
+  button[class*="nav" i],
+  button[class*="drawer" i],
+  button[aria-label*="menu" i],
+  button[aria-label*="options" i],
+  button[aria-label*="more" i],
+  button[aria-label*="overflow" i],
+  button[aria-label*="close" i],
+  button[aria-label*="search" i],
+  button[aria-label*="action" i],
+  [role="button"][class*="icon" i],
+  [role="button"][class*="ghost" i],
+  [role="button"][class*="plain" i],
+  [role="button"][aria-label*="menu" i],
+  [role="button"][aria-label*="options" i],
+  [role="button"][aria-label*="more" i],
+  [role="button"][aria-label*="close" i],
+  [aria-haspopup="menu"]:not(.btn-primary):not([class*="primary"]),
+  button:has(> svg:only-child),
+  button:has(> [class*="icon"]:only-child),
+  [role="button"]:has(> svg:only-child) {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  button[class*="icon" i]:hover,
+  button[class*="Icon" i]:hover,
+  button[class*="ghost" i]:hover,
+  button[class*="plain" i]:hover,
+  button[class*="borderless" i]:hover,
+  button[class*="transparent" i]:hover,
+  button[class*="close" i]:hover,
+  button[class*="Close" i]:hover,
+  button[class*="menu" i]:hover,
+  button[class*="Menu" i]:hover,
+  button[class*="toggle" i]:hover,
+  button[class*="nav" i]:hover,
+  button[class*="drawer" i]:hover,
+  button[aria-label*="menu" i]:hover,
+  button[aria-label*="options" i]:hover,
+  button[aria-label*="more" i]:hover,
+  button[aria-label*="overflow" i]:hover,
+  button[aria-label*="close" i]:hover,
+  button[aria-label*="search" i]:hover,
+  button[aria-label*="action" i]:hover,
+  [role="button"][class*="icon" i]:hover,
+  [role="button"][class*="ghost" i]:hover,
+  [role="button"][class*="plain" i]:hover,
+  [role="button"][aria-label*="menu" i]:hover,
+  [role="button"][aria-label*="options" i]:hover,
+  [role="button"][aria-label*="more" i]:hover,
+  [role="button"][aria-label*="close" i]:hover,
+  [aria-haspopup="menu"]:not(.btn-primary):not([class*="primary"]):hover,
+  button:has(> svg:only-child):hover,
+  button:has(> [class*="icon"]:only-child):hover,
+  [role="button"]:has(> svg:only-child):hover {
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    color: var(--matugen-fg-bright) !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  button[class*="icon" i] svg,
+  button[class*="icon" i] path,
+  button[class*="Icon" i] svg,
+  button[class*="Icon" i] path,
+  button[aria-label*="menu" i] svg,
+  button[aria-label*="menu" i] path,
+  button[aria-label*="options" i] svg,
+  button[aria-label*="options" i] path,
+  button[aria-label*="more" i] svg,
+  button[aria-label*="more" i] path,
+  button:has(> svg:only-child) svg,
+  button:has(> svg:only-child) path {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  /* 2. Standard / Secondary / Neutral Buttons across all websites: 100% TRANSPARENT at rest (No standalone background color, zero boxing) */
+  .btn:not(.btn-primary):not([class*="btn-primary"]):not([class*="primary"]):not([aria-selected="true"]):not([aria-pressed="true"]):not(.active):not([disabled]),
+  input[type="button"]:not(.btn-primary):not([class*="primary"]):not([disabled]),
+  input[type="submit"]:not(.btn-primary):not([class*="primary"]):not([disabled]),
+  a.btn:not(.btn-primary):not([class*="primary"]),
+  a.button:not(.btn-primary):not([class*="primary"]) {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: transparent !important;
+    background: transparent !important;
     color: var(--matugen-fg) !important;
     border: 1px solid var(--matugen-border-subtle) !important;
-    border-radius: 6px !important;
+    outline: none !important;
+    box-shadow: none !important;
+    border-radius: 8px !important;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease !important;
   }
 
-  :where(
-    button:not([class*="plain"]):not([class*="border-none"]):not([class*="bg-transparent"]):not([class*="join"]):not([slot="join-button"]):not([rpl]):not([upvote]):not([downvote]):not([data-action-bar-action]):not([class*="vote"]):not([aria-label*="upvote" i]):not([aria-label*="downvote" i]):not([class*="player"]):not([class*="video"]):not([class*="yt"]):not(.btn-primary):not([class*="Clear"]):not([class*="clear"]):not(recent-posts button):not(reddit-recent-pages button):not(shreddit-join-button button):not([noun*="clear"] button):not(rpl-vote-button-group button):not(shreddit-post-share-button button):not(shreddit-comment-share-button button):not(award-button button):not(shreddit-sort-dropdown button):not(feed-layout-controller button):not(shreddit-post-overflow-menu button):not(faceplate-dropdown-menu button):not([slot*="action"]):not([slot*="credit"]):not(shreddit-app button):not(reddit-header-large button):hover,
-    input[type="button"]:hover,
-    input[type="submit"]:hover,
-    .btn:not(.btn-primary):hover
-  ) {
+  /* General raw button / role=button: Neutralize dark backgrounds, inherit/adapt cleanly, NEVER force borders onto unbordered elements */
+  button:not(.btn-primary):not([class*="btn-primary"]):not([class*="button-primary"]):not([class*="Button--primary"]):not([class*="primary"]):not([aria-selected="true"]):not([aria-pressed="true"]):not(.active):not([disabled]),
+  [role="button"]:not(.btn-primary):not([class*="btn-primary"]):not([class*="primary"]):not([aria-selected="true"]):not([aria-pressed="true"]):not(.active):not([disabled]) {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: var(--matugen-fg) !important;
+    box-shadow: none !important;
+  }
+
+  /* Hover state for Standard Buttons */
+  button:not(.btn-primary):not([class*="btn-primary"]):not([class*="button-primary"]):not([class*="Button--primary"]):not([class*="primary"]):not([aria-selected="true"]):not([aria-pressed="true"]):not(.active):not([disabled]):hover,
+  input[type="button"]:not(.btn-primary):not([class*="primary"]):not([disabled]):hover,
+  input[type="submit"]:not(.btn-primary):not([class*="primary"]):not([disabled]):hover,
+  .btn:not(.btn-primary):not([class*="btn-primary"]):not([class*="primary"]):not([aria-selected="true"]):not([aria-pressed="true"]):not(.active):not([disabled]):hover,
+  [role="button"]:not(.btn-primary):not([class*="btn-primary"]):not([class*="primary"]):not([aria-selected="true"]):not([aria-pressed="true"]):not(.active):not([disabled]):hover,
+  a.btn:not(.btn-primary):not([class*="primary"]):hover,
+  a.button:not(.btn-primary):not([class*="primary"]):hover {
     appearance: none !important;
     -moz-appearance: none !important;
     -webkit-appearance: none !important;
-    background-color: var(--matugen-bg-card-hover) !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    color: var(--matugen-fg-bright) !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* 3. Primary, Call-To-Action & Accent Buttons */
+  .btn-primary,
+  [class*="btn-primary"],
+  [class*="button-primary"],
+  [class*="Button--primary"],
+  [class*="button_primary"],
+  [class*="btnPrimary"],
+  [class*="btn_primary"],
+  button[class*="primary" i],
+  [role="button"][class*="primary" i],
+  input[type="submit"].btn-primary,
+  input[type="submit"][class*="primary" i],
+  [class*="call-to-action"],
+  [class*="CallToAction"] {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-accent) !important;
+    background: var(--matugen-accent) !important;
+    color: var(--matugen-pill-fg) !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    border-radius: 8px !important;
+  }
+
+  .btn-primary:hover,
+  [class*="btn-primary"]:hover,
+  [class*="button-primary"]:hover,
+  [class*="Button--primary"]:hover,
+  [class*="button_primary"]:hover,
+  [class*="btnPrimary"]:hover,
+  [class*="btn_primary"]:hover,
+  button[class*="primary" i]:hover,
+  [role="button"][class*="primary" i]:hover,
+  input[type="submit"].btn-primary:hover,
+  input[type="submit"][class*="primary" i]:hover,
+  [class*="call-to-action"]:hover,
+  [class*="CallToAction"]:hover {
+    background-color: var(--matugen-accent-bright) !important;
+    background: var(--matugen-accent-bright) !important;
+    color: var(--matugen-pill-fg) !important;
+  }
+
+  .btn-primary *,
+  [class*="btn-primary"] *,
+  [class*="button-primary"] *,
+  [class*="Button--primary"] *,
+  button[class*="primary" i] * {
+    color: var(--matugen-pill-fg) !important;
+    fill: var(--matugen-pill-fg) !important;
+  }
+
+  /* 4. Active / Selected / Pressed States across all websites (Tabs, Filters, Toggle Buttons) */
+  button[aria-selected="true"],
+  [role="button"][aria-selected="true"],
+  button[aria-pressed="true"],
+  [role="button"][aria-pressed="true"],
+  [role="tab"][aria-selected="true"],
+  button.active,
+  [role="button"].active,
+  button[data-state="active"],
+  [role="button"][data-state="active"],
+  button[data-state="checked"],
+  [role="button"][data-state="checked"],
+  button[data-state="on"],
+  [role="button"][data-state="on"],
+  .btn.active,
+  .btn[aria-pressed="true"] {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-accent) !important;
+    background: var(--matugen-accent) !important;
+    color: var(--matugen-pill-fg) !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  button[aria-selected="true"] *,
+  [role="button"][aria-selected="true"] *,
+  button[aria-pressed="true"] *,
+  [role="button"][aria-pressed="true"] *,
+  [role="tab"][aria-selected="true"] *,
+  button.active *,
+  [role="button"].active * {
+    color: var(--matugen-pill-fg) !important;
+    fill: var(--matugen-pill-fg) !important;
+  }
+
+  /* Universal Chips, Badges & Tags: 100% transparent at rest, zero background boxing */
+  [class*="chip"]:not(input):not([class*="wrapper"]):not([class*="container"]):not([class*="bar"]),
+  [class*="Chip"]:not(input):not([class*="wrapper"]):not([class*="container"]):not([class*="bar"]),
+  [class*="badge"]:not(input):not([class*="wrapper"]):not([class*="container"]),
+  [class*="Badge"]:not(input):not([class*="wrapper"]):not([class*="container"]),
+  [class*="tag"]:not(input):not(html):not(body):not(main):not(article):not(section):not([class*="wrapper"]):not([class*="container"]),
+  [class*="Tag"]:not(input):not([class*="wrapper"]):not([class*="container"]) {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: var(--matugen-fg) !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  [class*="chip"]:not(input):hover,
+  [class*="Chip"]:not(input):hover,
+  [class*="badge"]:not(input):hover,
+  [class*="Badge"]:not(input):hover,
+  [class*="tag"]:not(input):not(html):not(body):not(main):not(article):not(section):hover,
+  [class*="Tag"]:not(input):hover {
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
     border-color: var(--matugen-border) !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  [class*="chip"][aria-selected="true"],
+  [class*="chip"][selected],
+  [class*="chip"].active,
+  [class*="Chip"][aria-selected="true"],
+  [class*="Chip"][selected],
+  [class*="Chip"].active {
+    background-color: var(--matugen-accent) !important;
+    background: var(--matugen-accent) !important;
+    color: var(--matugen-pill-fg) !important;
+  }
+
+  /* Structural toolbars, action bars, button groups: ZERO div boxing */
+  [role="toolbar"],
+  .toolbar,
+  .action-bar,
+  .button-group,
+  [class*="toolbar"],
+  [class*="ActionBar"],
+  [class*="ButtonGroup"],
+  [class*="actions-bar"],
+  [class*="button-group"],
+  [class*="sub-section"],
+  [class*="subSection"],
+  [class*="sub-panel"] {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+  }
+
+  /* Icon buttons nested inside search boxes or inputs: transparent blend with subtle hover */
+  form button,
+  form [role="button"],
+  [class*="search"] button:not([class*="submit"]):not([type="submit"]),
+  [class*="Search"] button:not([class*="submit"]):not([type="submit"]),
+  [class*="searchbox"] button:not([class*="submit"]):not([type="submit"]),
+  [class*="Searchbox"] button:not([class*="submit"]):not([type="submit"]) {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  form button:hover,
+  form [role="button"]:hover,
+  [class*="search"] button:not([class*="submit"]):not([type="submit"]):hover,
+  [class*="Search"] button:not([class*="submit"]):not([type="submit"]):hover,
+  [class*="searchbox"] button:not([class*="submit"]):not([type="submit"]):hover,
+  [class*="Searchbox"] button:not([class*="submit"]):not([type="submit"]):hover {
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    border: none !important;
+    border-color: transparent !important;
   }
 
   /* Checkboxes & Radios */
@@ -315,16 +851,209 @@
 
 /* YouTube custom styling matching the exact rice from the reference screenshot */
 @-moz-document domain("youtube.com") {
-  html, body, ytd-app {
+  :root,
+  html,
+  html[dark],
+  [dark],
+  body,
+  ytd-app,
+  ytd-masthead,
+  ytd-masthead.dark,
+  ytd-masthead[dark],
+  ytd-masthead.shell.dark,
+  ytd-masthead.theater,
+  #masthead-container,
+  #masthead,
+  ytd-watch-flexy,
+  ytd-watch-flexy[dark],
+  ytd-watch-flexy[theater],
+  ytd-watch-flexy ytd-masthead,
+  ytd-watch-flexy #masthead,
+  ytd-watch-flexy #buttons,
+  #buttons {
+    --yt-spec-base-background: var(--matugen-bg) !important;
+    --yt-spec-raised-background: var(--matugen-bg-surface) !important;
+    --yt-spec-menu-background: var(--matugen-bg-card) !important;
+    --yt-spec-inverted-background: var(--matugen-fg) !important;
+    --yt-spec-additive-background: transparent !important;
+    --yt-spec-outline: transparent !important;
+    --yt-spec-outline-inverse: transparent !important;
+    --yt-spec-shadow: none !important;
+    --yt-spec-text-primary: var(--matugen-fg) !important;
+    --yt-spec-text-secondary: var(--matugen-fg-muted) !important;
+    --yt-spec-text-disabled: var(--matugen-fg-muted) !important;
+    --yt-spec-call-to-action: var(--matugen-accent) !important;
+    --yt-spec-icon-active-other: var(--matugen-fg) !important;
+    --yt-spec-icon-inactive: var(--matugen-fg-muted) !important;
+    --yt-spec-icon-disabled: var(--matugen-fg-muted) !important;
+    --yt-spec-badge-chip-background: transparent !important;
+    --yt-spec-button-chip-background-hover: var(--matugen-btn-bg-hover) !important;
+    --yt-spec-touch-response: var(--matugen-btn-bg-hover) !important;
+    --yt-spec-filled-button-background: transparent !important;
+    --yt-spec-mono-filled-background: transparent !important;
+    --yt-spec-mono-filled-hover: var(--matugen-btn-bg-hover) !important;
+    --yt-spec-filled-button-text: var(--matugen-fg) !important;
+    --yt-spec-call-to-action-inverse: var(--matugen-accent) !important;
+    --yt-spec-suggested-action: var(--matugen-accent) !important;
+    --yt-spec-suggested-action-inverse: var(--matugen-pill-fg) !important;
+    --yt-spec-static-brand-white: var(--matugen-fg) !important;
+    --yt-spec-static-brand-black: var(--matugen-bg) !important;
+    --yt-spec-brand-icon-active: var(--matugen-accent) !important;
+    --yt-spec-brand-button-background: var(--matugen-accent) !important;
+    --yt-spec-brand-button-background-hover: var(--matugen-accent-bright) !important;
+    --yt-spec-brand-link-text: var(--matugen-accent) !important;
+    --yt-spec-wordmark-text: var(--matugen-fg) !important;
+    --yt-spec-10-percent-layer: transparent !important;
+    --yt-spec-selected-nav-text: var(--matugen-accent) !important;
+    --ytd-searchbox-text-color: var(--matugen-fg) !important;
+
+    /* Modern YouTube System Tokens */
+    --yt-sys-color-baseline--text-primary: var(--matugen-fg) !important;
+    --yt-sys-color-baseline--text-secondary: var(--matugen-fg-muted) !important;
+    --yt-sys-color-baseline--surface: var(--matugen-bg) !important;
+    --yt-sys-color-baseline--surface-raised: var(--matugen-bg-surface) !important;
+    --yt-sys-color-baseline--surface-variant: var(--matugen-bg-card) !important;
+    --yt-sys-color-baseline--tonal-surface: transparent !important;
+    --yt-sys-color-baseline--tonal-hover: var(--matugen-btn-bg-hover) !important;
+    --yt-sys-color-baseline--outline: transparent !important;
+    --yt-sys-color-outline: transparent !important;
+    --yt-sys-color-outline-variant: transparent !important;
+    --yt-sys-color-baseline--primary: var(--matugen-accent) !important;
+    --yt-sys-color-baseline--primary-hover: var(--matugen-accent-bright) !important;
+    --yt-sys-color-baseline--on-primary: var(--matugen-pill-fg) !important;
+    --yt-sys-color-on-surface: var(--matugen-fg) !important;
+    --yt-sys-color-on-surface-variant: var(--matugen-fg-muted) !important;
+    --yt-sys-color-on-surface-primary: var(--matugen-fg) !important;
+    --yt-sys-color-on-surface-secondary: var(--matugen-fg-muted) !important;
+
+    /* Global Icon & Masthead Tokens */
+    --iron-icon-fill-color: var(--matugen-fg) !important;
+    --iron-icon-stroke-color: var(--matugen-fg) !important;
+    --yt-icon-color: var(--matugen-fg) !important;
+    --ytd-masthead-text-color: var(--matugen-fg) !important;
+    --yt-spec-button-shape-next-text-color: var(--matugen-fg) !important;
+
     background-color: var(--matugen-bg) !important;
     color: var(--matugen-fg) !important;
   }
 
-  /* Masthead / Top Navigation Bar (Framed box from screenshot) */
+  /* Eliminate the 1px boxed outline stroke overlay on all YouTube buttons, chips and avatar */
+  .yt-spec-touch-feedback-shape__stroke,
+  yt-touch-feedback-shape .yt-spec-touch-feedback-shape__stroke,
+  .yt-spec-touch-feedback-shape {
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    display: none !important;
+  }
+
+  /* Masthead / Top Navigation Bar (Regular, Watch Page & Dark Shell) */
   #masthead-container,
-  ytd-masthead {
+  ytd-masthead,
+  ytd-masthead.dark,
+  ytd-masthead.shell.dark,
+  ytd-masthead.theater,
+  ytd-masthead[dark],
+  ytd-watch-flexy ytd-masthead,
+  ytd-watch-flexy #masthead {
     background-color: var(--matugen-bg-surface) !important;
+    background: var(--matugen-bg-surface) !important;
     border-bottom: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  /* YouTube Layout Sections & Feed Containers: 100% UNBOXED, ZERO BLACK BACKGROUNDS */
+  ytd-app,
+  ytd-browse,
+  ytd-page-manager,
+  #page-manager,
+  #primary,
+  #secondary,
+  #contents,
+  #contents.ytd-rich-grid-renderer,
+  #contents.ytd-section-list-renderer,
+  ytd-rich-grid-renderer,
+  ytd-rich-grid-row,
+  ytd-rich-item-renderer,
+  ytd-rich-section-renderer,
+  ytd-rich-shelf-renderer,
+  ytd-item-section-renderer,
+  ytd-section-list-renderer,
+  ytd-reel-shelf-renderer,
+  ytd-two-column-browse-results-renderer,
+  ytd-two-column-search-results-renderer,
+  ytd-feed-filter-chip-bar-renderer,
+  #chips-wrapper,
+  #chips-wrapper.ytd-feed-filter-chip-bar-renderer,
+  #header.ytd-rich-section-renderer,
+  #header.ytd-reel-shelf-renderer,
+  #title-container.ytd-reel-shelf-renderer,
+  #dismissible.ytd-video-renderer,
+  #dismissible.ytd-compact-video-renderer {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-color: transparent !important;
+  }
+
+  /* Guide hamburger button & Topbar Icons on ANY masthead */
+  #guide-button,
+  #guide-button yt-icon-button,
+  #guide-button button,
+  ytd-masthead #guide-button,
+  ytd-masthead #guide-button yt-icon-button,
+  ytd-masthead #guide-button button,
+  ytd-masthead.dark #guide-button button,
+  ytd-masthead[dark] #guide-button button {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    border-radius: 50% !important;
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  #guide-button:hover,
+  #guide-button button:hover,
+  ytd-masthead #guide-button:hover,
+  ytd-masthead #guide-button button:hover {
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    border-radius: 50% !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  #guide-button yt-icon,
+  #guide-button svg,
+  #guide-button path,
+  ytd-masthead #guide-button *,
+  ytd-masthead #guide-icon,
+  ytd-masthead.dark #guide-icon {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  /* YouTube Logo Wordmark on ANY masthead */
+  #logo-icon #youtube-paths path,
+  ytd-topbar-logo-renderer #youtube-paths path,
+  ytd-topbar-logo-renderer g#youtube-paths path,
+  ytd-masthead.dark svg#yt-logo-red-svg #youtube-red-paths path,
+  ytd-masthead.dark svg#yt-logo-red-updated-svg #youtube-paths path,
+  ytd-masthead.dark svg#yt-logo-updated-svg #youtube-paths path,
+  ytd-masthead.dark svg#yt-logo-svg #youtube-paths path,
+  ytd-masthead[dark] #youtube-paths path,
+  ytd-topbar-logo-renderer path.ytd-topbar-logo-renderer {
+    fill: var(--matugen-fg) !important;
+  }
+
+  ytd-topbar-logo-renderer #country-code {
+    color: var(--matugen-fg-muted) !important;
   }
 
   /* YouTube Search Bar (Both modern yt-searchbox & legacy ytd-searchbox) */
@@ -341,8 +1070,8 @@
 
   yt-searchbox .ytSearchboxComponentInputBox,
   ytd-searchbox #container.ytd-searchbox {
-    background-color: var(--matugen-bg-card) !important;
-    background: var(--matugen-bg-card) !important;
+    background-color: var(--matugen-input-bg) !important;
+    background: var(--matugen-input-bg) !important;
     border: 1px solid var(--matugen-border-subtle) !important;
     border-right: none !important;
     border-radius: 24px 0 0 24px !important;
@@ -375,26 +1104,31 @@
     outline: none !important;
   }
 
-  /* YouTube Search Button (Right magnifying glass area) */
+  /* YouTube Search Button (Right magnifying glass area): compact & transparent */
   yt-searchbox button.ytSearchboxComponentSearchButton,
   #search-icon-legacy.ytd-searchbox,
   ytd-searchbox #search-icon-legacy {
     appearance: none !important;
     -moz-appearance: none !important;
     -webkit-appearance: none !important;
-    background-color: var(--matugen-bg-surface) !important;
-    background: var(--matugen-bg-surface) !important;
+    background-color: transparent !important;
+    background: transparent !important;
     border: 1px solid var(--matugen-border-subtle) !important;
+    border-left: none !important;
     border-radius: 0 24px 24px 0 !important;
     box-shadow: none !important;
     color: var(--matugen-fg) !important;
     cursor: pointer !important;
+    height: 32px !important;
+    width: 38px !important;
+    min-width: 38px !important;
   }
 
   yt-searchbox button.ytSearchboxComponentSearchButton:hover,
   #search-icon-legacy.ytd-searchbox:hover,
   ytd-searchbox #search-icon-legacy:hover {
-    background-color: var(--matugen-bg-card-hover) !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
     border-color: var(--matugen-border) !important;
   }
 
@@ -420,22 +1154,51 @@
     fill: var(--matugen-fg-muted) !important;
   }
 
-  /* Voice Search Button */
+  /* Voice Search Button: compact clean borderless circle button */
   #voice-search-button,
   #voice-search-button yt-button-shape,
+  ytd-masthead #voice-search-button,
+  ytd-masthead #voice-search-button yt-button-shape {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
   #voice-search-button button,
   ytd-masthead #voice-search-button button,
-  yt-icon-button#search-button-narrow {
-    background-color: var(--matugen-bg-surface) !important;
-    border: 1px solid var(--matugen-border-subtle) !important;
+  yt-icon-button#search-button-narrow button {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: transparent !important;
+    background: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
     border-radius: 50% !important;
     color: var(--matugen-fg) !important;
+    box-shadow: none !important;
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    padding: 0 !important;
   }
 
   #voice-search-button button:hover,
-  ytd-masthead #voice-search-button button:hover {
-    background-color: var(--matugen-bg-card-hover) !important;
-    border-color: var(--matugen-border) !important;
+  ytd-masthead #voice-search-button button:hover,
+  yt-icon-button#search-button-narrow button:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    color: var(--matugen-fg-bright) !important;
+    border: none !important;
+    border-color: transparent !important;
   }
 
   #voice-search-button svg,
@@ -471,34 +1234,575 @@
     background-color: var(--matugen-bg-card-hover) !important;
   }
 
-  /* Category pills / filter chips ("All", "From A.MeloFi", "Lo-fi" in screenshot) */
-  yt-chip-cloud-chip-renderer {
+  /* Top Masthead "+ Create" Button on ANY masthead: Small & Transparent */
+  ytd-masthead yt-button-shape,
+  ytd-masthead yt-button-view-model,
+  ytd-masthead .yt-spec-button-shape-next {
+    background: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  ytd-masthead #end yt-button-shape button,
+  ytd-masthead #end yt-button-shape a,
+  ytd-masthead #buttons yt-button-shape button,
+  ytd-masthead #buttons yt-button-shape a,
+  ytd-masthead ytd-button-renderer yt-button-shape button,
+  ytd-masthead ytd-button-renderer yt-button-shape a,
+  ytd-masthead yt-button-view-model button,
+  ytd-masthead yt-button-view-model a {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: transparent !important;
+    background: transparent !important;
     border: 1px solid var(--matugen-border-subtle) !important;
-    border-radius: 16px !important;
-    background-color: var(--matugen-bg-card) !important;
-    color: var(--matugen-fg-muted) !important;
+    border-radius: 14px !important;
+    color: var(--matugen-fg) !important;
+    box-shadow: none !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    line-height: 26px !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease !important;
   }
 
-  yt-chip-cloud-chip-renderer[selected] {
+  ytd-masthead #end yt-button-shape button:hover,
+  ytd-masthead #end yt-button-shape a:hover,
+  ytd-masthead #buttons yt-button-shape button:hover,
+  ytd-masthead #buttons yt-button-shape a:hover,
+  ytd-masthead ytd-button-renderer yt-button-shape button:hover,
+  ytd-masthead ytd-button-renderer yt-button-shape a:hover,
+  ytd-masthead yt-button-view-model button:hover,
+  ytd-masthead yt-button-view-model a:hover,
+  ytd-masthead yt-button-shape button:hover,
+  ytd-masthead yt-button-shape a:hover,
+  ytd-masthead .yt-spec-button-shape-next--tonal:hover,
+  ytd-masthead .yt-spec-button-shape-next--mono:hover,
+  ytd-masthead .yt-spec-button-shape-next--outline:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Force ALL text, spans, icons, and SVG paths inside masthead buttons to theme foreground */
+  ytd-masthead #end yt-button-shape *,
+  ytd-masthead #buttons yt-button-shape *,
+  ytd-masthead ytd-button-renderer *,
+  ytd-masthead yt-button-view-model *,
+  ytd-masthead yt-button-shape *,
+  ytd-masthead .yt-spec-button-shape-next,
+  ytd-masthead .yt-spec-button-shape-next *,
+  ytd-masthead .yt-spec-button-shape-next__icon,
+  ytd-masthead .yt-spec-button-shape-next__icon *,
+  ytd-masthead .yt-spec-button-shape-next__button-text-content,
+  ytd-masthead .yt-spec-button-shape-next__button-text-content *,
+  ytd-masthead .yt-core-attributed-string {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  /* Top Masthead Notification Bell Button on ANY masthead */
+  ytd-masthead ytd-notification-topbar-button-renderer yt-icon-button,
+  ytd-masthead ytd-notification-topbar-button-renderer button,
+  ytd-masthead notification-topbar-button-view-model button,
+  ytd-notification-topbar-button-renderer yt-icon-button,
+  ytd-notification-topbar-button-renderer button,
+  notification-topbar-button-view-model button,
+  ytd-masthead ytd-notification-topbar-button-renderer,
+  ytd-masthead notification-topbar-button-view-model {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    border-radius: 50% !important;
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  ytd-masthead ytd-notification-topbar-button-renderer yt-icon-button:hover,
+  ytd-masthead ytd-notification-topbar-button-renderer button:hover,
+  ytd-masthead notification-topbar-button-view-model button:hover,
+  ytd-notification-topbar-button-renderer yt-icon-button:hover,
+  ytd-notification-topbar-button-renderer button:hover,
+  notification-topbar-button-view-model button:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    border-radius: 50% !important;
+  }
+
+  /* Notification count badge */
+  ytd-masthead ytd-notification-topbar-button-renderer .yt-spec-badge-shape__badge,
+  ytd-masthead notification-topbar-button-view-model .yt-spec-badge-shape__badge,
+  ytd-notification-topbar-button-renderer #notification-count {
     background-color: var(--matugen-accent) !important;
-    border-color: var(--matugen-accent) !important;
     color: var(--matugen-pill-fg) !important;
-    font-weight: bold !important;
   }
 
-  /* Video player container framed */
+  /* User Profile Avatar: Clean circular image with zero button boxing */
+  #avatar-btn,
+  #avatar-btn button,
+  ytd-topbar-menu-button-renderer,
+  ytd-topbar-menu-button-renderer #avatar-btn,
+  ytd-topbar-menu-button-renderer button {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+  }
+
+  #avatar-btn yt-img-shadow,
+  #avatar-btn img {
+    border: none !important;
+    border-color: transparent !important;
+    border-radius: 50% !important;
+    box-shadow: none !important;
+  }
+
+  /* General YouTube Call-To-Action Primary Buttons: Compact Small Size */
+  .yt-spec-button-shape-next--call-to-action.yt-spec-button-shape-next--filled {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-accent) !important;
+    background: var(--matugen-accent) !important;
+    color: var(--matugen-pill-fg) !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 12px !important;
+    font-size: 12px !important;
+    line-height: 26px !important;
+    border-radius: 14px !important;
+  }
+
+  .yt-spec-button-shape-next--call-to-action.yt-spec-button-shape-next--filled:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-accent-bright) !important;
+    background: var(--matugen-accent-bright) !important;
+    color: var(--matugen-pill-fg) !important;
+  }
+
+  .yt-spec-button-shape-next--call-to-action.yt-spec-button-shape-next--filled *,
+  .yt-spec-button-shape-next--call-to-action.yt-spec-button-shape-next--filled yt-icon,
+  .yt-spec-button-shape-next--call-to-action.yt-spec-button-shape-next--filled svg,
+  .yt-spec-button-shape-next--call-to-action.yt-spec-button-shape-next--filled path,
+  .yt-spec-button-shape-next--call-to-action.yt-spec-button-shape-next--filled .yt-core-attributed-string {
+    color: var(--matugen-pill-fg) !important;
+    fill: var(--matugen-pill-fg) !important;
+  }
+
+  /* General YouTube Tonal, Mono, Filled & Outline Buttons: Small, Compact, Borderless & 100% Transparent at rest */
+  .yt-spec-button-shape-next--tonal,
+  .yt-spec-button-shape-next--mono,
+  .yt-spec-button-shape-next--filled,
+  .yt-spec-button-shape-next--filled.yt-spec-button-shape-next--mono,
+  .yt-spec-button-shape-next--outline,
+  .yt-spec-button-shape-next--text,
+  ytd-button-renderer yt-button-shape button,
+  yt-button-shape button,
+  yt-button-view-model button {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: transparent !important;
+    background: transparent !important;
+    color: var(--matugen-fg) !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    line-height: 26px !important;
+    border-radius: 14px !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease !important;
+  }
+
+  /* CRITICAL: YouTube video metadata, channel names, bylines and badges must NEVER have background colors or boxes */
+  ytd-channel-name,
+  ytd-channel-name *,
+  #channel-name,
+  #channel-name *,
+  #byline-container,
+  #byline-container *,
+  #attributed-channel-name,
+  #attributed-channel-name *,
+  ytd-video-meta-block,
+  ytd-video-meta-block *,
+  #metadata-line,
+  #metadata-line *,
+  ytd-badge-supported-renderer,
+  ytd-badge-supported-renderer *,
+  badge-shape,
+  badge-shape *,
+  .badge-shape,
+  .badge-shape * {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  ytd-channel-name a,
+  #channel-name a,
+  #byline-container a,
+  #attributed-channel-name a,
+  ytd-channel-name yt-formatted-string,
+  #channel-name yt-formatted-string,
+  #text.ytd-channel-name {
+    color: var(--matugen-fg-muted) !important;
+    text-decoration: none !important;
+  }
+
+  ytd-channel-name a:hover,
+  #channel-name a:hover {
+    color: var(--matugen-fg) !important;
+    text-decoration: underline !important;
+  }
+
+  .yt-spec-button-shape-next--tonal:hover,
+  .yt-spec-button-shape-next--mono.yt-spec-button-shape-next--tonal:hover,
+  .yt-spec-button-shape-next--outline:hover,
+  .yt-spec-button-shape-next--text:hover,
+  ytd-button-renderer yt-button-shape button:hover,
+  yt-button-shape button:hover,
+  yt-button-view-model button:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    color: var(--matugen-fg-bright) !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .yt-spec-button-shape-next--tonal *,
+  .yt-spec-button-shape-next--mono.yt-spec-button-shape-next--tonal *,
+  .yt-spec-button-shape-next--outline *,
+  .yt-spec-button-shape-next--text *,
+  .yt-spec-button-shape-next__button-text-content,
+  .yt-spec-button-shape-next__button-text-content *,
+  .yt-spec-button-shape-next__icon,
+  .yt-spec-button-shape-next__icon * {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  /* ALL YouTube Action, Menu & 3-Dot Buttons across Video Cards, Feed, and Shelves: 100% TRANSPARENT AT REST */
+  ytd-menu-renderer,
+  ytd-menu-renderer yt-icon-button,
+  ytd-menu-renderer yt-icon-button button,
+  ytd-menu-renderer button,
+  ytd-rich-grid-media ytd-menu-renderer,
+  ytd-rich-grid-media ytd-menu-renderer yt-icon-button,
+  ytd-rich-grid-media ytd-menu-renderer button,
+  ytd-rich-item-renderer ytd-menu-renderer,
+  ytd-rich-item-renderer ytd-menu-renderer yt-icon-button,
+  ytd-rich-item-renderer ytd-menu-renderer button,
+  ytd-video-renderer ytd-menu-renderer,
+  ytd-video-renderer ytd-menu-renderer yt-icon-button,
+  ytd-video-renderer ytd-menu-renderer button,
+  ytd-grid-video-renderer ytd-menu-renderer,
+  ytd-grid-video-renderer ytd-menu-renderer yt-icon-button,
+  ytd-grid-video-renderer ytd-menu-renderer button,
+  ytd-compact-video-renderer ytd-menu-renderer,
+  ytd-compact-video-renderer ytd-menu-renderer yt-icon-button,
+  ytd-compact-video-renderer ytd-menu-renderer button,
+  ytd-reel-shelf-renderer yt-icon-button,
+  ytd-reel-shelf-renderer button,
+  ytd-rich-shelf-renderer yt-icon-button,
+  ytd-rich-shelf-renderer button,
+  yt-icon-button,
+  yt-icon-button button,
+  button[aria-label="Action menu"],
+  button[aria-label*="Action menu" i],
+  button[aria-label*="More actions" i] {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    border-radius: 50% !important;
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  ytd-menu-renderer yt-icon-button:hover,
+  ytd-menu-renderer button:hover,
+  ytd-rich-grid-media ytd-menu-renderer yt-icon-button:hover,
+  ytd-rich-grid-media ytd-menu-renderer button:hover,
+  ytd-rich-item-renderer ytd-menu-renderer yt-icon-button:hover,
+  ytd-rich-item-renderer ytd-menu-renderer button:hover,
+  ytd-video-renderer ytd-menu-renderer yt-icon-button:hover,
+  ytd-video-renderer ytd-menu-renderer button:hover,
+  ytd-reel-shelf-renderer yt-icon-button:hover,
+  ytd-reel-shelf-renderer button:hover,
+  ytd-rich-shelf-renderer yt-icon-button:hover,
+  ytd-rich-shelf-renderer button:hover,
+  yt-icon-button:hover,
+  yt-icon-button button:hover,
+  button[aria-label="Action menu"]:hover,
+  button[aria-label*="Action menu" i]:hover,
+  button[aria-label*="More actions" i]:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    border-radius: 50% !important;
+    color: var(--matugen-fg-bright) !important;
+    fill: var(--matugen-fg-bright) !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  ytd-masthead yt-icon-button *,
+  ytd-masthead yt-icon:not(#logo-icon),
+  ytd-masthead yt-icon:not(#logo-icon) *,
+  ytd-masthead #end yt-icon,
+  ytd-masthead #end yt-icon *,
+  ytd-masthead #end svg,
+  ytd-masthead #end path,
+  ytd-masthead #buttons yt-icon,
+  ytd-masthead #buttons yt-icon *,
+  ytd-masthead #buttons svg,
+  ytd-masthead #buttons path,
+  ytd-masthead .yt-icons-ext,
+  yt-icon-button * {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  /* YouTube Chip Bar Container & Scroller: 100% TRANSPARENT, NO BLACK BARS */
+  ytd-feed-filter-chip-bar-renderer,
+  #chips-wrapper.ytd-feed-filter-chip-bar-renderer,
+  #chips-wrapper,
+  #chips.yt-chip-cloud-renderer,
+  #chips,
+  yt-chip-cloud-renderer,
+  iron-selector#chips {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* YouTube Category Pills / Filter Chips: Clean single-pill geometry with ZERO concentric nested borders */
+  yt-chip-cloud-chip-renderer,
+  yt-chip-cloud-chip-renderer *,
+  yt-chip-cloud-chip-renderer #chip,
+  yt-chip-cloud-chip-renderer #chip-container,
+  yt-chip-cloud-chip-renderer .chip-container,
+  yt-chip-cloud-chip-renderer yt-button-shape,
+  [chip-style*="STYLE_"],
+  [chip-style*="STYLE_"] * {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  /* Single clickable button element inside chip: small, compact, clean */
+  yt-chip-cloud-chip-renderer button,
+  yt-chip-cloud-chip-renderer yt-button-shape button {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    line-height: 26px !important;
+    padding: 0 12px !important;
+    border-radius: 14px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  /* Unselected chip: 100% transparent resting state with subtle border */
+  yt-chip-cloud-chip-renderer:not([selected]):not(.iron-selected):not([aria-selected="true"]) button,
+  yt-chip-cloud-chip-renderer:not([selected]):not(.iron-selected):not([aria-selected="true"]) yt-button-shape button,
+  yt-chip-cloud-chip-renderer:not(:has(button)):not([selected]):not(.iron-selected):not([aria-selected="true"]) #chip {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  yt-chip-cloud-chip-renderer:not([selected]):not(.iron-selected):not([aria-selected="true"]) button:hover,
+  yt-chip-cloud-chip-renderer:not([selected]):not(.iron-selected):not([aria-selected="true"]) yt-button-shape button:hover,
+  yt-chip-cloud-chip-renderer:not(:has(button)):not([selected]):not(.iron-selected):not([aria-selected="true"]) #chip:hover {
+    background: var(--matugen-btn-bg-hover) !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    border-color: var(--matugen-border) !important;
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  yt-chip-cloud-chip-renderer:not([selected]):not(.iron-selected):not([aria-selected="true"]) yt-formatted-string,
+  yt-chip-cloud-chip-renderer:not([selected]):not(.iron-selected):not([aria-selected="true"]) span,
+  yt-chip-cloud-chip-renderer:not([selected]):not(.iron-selected):not([aria-selected="true"]) .yt-core-attributed-string {
+    color: var(--matugen-fg) !important;
+    font-size: 12px !important;
+    line-height: 26px !important;
+  }
+
+  /* Selected chip ("All"): Clean single accent pill */
+  yt-chip-cloud-chip-renderer[selected] button,
+  yt-chip-cloud-chip-renderer.iron-selected button,
+  yt-chip-cloud-chip-renderer[aria-selected="true"] button,
+  yt-chip-cloud-chip-renderer[selected] yt-button-shape button,
+  yt-chip-cloud-chip-renderer.iron-selected yt-button-shape button,
+  yt-chip-cloud-chip-renderer[aria-selected="true"] yt-button-shape button,
+  yt-chip-cloud-chip-renderer:not(:has(button))[selected] #chip,
+  yt-chip-cloud-chip-renderer:not(:has(button)).iron-selected #chip,
+  yt-chip-cloud-chip-renderer:not(:has(button))[aria-selected="true"] #chip {
+    background: var(--matugen-accent) !important;
+    background-color: var(--matugen-accent) !important;
+    border: 1px solid var(--matugen-accent) !important;
+    color: var(--matugen-pill-fg) !important;
+    font-weight: 600 !important;
+  }
+
+  yt-chip-cloud-chip-renderer[selected] button:hover,
+  yt-chip-cloud-chip-renderer.iron-selected button:hover,
+  yt-chip-cloud-chip-renderer[aria-selected="true"] button:hover,
+  yt-chip-cloud-chip-renderer:not(:has(button))[selected] #chip:hover {
+    background: var(--matugen-accent-bright) !important;
+    background-color: var(--matugen-accent-bright) !important;
+    border-color: var(--matugen-accent-bright) !important;
+  }
+
+  yt-chip-cloud-chip-renderer[selected] yt-formatted-string,
+  yt-chip-cloud-chip-renderer[selected] span,
+  yt-chip-cloud-chip-renderer[selected] .yt-core-attributed-string {
+    color: var(--matugen-pill-fg) !important;
+    font-size: 12px !important;
+    line-height: 26px !important;
+  }
+
+  /* Left/Right scroll navigation buttons on filter chips: Compact & Transparent */
+  yt-chip-cloud-renderer #right-arrow-button,
+  yt-chip-cloud-renderer #left-arrow-button,
+  yt-chip-cloud-renderer #right-arrow-button button,
+  yt-chip-cloud-renderer #left-arrow-button button,
+  yt-chip-cloud-renderer #right-arrow-button yt-icon-button,
+  yt-chip-cloud-renderer #left-arrow-button yt-icon-button,
+  yt-chip-cloud-renderer yt-icon-button,
+  #right-arrow.ytd-feed-filter-chip-bar-renderer,
+  #left-arrow.ytd-feed-filter-chip-bar-renderer,
+  #right-arrow,
+  #left-arrow {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: transparent !important;
+    background: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    border-radius: 50% !important;
+    box-shadow: none !important;
+    color: var(--matugen-fg) !important;
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+    min-height: 26px !important;
+  }
+
+  yt-chip-cloud-renderer #right-arrow-button:hover,
+  yt-chip-cloud-renderer #left-arrow-button:hover,
+  yt-chip-cloud-renderer #right-arrow-button button:hover,
+  yt-chip-cloud-renderer #left-arrow-button button:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    color: var(--matugen-fg-bright) !important;
+    border: none !important;
+  }
+
+  yt-chip-cloud-renderer #right-arrow-button yt-icon,
+  yt-chip-cloud-renderer #left-arrow-button yt-icon,
+  yt-chip-cloud-renderer #right-arrow-button svg,
+  yt-chip-cloud-renderer #left-arrow-button svg {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  /* Video player container - Clean sharp rectangular geometry (no rounded corners or framing borders) */
   #player-container-outer,
   #player-container,
-  ytd-watch-flexy #player {
-    border-radius: 10px !important;
+  #player-container-inner,
+  #player-wrap,
+  #player,
+  #ytd-player,
+  ytd-watch-flexy #player,
+  ytd-watch-flexy #player-container,
+  ytd-watch-flexy #player-container-outer,
+  ytd-watch-flexy #player-container-inner,
+  ytd-watch-flexy #ytd-player,
+  ytd-watch-flexy #player-theater-container,
+  ytd-watch-flexy #full-bleed-container,
+  .html5-video-player,
+  .html5-main-video,
+  video,
+  video.video-stream,
+  #movie_player,
+  .ytp-cued-thumbnail-overlay,
+  .ytp-cued-thumbnail-overlay-image {
+    border-radius: 0 !important;
+    border: none !important;
   }
 
-  .html5-video-player {
-    border-radius: 10px !important;
-    border: 1px solid var(--matugen-border-subtle) !important;
-  }
-
-  /* Secondary / Recommended video sidebar (clean and transparent, no dark shade) */
+  /* Secondary / Recommended video sidebar */
   #secondary.ytd-watch-flexy {
     border: none !important;
     padding: 0 !important;
@@ -510,17 +1814,537 @@
   ytd-compact-video-renderer #thumbnail {
     border-radius: 8px !important;
     overflow: hidden !important;
-    border: 1px solid var(--matugen-border-subtle) !important;
+    border: none !important;
   }
 
-  /* Buttons & Badges */
-  ytd-button-renderer yt-button-shape button {
+  /* ==========================================================================
+     Action Bar Buttons (Like/Dislike, Share, Ask, Download, Clip, More): Compact Small & Transparent
+     ========================================================================== */
+  ytd-watch-metadata #actions yt-button-shape button,
+  ytd-watch-metadata #actions yt-button-view-model button,
+  #actions.ytd-watch-metadata yt-button-shape button,
+  #top-level-buttons-computed yt-button-shape button,
+  ytd-watch-metadata ytd-menu-renderer yt-button-shape button,
+  ytd-watch-metadata ytd-menu-renderer yt-icon-button button,
+  ytd-segmented-like-dislike-button-renderer yt-button-shape button,
+  segmented-like-dislike-button-view-model yt-button-shape button,
+  like-button-view-model yt-button-shape button,
+  dislike-button-view-model yt-button-shape button,
+  ytd-download-button-renderer yt-button-shape button {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: transparent !important;
+    background: transparent !important;
     border: 1px solid var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg) !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    line-height: 26px !important;
+    border-radius: 14px !important;
+    box-shadow: none !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease !important;
+  }
+
+  ytd-watch-metadata #actions yt-button-shape button:hover,
+  ytd-watch-metadata #actions yt-button-view-model button:hover,
+  #actions.ytd-watch-metadata yt-button-shape button:hover,
+  #top-level-buttons-computed yt-button-shape button:hover,
+  ytd-watch-metadata ytd-menu-renderer yt-button-shape button:hover,
+  ytd-watch-metadata ytd-menu-renderer yt-icon-button button:hover,
+  ytd-segmented-like-dislike-button-renderer yt-button-shape button:hover,
+  segmented-like-dislike-button-view-model yt-button-shape button:hover,
+  like-button-view-model yt-button-shape button:hover,
+  dislike-button-view-model yt-button-shape button:hover,
+  ytd-download-button-renderer yt-button-shape button:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    border-color: var(--matugen-border) !important;
+    color: var(--matugen-fg-bright) !important;
+    box-shadow: none !important;
+  }
+
+  /* Segmented Like/Dislike Divider & Pill Radius */
+  ytd-segmented-like-dislike-button-renderer yt-button-shape:first-child button,
+  segmented-like-dislike-button-view-model like-button-view-model yt-button-shape button {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-right: none !important;
+  }
+  ytd-segmented-like-dislike-button-renderer yt-button-shape:last-child button,
+  segmented-like-dislike-button-view-model dislike-button-view-model yt-button-shape button {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+  }
+  .yt-spec-button-shape-next__segmented-buttons-divider {
+    background-color: var(--matugen-border-subtle) !important;
+  }
+
+  /* Content inside Action Buttons (text, icons, SVGs) */
+  ytd-watch-metadata #actions yt-icon,
+  ytd-watch-metadata #actions svg,
+  ytd-watch-metadata #actions path,
+  ytd-watch-metadata #actions .yt-core-attributed-string,
+  ytd-segmented-like-dislike-button-renderer yt-icon,
+  ytd-segmented-like-dislike-button-renderer svg,
+  ytd-segmented-like-dislike-button-renderer path,
+  ytd-segmented-like-dislike-button-renderer .yt-core-attributed-string,
+  segmented-like-dislike-button-view-model yt-icon,
+  segmented-like-dislike-button-view-model svg,
+  segmented-like-dislike-button-view-model path,
+  segmented-like-dislike-button-view-model .yt-core-attributed-string,
+  like-button-view-model *,
+  dislike-button-view-model *,
+  ytd-download-button-renderer *,
+  yt-button-view-model * {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  /* ==========================================================================
+     Subscribe & Membership Buttons: Compact Small Size
+     ========================================================================== */
+
+  /* Subscribe button - Unsubscribed: Compact Filled Accent Pill */
+  ytd-subscribe-button-renderer yt-button-shape button.yt-spec-button-shape-next--filled,
+  ytd-subscribe-button-renderer button[aria-label^="Subscribe" i],
+  ytd-subscribe-button-renderer button[aria-label="Subscribe"],
+  subscribe-button-view-model button.yt-spec-button-shape-next--filled {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-accent) !important;
+    background: var(--matugen-accent) !important;
+    color: var(--matugen-pill-fg) !important;
+    border: none !important;
+    border-color: transparent !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 12px !important;
+    font-size: 12px !important;
+    line-height: 26px !important;
+    border-radius: 14px !important;
+    font-weight: 600 !important;
+  }
+
+  ytd-subscribe-button-renderer yt-button-shape button.yt-spec-button-shape-next--filled:hover,
+  ytd-subscribe-button-renderer button[aria-label^="Subscribe" i]:hover,
+  subscribe-button-view-model button.yt-spec-button-shape-next--filled:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-accent-bright) !important;
+    background: var(--matugen-accent-bright) !important;
+    border: none !important;
+    border-color: transparent !important;
+    color: var(--matugen-pill-fg) !important;
+  }
+
+  ytd-subscribe-button-renderer yt-button-shape button.yt-spec-button-shape-next--filled *,
+  ytd-subscribe-button-renderer button[aria-label^="Subscribe" i] *,
+  subscribe-button-view-model button.yt-spec-button-shape-next--filled * {
+    color: var(--matugen-pill-fg) !important;
+    fill: var(--matugen-pill-fg) !important;
+  }
+
+  /* Subscribed button (Bell + Status Dropdown): Compact Small & Transparent */
+  ytd-subscribe-button-renderer yt-button-shape button.yt-spec-button-shape-next--tonal,
+  ytd-subscribe-button-renderer button[aria-label*="subscribed" i],
+  ytd-subscribe-button-renderer button[aria-label*="notification" i],
+  subscribe-button-view-model button.yt-spec-button-shape-next--tonal {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: transparent !important;
+    background: transparent !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg) !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    line-height: 26px !important;
+    border-radius: 14px !important;
+  }
+
+  ytd-subscribe-button-renderer yt-button-shape button.yt-spec-button-shape-next--tonal:hover,
+  subscribe-button-view-model button.yt-spec-button-shape-next--tonal:hover {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    border: none !important;
+    border-color: transparent !important;
+  }
+
+  ytd-subscribe-button-renderer yt-button-shape button.yt-spec-button-shape-next--tonal *,
+  subscribe-button-view-model button.yt-spec-button-shape-next--tonal * {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  /* Channel Join / Sponsor Button: Compact & Transparent */
+  ytd-button-renderer.ytd-channel-legal-payment-button-renderer yt-button-shape button,
+  #sponsor-button yt-button-shape button {
+    background-color: transparent !important;
+    background: transparent !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    color: var(--matugen-accent) !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    line-height: 26px !important;
+    border-radius: 14px !important;
+  }
+
+  /* ==========================================================================
+     Video Description Box, Next Video Card, Comments & Navigation
+     ========================================================================== */
+
+  /* Video Description Box: Soft background, unboxed */
+  #description.ytd-watch-metadata,
+  #description-inner.ytd-watch-metadata,
+  ytd-text-inline-expander#description {
+    background-color: var(--matugen-btn-bg) !important;
+    border: none !important;
+    border-color: transparent !important;
+    border-radius: 12px !important;
+    color: var(--matugen-fg) !important;
+    transition: background-color 0.15s ease !important;
+  }
+
+  #description.ytd-watch-metadata:hover {
+    background-color: var(--matugen-btn-bg-hover) !important;
+    border: none !important;
+    border-color: transparent !important;
+  }
+
+  #description.ytd-watch-metadata * {
+    color: var(--matugen-fg) !important;
+  }
+
+  #description.ytd-watch-metadata a {
+    color: var(--matugen-accent) !important;
+  }
+
+  /* ==========================================================================
+     YouTube Playlist Panel (Watch Page & Mini Playlists)
+     Complete dynamic theming for playlist container, header, controls & rows
+     ========================================================================== */
+
+  /* Outer Playlist Panel Container */
+  ytd-playlist-panel-renderer,
+  ytd-playlist-panel-renderer #container,
+  ytd-playlist-panel-renderer[collapsible] #container,
+  #panels.ytd-watch-flexy ytd-playlist-panel-renderer,
+  #panels.ytd-watch-flexy ytd-playlist-panel-renderer #container,
+  ytd-engagement-panel-section-list-renderer[target-id*="playlist"],
+  ytd-engagement-panel-section-list-renderer[target-id*="playlist"] #content {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+  }
+
+  /* Playlist Header */
+  ytd-playlist-panel-renderer #header,
+  ytd-playlist-panel-renderer .header,
+  ytd-playlist-panel-renderer #header-contents,
+  ytd-playlist-panel-renderer #header-container,
+  ytd-engagement-panel-section-list-renderer[target-id*="playlist"] #header,
+  ytd-engagement-panel-title-header-renderer {
+    background-color: var(--matugen-bg-surface) !important;
+    background: var(--matugen-bg-surface) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* Playlist Header Title & Metadata */
+  ytd-playlist-panel-renderer #header .title,
+  ytd-playlist-panel-renderer #header h3,
+  ytd-playlist-panel-renderer #header a,
+  ytd-playlist-panel-renderer #header yt-formatted-string,
+  ytd-playlist-panel-renderer .title-container *,
+  ytd-engagement-panel-title-header-renderer #title {
+    color: var(--matugen-fg) !important;
+  }
+
+  ytd-playlist-panel-renderer #header a:hover {
+    color: var(--matugen-accent) !important;
+  }
+
+  ytd-playlist-panel-renderer #publisher-container,
+  ytd-playlist-panel-renderer #publisher-container *,
+  ytd-playlist-panel-renderer #byline-container,
+  ytd-playlist-panel-renderer #byline-container *,
+  ytd-playlist-panel-renderer .badge-and-byline *,
+  ytd-playlist-panel-renderer #header-description,
+  ytd-playlist-panel-renderer #header-description * {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  /* Playlist Header Buttons (Loop, Shuffle, Close, 3 Dots) */
+  ytd-playlist-panel-renderer #playlist-actions yt-icon-button,
+  ytd-playlist-panel-renderer #playlist-actions button,
+  ytd-playlist-panel-renderer #playlist-action-menu yt-icon-button,
+  ytd-playlist-panel-renderer #playlist-action-menu button,
+  ytd-playlist-panel-renderer #header-actions yt-icon-button,
+  ytd-playlist-panel-renderer #header-actions button,
+  ytd-playlist-panel-renderer yt-icon-button[aria-label*="close" i],
+  ytd-playlist-panel-renderer button[aria-label*="close" i],
+  ytd-playlist-panel-renderer #top-level-buttons-computed yt-icon-button,
+  ytd-playlist-panel-renderer #top-level-buttons-computed button {
+    background-color: transparent !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 8px !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  ytd-playlist-panel-renderer #playlist-actions yt-icon-button:hover,
+  ytd-playlist-panel-renderer #playlist-actions button:hover,
+  ytd-playlist-panel-renderer #playlist-action-menu yt-icon-button:hover,
+  ytd-playlist-panel-renderer #playlist-action-menu button:hover,
+  ytd-playlist-panel-renderer #header-actions yt-icon-button:hover,
+  ytd-playlist-panel-renderer #header-actions button:hover {
+    background-color: var(--matugen-btn-bg-hover) !important;
+    border-color: var(--matugen-border-subtle) !important;
+  }
+
+  /* Header Button Icons */
+  ytd-playlist-panel-renderer #header yt-icon,
+  ytd-playlist-panel-renderer #header svg,
+  ytd-playlist-panel-renderer #header path,
+  ytd-playlist-panel-renderer #playlist-actions yt-icon,
+  ytd-playlist-panel-renderer #playlist-actions svg,
+  ytd-playlist-panel-renderer #playlist-actions path,
+  ytd-playlist-panel-renderer #header-actions yt-icon,
+  ytd-playlist-panel-renderer #header-actions svg,
+  ytd-playlist-panel-renderer #header-actions path {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  /* Active / Toggled Loop or Shuffle Button */
+  ytd-playlist-panel-renderer #playlist-actions yt-icon-button[aria-pressed="true"],
+  ytd-playlist-panel-renderer #playlist-actions yt-icon-button.yt-spec-icon-button--toggled,
+  ytd-playlist-panel-renderer #top-level-buttons-computed ytd-toggle-button-renderer[is-icon-button][aria-pressed="true"],
+  ytd-playlist-panel-renderer [aria-pressed="true"] {
+    background-color: var(--matugen-btn-bg-hover) !important;
+    border: 1px solid var(--matugen-accent) !important;
     border-radius: 8px !important;
   }
 
-  ytd-button-renderer yt-button-shape button:hover {
-    border-color: var(--matugen-border-highlight) !important;
+  ytd-playlist-panel-renderer #playlist-actions yt-icon-button[aria-pressed="true"] yt-icon,
+  ytd-playlist-panel-renderer #playlist-actions yt-icon-button[aria-pressed="true"] svg,
+  ytd-playlist-panel-renderer #playlist-actions yt-icon-button[aria-pressed="true"] path,
+  ytd-playlist-panel-renderer [aria-pressed="true"] yt-icon,
+  ytd-playlist-panel-renderer [aria-pressed="true"] svg,
+  ytd-playlist-panel-renderer [aria-pressed="true"] path {
+    color: var(--matugen-accent) !important;
+    fill: var(--matugen-accent) !important;
+  }
+
+  /* Playlist Video Items Container */
+  ytd-playlist-panel-renderer #items,
+  ytd-playlist-panel-renderer .playlist-items,
+  ytd-playlist-panel-renderer #playlist-items,
+  ytd-watch-next-secondary-results-renderer #items {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+  }
+
+  /* Playlist Individual Video Items (Unselected rows) */
+  ytd-playlist-panel-video-renderer,
+  ytd-playlist-panel-video-renderer #wc-endpoint,
+  ytd-playlist-panel-video-renderer #container,
+  ytd-playlist-panel-video-renderer a {
+    background-color: var(--matugen-bg-card) !important;
+    background: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+    transition: background-color 0.15s ease !important;
+  }
+
+  /* Hovered Video Row */
+  ytd-playlist-panel-video-renderer:hover,
+  ytd-playlist-panel-video-renderer:hover #wc-endpoint,
+  ytd-playlist-panel-video-renderer:hover #container,
+  ytd-playlist-panel-video-renderer:hover a {
+    background-color: var(--matugen-bg-card-hover) !important;
+    background: var(--matugen-bg-card-hover) !important;
+  }
+
+  /* Selected / Currently Playing Video Row */
+  ytd-playlist-panel-video-renderer[selected],
+  ytd-playlist-panel-video-renderer[selected] #wc-endpoint,
+  ytd-playlist-panel-video-renderer[selected] #container,
+  ytd-playlist-panel-video-renderer[selected] a {
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+  }
+
+  /* Video Item Typography */
+  ytd-playlist-panel-video-renderer #video-title {
+    color: var(--matugen-fg) !important;
+  }
+
+  ytd-playlist-panel-video-renderer #index {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  ytd-playlist-panel-video-renderer #byline-container,
+  ytd-playlist-panel-video-renderer #byline,
+  ytd-playlist-panel-video-renderer yt-formatted-string.byline-item,
+  ytd-playlist-panel-video-renderer #byline-container * {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  /* Playing Triangle / Indicator Icon */
+  ytd-playlist-panel-video-renderer #index yt-icon,
+  ytd-playlist-panel-video-renderer #thumbnail-container yt-icon,
+  ytd-playlist-panel-video-renderer yt-icon[icon*="play" i] {
+    color: var(--matugen-accent) !important;
+    fill: var(--matugen-accent) !important;
+  }
+
+  /* Video Thumbnail in Playlist */
+  ytd-playlist-panel-video-renderer #thumbnail-container,
+  ytd-playlist-panel-video-renderer ytd-thumbnail {
+    border-radius: 6px !important;
+    overflow: hidden !important;
+    border: none !important;
+  }
+
+  /* Video Progress Bar in Playlist */
+  ytd-playlist-panel-video-renderer ytd-thumbnail-overlay-resume-playback-renderer #progress {
+    background-color: var(--matugen-accent) !important;
+  }
+
+  /* Collapsed Playlist Header Bar */
+  ytd-playlist-panel-renderer[collapsed] #container {
+    background-color: var(--matugen-bg-surface) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  /* Full Playlist Page items (youtube.com/playlist?list=...) */
+  ytd-playlist-video-renderer,
+  ytd-playlist-video-renderer #content {
+    background-color: var(--matugen-bg-card) !important;
+    color: var(--matugen-fg) !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  ytd-playlist-video-renderer:hover {
+    background-color: var(--matugen-bg-card-hover) !important;
+  }
+
+  /* Comments section */
+  ytd-commentbox #placeholder-area,
+  ytd-commentbox #simplebox-placeholder {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  ytd-commentbox #contenteditable-root,
+  ytd-commentbox [contenteditable="true"],
+  ytd-commentbox #main {
+    background-color: transparent !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  ytd-comment-thread-renderer #content-text,
+  ytd-comment-renderer #content-text {
+    color: var(--matugen-fg) !important;
+  }
+
+  ytd-comment-renderer #author-text span {
+    color: var(--matugen-fg-bright) !important;
+  }
+
+  ytd-comment-renderer #published-time-text a {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  ytd-comment-renderer #vote-count-middle {
+    color: var(--matugen-fg-muted) !important;
+  }
+
+  /* Left Sidebar / Guide Drawer */
+  ytd-guide-renderer,
+  ytd-mini-guide-renderer,
+  #guide-content.ytd-app {
+    background-color: var(--matugen-bg-surface) !important;
+    border-right: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  ytd-guide-entry-renderer,
+  ytd-mini-guide-entry-renderer {
+    color: var(--matugen-fg) !important;
+  }
+
+  ytd-guide-entry-renderer:hover,
+  ytd-mini-guide-entry-renderer:hover {
+    background-color: var(--matugen-bg-card-hover) !important;
+    border-radius: 10px !important;
+  }
+
+  ytd-guide-entry-renderer[is-primary] yt-icon,
+  ytd-guide-entry-renderer yt-icon,
+  ytd-mini-guide-entry-renderer yt-icon {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
+  }
+
+  ytd-guide-entry-renderer[active] {
+    background-color: var(--matugen-btn-bg) !important;
+    color: var(--matugen-accent) !important;
+  }
+
+  ytd-guide-entry-renderer[active] yt-icon,
+  ytd-guide-entry-renderer[active] yt-formatted-string {
+    color: var(--matugen-accent) !important;
+    fill: var(--matugen-accent) !important;
+  }
+
+  /* Popup menus (3 dots menu, profile menu, etc.) */
+  ytd-menu-popup-renderer,
+  tp-yt-paper-listbox,
+  tp-yt-iron-dropdown {
+    background-color: var(--matugen-bg-card) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  ytd-menu-service-item-renderer,
+  ytd-menu-navigation-item-renderer,
+  tp-yt-paper-item {
+    color: var(--matugen-fg) !important;
+  }
+
+  ytd-menu-service-item-renderer:hover,
+  ytd-menu-navigation-item-renderer:hover,
+  tp-yt-paper-item:hover {
+    background-color: var(--matugen-bg-card-hover) !important;
+  }
+
+  ytd-menu-service-item-renderer yt-icon,
+  ytd-menu-navigation-item-renderer yt-icon {
+    color: var(--matugen-fg) !important;
+    fill: var(--matugen-fg) !important;
   }
 
   /* ==========================================================================
@@ -590,7 +2414,8 @@
   yt-live-chat-header-renderer #viewer-leaderboard-entry-point yt-button-shape button,
   yt-live-chat-header-renderer #viewer-leaderboard-entry-point button {
     background-color: var(--matugen-btn-bg) !important;
-    border: 1px solid var(--matugen-border-subtle) !important;
+    border: none !important;
+    border-color: transparent !important;
     border-radius: 16px !important;
     color: var(--matugen-fg) !important;
   }
@@ -788,6 +2613,8 @@
 
 /* ==========================================================================
    GitHub - Polished Omarchy Theme Integration
+   Framing applied ONLY to macro structural layout (Header, Sidebar, Main prompt input)
+   Buttons and small sections remain unboxed, natural, and seamless
    ========================================================================== */
 @-moz-document domain("github.com") {
   html,
@@ -799,63 +2626,323 @@
     color: var(--matugen-fg) !important;
   }
 
+  /* 1. Macro Section: Top Header */
   .AppHeader,
   header.Header,
   header {
-    background-color: var(--matugen-bg-surface) !important;
+    background-color: var(--matugen-bg) !important;
+    background: var(--matugen-bg) !important;
     border-bottom: 1px solid var(--matugen-border-subtle) !important;
   }
 
+  /* Header buttons & icon controls: Clean, unboxed icon buttons */
+  .AppHeader button,
+  .AppHeader a.Header-link,
+  .AppHeader [role="button"],
+  header button,
+  header [role="button"] {
+    border: none !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  .AppHeader button:hover,
+  .AppHeader a.Header-link:hover,
+  header button:hover {
+    background-color: color-mix(in srgb, var(--matugen-fg) 8%, transparent) !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Header search input: clean, unboxed, NO dark shadow */
+  .AppHeader input,
+  .AppHeader-search,
+  .header-search,
+  header.Header input {
+    background-color: transparent !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    box-shadow: none !important;
+  }
+
+  /* 2. Macro Section: Left Sidebar */
   .feed-left-sidebar,
   .dashboard-sidebar,
   aside {
-    background-color: var(--matugen-bg-surface) !important;
-    border-color: var(--matugen-border-subtle) !important;
+    background-color: var(--matugen-bg) !important;
+    background: var(--matugen-bg) !important;
+    border-right: 1px solid var(--matugen-border-subtle) !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
   }
 
-  .Box,
-  .timeline-comment,
-  .feed-item-card,
-  article,
-  fieldset {
-    background-color: var(--matugen-bg-card) !important;
-    border: 1px solid var(--matugen-border-subtle) !important;
-  }
-
-  .Box-header {
-    background-color: var(--matugen-bg-surface) !important;
-    border-bottom: 1px solid var(--matugen-border-subtle) !important;
-  }
-
-  /* Buttons & badges */
-  .btn:not(.btn-primary) {
-    background-color: var(--matugen-bg-card) !important;
+  /* Sidebar "Find a repository..." search input */
+  .feed-left-sidebar input,
+  .dashboard-sidebar input,
+  aside input,
+  #dashboard-repos-filter-left,
+  .subnav-search-input,
+  input[placeholder*="Find a repository"] {
+    background-color: var(--matugen-input-bg) !important;
+    background: var(--matugen-input-bg) !important;
     color: var(--matugen-fg) !important;
     border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
   }
 
-  .btn:not(.btn-primary):hover {
-    background-color: var(--matugen-bg-card-hover) !important;
-    border-color: var(--matugen-accent) !important;
+  .subnav-search {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
-  /* Form controls and inputs */
+  /* Sidebar "New" repository button */
+  .feed-left-sidebar a[href="/new"],
+  .dashboard-sidebar a[href="/new"],
+  aside a[href="/new"],
+  .btn-primary {
+    background-color: var(--omarchy-green, #238636) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-color: transparent !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+  }
+
+  /* 3. Main Screen Prompt Area (Active User Input Container) */
+  /* Main prompt box wrapper where user types */
+  [class*="copilot-chat-container"],
+  [class*="copilot-prompt"],
+  form[action*="copilot"],
+  #home-prompt-box,
+  div:has(textarea[placeholder*="Ask"]),
+  div:has(textarea[aria-label*="Ask"]) {
+    background-color: var(--matugen-bg) !important;
+    background: var(--matugen-bg) !important;
+    border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+  }
+
+  /* Prompt input textarea & inner elements: completely borderless inside container */
+  form[action*="copilot"] textarea,
+  form[action*="copilot"] [class*="Textarea"],
+  form[action*="copilot"] [class*="TextInput"],
+  form[action*="copilot"] [class*="wrapper"],
+  form[action*="copilot"] [class*="container"],
+  [class*="copilot-chat-container"] textarea,
+  [class*="copilot-chat-container"] [class*="Textarea"],
+  [class*="copilot-chat-container"] [class*="TextInput"],
+  [class*="copilot-prompt"] textarea,
+  [class*="copilot-prompt"] [class*="Textarea"],
+  [class*="copilot-prompt"] [class*="TextInput"],
+  div:has(textarea[placeholder*="Ask"]) div,
+  div:has(textarea[placeholder*="Ask"]) textarea,
+  div:has(textarea[placeholder*="Ask"]) [contenteditable],
+  div:has(textarea[placeholder*="Ask"]) footer,
+  div:has(textarea[placeholder*="Ask"]) section,
+  div:has(textarea[placeholder*="Ask"]) fieldset,
+  div:has(textarea[aria-label*="Ask"]) div,
+  div:has(textarea[aria-label*="Ask"]) textarea,
+  div:has(textarea[aria-label*="Ask"]) [contenteditable],
+  div:has(textarea[aria-label*="Ask"]) footer,
+  div:has(textarea[aria-label*="Ask"]) section,
+  div:has(textarea[aria-label*="Ask"]) fieldset,
+  form[action*="copilot"] div,
+  form[action*="copilot"] [contenteditable],
+  form[action*="copilot"] footer,
+  form[action*="copilot"] section,
+  form[action*="copilot"] fieldset,
+  [class*="copilot-chat-container"] div,
+  [class*="copilot-chat-container"] [contenteditable],
+  [class*="copilot-chat-container"] footer,
+  [class*="copilot-chat-container"] section,
+  [class*="copilot-prompt"] div,
+  [class*="copilot-prompt"] footer,
+  [class*="copilot-prompt"] section,
+  textarea[placeholder*="Ask"],
+  textarea[aria-label*="Ask"] {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    color: var(--matugen-fg) !important;
+    appearance: none !important;
+    -moz-appearance: none !important;
+  }
+
+  /* 4. DO NOT BOX BUTTONS: 100% transparent resting state, ZERO dark background shadow fills */
+  .btn:not(.btn-primary),
+  button:not(.btn-primary):not([class*="primary"]):not([class*="filled"]),
+  [role="button"]:not(.btn-primary),
+  [class*="ButtonBase"]:not([class*="primary"]),
+  .prc-Button-ButtonBase:not([class*="primary"]) {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  /* Copilot prompt toolbar buttons (Ask, All repos, +, Auto, icons) */
+  div:has(textarea[placeholder*="Ask"]) button,
+  div:has(textarea[aria-label*="Ask"]) button,
+  form[action*="copilot"] button,
+  [class*="copilot-chat-container"] button,
+  [class*="copilot-prompt"] button {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    color: var(--matugen-fg) !important;
+    border-radius: 6px !important;
+  }
+
+  div:has(textarea[placeholder*="Ask"]) button:hover,
+  div:has(textarea[aria-label*="Ask"]) button:hover,
+  form[action*="copilot"] button:hover,
+  [class*="copilot-chat-container"] button:hover,
+  [class*="copilot-prompt"] button:hover {
+    background-color: color-mix(in srgb, var(--matugen-fg) 8%, transparent) !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Action chips cluster in Copilot prompt (Debug, Agent, Create issue, Write code, etc.) */
+  .copilot-prompt-suggestions button,
+  [class*="copilot-prompt"] .action-buttons button,
+  [class*="copilot-chat"] [class*="suggestion"] button {
+    background-color: var(--matugen-btn-bg) !important;
+    background: var(--matugen-btn-bg) !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    border-radius: 8px !important;
+    color: var(--matugen-fg) !important;
+  }
+
+  .copilot-prompt-suggestions button:hover,
+  [class*="copilot-prompt"] .action-buttons button:hover,
+  [class*="copilot-chat"] [class*="suggestion"] button:hover {
+    background-color: var(--matugen-btn-bg-hover) !important;
+    background: var(--matugen-btn-bg-hover) !important;
+    color: var(--matugen-fg-bright) !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* 5. DO NOT BOX SMALL SECTIONS / DO NOT BOX EVERY DIV */
+  /* Remove forced borders from Primer .Box utility divs, timeline, fieldset, details */
+  .Box,
+  fieldset,
+  details,
+  .Box-header,
+  .Box-body,
+  .Box-footer {
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Feed item cards: Clean seamless divider, ZERO card box outline */
+  .feed-item-card,
+  article {
+    background-color: transparent !important;
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* UNBOX all nested sections inside feed cards / articles (e.g. "What's Changed", inner divs, sub-boxes) */
+  article .Box,
+  article .Box-header,
+  article .Box-body,
+  article fieldset,
+  article details,
+  article section,
+  article div,
+  article div[class*="color-bg-subtle"],
+  article div[class*="Box-sc"],
+  .feed-item-card .Box,
+  .feed-item-card fieldset,
+  .feed-item-card details,
+  .feed-item-card section,
+  .feed-item-card div {
+    border: none !important;
+    border-color: transparent !important;
+    background-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Filter buttons in Feed */
+  button[aria-label*="Filter"],
+  .feed-header button,
+  div[class*="Feed"] button {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-color: transparent !important;
+  }
+
+  /* Form controls and inputs across GitHub (Search inputs, issue comments, settings) */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]),
   input[type="text"],
   input[type="search"],
-  textarea {
-    background-color: var(--matugen-bg-card) !important;
+  textarea,
+  select,
+  .form-control,
+  .TextInput-wrapper,
+  .TextInput,
+  [contenteditable="true"],
+  [role="textbox"] {
+    background-color: var(--matugen-input-bg) !important;
+    background: var(--matugen-input-bg) !important;
     color: var(--matugen-fg) !important;
     border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
   }
 
-  /* Tooltips, Popovers & Banners */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):focus,
+  input[type="text"]:focus,
+  input[type="search"]:focus,
+  textarea:focus,
+  select:focus,
+  .form-control:focus,
+  .TextInput-wrapper:focus-within,
+  [contenteditable="true"]:focus {
+    background-color: var(--matugen-input-bg-focus) !important;
+    border-color: var(--matugen-accent) !important;
+    box-shadow: 0 0 0 1px var(--matugen-accent) !important;
+  }
+
+  /* Tooltips, Popovers & Banners: Soft surfaces without heavy borders or harsh shadows */
   .Popover-message,
-  div[role="tooltip"],
-  [class*="banner"],
-  [class*="Banner"] {
+  div[role="tooltip"] {
     background-color: var(--matugen-bg-card) !important;
     color: var(--matugen-fg) !important;
     border: 1px solid var(--matugen-border-subtle) !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
   }
 }
 
@@ -911,8 +2998,8 @@
   .P3mIxe,
   header#gb,
   div[role="navigation"] {
-    background-color: var(--matugen-bg-surface) !important;
-    background: var(--matugen-bg-surface) !important;
+    background-color: var(--matugen-bg) !important;
+    background: var(--matugen-bg) !important;
     border-color: var(--matugen-border-subtle) !important;
   }
 
@@ -924,7 +3011,7 @@
     width: 100% !important;
     min-width: 100vw !important;
     border-bottom: 1px solid var(--matugen-border-subtle) !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    box-shadow: none !important;
   }
 
   /* Navigation filter tabs (All, Images, Videos, News...) */
@@ -968,17 +3055,17 @@
   .RNNXgb,
   .em4d2b,
   form[role="search"] .A8SBwf {
-    background-color: var(--matugen-bg-card) !important;
-    background: var(--matugen-bg-card) !important;
+    background-color: var(--matugen-input-bg) !important;
+    background: var(--matugen-input-bg) !important;
     border: 1px solid var(--matugen-border-subtle) !important;
     border-radius: 24px !important;
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08) !important;
+    box-shadow: none !important;
   }
 
   .RNNXgb:hover,
   .RNNXgb:focus-within {
     border-color: var(--matugen-border-highlight) !important;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16) !important;
+    box-shadow: 0 0 0 1px var(--matugen-accent) !important;
   }
 
   /* Neutralize inner containers and textareas inside the Google search pill */
@@ -1076,7 +3163,7 @@
     background-color: var(--matugen-bg-card-hover) !important;
   }
 
-  /* 4. "People also search for" Chips, Cards & Carousels */
+  /* 4. "People also search for" Chips, Cards & Carousels: Unboxed soft pills */
   .s75Ffe,
   .k820oc,
   .wQ4G4d,
@@ -1095,8 +3182,10 @@
     background-color: var(--matugen-bg-card) !important;
     background: var(--matugen-bg-card) !important;
     color: var(--matugen-fg) !important;
-    border: 1px solid var(--matugen-border-subtle) !important;
+    border: none !important;
+    border-color: transparent !important;
     border-radius: 12px !important;
+    box-shadow: none !important;
   }
 
   /* Remove duplicate nested borders inside search chips */
@@ -1120,7 +3209,8 @@
   .b2Rnsc:hover,
   a.ngTNl:hover {
     background-color: var(--matugen-bg-card-hover) !important;
-    border-color: var(--matugen-border) !important;
+    border: none !important;
+    border-color: transparent !important;
   }
 
   /* 5. Pagination ("Goooooooogle" 1 2 3 ... Next) */
@@ -1308,6 +3398,10 @@
     --background-color-interactive-subtle--hover: var(--matugen-bg-card-hover) !important;
     --background-color-disabled: var(--matugen-bg-card) !important;
     --background-color-disabled-subtle: var(--matugen-bg-surface) !important;
+    --background-color-input: var(--matugen-input-bg) !important;
+    --background-color-input--hover: var(--matugen-bg-card-hover) !important;
+    --background-color-input--focus: var(--matugen-input-bg-focus) !important;
+    --border-color-input: var(--matugen-border-subtle) !important;
     --background-color-progressive: var(--matugen-accent) !important;
     --background-color-progressive--hover: var(--matugen-border-highlight) !important;
     --background-color-progressive--active: var(--matugen-accent) !important;
@@ -1454,8 +3548,8 @@
   input.mw-searchInput,
   #simpleSearch,
   #searchInput {
-    background-color: var(--matugen-bg-card) !important;
-    background: var(--matugen-bg-card) !important;
+    background-color: var(--matugen-input-bg) !important;
+    background: var(--matugen-input-bg) !important;
     color: var(--matugen-fg) !important;
     border: 1px solid var(--matugen-border-subtle) !important;
     border-radius: 8px 0 0 8px !important;
@@ -1472,21 +3566,25 @@
     background-color: var(--matugen-bg-surface) !important;
     color: var(--matugen-fg) !important;
     border: 1px solid var(--matugen-border-subtle) !important;
+    border-left: none !important;
     border-radius: 0 8px 8px 0 !important;
   }
 
   .cdx-button,
   .mw-ui-button {
-    background-color: var(--matugen-bg-surface) !important;
+    background-color: var(--matugen-btn-bg) !important;
     color: var(--matugen-fg) !important;
-    border: 1px solid var(--matugen-border-subtle) !important;
+    border: none !important;
+    border-color: transparent !important;
     border-radius: 6px !important;
+    box-shadow: none !important;
   }
 
   .cdx-button:hover,
   .mw-ui-button:hover {
-    background-color: var(--matugen-bg-card-hover) !important;
-    border-color: var(--matugen-border) !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    border: none !important;
+    border-color: transparent !important;
   }
 
   /* 6. Disambiguation, Hatnotes & Alerts */
@@ -1635,18 +3733,18 @@
   [data-color-mode],
   [data-theme] {
     --color-neutral-background-canvas: var(--matugen-bg) !important;
-    --color-neutral-background: var(--matugen-bg-card) !important;
-    --color-neutral-background-hover: var(--matugen-bg-card-hover) !important;
-    --color-neutral-background-container: var(--matugen-bg-card) !important;
-    --color-neutral-background-container-hover: var(--matugen-bg-card-hover) !important;
-    --color-neutral-background-container-strong: var(--matugen-bg-surface) !important;
-    --color-neutral-background-container-strong-hover: var(--matugen-bg-card-hover) !important;
-    --color-neutral-background-weak: var(--matugen-btn-bg) !important;
-    --color-neutral-background-weak-hover: var(--matugen-btn-bg-hover) !important;
+    --color-neutral-background: var(--matugen-bg) !important;
+    --color-neutral-background-hover: var(--matugen-bg-surface) !important;
+    --color-neutral-background-container: transparent !important;
+    --color-neutral-background-container-hover: var(--matugen-bg-surface) !important;
+    --color-neutral-background-container-strong: transparent !important;
+    --color-neutral-background-container-strong-hover: var(--matugen-bg-surface) !important;
+    --color-neutral-background-weak: transparent !important;
+    --color-neutral-background-weak-hover: var(--matugen-btn-bg) !important;
     --color-neutral-background-medium: var(--matugen-bg-surface) !important;
-    --color-neutral-background-strong: var(--matugen-bg-card) !important;
-    --color-neutral-background-strong-hover: var(--matugen-bg-card-hover) !important;
-    --color-neutral-background-selected: var(--matugen-bg-card-hover) !important;
+    --color-neutral-background-strong: transparent !important;
+    --color-neutral-background-strong-hover: var(--matugen-bg-surface) !important;
+    --color-neutral-background-selected: var(--matugen-btn-bg) !important;
     --color-neutral-border: var(--matugen-border-subtle) !important;
     --color-neutral-border-weak: var(--matugen-border-subtle) !important;
     --color-neutral-border-medium: var(--matugen-border) !important;
@@ -1657,9 +3755,9 @@
     --color-neutral-content-weak: var(--matugen-fg-muted) !important;
 
     /* Secondary backgrounds & inputs */
-    --color-secondary-background: var(--matugen-btn-bg) !important;
-    --color-secondary-background-hover: var(--matugen-btn-bg-hover) !important;
-    --color-secondary-background-selected: var(--matugen-btn-bg-hover) !important;
+    --color-secondary-background: transparent !important;
+    --color-secondary-background-hover: var(--matugen-btn-bg) !important;
+    --color-secondary-background-selected: var(--matugen-btn-bg) !important;
     --color-secondary-plain: var(--matugen-fg) !important;
     --color-secondary-plain-hover: var(--matugen-fg-bright) !important;
     --color-secondary-plain-weak: var(--matugen-fg-muted) !important;
@@ -1668,20 +3766,20 @@
     --color-secondary-onBackground: var(--matugen-fg) !important;
 
     /* Buttons: cohesive soft pills that blend into cards */
-    --button-color-background: var(--matugen-btn-bg) !important;
-    --button-color-background-default: var(--matugen-btn-bg) !important;
-    --button-color-background-hover: var(--matugen-btn-bg-hover) !important;
+    --button-color-background: transparent !important;
+    --button-color-background-default: transparent !important;
+    --button-color-background-hover: var(--matugen-btn-bg) !important;
     --button-color-background-active: var(--matugen-btn-bg-hover) !important;
-    --button-color-background-focus: var(--matugen-btn-bg) !important;
+    --button-color-background-focus: transparent !important;
     --button-color-text: var(--matugen-fg) !important;
     --button-color-text-default: var(--matugen-fg) !important;
     --button-color-text-hover: var(--matugen-fg-bright) !important;
-    --button-border-color: var(--matugen-btn-border) !important;
-    --button-border-color-default: var(--matugen-btn-border) !important;
-    --button-border-color-hover: var(--matugen-border-subtle) !important;
+    --button-border-color: transparent !important;
+    --button-border-color-default: transparent !important;
+    --button-border-color-hover: transparent !important;
 
-    --color-button-secondary-background: var(--matugen-btn-bg) !important;
-    --color-button-secondary-background-hover: var(--matugen-btn-bg-hover) !important;
+    --color-button-secondary-background: transparent !important;
+    --color-button-secondary-background-hover: var(--matugen-btn-bg) !important;
     --color-button-secondary-text: var(--matugen-fg) !important;
     --color-button-tertiary-background: transparent !important;
     --color-button-tertiary-background-hover: var(--matugen-btn-bg) !important;
@@ -1713,8 +3811,8 @@
     --color-tone-2: var(--matugen-fg) !important;
     --color-tone-3: var(--matugen-fg-muted) !important;
     --color-tone-4: var(--matugen-bg-surface) !important;
-    --color-tone-5: var(--matugen-bg-card) !important;
-    --color-tone-6: var(--matugen-bg-card-hover) !important;
+    --color-tone-5: var(--matugen-bg) !important;
+    --color-tone-6: var(--matugen-bg-surface) !important;
     --color-tone-7: var(--matugen-bg) !important;
 
     /* Upvote & Action */
@@ -1722,10 +3820,10 @@
     --color-action-downvote: #5e81ac !important;
     --vote-button-label-color: var(--matugen-fg) !important;
     --shreddit-content-background: transparent !important;
-    --shreddit-post-background: var(--matugen-bg-card) !important;
-    --shreddit-post-background-hover: var(--matugen-bg-card-hover) !important;
+    --shreddit-post-background: transparent !important;
+    --shreddit-post-background-hover: var(--matugen-btn-bg) !important;
     --color-ui-canvas: var(--matugen-bg) !important;
-    --color-ui-modalbackground: var(--matugen-bg-card) !important;
+    --color-ui-modalbackground: var(--matugen-bg-surface) !important;
   }
 
   /* ========================================================================
@@ -1824,7 +3922,10 @@
     -webkit-appearance: none !important;
     background-color: var(--matugen-btn-bg) !important;
     background: var(--matugen-btn-bg) !important;
-    border: 1px solid var(--matugen-btn-border) !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
     border-radius: 9999px !important;
     color: var(--matugen-fg) !important;
     padding: 4px 14px !important;
@@ -1846,7 +3947,8 @@
     -webkit-appearance: none !important;
     background-color: var(--matugen-btn-bg-hover) !important;
     background: var(--matugen-btn-bg-hover) !important;
-    border-color: var(--matugen-border-subtle) !important;
+    border: none !important;
+    border-color: transparent !important;
     color: var(--matugen-fg-bright) !important;
   }
 
@@ -1861,8 +3963,8 @@
   form.reddit-search-bar,
   faceplate-search-input form,
   .search-input {
-    background-color: var(--matugen-bg-card) !important;
-    background: var(--matugen-bg-card) !important;
+    background-color: var(--matugen-input-bg) !important;
+    background: var(--matugen-input-bg) !important;
     border: 1px solid var(--matugen-border-subtle) !important;
     border-radius: 9999px !important;
     box-shadow: none !important;
@@ -1902,26 +4004,35 @@
     color: var(--matugen-fg-muted) !important;
   }
 
-  /* 6. Post Cards */
+  /* 6. Post Cards: completely clean, seamless, no dark boxed container or drop shadow */
   shreddit-post,
   article[data-testid="post-container"],
   div[data-testid="post-container"] {
-    background-color: var(--matugen-bg-card) !important;
-    background: var(--matugen-bg-card) !important;
-    border: 1px solid var(--matugen-border-subtle) !important;
-    border-radius: 12px !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
     margin-bottom: 12px !important;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
-    transition: all 0.15s ease !important;
+    transition: none !important;
     position: relative !important;
   }
 
   shreddit-post:hover,
   article[data-testid="post-container"]:hover,
   div[data-testid="post-container"]:hover {
-    background-color: var(--matugen-bg-card-hover) !important;
-    background: var(--matugen-bg-card-hover) !important;
-    border-color: var(--matugen-border) !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Feed post separator divider (subtle clean line, no boxed card or shadow) */
+  shreddit-feed shreddit-post,
+  reddit-feed shreddit-post {
+    border-bottom: 1px solid var(--matugen-border-subtle) !important;
+    padding-bottom: 12px !important;
+    margin-bottom: 12px !important;
   }
 
   /* Full Post Link Overlay: must NEVER have a background or occlude text on hover */
@@ -1971,12 +4082,35 @@
   shreddit-post-text-body,
   shreddit-post [slot="text-body"],
   shreddit-post [slot="text-body"] *,
-  shreddit-post-text-body * {
+  shreddit-post-text-body *,
+  shreddit-post a:has(shreddit-post-text-body),
+  shreddit-post a[href*="/comments/"]:has(shreddit-post-text-body),
+  shreddit-post a[href*="/comments/"]:has(p),
+  shreddit-post a[href*="/comments/"] p {
     color: var(--matugen-fg) !important;
     background: transparent !important;
     background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
     position: relative !important;
     z-index: 2 !important;
+  }
+
+  shreddit-post-text-body:hover,
+  shreddit-post [slot="text-body"]:hover,
+  shreddit-post [slot="text-body"] *:hover,
+  shreddit-post-text-body *:hover,
+  shreddit-post a:has(shreddit-post-text-body):hover,
+  shreddit-post a[href*="/comments/"]:has(shreddit-post-text-body):hover,
+  shreddit-post a[href*="/comments/"]:has(p):hover,
+  shreddit-post a[href*="/comments/"] p:hover {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
   }
 
   /* Post metadata / credit bar */
@@ -2028,7 +4162,7 @@
     z-index: 2 !important;
   }
 
-  /* Vote pill group: seamless retro pill that blends into the card */
+  /* Vote pill group: seamless retro pill with ZERO border outline */
   rpl-vote-button-group,
   .rpl-vote-button-group,
   span.rpl-vote-button-group,
@@ -2040,7 +4174,9 @@
     -webkit-appearance: none !important;
     background-color: var(--matugen-btn-bg) !important;
     background: var(--matugen-btn-bg) !important;
-    border: 1px solid var(--matugen-btn-border) !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
     border-radius: 9999px !important;
     box-shadow: none !important;
     display: inline-flex !important;
@@ -2057,13 +4193,13 @@
   [class*="vote-button-group"]:hover {
     background-color: var(--matugen-btn-bg-hover) !important;
     background: var(--matugen-btn-bg-hover) !important;
-    border-color: var(--matugen-border-subtle) !important;
+    border: none !important;
+    border-color: transparent !important;
   }
 
   /* Action buttons and pills across Reddit feed & posts (Comments, Share, Repost, Awards) */
   shreddit-post [slot="action-row"] a[href*="/comments/"],
   rpl-action-bar a[href*="/comments/"],
-  shreddit-post a[href*="/comments/"]:not([slot="full-post-link"]):not([slot="title"]):not([id*="post-title"]):not([class*="post-link"]):not([class*="absolute"]),
   rpl-action-bar button:not([upvote]):not([downvote]):not([slot="join-button"]):not(.join-btn):not(.button-primary):not([class*="Clear"]):not([class*="clear"]),
   shreddit-post-share-button button,
   shreddit-post-share-button::part(button),
@@ -2080,7 +4216,9 @@
     -webkit-appearance: none !important;
     background-color: var(--matugen-btn-bg) !important;
     background: var(--matugen-btn-bg) !important;
-    border: 1px solid var(--matugen-btn-border) !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
     border-radius: 9999px !important;
     color: var(--matugen-fg) !important;
     box-shadow: none !important;
@@ -2094,7 +4232,6 @@
   /* Hover state for buttons and pills */
   shreddit-post [slot="action-row"] a[href*="/comments/"]:hover,
   rpl-action-bar a[href*="/comments/"]:hover,
-  shreddit-post a[href*="/comments/"]:not([slot="full-post-link"]):not([slot="title"]):not([id*="post-title"]):not([class*="post-link"]):not([class*="absolute"]):hover,
   rpl-action-bar button:not([upvote]):not([downvote]):not([slot="join-button"]):not(.join-btn):not(.button-primary):not([class*="Clear"]):not([class*="clear"]):hover,
   shreddit-post-share-button button:hover,
   shreddit-post-share-button::part(button):hover,
@@ -2110,11 +4247,12 @@
     -webkit-appearance: none !important;
     background-color: var(--matugen-btn-bg-hover) !important;
     background: var(--matugen-btn-bg-hover) !important;
-    border-color: var(--matugen-border-subtle) !important;
+    border: none !important;
+    border-color: transparent !important;
     color: var(--matugen-fg-bright) !important;
   }
 
-  /* Feed Sort Dropdowns & View Mode Switcher */
+  /* Feed Sort Dropdowns & View Mode Switcher: UNBOXED, ZERO borders */
   shreddit-sort-dropdown,
   shreddit-sort-dropdown button,
   shreddit-sort-dropdown::part(button),
@@ -2131,9 +4269,11 @@
     appearance: none !important;
     -moz-appearance: none !important;
     -webkit-appearance: none !important;
-    background-color: var(--matugen-btn-bg) !important;
-    background: var(--matugen-btn-bg) !important;
-    border: 1px solid var(--matugen-btn-border) !important;
+    background-color: transparent !important;
+    background: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
     border-radius: 9999px !important;
     color: var(--matugen-fg) !important;
     box-shadow: none !important;
@@ -2160,7 +4300,8 @@
     -webkit-appearance: none !important;
     background-color: var(--matugen-btn-bg-hover) !important;
     background: var(--matugen-btn-bg-hover) !important;
-    border-color: var(--matugen-border-subtle) !important;
+    border: none !important;
+    border-color: transparent !important;
     color: var(--matugen-fg-bright) !important;
   }
 
@@ -2339,7 +4480,7 @@
     color: #ffffff !important;
   }
 
-  /* Left nav drawer / hamburger toggle button */
+  /* Left nav drawer / hamburger toggle button: UNBOXED clean icon button */
   left-nav-drawer-controller button,
   shreddit-drawer-controller button,
   button[aria-label*="navigation" i],
@@ -2352,9 +4493,11 @@
     appearance: none !important;
     -moz-appearance: none !important;
     -webkit-appearance: none !important;
-    background-color: var(--matugen-bg-card) !important;
-    background: var(--matugen-bg-card) !important;
-    border: 1px solid var(--matugen-border-subtle) !important;
+    background-color: transparent !important;
+    background: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
     border-radius: 8px !important;
     color: var(--matugen-fg) !important;
     box-shadow: none !important;
@@ -2368,8 +4511,9 @@
     appearance: none !important;
     -moz-appearance: none !important;
     -webkit-appearance: none !important;
-    background-color: var(--matugen-bg-card-hover) !important;
-    border-color: var(--matugen-border) !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    border: none !important;
+    border-color: transparent !important;
     color: var(--matugen-fg-bright) !important;
   }
 
@@ -2415,7 +4559,9 @@
     -webkit-appearance: none !important;
     background-color: var(--matugen-accent) !important;
     background: var(--matugen-accent) !important;
-    border: 1px solid var(--matugen-accent) !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
     border-radius: 9999px !important;
     color: #ffffff !important;
     font-weight: 600 !important;
@@ -2438,16 +4584,17 @@
     -webkit-appearance: none !important;
     background-color: var(--matugen-accent-bright) !important;
     background: var(--matugen-accent-bright) !important;
-    border-color: var(--matugen-accent-bright) !important;
+    border: none !important;
+    border-color: transparent !important;
     color: #ffffff !important;
   }
 
-  /* Joined state: clean subtle outline instead of loud solid pill */
+  /* Joined state: clean subtle unboxed pill */
   shreddit-join-button[aria-label*="Joined"],
   shreddit-join-button[joined] {
     --button-color-background: transparent !important;
     --button-color-text: var(--matugen-fg) !important;
-    --button-border-color: var(--matugen-border-subtle) !important;
+    --button-border-color: transparent !important;
   }
 
   shreddit-join-button[aria-label*="Joined"]::part(button),
@@ -2461,7 +4608,9 @@
     -webkit-appearance: none !important;
     background-color: transparent !important;
     background: transparent !important;
-    border: 1px solid var(--matugen-btn-border) !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
     color: var(--matugen-fg) !important;
     padding: 4px 16px !important;
     cursor: pointer !important;
@@ -2477,16 +4626,19 @@
     -webkit-appearance: none !important;
     background-color: var(--matugen-btn-bg) !important;
     background: var(--matugen-btn-bg) !important;
-    border-color: var(--matugen-border-subtle) !important;
+    border: none !important;
+    border-color: transparent !important;
     color: var(--matugen-fg-bright) !important;
   }
 
-  /* Suggested Communities Carousel Cards & Buttons */
+  /* Suggested Communities Carousel Cards & Buttons: UNBOXED */
   [class*="community-recommendation"],
   [data-testid*="community-recommendation"] {
     background-color: var(--matugen-bg-card) !important;
-    border: 1px solid var(--matugen-border-subtle) !important;
+    border: none !important;
+    border-color: transparent !important;
     border-radius: 12px !important;
+    box-shadow: none !important;
   }
 
   [class*="community-recommendation"] shreddit-join-button,
@@ -2507,7 +4659,8 @@
     width: 100% !important;
     border-radius: 9999px !important;
     background-color: var(--matugen-accent) !important;
-    border: 1px solid var(--matugen-accent) !important;
+    border: none !important;
+    border-color: transparent !important;
     color: #ffffff !important;
   }
 
@@ -2595,11 +4748,12 @@
   .label-container,
   [placeholder*="Join the conversation" i],
   [data-testid*="comment-composer" i] {
-    background-color: var(--matugen-bg-card) !important;
-    background: var(--matugen-bg-card) !important;
+    background-color: transparent !important;
+    background: transparent !important;
     border: 1px solid var(--matugen-border-subtle) !important;
     border-radius: 9999px !important;
     color: var(--matugen-fg) !important;
+    box-shadow: none !important;
   }
 
   [placeholder*="Join the conversation" i]::placeholder {
@@ -2638,7 +4792,7 @@
     text-decoration: none !important;
   }
 
-  /* 8. Right Sidebar ("RECENT POSTS" and widgets) */
+  /* 8. Right Sidebar: Clean macro dividing border, ZERO boxed cards/sections inside */
   aside,
   reddit-sidebar-nav,
   [slot="secondary"],
@@ -2649,23 +4803,72 @@
     background-color: transparent !important;
   }
 
-  /* Sidebar widgets / sections */
+  /* Right sidebar structural container: Macro layout dividing line */
+  #right-sidebar-container,
+  aside[slot="secondary"],
+  aside.right-sidebar {
+    border-left: 1px solid var(--matugen-border-subtle) !important;
+  }
+
+  /* NEVER BOX SIDEBAR WIDGETS OR SECTIONS (Recent posts, bookmarks, etc. are completely unboxed) */
   reddit-recent-pages,
   recent-posts,
   community-bookmarks,
   #right-sidebar-container section,
   #right-sidebar-container aside,
-  #right-sidebar-container > div > div,
   #right-sidebar-container [class*="recent"],
   #right-sidebar-container [class*="popular"],
   aside section,
-  aside > div > div,
   aside .sidebar-grid {
-    background-color: var(--matugen-bg-card) !important;
-    background: var(--matugen-bg-card) !important;
-    border: 1px solid var(--matugen-border-subtle) !important;
-    border-radius: 12px !important;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Strip background, border and shadow from nested inner wrappers */
+  #right-sidebar-container > div,
+  #right-sidebar-container > div > div,
+  aside > div,
+  aside > div > div {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Community Bookmarks buttons: clean unboxed pills */
+  community-bookmarks a,
+  community-bookmarks button,
+  community-bookmarks li a,
+  [data-testid*="community-bookmarks"] a,
+  [data-testid*="community-bookmarks"] button {
+    appearance: none !important;
+    -moz-appearance: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    border-radius: 9999px !important;
+    color: var(--matugen-fg) !important;
+    box-shadow: none !important;
+    transition: all 0.15s ease !important;
+  }
+
+  community-bookmarks a:hover,
+  community-bookmarks button:hover,
+  community-bookmarks li a:hover,
+  [data-testid*="community-bookmarks"] a:hover,
+  [data-testid*="community-bookmarks"] button:hover {
+    background: var(--matugen-btn-bg-hover) !important;
+    background-color: var(--matugen-btn-bg-hover) !important;
+    color: var(--matugen-fg-bright) !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
   }
 
   /* Headers in sidebar */
@@ -2810,10 +5013,41 @@
   shreddit-comment,
   shreddit-comment-tree {
     background-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   shreddit-comment [slot="comment"] {
     color: var(--matugen-fg) !important;
+  }
+
+  /* Universal shadow killer: strip all shadows from Reddit content, containers, and sections */
+  shreddit-app *,
+  shreddit-post,
+  shreddit-feed,
+  reddit-feed,
+  #main-content,
+  #main-content *,
+  #right-sidebar-container,
+  #right-sidebar-container *,
+  aside,
+  aside *,
+  div.subgrid-container,
+  div.grid-container {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Maintain elevation strictly on floating menus and dialog overlays */
+  faceplate-menu,
+  faceplate-dropdown-menu,
+  rpl-dropdown,
+  rpl-menu,
+  rpl-hovercard,
+  rpl-tooltip,
+  dialog,
+  [role="dialog"] {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
   }
 }
 
