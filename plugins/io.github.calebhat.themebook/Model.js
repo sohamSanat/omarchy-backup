@@ -91,12 +91,19 @@ function capPath(s) {
 function maxCatalogChars() { return MAX_CATALOG_CHARS }
 function maxConfigChars() { return MAX_CONFIG_CHARS }
 
+function isOmagenPreviewTheme(theme) {
+  if (!theme) return false
+  var slug = (typeof theme === "string" ? theme : String(theme.slug || "")).toLowerCase()
+  var name = (typeof theme === "object" && theme ? String(theme.name || "") : "").toLowerCase()
+  return /omagen[-_ ]preview/.test(slug) || name.indexOf("omagen preview") >= 0
+}
+
 function boundCatalog(themes) {
   if (!Array.isArray(themes)) return []
   var out = []
   for (var i = 0; i < themes.length && out.length < MAX_THEMES; i++) {
     var src = themes[i]
-    if (!src || !isValidSlug(src.slug)) continue
+    if (!src || !isValidSlug(src.slug) || isOmagenPreviewTheme(src)) continue
     var t = {}
     for (var k in src) t[k] = src[k]
     t.slug = String(src.slug)
@@ -271,6 +278,7 @@ function normalizeHHMM(value, fallback) {
 function scheduleThemeKey(value) {
   var s = String(value || "")
   if (s === "__random_favorite__") return s
+  if (isOmagenPreviewTheme(s)) return ""
   return isValidSlug(s) ? s : ""
 }
 
@@ -366,7 +374,7 @@ function pickerSections(config, themes) {
   function add(id, name, slugs) {
     var kept = []
     for (var i = 0; i < slugs.length; i++) {
-      if (themeBySlug(themes, slugs[i])) kept.push(slugs[i])
+      if (!isOmagenPreviewTheme(slugs[i]) && themeBySlug(themes, slugs[i])) kept.push(slugs[i])
     }
     out.push({ id: id, name: name, themes: kept })
   }
@@ -666,7 +674,7 @@ function cycleSlugs(config, themes, folderId) {
   var seen = {}
   for (var i = 0; i < raw.length; i++) {
     var s = raw[i]
-    if (!s || seen[s]) continue
+    if (!s || seen[s] || isOmagenPreviewTheme(s)) continue
     if (cfg.hidden.indexOf(s) >= 0) continue
     if (!themeBySlug(themes, s)) continue
     seen[s] = true
@@ -824,7 +832,7 @@ function folderOfSlug(config, slug) {
 
 function addSlugToFolder(config, folderId, slug) {
   var cfg = normalizeConfig(config)
-  if (isReservedSection(folderId) || !isValidSlug(slug)) return cfg
+  if (isReservedSection(folderId) || !isValidSlug(slug) || isOmagenPreviewTheme(slug)) return cfg
   for (var i = 0; i < cfg.folders.length; i++) {
     if (cfg.folders[i].id === folderId) {
       if (cfg.folders[i].themes.indexOf(slug) < 0) cfg.folders[i].themes.push(slug)
@@ -924,7 +932,7 @@ function themeBySlug(themes, slug) {
 }
 
 function matchesFilter(theme, config, filter, query) {
-  if (!theme) return false
+  if (!theme || isOmagenPreviewTheme(theme)) return false
   var q = String(query || "").trim().toLowerCase()
   if (q && String(theme.name).toLowerCase().indexOf(q) < 0 && String(theme.slug).toLowerCase().indexOf(q) < 0)
     return false
@@ -1023,6 +1031,7 @@ function moveInList(list, slug, delta) {
 }
 
 function pushRecent(list, slug) {
+  if (isOmagenPreviewTheme(slug)) return Array.isArray(list) ? list.slice(0, 8) : []
   var out = [slug]
   for (var i = 0; i < list.length; i++) {
     if (list[i] !== slug) out.push(list[i])

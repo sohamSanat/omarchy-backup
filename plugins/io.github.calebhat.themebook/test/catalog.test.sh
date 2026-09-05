@@ -29,6 +29,8 @@ write_png "$fake/home/.config/omarchy/themes/bad theme/backgrounds/wall.png"
 mkdir -p "$fake/home/.config/omarchy/themes/ancient-portal/backgrounds"
 write_png "$fake/home/.config/omarchy/themes/ancient-portal/backgrounds/0-deep-forest.jpg"
 write_png "$fake/home/.config/omarchy/themes/ancient-portal/backgrounds/ancient-portal.png"
+mkdir -p "$fake/home/.config/omarchy/themes/omagen-preview-candidate-123/backgrounds"
+write_png "$fake/home/.config/omarchy/themes/omagen-preview-candidate-123/backgrounds/wall.png"
 write_png "$fake/omarchy/themes/catppuccin/preview.png"
 write_png "$fake/omarchy/themes/catppuccin/backgrounds/1.jpg"
 printf 'accent = "#aabbcc"\nbackground = "#111111"\nforeground = "#eeeeee"\nmode = "dark"\n' \
@@ -41,9 +43,13 @@ echo "$isolated" | jq -e 'any(.[]; .slug == "aether" and .source == "user" and (
 echo "$isolated" | jq -e 'any(.[]; .slug == "catppuccin" and .source == "stock" and .preview != "")' >/dev/null
 echo "$isolated" | jq -e 'any(.[]; .slug == "ancient-portal" and (.preview | endswith("ancient-portal.png")))' >/dev/null
 echo "$isolated" | jq -e 'all(.[]; .slug != "bad theme")' >/dev/null
+echo "$isolated" | jq -e 'all(.[]; .slug != "omagen-preview-candidate-123")' >/dev/null
+echo "$isolated" | jq -e 'all(.[]; (.name | ascii_downcase | contains("omagen preview") | not))' >/dev/null
 
 out=$("$root/scripts/catalog")
 echo "$out" | jq -e 'type == "array" and length > 0' >/dev/null
 echo "$out" | jq -e 'all(.[]; has("slug") and has("name") and has("source") and has("colors"))' >/dev/null
+echo "$out" | jq -e 'all(.[]; (.name | ascii_downcase | contains("omagen preview") | not))' >/dev/null
+echo "$out" | jq -e 'all(.[]; (.slug | test("omagen[-_ ]preview") | not))' >/dev/null
 echo "$out" | jq -e 'any(.[]; .current == true)' >/dev/null
 echo "catalog ok ($("$root/scripts/catalog" | jq 'length') themes, isolated $(echo "$isolated" | jq 'length'))"

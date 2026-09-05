@@ -201,6 +201,16 @@ emit_theme() {
   # Skip this theme only. A non-zero return would kill the rest of the catalog.
   [[ $slug =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || return 0
   [[ $slug != *..* ]] || return 0
+  [[ -d $theme_path ]] || return 0
+
+  # Permanent rule: do not catalogue themes with "omagen preview" in their name or slug
+  local slug_lower=${slug,,}
+  local name
+  name="$(title_case "$slug")"
+  local name_lower=${name,,}
+  if [[ "$slug_lower" =~ omagen[-_\ ]preview || "$name_lower" =~ omagen\ preview ]]; then
+    return 0
+  fi
   local colors_file preview is_current=false is_git=false
   local accent background foreground red orange yellow green cyan blue magenta mode
   local bg_json='[]'
@@ -245,7 +255,7 @@ emit_theme() {
 
   jq -cn \
     --arg slug "$slug" \
-    --arg name "$(title_case "$slug")" \
+    --arg name "$name" \
     --arg path "$theme_path" \
     --arg source "$source" \
     --arg preview "$preview" \
@@ -296,13 +306,22 @@ emit_theme() {
 user_themes=()
 if [[ -d $USER_THEMES_PATH ]]; then
   while IFS= read -r theme_path; do
-    user_themes+=("${theme_path##*/}")
-  done < <(capped_find "$MAX_THEMES" find -L "$USER_THEMES_PATH" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -print | sort)
+    slug=${theme_path##*/}
+    slug_lower=${slug,,}
+    if [[ "$slug_lower" =~ omagen[-_\ ]preview ]]; then
+      continue
+    fi
+    user_themes+=("$slug")
+  done < <(capped_find "$MAX_THEMES" find -L "$USER_THEMES_PATH" -mindepth 1 -maxdepth 1 -type d -print | sort)
 fi
 
 if [[ -d $OMARCHY_THEMES_PATH ]]; then
   while IFS= read -r theme_path; do
     slug=${theme_path##*/}
+    slug_lower=${slug,,}
+    if [[ "$slug_lower" =~ omagen[-_\ ]preview ]]; then
+      continue
+    fi
     skip=false
     for u in "${user_themes[@]}"; do
       if [[ $u == "$slug" ]]; then

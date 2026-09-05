@@ -1,5 +1,5 @@
 diff --git i/Model.js w/Model.js
-index 976acea..37450c0 100644
+index 976acea..c689d3c 100644
 --- i/Model.js
 +++ w/Model.js
 @@ -4,6 +4,7 @@ function defaultConfig() {
@@ -10,7 +10,45 @@ index 976acea..37450c0 100644
      recents: [],
      folders: [],
      collapsed: { recents: true },
-@@ -434,6 +435,7 @@ function normalizeConfig(raw) {
+@@ -90,12 +91,19 @@ function capPath(s) {
+ function maxCatalogChars() { return MAX_CATALOG_CHARS }
+ function maxConfigChars() { return MAX_CONFIG_CHARS }
+ 
++function isOmagenPreviewTheme(theme) {
++  if (!theme) return false
++  var slug = (typeof theme === "string" ? theme : String(theme.slug || "")).toLowerCase()
++  var name = (typeof theme === "object" && theme ? String(theme.name || "") : "").toLowerCase()
++  return /omagen[-_ ]preview/.test(slug) || name.indexOf("omagen preview") >= 0
++}
++
+ function boundCatalog(themes) {
+   if (!Array.isArray(themes)) return []
+   var out = []
+   for (var i = 0; i < themes.length && out.length < MAX_THEMES; i++) {
+     var src = themes[i]
+-    if (!src || !isValidSlug(src.slug)) continue
++    if (!src || !isValidSlug(src.slug) || isOmagenPreviewTheme(src)) continue
+     var t = {}
+     for (var k in src) t[k] = src[k]
+     t.slug = String(src.slug)
+@@ -270,6 +278,7 @@ function normalizeHHMM(value, fallback) {
+ function scheduleThemeKey(value) {
+   var s = String(value || "")
+   if (s === "__random_favorite__") return s
++  if (isOmagenPreviewTheme(s)) return ""
+   return isValidSlug(s) ? s : ""
+ }
+ 
+@@ -365,7 +374,7 @@ function pickerSections(config, themes) {
+   function add(id, name, slugs) {
+     var kept = []
+     for (var i = 0; i < slugs.length; i++) {
+-      if (themeBySlug(themes, slugs[i])) kept.push(slugs[i])
++      if (!isOmagenPreviewTheme(slugs[i]) && themeBySlug(themes, slugs[i])) kept.push(slugs[i])
+     }
+     out.push({ id: id, name: name, themes: kept })
+   }
+@@ -434,6 +443,7 @@ function normalizeConfig(raw) {
    var cfg = defaultConfig()
    cfg.favorites = asStringArray(c.favorites)
    cfg.hidden = asStringArray(c.hidden)
@@ -18,7 +56,25 @@ index 976acea..37450c0 100644
    cfg.recents = asStringArray(c.recents).slice(0, 8)
    cfg.folders = normalizeFolders(c.folders)
    cfg.collapsed = normalizeCollapsed(c.collapsed)
-@@ -860,6 +862,38 @@ function setThemeFolders(config, slug, folderIds) {
+@@ -664,7 +674,7 @@ function cycleSlugs(config, themes, folderId) {
+   var seen = {}
+   for (var i = 0; i < raw.length; i++) {
+     var s = raw[i]
+-    if (!s || seen[s]) continue
++    if (!s || seen[s] || isOmagenPreviewTheme(s)) continue
+     if (cfg.hidden.indexOf(s) >= 0) continue
+     if (!themeBySlug(themes, s)) continue
+     seen[s] = true
+@@ -822,7 +832,7 @@ function folderOfSlug(config, slug) {
+ 
+ function addSlugToFolder(config, folderId, slug) {
+   var cfg = normalizeConfig(config)
+-  if (isReservedSection(folderId) || !isValidSlug(slug)) return cfg
++  if (isReservedSection(folderId) || !isValidSlug(slug) || isOmagenPreviewTheme(slug)) return cfg
+   for (var i = 0; i < cfg.folders.length; i++) {
+     if (cfg.folders[i].id === folderId) {
+       if (cfg.folders[i].themes.indexOf(slug) < 0) cfg.folders[i].themes.push(slug)
+@@ -860,6 +870,38 @@ function setThemeFolders(config, slug, folderIds) {
    return cfg
  }
  
@@ -57,6 +113,23 @@ index 976acea..37450c0 100644
  function replaceFolderThemes(config, folderId, slugs, known) {
    var cfg = normalizeConfig(config)
    if (isReservedSection(folderId)) return cfg
+@@ -890,7 +932,7 @@ function themeBySlug(themes, slug) {
+ }
+ 
+ function matchesFilter(theme, config, filter, query) {
+-  if (!theme) return false
++  if (!theme || isOmagenPreviewTheme(theme)) return false
+   var q = String(query || "").trim().toLowerCase()
+   if (q && String(theme.name).toLowerCase().indexOf(q) < 0 && String(theme.slug).toLowerCase().indexOf(q) < 0)
+     return false
+@@ -989,6 +1031,7 @@ function moveInList(list, slug, delta) {
+ }
+ 
+ function pushRecent(list, slug) {
++  if (isOmagenPreviewTheme(slug)) return Array.isArray(list) ? list.slice(0, 8) : []
+   var out = [slug]
+   for (var i = 0; i < list.length; i++) {
+     if (list[i] !== slug) out.push(list[i])
 diff --git i/README.md w/README.md
 index 6e731d6..b3219ee 100644
 --- i/README.md
@@ -367,10 +440,61 @@ index 8f14c15..458a9b6 100644
                  }
                }
 diff --git i/scripts/catalog w/scripts/catalog
-index b4dee12..b5ebb94 100755
+index b4dee12..502ccd8 100755
 --- i/scripts/catalog
 +++ w/scripts/catalog
-@@ -310,6 +310,11 @@ if [[ -d $OMARCHY_THEMES_PATH ]]; then
+@@ -201,6 +201,16 @@ emit_theme() {
+   # Skip this theme only. A non-zero return would kill the rest of the catalog.
+   [[ $slug =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || return 0
+   [[ $slug != *..* ]] || return 0
++  [[ -d $theme_path ]] || return 0
++
++  # Permanent rule: do not catalogue themes with "omagen preview" in their name or slug
++  local slug_lower=${slug,,}
++  local name
++  name="$(title_case "$slug")"
++  local name_lower=${name,,}
++  if [[ "$slug_lower" =~ omagen[-_\ ]preview || "$name_lower" =~ omagen\ preview ]]; then
++    return 0
++  fi
+   local colors_file preview is_current=false is_git=false
+   local accent background foreground red orange yellow green cyan blue magenta mode
+   local bg_json='[]'
+@@ -245,7 +255,7 @@ emit_theme() {
+ 
+   jq -cn \
+     --arg slug "$slug" \
+-    --arg name "$(title_case "$slug")" \
++    --arg name "$name" \
+     --arg path "$theme_path" \
+     --arg source "$source" \
+     --arg preview "$preview" \
+@@ -296,13 +306,22 @@ emit_theme() {
+ user_themes=()
+ if [[ -d $USER_THEMES_PATH ]]; then
+   while IFS= read -r theme_path; do
+-    user_themes+=("${theme_path##*/}")
+-  done < <(capped_find "$MAX_THEMES" find -L "$USER_THEMES_PATH" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -print | sort)
++    slug=${theme_path##*/}
++    slug_lower=${slug,,}
++    if [[ "$slug_lower" =~ omagen[-_\ ]preview ]]; then
++      continue
++    fi
++    user_themes+=("$slug")
++  done < <(capped_find "$MAX_THEMES" find -L "$USER_THEMES_PATH" -mindepth 1 -maxdepth 1 -type d -print | sort)
+ fi
+ 
+ if [[ -d $OMARCHY_THEMES_PATH ]]; then
+   while IFS= read -r theme_path; do
+     slug=${theme_path##*/}
++    slug_lower=${slug,,}
++    if [[ "$slug_lower" =~ omagen[-_\ ]preview ]]; then
++      continue
++    fi
+     skip=false
+     for u in "${user_themes[@]}"; do
+       if [[ $u == "$slug" ]]; then
+@@ -310,6 +329,11 @@ if [[ -d $OMARCHY_THEMES_PATH ]]; then
          break
        fi
      done
@@ -382,8 +506,35 @@ index b4dee12..b5ebb94 100755
      if [[ $skip == false ]]; then
        emit_theme "$slug" "$theme_path" "stock"
      fi
+diff --git i/test/catalog.test.sh w/test/catalog.test.sh
+index 4277620..c1e6e9c 100755
+--- i/test/catalog.test.sh
++++ w/test/catalog.test.sh
+@@ -29,6 +29,8 @@ write_png "$fake/home/.config/omarchy/themes/bad theme/backgrounds/wall.png"
+ mkdir -p "$fake/home/.config/omarchy/themes/ancient-portal/backgrounds"
+ write_png "$fake/home/.config/omarchy/themes/ancient-portal/backgrounds/0-deep-forest.jpg"
+ write_png "$fake/home/.config/omarchy/themes/ancient-portal/backgrounds/ancient-portal.png"
++mkdir -p "$fake/home/.config/omarchy/themes/omagen-preview-candidate-123/backgrounds"
++write_png "$fake/home/.config/omarchy/themes/omagen-preview-candidate-123/backgrounds/wall.png"
+ write_png "$fake/omarchy/themes/catppuccin/preview.png"
+ write_png "$fake/omarchy/themes/catppuccin/backgrounds/1.jpg"
+ printf 'accent = "#aabbcc"\nbackground = "#111111"\nforeground = "#eeeeee"\nmode = "dark"\n' \
+@@ -41,9 +43,13 @@ echo "$isolated" | jq -e 'any(.[]; .slug == "aether" and .source == "user" and (
+ echo "$isolated" | jq -e 'any(.[]; .slug == "catppuccin" and .source == "stock" and .preview != "")' >/dev/null
+ echo "$isolated" | jq -e 'any(.[]; .slug == "ancient-portal" and (.preview | endswith("ancient-portal.png")))' >/dev/null
+ echo "$isolated" | jq -e 'all(.[]; .slug != "bad theme")' >/dev/null
++echo "$isolated" | jq -e 'all(.[]; .slug != "omagen-preview-candidate-123")' >/dev/null
++echo "$isolated" | jq -e 'all(.[]; (.name | ascii_downcase | contains("omagen preview") | not))' >/dev/null
+ 
+ out=$("$root/scripts/catalog")
+ echo "$out" | jq -e 'type == "array" and length > 0' >/dev/null
+ echo "$out" | jq -e 'all(.[]; has("slug") and has("name") and has("source") and has("colors"))' >/dev/null
++echo "$out" | jq -e 'all(.[]; (.name | ascii_downcase | contains("omagen preview") | not))' >/dev/null
++echo "$out" | jq -e 'all(.[]; (.slug | test("omagen[-_ ]preview") | not))' >/dev/null
+ echo "$out" | jq -e 'any(.[]; .current == true)' >/dev/null
+ echo "catalog ok ($("$root/scripts/catalog" | jq 'length') themes, isolated $(echo "$isolated" | jq 'length'))"
 diff --git i/test/model.test.js w/test/model.test.js
-index cdf60c2..ea64647 100755
+index cdf60c2..448f3ae 100755
 --- i/test/model.test.js
 +++ w/test/model.test.js
 @@ -3,7 +3,7 @@ const fs = require("fs")
@@ -391,11 +542,11 @@ index cdf60c2..ea64647 100755
  const src = fs.readFileSync(path.join(__dirname, "..", "Model.js"), "utf8")
    .replace(/^\.pragma library\s*/, "")
 -eval(src + "\nmodule.exports = { defaultConfig, normalizeConfig, flatten, clockPeriod, bumpHHMM, pruneConfig, toggleInList, moveInList, isValidSlug, isReservedSection, currentPeriod, sanitizeFolderName, isCollapsed, activeRule, themeSlugForBackground, moveFolderIds, parseTimeInput, formatTimeDisplay, formatHourMinute, hourIsPm, applyMeridiem, parseClockTime, pickerSections, fuzzyMatch, minutesOf, moveIdBefore, wallpaperCyclePaths, nextWallpaper, cycleFolderChoices, isReorderableSection, themeWallpaperPaths, cycleIntervalMs, cycleSlugs, syncThemeCycleState, activeWallpaperSpec, isScheduleActive, clearSchedule, scheduleActiveLabel, defaultWallpaper, applyDefaultPreviews, boundCatalog, foldersForSlug, addSlugToFolder, dropSlugFromFolder, replaceFolderThemes, setThemeFolders }")
-+eval(src + "\nmodule.exports = { defaultConfig, normalizeConfig, flatten, clockPeriod, bumpHHMM, pruneConfig, toggleInList, moveInList, isValidSlug, isReservedSection, currentPeriod, sanitizeFolderName, isCollapsed, activeRule, themeSlugForBackground, moveFolderIds, parseTimeInput, formatTimeDisplay, formatHourMinute, hourIsPm, applyMeridiem, parseClockTime, pickerSections, fuzzyMatch, minutesOf, moveIdBefore, wallpaperCyclePaths, nextWallpaper, cycleFolderChoices, isReorderableSection, themeWallpaperPaths, cycleIntervalMs, cycleSlugs, syncThemeCycleState, activeWallpaperSpec, isScheduleActive, clearSchedule, scheduleActiveLabel, defaultWallpaper, applyDefaultPreviews, boundCatalog, foldersForSlug, addSlugToFolder, dropSlugFromFolder, replaceFolderThemes, setThemeFolders, removeThemeFromConfig }")
++eval(src + "\nmodule.exports = { defaultConfig, normalizeConfig, flatten, matchesFilter, clockPeriod, bumpHHMM, pruneConfig, toggleInList, moveInList, isValidSlug, isReservedSection, currentPeriod, sanitizeFolderName, isCollapsed, activeRule, themeSlugForBackground, moveFolderIds, parseTimeInput, formatTimeDisplay, formatHourMinute, hourIsPm, applyMeridiem, parseClockTime, pickerSections, fuzzyMatch, minutesOf, moveIdBefore, wallpaperCyclePaths, nextWallpaper, cycleFolderChoices, isReorderableSection, themeWallpaperPaths, cycleIntervalMs, cycleSlugs, syncThemeCycleState, activeWallpaperSpec, isScheduleActive, clearSchedule, scheduleActiveLabel, defaultWallpaper, applyDefaultPreviews, boundCatalog, foldersForSlug, addSlugToFolder, dropSlugFromFolder, replaceFolderThemes, setThemeFolders, removeThemeFromConfig, isOmagenPreviewTheme }")
  
  const m = module.exports
  const cfg = m.normalizeConfig({
-@@ -249,4 +249,29 @@ if (!freshPick.picker.includeStock || !freshPick.picker.includeUser) throw new E
+@@ -249,4 +249,62 @@ if (!freshPick.picker.includeStock || !freshPick.picker.includeUser) throw new E
  const keptOff = m.normalizeConfig({ picker: { includeStock: false, includeUser: false, defaultFolder: "favorites" } })
  if (keptOff.picker.includeStock || keptOff.picker.includeUser) throw new Error("keep picker includes off")
  if (keptOff.picker.defaultFolder !== "favorites") throw new Error("keep picker folder")
@@ -423,5 +574,38 @@ index cdf60c2..ea64647 100755
 +if (afterRemove.schedule.sun.night !== "other") throw new Error("keep sun night theme")
 +if (afterRemove.themeCycle.lastSlug !== "") throw new Error("clear themeCycle lastSlug")
 +if (!afterRemove.removed || afterRemove.removed.indexOf("nord") < 0) throw new Error("add to removed list")
++
++// Omagen preview filtering tests
++const omagenThemes = [
++  { slug: "omagen-preview-20260905t165309z-calm-123", name: "Omagen Preview 20260905t165309z Calm 123", backgrounds: [] },
++  { slug: "omagen_preview_sample", name: "Omagen Preview Sample", backgrounds: [] },
++  { slug: "custom-preview", name: "My omagen preview theme", backgrounds: [] },
++  { slug: "omagen1", name: "Omagen1", backgrounds: [] },
++  { slug: "nord", name: "Nord", backgrounds: [] }
++]
++const bound = m.boundCatalog(omagenThemes)
++if (bound.some(t => t.slug.includes("omagen-preview") || t.name.toLowerCase().includes("omagen preview"))) {
++  throw new Error("boundCatalog must not catalogue omagen preview themes")
++}
++if (!bound.some(t => t.slug === "omagen1")) throw new Error("boundCatalog must keep legitimate omagen1 theme")
++if (!bound.some(t => t.slug === "nord")) throw new Error("boundCatalog must keep nord theme")
++if (bound.length !== 2) throw new Error("boundCatalog should only contain 2 themes")
++
++if (!m.isOmagenPreviewTheme("omagen-preview-123")) throw new Error("isOmagenPreviewTheme slug check")
++if (!m.isOmagenPreviewTheme({ slug: "test", name: "Omagen Preview Alpha" })) throw new Error("isOmagenPreviewTheme name check")
++if (m.isOmagenPreviewTheme("omagen1")) throw new Error("isOmagenPreviewTheme should not match omagen1")
++if (m.isOmagenPreviewTheme("nord")) throw new Error("isOmagenPreviewTheme should not match nord")
++
++const matchTestTheme = { slug: "omagen-preview-xyz", name: "Omagen Preview Xyz" }
++if (m.matchesFilter(matchTestTheme, cfg, "all", "")) throw new Error("matchesFilter must reject omagen preview themes")
++if (m.matchesFilter(matchTestTheme, cfg, "user", "")) throw new Error("matchesFilter must reject omagen preview in user filter")
++if (m.matchesFilter(matchTestTheme, cfg, "stock", "")) throw new Error("matchesFilter must reject omagen preview in stock filter")
++
++const pickOmagen = m.pickerSections({ picker: { includeStock: true, includeUser: true } }, omagenThemes)
++for (const sec of pickOmagen) {
++  if (sec.themes.some(s => s.includes("omagen-preview"))) {
++    throw new Error("pickerSections must not include omagen preview themes")
++  }
++}
 +
  console.log("model ok")

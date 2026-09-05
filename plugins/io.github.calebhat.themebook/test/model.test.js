@@ -3,7 +3,7 @@ const fs = require("fs")
 const path = require("path")
 const src = fs.readFileSync(path.join(__dirname, "..", "Model.js"), "utf8")
   .replace(/^\.pragma library\s*/, "")
-eval(src + "\nmodule.exports = { defaultConfig, normalizeConfig, flatten, clockPeriod, bumpHHMM, pruneConfig, toggleInList, moveInList, isValidSlug, isReservedSection, currentPeriod, sanitizeFolderName, isCollapsed, activeRule, themeSlugForBackground, moveFolderIds, parseTimeInput, formatTimeDisplay, formatHourMinute, hourIsPm, applyMeridiem, parseClockTime, pickerSections, fuzzyMatch, minutesOf, moveIdBefore, wallpaperCyclePaths, nextWallpaper, cycleFolderChoices, isReorderableSection, themeWallpaperPaths, cycleIntervalMs, cycleSlugs, syncThemeCycleState, activeWallpaperSpec, isScheduleActive, clearSchedule, scheduleActiveLabel, defaultWallpaper, applyDefaultPreviews, boundCatalog, foldersForSlug, addSlugToFolder, dropSlugFromFolder, replaceFolderThemes, setThemeFolders, removeThemeFromConfig }")
+eval(src + "\nmodule.exports = { defaultConfig, normalizeConfig, flatten, matchesFilter, clockPeriod, bumpHHMM, pruneConfig, toggleInList, moveInList, isValidSlug, isReservedSection, currentPeriod, sanitizeFolderName, isCollapsed, activeRule, themeSlugForBackground, moveFolderIds, parseTimeInput, formatTimeDisplay, formatHourMinute, hourIsPm, applyMeridiem, parseClockTime, pickerSections, fuzzyMatch, minutesOf, moveIdBefore, wallpaperCyclePaths, nextWallpaper, cycleFolderChoices, isReorderableSection, themeWallpaperPaths, cycleIntervalMs, cycleSlugs, syncThemeCycleState, activeWallpaperSpec, isScheduleActive, clearSchedule, scheduleActiveLabel, defaultWallpaper, applyDefaultPreviews, boundCatalog, foldersForSlug, addSlugToFolder, dropSlugFromFolder, replaceFolderThemes, setThemeFolders, removeThemeFromConfig, isOmagenPreviewTheme }")
 
 const m = module.exports
 const cfg = m.normalizeConfig({
@@ -273,5 +273,38 @@ if (afterRemove.schedule.sun.day !== "") throw new Error("clear sun day theme")
 if (afterRemove.schedule.sun.night !== "other") throw new Error("keep sun night theme")
 if (afterRemove.themeCycle.lastSlug !== "") throw new Error("clear themeCycle lastSlug")
 if (!afterRemove.removed || afterRemove.removed.indexOf("nord") < 0) throw new Error("add to removed list")
+
+// Omagen preview filtering tests
+const omagenThemes = [
+  { slug: "omagen-preview-20260905t165309z-calm-123", name: "Omagen Preview 20260905t165309z Calm 123", backgrounds: [] },
+  { slug: "omagen_preview_sample", name: "Omagen Preview Sample", backgrounds: [] },
+  { slug: "custom-preview", name: "My omagen preview theme", backgrounds: [] },
+  { slug: "omagen1", name: "Omagen1", backgrounds: [] },
+  { slug: "nord", name: "Nord", backgrounds: [] }
+]
+const bound = m.boundCatalog(omagenThemes)
+if (bound.some(t => t.slug.includes("omagen-preview") || t.name.toLowerCase().includes("omagen preview"))) {
+  throw new Error("boundCatalog must not catalogue omagen preview themes")
+}
+if (!bound.some(t => t.slug === "omagen1")) throw new Error("boundCatalog must keep legitimate omagen1 theme")
+if (!bound.some(t => t.slug === "nord")) throw new Error("boundCatalog must keep nord theme")
+if (bound.length !== 2) throw new Error("boundCatalog should only contain 2 themes")
+
+if (!m.isOmagenPreviewTheme("omagen-preview-123")) throw new Error("isOmagenPreviewTheme slug check")
+if (!m.isOmagenPreviewTheme({ slug: "test", name: "Omagen Preview Alpha" })) throw new Error("isOmagenPreviewTheme name check")
+if (m.isOmagenPreviewTheme("omagen1")) throw new Error("isOmagenPreviewTheme should not match omagen1")
+if (m.isOmagenPreviewTheme("nord")) throw new Error("isOmagenPreviewTheme should not match nord")
+
+const matchTestTheme = { slug: "omagen-preview-xyz", name: "Omagen Preview Xyz" }
+if (m.matchesFilter(matchTestTheme, cfg, "all", "")) throw new Error("matchesFilter must reject omagen preview themes")
+if (m.matchesFilter(matchTestTheme, cfg, "user", "")) throw new Error("matchesFilter must reject omagen preview in user filter")
+if (m.matchesFilter(matchTestTheme, cfg, "stock", "")) throw new Error("matchesFilter must reject omagen preview in stock filter")
+
+const pickOmagen = m.pickerSections({ picker: { includeStock: true, includeUser: true } }, omagenThemes)
+for (const sec of pickOmagen) {
+  if (sec.themes.some(s => s.includes("omagen-preview"))) {
+    throw new Error("pickerSections must not include omagen preview themes")
+  }
+}
 
 console.log("model ok")
