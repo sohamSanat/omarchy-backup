@@ -1,0 +1,11 @@
+{
+  "plugins": {
+    "compound-engineering": {
+      "enabled": true
+    }
+  },
+  "userSettings": {
+    "remoteControlHostname": "omarchy-stellar-spark",
+    "themeMode": "THEME_MODE_DARK"
+  }
+}

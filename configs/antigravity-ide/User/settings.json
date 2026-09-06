@@ -1,0 +1,7 @@
+{
+  "workbench.colorTheme": "Omarchy",
+  "workbench.preferredLightColorTheme": "Omarchy",
+  "workbench.preferredDarkColorTheme": "Omarchy",
+  "editor.semanticHighlighting.enabled": true,
+  "python.languageServer": "Default"
+}

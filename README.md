@@ -125,6 +125,25 @@ This backup integrates frontier agent tooling and multi-agent fleet operations:
 - **`bin/printer`**: Full CLI tool for printer status, IPP ink level gauges, test page printing, maintenance routines (nozzle check, deep cleaning), and CUPS administration.
 - **`bin/printbar`**: Embedded status daemon for the `mryll.printbar` status bar widget.
 
+
+### 💻 Code Editors: Cursor IDE, Antigravity IDE & Antigravity App
+- **Cursor IDE (`configs/cursor/`)**:
+  - `User/settings.json`: Configured with the dynamic `Omarchy` theme, dark/light auto-detection, and semantic syntax highlighting.
+  - `argv.json` & `hooks.json`: Integrates Herdr session tracking (`herdr-agent-state.sh`) and basic password storage.
+  - `extensions/omarchy-theme/`: Local VS Code theme extension contributing the `"Omarchy"` theme dynamically linked to `/home/soham/.local/state/omarchy/current/theme/vscode-theme.json`.
+  - `skills-cursor/`: Full Cursor agentic skill suite containing 24 specialized workflows (`canvas`, `automate`, `review-bugbot`, `autopilot`, `statusline`, etc.).
+- **Antigravity IDE (`configs/antigravity-ide/`)**:
+  - `User/settings.json`: Configured with the `Omarchy` theme, semantic highlighting, and default Python language server.
+  - `argv.json` & `extensions.json`: Tracks installed extensions (`clangd`, `pyrefly`, `go`, `python`, `ruby-lsp`).
+  - `extensions/omarchy-theme/`: Local theme extension linked to Omarchy's system theme generator.
+- **Antigravity Desktop App (`configs/antigravity-app/`)**:
+  - `app_storage.json` & `Preferences`: Application state, workspace configurations, and window settings.
+  - `gemini-config/`: Compound engineering plugin activation, remote control hostname (`omarchy-stellar-spark`), dark theme mode, and Herdr lifecycle state hooks.
+- **Launchers & Assets**:
+  - `desktop-entries/`: `cursor.desktop`, `cursor-url-handler.desktop`, `antigravity-ide.desktop`, `antigravity.desktop`.
+  - `bin/`: `antigravity-app`, `cursor`, `cursor-tunnel`, `antigravity-ide`, `antigravity`.
+  - `pixmaps/`: Application icons for `antigravity-ide.png`, `cursor.png`, and `antigravity.png`.
+
 ## 🎨 Themes Included
 
 | Theme | Type | Source / Upstream |

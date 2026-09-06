@@ -209,6 +209,56 @@ if [[ -d "${SCRIPT_DIR}/configs/pi" ]]; then
   mkdir -p "${USER_HOME}/.pi/agent/themes"
   cp -a "${SCRIPT_DIR}/configs/pi/agent/." "${USER_HOME}/.pi/agent/"
 fi
+if [[ -d "${SCRIPT_DIR}/configs/cursor" ]]; then
+  echo "  -> Restoring Cursor IDE settings, skills, and omarchy-theme..."
+  mkdir -p "${USER_HOME}/.config/Cursor/User"
+  cp -a "${SCRIPT_DIR}/configs/cursor/User/." "${USER_HOME}/.config/Cursor/User/"
+  mkdir -p "${USER_HOME}/.cursor/extensions"
+  cp -a "${SCRIPT_DIR}/configs/cursor/argv.json" "${USER_HOME}/.cursor/" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/cursor/hooks.json" "${USER_HOME}/.cursor/" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/cursor/herdr-agent-state.sh" "${USER_HOME}/.cursor/" 2>/dev/null || true
+  chmod +x "${USER_HOME}/.cursor/herdr-agent-state.sh" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/cursor/extensions/." "${USER_HOME}/.cursor/extensions/" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/cursor/skills-cursor" "${USER_HOME}/.cursor/" 2>/dev/null || true
+  # Link Omarchy color theme to active theme
+  mkdir -p "${USER_HOME}/.cursor/extensions/omarchy-theme/themes"
+  ln -nsf "${USER_HOME}/.local/state/omarchy/current/theme/vscode-theme.json" "${USER_HOME}/.cursor/extensions/omarchy-theme/themes/omarchy-color-theme.json"
+  if [[ -f "${USER_HOME}/.local/share/cursor/bin/cursor" ]]; then
+    ln -nsf "${USER_HOME}/.local/share/cursor/bin/cursor" "${USER_HOME}/.local/bin/cursor"
+    ln -nsf "${USER_HOME}/.local/share/cursor/bin/cursor-tunnel" "${USER_HOME}/.local/bin/cursor-tunnel"
+  fi
+  echo "  [OK] Cursor IDE settings, skills, and theme restored."
+fi
+if [[ -d "${SCRIPT_DIR}/configs/antigravity-ide" ]]; then
+  echo "  -> Restoring Antigravity IDE settings and omarchy-theme..."
+  mkdir -p "${USER_HOME}/.config/Antigravity IDE/User"
+  cp -a "${SCRIPT_DIR}/configs/antigravity-ide/User/." "${USER_HOME}/.config/Antigravity IDE/User/"
+  mkdir -p "${USER_HOME}/.antigravity-ide/extensions"
+  cp -a "${SCRIPT_DIR}/configs/antigravity-ide/argv.json" "${USER_HOME}/.antigravity-ide/" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/antigravity-ide/extensions/." "${USER_HOME}/.antigravity-ide/extensions/" 2>/dev/null || true
+  # Link Omarchy color theme to active theme
+  mkdir -p "${USER_HOME}/.antigravity-ide/extensions/omarchy-theme/themes"
+  ln -nsf "${USER_HOME}/.local/state/omarchy/current/theme/vscode-theme.json" "${USER_HOME}/.antigravity-ide/extensions/omarchy-theme/themes/omarchy-color-theme.json"
+  if [[ -f "${USER_HOME}/.local/share/antigravity-ide/bin/antigravity-ide" ]]; then
+    ln -nsf "${USER_HOME}/.local/share/antigravity-ide/bin/antigravity-ide" "${USER_HOME}/.local/bin/antigravity-ide"
+  fi
+  echo "  [OK] Antigravity IDE settings and theme restored."
+fi
+if [[ -d "${SCRIPT_DIR}/configs/antigravity-app" ]]; then
+  echo "  -> Restoring Antigravity Desktop App and Gemini agent configurations..."
+  mkdir -p "${USER_HOME}/.config/Antigravity"
+  cp -a "${SCRIPT_DIR}/configs/antigravity-app/app_storage.json" "${USER_HOME}/.config/Antigravity/" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/antigravity-app/Preferences" "${USER_HOME}/.config/Antigravity/" 2>/dev/null || true
+  if [[ -d "${SCRIPT_DIR}/configs/antigravity-app/gemini-config" ]]; then
+    mkdir -p "${USER_HOME}/.gemini/config/hooks"
+    cp -a "${SCRIPT_DIR}/configs/antigravity-app/gemini-config/." "${USER_HOME}/.gemini/config/"
+    chmod +x "${USER_HOME}/.gemini/config/hooks/herdr-agent-state.sh" 2>/dev/null || true
+  fi
+  if [[ -f "${USER_HOME}/.local/bin/agy" ]]; then
+    ln -nsf "${USER_HOME}/.local/bin/agy" "${USER_HOME}/.local/bin/antigravity"
+  fi
+  echo "  [OK] Antigravity Desktop App configurations restored."
+fi
 if [[ -d "${SCRIPT_DIR}/agents" ]]; then
   mkdir -p "${USER_HOME}/.agents/rules" "${USER_HOME}/.agents/skills"
   cp -a "${SCRIPT_DIR}/agents/rules/." "${USER_HOME}/.agents/rules/"
@@ -305,6 +355,15 @@ if [[ -d "${SCRIPT_DIR}/desktop-entries" ]]; then
     update-desktop-database "${USER_HOME}/.local/share/applications" 2>/dev/null || true
   fi
   echo "  [OK] Desktop applications registered."
+if [[ -d "${SCRIPT_DIR}/pixmaps" ]]; then
+  mkdir -p "${USER_HOME}/.local/share/pixmaps"
+  cp -a "${SCRIPT_DIR}/pixmaps/." "${USER_HOME}/.local/share/pixmaps/"
+  if [[ -f "${SCRIPT_DIR}/pixmaps/antigravity.png" ]]; then
+    mkdir -p "${USER_HOME}/.local/share/icons/hicolor/256x256/apps"
+    cp -a "${SCRIPT_DIR}/pixmaps/antigravity.png" "${USER_HOME}/.local/share/icons/hicolor/256x256/apps/"
+  fi
+fi
+
 if command -v flatpak >/dev/null 2>&1; then
   echo "  -> Ensuring Flatpak user remote and apps..."
   flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true

@@ -1,0 +1,43 @@
+[
+  {
+    "identifier": {
+      "id": "anysphere.remote-ssh"
+    },
+    "version": "1.1.14",
+    "location": {
+      "$mid": 1,
+      "fsPath": "/home/soham/.cursor/extensions/anysphere.remote-ssh-1.1.14",
+      "external": "file:///home/soham/.cursor/extensions/anysphere.remote-ssh-1.1.14",
+      "path": "/home/soham/.cursor/extensions/anysphere.remote-ssh-1.1.14",
+      "scheme": "file"
+    },
+    "relativeLocation": "anysphere.remote-ssh-1.1.14",
+    "metadata": {
+      "isApplicationScoped": true,
+      "installedTimestamp": 1788434390837,
+      "source": "gallery",
+      "id": "73a45d83-83c7-4b22-bebf-c9130b0ab3f3",
+      "publisherId": "c16ea17f-2629-4893-9064-35c0fd9add4c",
+      "publisherDisplayName": "Anysphere",
+      "targetPlatform": "undefined",
+      "updated": false,
+      "private": false,
+      "isPreReleaseVersion": false,
+      "hasPreReleaseVersion": false
+    }
+  },
+  {
+    "identifier": {
+      "id": "local.omarchy-theme"
+    },
+    "version": "1.0.0",
+    "location": {
+      "$mid": 1,
+      "fsPath": "/home/soham/.cursor/extensions/omarchy-theme",
+      "external": "file:///home/soham/.cursor/extensions/omarchy-theme",
+      "path": "/home/soham/.cursor/extensions/omarchy-theme",
+      "scheme": "file"
+    },
+    "relativeLocation": "omarchy-theme"
+  }
+]

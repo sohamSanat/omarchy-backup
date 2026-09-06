@@ -170,6 +170,13 @@ This repository contains the full snapshot of user customizations:
    - Templates: `configs/omarchy/themed/zen-darkreader*.tpl`
    - Synced via `omarchy-sync-zen --sync` and auto-hooked to theme switches.
 
+
+14. **Cursor IDE, Antigravity IDE & Antigravity App**:
+   - `configs/cursor/`: User settings, Herdr hooks, 24 cursor skills, and `omarchy-theme` extension.
+   - `configs/antigravity-ide/`: IDE settings, extension list, and `omarchy-theme` extension.
+   - `configs/antigravity-app/`: Desktop app state, Preferences, and `~/.gemini/config/` plugin/hook configurations.
+   - `restore.sh` automatically links `omarchy-theme` to active `vscode-theme.json` so editors match Omarchy Linux themes.
+
 ## 3. Fast Restoration (Automated)
 
 To apply everything at once, simply clone this repository onto the target Omarchy machine and execute:
