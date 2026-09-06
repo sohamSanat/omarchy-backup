@@ -1,0 +1,3 @@
+#!/bin/bash
+# Omarchy file manager (cwd) launcher redirect to Strata
+exec setsid uwsm-app -- /home/soham/.local/bin/strata "$(omarchy-cmd-terminal-cwd)"

@@ -43,6 +43,20 @@ o.window("(io\\.github\\.lgse\\.Strata|strata|org\\.gnome\\.Nautilus|nautilus)",
   opacity = "0.82 0.75",
 })
 
+-- Float file chooser and desktop portal dialogs
+o.window("(GTK Application|xdg-desktop-portal-.*)", {
+  tag = "+floating-window",
+})
+
+-- Float Ristretto image viewer with full opacity
+o.window("(org\\.xfce\\.ristretto|ristretto)", {
+  tag = "+floating-window",
+})
+o.window("(org\\.xfce\\.ristretto|ristretto)", {
+  tag = "-default-opacity",
+  opacity = "1.0 1.0",
+})
+
 -- Window opacity for Zen Browser is disabled so loaded websites remain 100% opaque.
 -- Zen native Wayland transparency handles default tab glass rendering.
 -- o.window("(zen|zen-bin|zen-alpha)", {
@@ -60,3 +74,10 @@ o.window("(Alacritty|alacritty|kitty|com\\.mitchellh\\.ghostty|ghostty|foot|wezt
 
 -- wmfeht.border-fx (Omarchy plugin control plane; pcall if the file is missing)
 pcall(require, "hypr.border-fx")
+
+-- Inhibit idle for all fullscreen windows (video playback, games, presentations)
+o.window(".*", { idle_inhibit = "fullscreen" })
+
+-- Inhibit idle for Picture-in-Picture windows
+o.window({ tag = "pip" }, { idle_inhibit = "always" })
+

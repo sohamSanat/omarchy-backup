@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Universal redirect from Nautilus to Strata
+
+STRATA_BIN="/home/soham/.local/bin/strata"
+args=()
+select_file=""
+
+while (( $# > 0 )); do
+  case "$1" in
+    --select)
+      shift
+      if (( $# > 0 )); then
+        select_file="$1"
+      fi
+      ;;
+    --new-window|--no-default-window|-w)
+      # Strata manages windows natively
+      ;;
+    --gapplication-service)
+      exec "$STRATA_BIN" --gapplication-service
+      ;;
+    -h|--help)
+      exec "$STRATA_BIN" --help
+      ;;
+    --version)
+      echo "Strata (Nautilus redirect)"
+      exit 0
+      ;;
+    -*)
+      ;;
+    *)
+      args+=("$1")
+      ;;
+  esac
+  shift
+done
+
+if [[ -n "$select_file" ]]; then
+  if [[ -d "$select_file" ]]; then
+    exec "$STRATA_BIN" "$select_file"
+  elif [[ -f "$select_file" ]]; then
+    exec "$STRATA_BIN" "$(dirname "$select_file")"
+  fi
+fi
+
+exec "$STRATA_BIN" "${args[@]}"

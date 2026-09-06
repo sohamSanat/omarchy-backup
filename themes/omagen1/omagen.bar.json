@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "ownership": "overlay",
+  "implementation": "replacement",
+  "bar": {
+    "id": "pretty.omagen.bar"
+  },
+  "behavior": {
+    "form": "floating",
+    "visibility": "always",
+    "reveal": "edge",
+    "expansion": "none",
+    "workspace": "native"
+  }
+}

@@ -1,4 +1,3 @@
-aether
 alsa-utils
 asdcontrol
 base
@@ -14,15 +13,14 @@ brave-origin-nightly-bin
 brightnessctl
 btop
 btrfs-progs
+chntpw
 clang
-cliamp
 cups
 cups-filters
 cups-pk-helper
 ddcutil
 dosfstools
 dotnet-runtime
-dua-cli
 efibootmgr
 espeak-ng
 evince
@@ -37,12 +35,10 @@ fd
 fetch-git
 ffmpegthumbnailer
 flatpak
-foot
 fprintd
 fzf
 ghostty
 git
-gnome-disk-utility
 gnome-keyring
 gnome-themes-extra
 gpu-screen-recorder
@@ -68,6 +64,7 @@ inotify-tools
 intel-media-driver
 intel-ucode
 inxi
+ipp-usb
 jq
 kdeconnect
 kdenlive
@@ -82,7 +79,6 @@ limine
 linux
 linux-firmware
 llvm
-localsend
 lua51
 luarocks
 man-db
@@ -125,11 +121,13 @@ proton-vpn-cli
 proton-vpn-gtk-app
 python-gobject
 python-poetry-core
+qdirstat
 qemu-user-static-binfmt
 qrencode
 qt6-imageformats
 quickshell
 ripgrep
+ristretto
 ruby
 sddm
 slurp

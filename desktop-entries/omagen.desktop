@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Omagen
+GenericName=Theme Studio
+Comment=Generate and customize Omarchy themes from images
+Exec=omarchy-shell shell toggle pretty.omagen
+TryExec=omarchy-shell
+Icon=omagen
+Terminal=false
+StartupNotify=false
+Categories=Settings;DesktopSettings;
+Keywords=theme;omarchy;wallpaper;generator;palette;colors;studio;omagen;

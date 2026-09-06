@@ -259,6 +259,53 @@ if [[ -d "${SCRIPT_DIR}/configs/antigravity-app" ]]; then
   fi
   echo "  [OK] Antigravity Desktop App configurations restored."
 fi
+if [[ -d "${SCRIPT_DIR}/lib" ]]; then
+  echo "  -> Restoring custom system libraries..."
+  mkdir -p "${USER_HOME}/.local/lib"
+  cp -a "${SCRIPT_DIR}/lib/." "${USER_HOME}/.local/lib/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/foliate" ]]; then
+  echo "  -> Restoring Foliate configuration and theme..."
+  mkdir -p "${USER_HOME}/.config/com.github.johnfactotum.Foliate"
+  cp -a "${SCRIPT_DIR}/configs/foliate/." "${USER_HOME}/.config/com.github.johnfactotum.Foliate/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/qdirstat" ]]; then
+  echo "  -> Restoring QDirStat configurations..."
+  mkdir -p "${USER_HOME}/.config/QDirStat"
+  cp -a "${SCRIPT_DIR}/configs/qdirstat/." "${USER_HOME}/.config/QDirStat/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/fdm" ]]; then
+  echo "  -> Restoring Free Download Manager configurations..."
+  mkdir -p "${USER_HOME}/.config/Softdeluxe" "${USER_HOME}/.config/autostart" "${USER_HOME}/.config/zen/native-messaging-hosts"
+  cp -a "${SCRIPT_DIR}/configs/fdm/Free Download Manager.conf" "${USER_HOME}/.config/Softdeluxe/" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/fdm/FDM.desktop" "${USER_HOME}/.config/autostart/" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/fdm/org.freedownloadmanager.fdm5.cnh.json" "${USER_HOME}/.config/zen/native-messaging-hosts/" 2>/dev/null || true
+fi
+if [[ -d "${SCRIPT_DIR}/configs/gtk-4.0" ]]; then
+  echo "  -> Restoring GTK 4 custom styling..."
+  mkdir -p "${USER_HOME}/.config/gtk-4.0"
+  cp -a "${SCRIPT_DIR}/configs/gtk-4.0/." "${USER_HOME}/.config/gtk-4.0/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/ristretto" ]]; then
+  echo "  -> Restoring Ristretto image viewer configuration..."
+  mkdir -p "${USER_HOME}/.config/ristretto"
+  cp -a "${SCRIPT_DIR}/configs/ristretto/." "${USER_HOME}/.config/ristretto/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/strata" ]]; then
+  mkdir -p "${USER_HOME}/.config/strata"
+  cp -a "${SCRIPT_DIR}/configs/strata/." "${USER_HOME}/.config/strata/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/xdg-desktop-portal" ]]; then
+  echo "  -> Restoring XDG Desktop Portal and Strata portal config..."
+  mkdir -p "${USER_HOME}/.config/xdg-desktop-portal" "${USER_HOME}/.local/share/xdg-desktop-portal/portals"
+  cp -a "${SCRIPT_DIR}/configs/xdg-desktop-portal/portals.conf" "${USER_HOME}/.config/xdg-desktop-portal/" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/xdg-desktop-portal/hyprland-portals.conf" "${USER_HOME}/.config/xdg-desktop-portal/" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/xdg-desktop-portal/strata.portal" "${USER_HOME}/.local/share/xdg-desktop-portal/portals/" 2>/dev/null || true
+fi
+if [[ -d "${SCRIPT_DIR}/configs/dbus-services" ]]; then
+  mkdir -p "${USER_HOME}/.local/share/dbus-1/services"
+  cp -a "${SCRIPT_DIR}/configs/dbus-services/." "${USER_HOME}/.local/share/dbus-1/services/"
+fi
 if [[ -d "${SCRIPT_DIR}/agents" ]]; then
   mkdir -p "${USER_HOME}/.agents/rules" "${USER_HOME}/.agents/skills"
   cp -a "${SCRIPT_DIR}/agents/rules/." "${USER_HOME}/.agents/rules/"
@@ -377,8 +424,8 @@ fi
 echo ""
 echo "==> Step 11: Applying customizations and restarting components..."
 if command -v omarchy >/dev/null 2>&1; then
-  echo "  -> Setting theme: Akaito"
-  omarchy theme set "Akaito" || true
+  echo "  -> Setting theme: Solitude"
+  omarchy theme set "Solitude" || true
 
   
   if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-zen" ]]; then
@@ -406,7 +453,7 @@ fi
 echo ""
 echo "========================================================"
 echo "  Customizations Restored Successfully!"
-echo "  - Current theme: Akaito"
+echo "  - Current theme: Solitude"
 echo "  - Current font: JetBrainsMono Nerd Font"
 echo "  - Bar Layout: Custom floating bar with 14 plugins"
 echo "  - Window Manager: Hyprland with blur, scale 2, and custom bindings"

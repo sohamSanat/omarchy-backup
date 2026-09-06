@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "preset": "cyberpunk-glitch",
+  "preset_revision": 7,
+  "customized": {
+    "animations": false,
+    "bar": true,
+    "shell": true,
+    "terminal": false,
+    "window": false
+  }
+}

@@ -1,0 +1,497 @@
+#!/usr/bin/env python3
+"""
+Omarchy Video & Media Idle Inhibitor and Lock-on-Screensaver Guard.
+1. Prevents animated screensavers and idle lock while watching videos or listening to media.
+2. Ensures that whenever the animated screensaver is dismissed or closed, the system locks
+   and prompts for password / fingerprint authentication.
+"""
+
+import os
+import sys
+import time
+import signal
+import socket
+import subprocess
+import json
+import threading
+import warnings
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+import gi
+gi.require_version('Gio', '2.0')
+gi.require_version('GLib', '2.0')
+from gi.repository import Gio, GLib
+
+HOME = os.path.expanduser("~")
+TOGGLE_FILE = os.path.join(HOME, ".local/state/omarchy/toggles/screensaver-off")
+STAY_AWAKE_FILE = os.path.join(HOME, ".local/state/omarchy/indicators/stay-awake")
+
+IGNORED_APPS = {
+    "speech-dispatcher-dummy",
+    "voxtype-avx512",
+    "voxtype",
+    "system-sounds",
+}
+
+def log(msg: str):
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] [omarchy-idle-inhibit] {msg}", flush=True)
+
+class OmarchyVideoIdleInhibitor:
+    def __init__(self):
+        self.loop = GLib.MainLoop()
+        self.lock = threading.Lock()
+
+        self.dbus_inhibits = {}   # cookie -> {"app": str, "reason": str, "sender": str}
+        self.next_cookie = 1
+
+        self.mpris_players = {}   # bus_name -> bool (is_playing)
+        self.audio_active = False
+
+        self.currently_inhibited = False
+        self.grace_timer = None
+        self.tagged_addresses = set()
+        self.screensaver_windows = set()
+
+        self.conn = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+
+        signal.signal(signal.SIGINT, self._handle_signal)
+        signal.signal(signal.SIGTERM, self._handle_signal)
+
+    def _handle_signal(self, signum, frame):
+        log("Shutting down inhibitor daemon...")
+        self.release_all_inhibitions()
+        self.loop.quit()
+
+    # ------------------ Hyprland Socket2 Watcher ------------------
+    def hyprland_socket_thread(self):
+        """Watches Hyprland socket2 to ensure any screensaver window close triggers a system lock."""
+        runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+
+        while True:
+            try:
+                sig = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
+                sock_path = os.path.join(runtime_dir, "hypr", sig, ".socket2.sock") if sig else ""
+
+                if not (sock_path and os.path.exists(sock_path)):
+                    hypr_dir = os.path.join(runtime_dir, "hypr")
+                    sock_path = None
+                    if os.path.exists(hypr_dir):
+                        for entry in os.listdir(hypr_dir):
+                            candidate = os.path.join(hypr_dir, entry, ".socket2.sock")
+                            if os.path.exists(candidate):
+                                sock_path = candidate
+                                break
+
+                if not sock_path or not os.path.exists(sock_path):
+                    time.sleep(2)
+                    continue
+
+                # Scan for any already running screensaver windows
+                try:
+                    res = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=2)
+                    if res.returncode == 0:
+                        clients = json.loads(res.stdout)
+                        for c in clients:
+                            if c.get("class") == "org.omarchy.screensaver":
+                                with self.lock:
+                                    self.screensaver_windows.add(c.get("address", ""))
+                except Exception:
+                    pass
+
+                s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                s.connect(sock_path)
+                f = s.makefile("r")
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("openwindow>>"):
+                        # format: address,workspace,class,title
+                        parts = line[12:].split(",", 3)
+                        if len(parts) >= 3 and parts[2] == "org.omarchy.screensaver":
+                            addr = parts[0].strip()
+                            with self.lock:
+                                self.screensaver_windows.add(addr)
+                            log(f"Screensaver window active: {addr}")
+                    elif line.startswith("closewindow>>"):
+                        addr = line[13:].strip()
+                        was_screensaver = False
+                        with self.lock:
+                            if addr in self.screensaver_windows:
+                                self.screensaver_windows.remove(addr)
+                                was_screensaver = True
+                        if was_screensaver:
+                            log(f"Screensaver window closed: {addr}. Ensuring lock engaged...")
+                            try:
+                                is_locked = subprocess.check_output(
+                                    ["omarchy-shell", "lock", "isLocked"],
+                                    text=True, stderr=subprocess.DEVNULL, timeout=1
+                                ).strip()
+                                if is_locked != "true":
+                                    subprocess.run(["omarchy-system-lock"], timeout=2)
+                            except Exception:
+                                subprocess.run(["omarchy-system-lock"], timeout=2)
+                s.close()
+            except Exception as e:
+                time.sleep(2)
+
+    # ------------------ Hyprland Tagging ------------------
+    def tag_hyprland_windows(self, tag_on: bool, app_hints=None):
+        """Tags windows belonging to media apps with +noidle or -noidle."""
+        try:
+            res = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=2)
+            if res.returncode != 0:
+                return
+            clients = json.loads(res.stdout)
+        except Exception:
+            return
+
+        media_keywords = ["zen", "firefox", "chrom", "brave", "edge", "vivaldi", "mpv", "vlc", "spotify"]
+        if app_hints:
+            media_keywords.extend([h.lower() for h in app_hints if h])
+
+        for c in clients:
+            c_class = c.get("class", "").lower()
+            c_title = c.get("title", "").lower()
+            addr = c.get("address", "")
+            if not addr:
+                continue
+
+            matches = any(k in c_class or k in c_title for k in media_keywords)
+            if matches:
+                if tag_on:
+                    if addr not in self.tagged_addresses:
+                        subprocess.run(
+                            ["hyprctl", "dispatch", f'hl.dsp.window.tag({{ tag = "+noidle", window = "address:{addr}" }})'],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
+                        )
+                        self.tagged_addresses.add(addr)
+                        log(f"Tagged window {c.get('class')} ({addr}) with +noidle")
+                else:
+                    if addr in self.tagged_addresses:
+                        subprocess.run(
+                            ["hyprctl", "dispatch", f'hl.dsp.window.tag({{ tag = "-noidle", window = "address:{addr}" }})'],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
+                        )
+                        self.tagged_addresses.discard(addr)
+                        log(f"Untagged window {c.get('class')} ({addr}) with -noidle")
+
+    # ------------------ Core Inhibit State ------------------
+    def set_system_inhibit(self, inhibit: bool):
+        if inhibit:
+            if self.grace_timer:
+                self.grace_timer.cancel()
+                self.grace_timer = None
+
+            if not self.currently_inhibited:
+                self.currently_inhibited = True
+                log(">>> INHIBITING IDLE: Video/media is active.")
+                subprocess.run(["omarchy-shell", "-q", "idle", "disable"], timeout=2)
+                os.makedirs(os.path.dirname(TOGGLE_FILE), exist_ok=True)
+                try:
+                    open(TOGGLE_FILE, "a").close()
+                except Exception:
+                    pass
+                app_hints = [r.get("app") for r in self.dbus_inhibits.values()]
+                self.tag_hyprland_windows(True, app_hints)
+        else:
+            if self.currently_inhibited and not self.grace_timer:
+                log("Playback paused/stopped. Starting 6s grace period before re-enabling idle...")
+                self.grace_timer = threading.Timer(6.0, self._apply_release)
+                self.grace_timer.start()
+
+    def _apply_release(self):
+        with self.lock:
+            self.grace_timer = None
+            has_dbus = len(self.dbus_inhibits) > 0
+            has_mpris = any(self.mpris_players.values())
+            if has_dbus or has_mpris or self.audio_active:
+                log("Media resumed during grace period. Maintaining inhibit.")
+                return
+
+            self.currently_inhibited = False
+            log("<<< RELEASING INHIBIT: Normal idle timers restored.")
+            try:
+                if os.path.exists(TOGGLE_FILE):
+                    os.remove(TOGGLE_FILE)
+            except Exception:
+                pass
+            subprocess.run(["omarchy-shell", "-q", "idle", "enable"], timeout=2)
+            self.tag_hyprland_windows(False)
+
+    def release_all_inhibitions(self):
+        with self.lock:
+            if self.grace_timer:
+                self.grace_timer.cancel()
+                self.grace_timer = None
+            self.currently_inhibited = False
+            try:
+                if os.path.exists(TOGGLE_FILE):
+                    os.remove(TOGGLE_FILE)
+            except Exception:
+                pass
+            subprocess.run(["omarchy-shell", "-q", "idle", "enable"], timeout=2)
+            self.tag_hyprland_windows(False)
+
+    def evaluate_state(self):
+        has_dbus = len(self.dbus_inhibits) > 0
+        has_mpris = any(self.mpris_players.values())
+        should_inhibit = has_dbus or has_mpris or self.audio_active
+        self.set_system_inhibit(should_inhibit)
+
+    # ------------------ D-Bus Services Export ------------------
+    def export_dbus_services(self):
+        screensaver_xml = """
+        <node>
+          <interface name="org.freedesktop.ScreenSaver">
+            <method name="Inhibit">
+              <arg name="application_name" type="s" direction="in"/>
+              <arg name="reason_for_inhibit" type="s" direction="in"/>
+              <arg name="cookie" type="u" direction="out"/>
+            </method>
+            <method name="UnInhibit">
+              <arg name="cookie" type="u" direction="in"/>
+            </method>
+            <method name="GetActive">
+              <arg name="active" type="b" direction="out"/>
+            </method>
+            <method name="SimulateUserActivity"/>
+          </interface>
+          <interface name="org.freedesktop.PowerManagement.Inhibit">
+            <method name="Inhibit">
+              <arg name="application" type="s" direction="in"/>
+              <arg name="reason" type="s" direction="in"/>
+              <arg name="cookie" type="u" direction="out"/>
+            </method>
+            <method name="UnInhibit">
+              <arg name="cookie" type="u" direction="in"/>
+            </method>
+            <method name="HasInhibit">
+              <arg name="has_inhibit" type="b" direction="out"/>
+            </method>
+          </interface>
+        </node>
+        """
+        node_info = Gio.DBusNodeInfo.new_for_xml(screensaver_xml)
+
+        def method_call(conn, sender, object_path, interface_name, method_name, parameters, invocation):
+            with self.lock:
+                if method_name == "Inhibit":
+                    app_name, reason = parameters.unpack()
+                    cookie = self.next_cookie
+                    self.next_cookie += 1
+                    self.dbus_inhibits[cookie] = {
+                        "app": app_name,
+                        "reason": reason,
+                        "sender": sender
+                    }
+                    log(f"DBus Inhibit received from '{app_name}': '{reason}' (cookie: {cookie})")
+                    self.evaluate_state()
+                    invocation.return_value(GLib.Variant("(u)", (cookie,)))
+                elif method_name == "UnInhibit":
+                    cookie, = parameters.unpack()
+                    req = self.dbus_inhibits.pop(cookie, None)
+                    if req:
+                        log(f"DBus UnInhibit received for cookie {cookie} ({req.get('app')})")
+                    self.evaluate_state()
+                    invocation.return_value(None)
+                elif method_name in ("GetActive", "HasInhibit"):
+                    invocation.return_value(GLib.Variant("(b)", (self.currently_inhibited,)))
+                elif method_name == "SimulateUserActivity":
+                    invocation.return_value(None)
+
+        for iface in node_info.interfaces:
+            path = "/org/freedesktop/ScreenSaver" if "ScreenSaver" in iface.name else "/org/freedesktop/PowerManagement/Inhibit"
+            self.conn.register_object(path, iface, method_call, None, None)
+
+        Gio.bus_own_name_on_connection(
+            self.conn,
+            "org.freedesktop.ScreenSaver",
+            Gio.BusNameOwnerFlags.REPLACE,
+            lambda c, n: log(f"Registered D-Bus: {n}"),
+            lambda c, n: log(f"Lost D-Bus: {n}")
+        )
+        Gio.bus_own_name_on_connection(
+            self.conn,
+            "org.freedesktop.PowerManagement.Inhibit",
+            Gio.BusNameOwnerFlags.REPLACE,
+            lambda c, n: log(f"Registered D-Bus: {n}"),
+            lambda c, n: log(f"Lost D-Bus: {n}")
+        )
+
+    # ------------------ MPRIS Monitoring ------------------
+    def check_mpris_player(self, bus_name: str):
+        try:
+            val = self.conn.call_sync(
+                bus_name,
+                "/org/mpris/MediaPlayer2",
+                "org.freedesktop.DBus.Properties",
+                "Get",
+                GLib.Variant("(ss)", ("org.mpris.MediaPlayer2.Player", "PlaybackStatus")),
+                GLib.VariantType("(v)"),
+                Gio.DBusCallFlags.NONE,
+                300,
+                None
+            )
+            status = val.unpack()[0]
+            is_playing = (status == "Playing")
+            with self.lock:
+                self.mpris_players[bus_name] = is_playing
+                if is_playing:
+                    log(f"MPRIS {bus_name} is Playing")
+                self.evaluate_state()
+        except Exception:
+            pass
+
+    def setup_mpris_listener(self):
+        self.conn.signal_subscribe(
+            "org.freedesktop.DBus",
+            "org.freedesktop.DBus",
+            "NameOwnerChanged",
+            "/org/freedesktop/DBus",
+            None,
+            Gio.DBusSignalFlags.NONE,
+            self._on_name_owner_changed,
+            None
+        )
+
+        self.conn.signal_subscribe(
+            None,
+            "org.freedesktop.DBus.Properties",
+            "PropertiesChanged",
+            "/org/mpris/MediaPlayer2",
+            None,
+            Gio.DBusSignalFlags.NONE,
+            self._on_properties_changed,
+            None
+        )
+
+        try:
+            val = self.conn.call_sync(
+                "org.freedesktop.DBus",
+                "/org/freedesktop/DBus",
+                "org.freedesktop.DBus",
+                "ListNames",
+                None,
+                GLib.VariantType("(as)"),
+                Gio.DBusCallFlags.NONE,
+                -1,
+                None
+            )
+            for n in val.unpack()[0]:
+                if n.startswith("org.mpris.MediaPlayer2."):
+                    self.check_mpris_player(n)
+        except Exception as e:
+            log(f"Error scanning MPRIS: {e}")
+
+    def _on_name_owner_changed(self, conn, sender, path, iface, signal_name, params, user_data):
+        name, old_owner, new_owner = params.unpack()
+        with self.lock:
+            if name.startswith("org.mpris.MediaPlayer2."):
+                if not new_owner:
+                    self.mpris_players.pop(name, None)
+                    self.evaluate_state()
+                else:
+                    self.check_mpris_player(name)
+
+            dropped = [c for c, r in self.dbus_inhibits.items() if r.get("sender") == name and not new_owner]
+            for c in dropped:
+                self.dbus_inhibits.pop(c, None)
+            if dropped:
+                self.evaluate_state()
+
+    def _on_properties_changed(self, conn, sender, path, iface, signal_name, params, user_data):
+        interface_name, changed_props, invalidated_props = params.unpack()
+        if interface_name == "org.mpris.MediaPlayer2.Player" and "PlaybackStatus" in changed_props:
+            status = changed_props["PlaybackStatus"]
+            is_playing = (status == "Playing")
+            with self.lock:
+                self.mpris_players[sender] = is_playing
+                log(f"MPRIS status change: {sender} -> {status}")
+                self.evaluate_state()
+
+    # ------------------ PipeWire Audio Monitoring ------------------
+    def check_audio_active(self) -> bool:
+        try:
+            out = subprocess.check_output(
+                ["pactl", "list", "sink-inputs"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+                timeout=2
+            )
+        except Exception:
+            return False
+
+        blocks = out.split("Sink Input #")
+        for block in blocks[1:]:
+            if "Corked: yes" in block or "Mute: yes" in block:
+                continue
+            app_name = ""
+            for line in block.splitlines():
+                line = line.strip()
+                if line.startswith("application.name = "):
+                    app_name = line.split("=", 1)[1].strip(' "\'')
+                    break
+            if app_name in IGNORED_APPS or (app_name and "voxtype" in app_name.lower()):
+                continue
+            return True
+        return False
+
+    def audio_monitor_thread(self):
+        """Unbuffered listener on pactl subscribe + 2-second heartbeat."""
+        while True:
+            try:
+                proc = subprocess.Popen(
+                    ["pactl", "subscribe"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    bufsize=1
+                )
+
+                def heartbeat():
+                    while proc.poll() is None:
+                        time.sleep(2)
+                        active = self.check_audio_active()
+                        with self.lock:
+                            if active != self.audio_active:
+                                self.audio_active = active
+                                self.evaluate_state()
+
+                hb = threading.Thread(target=heartbeat, daemon=True)
+                hb.start()
+
+                while True:
+                    line = proc.stdout.readline()
+                    if not line:
+                        break
+                    if "sink-input" in line:
+                        time.sleep(0.05)
+                        active = self.check_audio_active()
+                        with self.lock:
+                            if active != self.audio_active:
+                                self.audio_active = active
+                                self.evaluate_state()
+            except Exception as e:
+                time.sleep(2)
+
+    def run(self):
+        log("Omarchy Video & Media Idle Inhibitor Daemon running.")
+        self.export_dbus_services()
+        self.setup_mpris_listener()
+
+        audio_t = threading.Thread(target=self.audio_monitor_thread, daemon=True)
+        audio_t.start()
+
+        hypr_t = threading.Thread(target=self.hyprland_socket_thread, daemon=True)
+        hypr_t.start()
+
+        with self.lock:
+            self.audio_active = self.check_audio_active()
+            self.evaluate_state()
+
+        self.loop.run()
+
+if __name__ == "__main__":
+    inhibitor = OmarchyVideoIdleInhibitor()
+    inhibitor.run()

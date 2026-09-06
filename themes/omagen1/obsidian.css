@@ -1,0 +1,147 @@
+/* Omarchy Theme for Obsidian */
+
+.theme-dark, .theme-light {
+  /* Mode-adaptive / Core base colors */
+  --color-base-00: #0d0506;
+  --color-base-05: #020001;
+  --color-base-10: #070203;
+  --color-base-20: #020001;
+  --color-base-25: #1b1011;
+  --color-base-30: #1b1011;
+  --color-base-35: #715555;
+  --color-base-40: #715555;
+  --color-base-50: #9d6b6b;
+  --color-base-60: #ffc8c6;
+  --color-base-70: #ffe4e3;
+  --color-base-100: #fff6f6;
+
+  /* Core background & text colors */
+  --background-primary: #0d0506;
+  --background-primary-alt: #020001;
+  --background-secondary: #070203;
+  --background-secondary-alt: #020001;
+  --text-normal: #ffc8c6;
+  --text-bold: #fff6f6;
+  --text-muted: #9d6b6b;
+  --text-faint: color-mix(in srgb, #9d6b6b 70%, transparent);
+
+  /* Title bar & Sidebars */
+  --titlebar-background: #070203;
+  --titlebar-background-focused: #020001;
+  --titlebar-text-color-focused: #ffc8c6;
+  --tab-background-active: #0d0506;
+  --tab-text-color-focused-active: #fff6f6;
+  --ribbon-background: #070203;
+
+  /* Selection colors */
+  --text-selection: #45111b;
+
+  /* Borders & Dividers */
+  --background-modifier-border: #715555;
+  --divider-color: #715555;
+  --background-modifier-border-focus: #de555d;
+  --background-modifier-border-hover: #ffe4e3;
+
+  /* UI Form & Hover states */
+  --background-modifier-form-field: #020001;
+  --background-modifier-hover: color-mix(in srgb, #ffc8c6 8%, transparent);
+  --background-modifier-active-hover: color-mix(in srgb, #ffc8c6 15%, transparent);
+
+  /* Semantic accent & rainbow palette */
+  --color-accent: #de555d;
+  --color-accent-1: #ed6173;
+  --color-accent-2: #c54d5d;
+  --text-accent: #de555d;
+  --text-accent-hover: #ed6173;
+  --interactive-accent: #de555d;
+  --interactive-accent-hover: #ed6173;
+  --interactive-hover: color-mix(in srgb, #de555d 15%, transparent);
+
+  --color-red: #c64b5c;
+  --color-orange: #c8495b;
+  --color-yellow: #c44d5d;
+  --color-green: #c84a5c;
+  --color-cyan: #c54d5d;
+  --color-blue: #c9475a;
+  --color-purple: #c34f5e;
+  --color-pink: #c34f5e;
+
+  /* Headings */
+  --text-title-h1: #c64b5c;
+  --text-title-h2: #c84a5c;
+  --text-title-h3: #c44d5d;
+  --text-title-h4: #c9475a;
+  --text-title-h5: #c34f5e;
+  --text-title-h6: #c54d5d;
+  --heading-spacing: calc(var(--p-spacing) * 1.5);
+
+  /* Links */
+  --text-link: #c9475a;
+  --link-color: #c9475a;
+  --link-color-hover: #ed6173;
+  --link-external-color: #c54d5d;
+  --link-external-color-hover: #f05e72;
+
+  /* Code & Syntax */
+  --code-normal: #c54d5d;
+  --code-background: #020001;
+
+  /* Callouts & Quotes */
+  --blockquote-border-color: #de555d;
+
+  /* Tags & Checkboxes */
+  --tag-color: #c54d5d;
+  --tag-background: color-mix(in srgb, #c54d5d 15%, transparent);
+  --tag-background-hover: color-mix(in srgb, #c54d5d 25%, transparent);
+  --checkbox-color: #de555d;
+  --checkbox-color-hover: #ed6173;
+
+  /* Errors and success */
+  --text-error: #c64b5c;
+  --text-error-hover: #ee5f72;
+  --text-success: #c84a5c;
+
+  /* Graph */
+  --graph-line: #715555;
+  --graph-node: #de555d;
+  --graph-node-focused: #ed6173;
+  --graph-node-tag: #c54d5d;
+  --graph-node-attachment: #c84a5c;
+}
+
+/* Headers */
+.cm-header-1, .markdown-rendered h1 { color: var(--text-title-h1); }
+.cm-header-2, .markdown-rendered h2 { color: var(--text-title-h2); }
+.cm-header-3, .markdown-rendered h3 { color: var(--text-title-h3); }
+.cm-header-4, .markdown-rendered h4 { color: var(--text-title-h4); }
+.cm-header-5, .markdown-rendered h5 { color: var(--text-title-h5); }
+.cm-header-6, .markdown-rendered h6 { color: var(--text-title-h6); }
+
+/* Code blocks */
+.markdown-rendered code {
+  color: #c54d5d;
+}
+
+/* Syntax highlighting */
+.cm-s-obsidian span.cm-keyword { color: #c64b5c; }
+.cm-s-obsidian span.cm-string { color: #c84a5c; }
+.cm-s-obsidian span.cm-number { color: #c44d5d; }
+.cm-s-obsidian span.cm-comment { color: #715555; }
+.cm-s-obsidian span.cm-operator { color: #c9475a; }
+.cm-s-obsidian span.cm-def { color: #c9475a; }
+.cm-s-obsidian span.cm-variable { color: #ffc8c6; }
+.cm-s-obsidian span.cm-property { color: #c54d5d; }
+
+/* Active navigation items & headers */
+.workspace-leaf.mod-active .workspace-leaf-header-title {
+  color: var(--interactive-accent);
+}
+
+.nav-file-title.is-active {
+  color: var(--interactive-accent);
+}
+
+/* Search results */
+.search-result-file-title {
+  color: var(--interactive-accent);
+}

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "mode": "advanced",
+  "runtime": "pretty.omagen",
+  "requires_runtime": true,
+  "features": [
+    "shell",
+    "bar",
+    "window",
+    "animations"
+  ]
+}

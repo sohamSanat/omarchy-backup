@@ -1,0 +1,280 @@
+#!/bin/bash
+set -euo pipefail
+
+# ==============================================================================
+# Omarchy Zen Browser Frosted Glass Mod CLI
+# ------------------------------------------------------------------------------
+# Script: ~/.local/bin/omarchy-zen-glass
+# Purpose: Manages the Frosted Glass Default Tab mod for Zen Browser on Omarchy Linux.
+#
+# ARCHITECTURAL OVERVIEW FOR AI AGENTS & DEVELOPERS:
+# ------------------------------------------------------------------------------
+# Goal: Give Zen Browser's default/new tab (when no website is open) a frosted
+#       glass aesthetic identical to the system terminal (Ghostty/Hyprland blur),
+#       while ensuring loaded web pages (Google, GitHub, etc.) remain 100% solid,
+#       crisp, and uncorrupted.
+#
+# The Glass Stack consists of 4 coordinated layers:
+#
+# 1. Compositor Layer (Hyprland):
+#    - ~/.config/hypr/hyprland.lua contains a window rule for "(zen|zen-bin|zen-alpha)":
+#      tag = "-default-opacity", opacity = "0.85 0.78"
+#    - Hyprland's dual-pass background blur blurs the wallpaper behind Zen's window.
+#
+# 2. Browser Engine Layer (Gecko / Wayland Native Transparency):
+#    - <profile>/user.js specifies:
+#      * user_pref("zen.widget.linux.transparency", true);
+#      * user_pref("browser.tabs.allow_transparent_browser", true);
+#      * user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
+#    - This directs Zen's Wayland surface compositor to preserve alpha channel buffers.
+#
+# 3. Chrome Window Canvas Layer (userChrome.css):
+#    - ~/.config/omarchy/themed/zen.css.tpl makes:
+#      #main-window, #zen-main-app-wrapper, #browser, #tabbrowser-tabbox,
+#      #tabbrowser-tabpanels, .browserSidebarContainer, .browserContainer,
+#      browser[type="content"][transparent="true"]
+#      have background: transparent !important.
+#    - Floating search bar (#urlbar[zen-floating-urlbar="true"]) gets frosted card
+#      styling (backdrop-filter: blur(24px), subtle border, and shadow).
+#
+# 4. Tab Content Layer (userContent.css):
+#    - ~/.config/omarchy/themed/zen-content.css.tpl targets:
+#      @-moz-document url("about:blank"), url("about:newtab"), url("about:home")
+#      Setting background: transparent !important, glass search input, and glass tiles.
+#    - Regular websites (e.g. https://...) specify their own opaque backgrounds,
+#      meaning web content is strictly untouched and 100% solid.
+# ==============================================================================
+
+# Source Omarchy theme helpers for high-contrast output in both light & dark themes
+if [[ -f "$HOME/.local/lib/omarchy-theme.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$HOME/.local/lib/omarchy-theme.sh"
+else
+  COLOR_RESET="\033[0m"
+  COLOR_BOLD="\033[1m"
+  COLOR_BLUE="\033[38;5;75m"
+  COLOR_GREEN="\033[38;5;84m"
+  COLOR_RED="\033[38;5;196m"
+  COLOR_YELLOW="\033[38;5;220m"
+  COLOR_TEXT="\033[38;5;253m"
+  COLOR_MUTED="\033[38;5;245m"
+fi
+
+HYPR_CONFIG="$HOME/.config/hypr/hyprland.lua"
+ZEN_CONFIG_DIR="$HOME/.config/zen"
+CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+SYNC_SCRIPT="$HOME/.local/bin/omarchy-sync-zen"
+
+# Display CLI Help
+show_help() {
+  cat <<EOF
+${COLOR_BOLD}${COLOR_BLUE}Omarchy Zen Browser Frosted Glass Mod${COLOR_RESET}
+Usage: $(basename "$0") [COMMAND]
+
+${COLOR_BOLD}Commands:${COLOR_RESET}
+  ${COLOR_GREEN}--status${COLOR_RESET}     Inspect glass mod health (Hyprland rules, preferences, stylesheets, process)
+  ${COLOR_GREEN}--enable${COLOR_RESET}     Enable the frosted glass default tab mod across all profiles & Hyprland
+  ${COLOR_GREEN}--disable${COLOR_RESET}    Disable the frosted glass default tab mod
+  ${COLOR_GREEN}--restart${COLOR_RESET}    Gracefully restart Zen Browser to apply stylesheet updates with session restored
+  ${COLOR_GREEN}-h, --help${COLOR_RESET}   Show this detailed architectural reference
+
+${COLOR_BOLD}Architecture:${COLOR_RESET}
+  • ${COLOR_MUTED}Compositor:${COLOR_RESET} Hyprland dual-pass blur + opacity (0.85 active / 0.78 inactive)
+  • ${COLOR_MUTED}Engine:${COLOR_RESET}     Wayland transparency enabled in user.js
+  • ${COLOR_MUTED}Chrome:${COLOR_RESET}     ~/.config/omarchy/themed/zen.css.tpl -> userChrome.css
+  • ${COLOR_MUTED}Content:${COLOR_RESET}    ~/.config/omarchy/themed/zen-content.css.tpl -> userContent.css
+EOF
+}
+
+# Inspect status of all layers
+cmd_status() {
+  echo -e "${COLOR_BOLD}${COLOR_BLUE}==================================================================${COLOR_RESET}"
+  echo -e "${COLOR_BOLD}${COLOR_BLUE} Zen Browser Frosted Glass Mod Status${COLOR_RESET}"
+  echo -e "${COLOR_BOLD}${COLOR_BLUE}==================================================================${COLOR_RESET}"
+
+  # 1. Hyprland Window Rule Status
+  echo -e "${COLOR_BOLD}1. Hyprland Window Opacity & Blur Rule:${COLOR_RESET}"
+  if [[ -f "$HYPR_CONFIG" ]] && grep -q 'o\.window("(zen|zen-bin|zen-alpha)"' "$HYPR_CONFIG"; then
+    echo -e "   Status     : ${COLOR_GREEN}✓ Active in ~/.config/hypr/hyprland.lua${COLOR_RESET}"
+    local rule_snippet
+    rule_snippet=$(grep -A 3 'o\.window("(zen|zen-bin|zen-alpha)"' "$HYPR_CONFIG" | head -n 4)
+    echo -e "   ${COLOR_MUTED}$rule_snippet${COLOR_RESET}"
+  else
+    echo -e "   Status     : ${COLOR_RED}✗ Not found in ~/.config/hypr/hyprland.lua${COLOR_RESET}"
+  fi
+
+  # 2. Zen Preferences Status
+  echo -e "\n${COLOR_BOLD}2. Zen Wayland Transparency Preferences (user.js):${COLOR_RESET}"
+  local p_count=0
+  for p_dir in "$ZEN_CONFIG_DIR"/*.[Dd]efault*; do
+    [[ -d "$p_dir" ]] || continue
+    ((p_count++)) || true
+    local p_name
+    p_name=$(basename "$p_dir")
+    local ujs="$p_dir/user.js"
+    local has_transp="no"
+    local has_allow="no"
+    if [[ -f "$ujs" ]]; then
+      grep -q 'user_pref("zen.widget.linux.transparency", true);' "$ujs" && has_transp="yes"
+      grep -q 'user_pref("browser.tabs.allow_transparent_browser", true);' "$ujs" && has_allow="yes"
+    fi
+    echo -e "   Profile    : ${COLOR_TEXT}$p_name${COLOR_RESET}"
+    if [[ "$has_transp" == "yes" && "$has_allow" == "yes" ]]; then
+      echo -e "   Prefs      : ${COLOR_GREEN}✓ Wayland transparency enabled${COLOR_RESET}"
+    else
+      echo -e "   Prefs      : ${COLOR_RED}✗ Missing transparency user_pref in user.js${COLOR_RESET}"
+    fi
+  done
+
+  # 3. Dynamic Stylesheet Status
+  echo -e "\n${COLOR_BOLD}3. Omarchy Stylesheets & Templates:${COLOR_RESET}"
+  local chrome_tpl="$HOME/.config/omarchy/themed/zen.css.tpl"
+  local content_tpl="$HOME/.config/omarchy/themed/zen-content.css.tpl"
+  local compiled_chrome="$CURRENT_THEME_DIR/zen.css"
+  local compiled_content="$CURRENT_THEME_DIR/zen-content.css"
+
+  echo -e "   Chrome Template  : $([[ -f "$chrome_tpl" ]] && echo -e "${COLOR_GREEN}✓ Present ($chrome_tpl)${COLOR_RESET}" || echo -e "${COLOR_RED}✗ Missing${COLOR_RESET}")"
+  echo -e "   Content Template : $([[ -f "$content_tpl" ]] && echo -e "${COLOR_GREEN}✓ Present ($content_tpl)${COLOR_RESET}" || echo -e "${COLOR_RED}✗ Missing${COLOR_RESET}")"
+  echo -e "   Compiled Chrome  : $([[ -f "$compiled_chrome" ]] && echo -e "${COLOR_GREEN}✓ Present ($(wc -c < "$compiled_chrome") bytes)${COLOR_RESET}" || echo -e "${COLOR_RED}✗ Missing${COLOR_RESET}")"
+  echo -e "   Compiled Content : $([[ -f "$compiled_content" ]] && echo -e "${COLOR_GREEN}✓ Present ($(wc -c < "$compiled_content") bytes)${COLOR_RESET}" || echo -e "${COLOR_RED}✗ Missing${COLOR_RESET}")"
+
+  # 4. Live Process & Window Inspection
+  echo -e "\n${COLOR_BOLD}4. Running Zen Browser Process:${COLOR_RESET}"
+  local zen_pid
+  zen_pid=$(pgrep -x zen 2>/dev/null || true)
+  if [[ -n "$zen_pid" ]]; then
+    echo -e "   Process    : ${COLOR_GREEN}✓ Running (PID: $zen_pid)${COLOR_RESET}"
+    if command -v hyprctl &>/dev/null; then
+      local win_info
+      win_info=$(hyprctl clients -j 2>/dev/null | jq '.[] | select(.class=="zen" or .class=="zen-alpha") | {title, at, size, focusHistoryID}' 2>/dev/null || true)
+      if [[ -n "$win_info" ]]; then
+        echo -e "   Hyprland   : ${COLOR_GREEN}✓ Window recognized by compositor${COLOR_RESET}"
+      fi
+    fi
+  else
+    echo -e "   Process    : ${COLOR_MUTED}Not currently running${COLOR_RESET}"
+  fi
+  echo -e "${COLOR_BOLD}${COLOR_BLUE}==================================================================${COLOR_RESET}"
+}
+
+# Enable the glass mod
+cmd_enable() {
+  echo -e "${COLOR_BOLD}${COLOR_BLUE}[omarchy-zen-glass] Enabling Frosted Glass Default Tab Mod...${COLOR_RESET}"
+
+  # 1. Ensure Hyprland Window Rule
+  if [[ -f "$HYPR_CONFIG" ]]; then
+    if ! grep -q 'o\.window("(zen|zen-bin|zen-alpha)"' "$HYPR_CONFIG"; then
+      echo -e "   Adding Hyprland window rule to $HYPR_CONFIG..."
+      cat >>"$HYPR_CONFIG" <<'EOF'
+
+-- Increase transparency for Zen Browser for a glass-like blur effect matching the terminal
+o.window("(zen|zen-bin|zen-alpha)", {
+  tag = "-default-opacity",
+  opacity = "0.85 0.78",
+})
+EOF
+    else
+      echo -e "   Hyprland window rule already present in $HYPR_CONFIG."
+    fi
+  fi
+
+  # 2. Reload Hyprland configuration
+  if command -v hyprctl &>/dev/null; then
+    hyprctl reload >/dev/null 2>&1 || true
+    echo -e "   Reloaded Hyprland configuration."
+  fi
+
+  # 3. Synchronize Zen Browser profiles & compile stylesheets
+  if [[ -x "$SYNC_SCRIPT" ]]; then
+    "$SYNC_SCRIPT" --sync
+  else
+    echo -e "   ${COLOR_RED}Error: $SYNC_SCRIPT not found.${COLOR_RESET}" >&2
+    return 1
+  fi
+
+  echo -e "${COLOR_BOLD}${COLOR_GREEN}[omarchy-zen-glass] Frosted Glass Mod successfully enabled!${COLOR_RESET}"
+  if pgrep -x zen &>/dev/null; then
+    echo -e "   ${COLOR_YELLOW}Zen Browser is running. Run 'omarchy-zen-glass --restart' to apply stylesheet changes live.${COLOR_RESET}"
+  fi
+}
+
+# Disable the glass mod
+cmd_disable() {
+  echo -e "${COLOR_BOLD}${COLOR_BLUE}[omarchy-zen-glass] Disabling Frosted Glass Default Tab Mod...${COLOR_RESET}"
+
+  # 1. Remove or comment out Hyprland rule
+  if [[ -f "$HYPR_CONFIG" ]] && grep -q 'o\.window("(zen|zen-bin|zen-alpha)"' "$HYPR_CONFIG"; then
+    local tmp_hypr
+    tmp_hypr=$(mktemp)
+    awk '
+      /o\.window\("\(zen\|zen-bin\|zen-alpha\)"/ { skipping = 1; next }
+      skipping && /^\}\)/ { skipping = 0; next }
+      !skipping { print }
+    ' "$HYPR_CONFIG" > "$tmp_hypr"
+    mv "$tmp_hypr" "$HYPR_CONFIG"
+    echo -e "   Removed Zen window opacity rule from $HYPR_CONFIG."
+    if command -v hyprctl &>/dev/null; then
+      hyprctl reload >/dev/null 2>&1 || true
+      echo -e "   Reloaded Hyprland configuration."
+    fi
+  fi
+
+  # 2. Disable transparency pref in user.js
+  for p_dir in "$ZEN_CONFIG_DIR"/*.[Dd]efault*; do
+    [[ -d "$p_dir" ]] || continue
+    local ujs="$p_dir/user.js"
+    if [[ -f "$ujs" ]]; then
+      sed -i 's/user_pref("zen.widget.linux.transparency", true);/user_pref("zen.widget.linux.transparency", false);/g' "$ujs"
+    fi
+  done
+
+  echo -e "${COLOR_BOLD}${COLOR_GREEN}[omarchy-zen-glass] Frosted Glass Mod disabled.${COLOR_RESET}"
+}
+
+# Main Dispatcher
+MODE="status"
+if [[ $# -gt 0 ]]; then
+  case "$1" in
+    --status)
+      MODE="status"
+      ;;
+    --enable)
+      MODE="enable"
+      ;;
+    --disable)
+      MODE="disable"
+      ;;
+    --restart)
+      MODE="restart"
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    *)
+      echo -e "${COLOR_RED}Unknown option: $1${COLOR_RESET}" >&2
+      show_help
+      exit 1
+      ;;
+  esac
+fi
+
+case "$MODE" in
+  status)
+    cmd_status
+    ;;
+  enable)
+    cmd_enable
+    ;;
+  disable)
+    cmd_disable
+    ;;
+  restart)
+    if [[ -x "$SYNC_SCRIPT" ]]; then
+      "$SYNC_SCRIPT" --restart
+    else
+      echo -e "${COLOR_RED}Error: $SYNC_SCRIPT not found.${COLOR_RESET}" >&2
+      exit 1
+    fi
+    ;;
+esac

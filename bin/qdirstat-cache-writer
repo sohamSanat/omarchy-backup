@@ -1,0 +1,607 @@
+#!/usr/bin/perl -w
+#
+# qdirstat-cache-writer - script to write QDirStat cache files from cron jobs
+#
+# QDirStat can read its information from cache files. This is a lot faster than
+# reading all the directories in a directory tree and obtaining detailed
+# information (size, type, last modification time) for each file and directory
+# with the opendir() / readdir() and lstat() system calls for each individual
+# file and directory.
+#
+# QDirStat can also write those cache files ("Write Cache File..." from the
+# "File" menu), but the whole point of cache files is being able to do that in
+# the background when the user does not have to wait for it - like in a cron
+# job running in the middle of the night. QDirStat itself cannot be used to do
+# that because it is a KDE program and thus an X program that needs access to
+# an X display - which cron does not provide.
+#
+# This is what this Perl script is for.
+#
+# Usage:
+#	qdirstat-cache-writer [-lvdhi] <directory> [<cache-file-name>]
+#
+#	If not specified, <cache-file-name> defaults to ".qdirstat.cache.gz"
+#	in <directory>.
+#
+#	If <cache-file-name> ends with ".gz", it will be compressed with gzip.
+#	qdirstat can read gzipped and plain text cache files.
+#
+#	-l	long format - always add full path, even for plain files
+#	-1	file format 1.0 without UID/GID/permissions
+#	-2	(default) file format 2.0 with UID/GID/permissions
+#	-m	scan mounted filesystems (cross filesystem boundaries)
+#	-i	ignore directory own size. Useful if the filesystem reports
+#		the subtree size as the size of the directory (like CephFS).
+#	-v	verbose
+#	-d	debug
+#	-h	help (usage message)
+#
+# Author:  Stefan Hundhammer <Stefan.Hundhammer@gmx.de>
+#
+# This script is freeware. Fuck the lawyers and their legalese bullshit.
+# All they ever contribute to software is those legalese headers that are just
+# in the way of people working with the code.
+
+
+# TO DO:
+#
+# - ensure to use UTF-8
+
+
+
+use strict;
+use English;
+use Getopt::Std;
+use Fcntl ':mode';
+use Encode;
+use Cwd;
+use URI::Escape qw(uri_escape);
+use vars qw( $opt_l $opt_1 $opt_2 $opt_m $opt_v $opt_d $opt_h $opt_i);
+
+
+# Forward declarations.
+
+sub main();
+
+
+# Global variables.
+
+my $long_format		= 0;
+my $with_uid_gid_perm   = 1;
+my $scan_mounted	= 0;
+my $verbose		= 0;
+my $debug		= 0;
+my $ignore_dir_own_size = 0;
+
+my $default_cache_file_name = ".qdirstat.cache.gz";
+
+my $toplevel_dev_no	= undef;
+my $toplevel_dev_name   = undef;
+my $unsafe_chars	= "\x00-\x20%";
+
+
+# Call the main function and exit.
+# DO NOT enter any other code outside a sub -
+# any variables would otherwise be global.
+
+
+main();
+exit 0;
+
+
+#-----------------------------------------------------------------------------
+
+
+sub main()
+{
+    # Extract command line options.
+    # This will set a variable opt_? for any option,
+    # e.g. opt_v if option '-v' is passed on the command line.
+
+    getopts('l12mvdhi');
+
+    usage()			if $opt_h;
+    $long_format	 = 1	if $opt_l;
+    $with_uid_gid_perm	 = 0	if $opt_1;
+    $with_uid_gid_perm	 = 1	if $opt_2;
+    $scan_mounted	 = 1	if $opt_m;
+    $verbose		 = 1	if $opt_v;
+    $debug		 = 1	if $opt_d;
+    $ignore_dir_own_size = 1	if $opt_i;
+
+    # One or two parameters are required
+    # (yes, Perl does weird counting)
+    usage() if $#ARGV < 0 || $#ARGV > 1;
+
+    my $toplevel_dir = shift @ARGV;
+    $toplevel_dir = Cwd::abs_path( $toplevel_dir );
+
+    my $cache_file_name;
+
+    if ( $#ARGV < 0 )	# No more command line arguments?
+    {
+	$cache_file_name = $toplevel_dir . "/" . $default_cache_file_name;
+    }
+    else
+    {
+	$cache_file_name = shift @ARGV;
+    }
+
+    write_cache_file( $toplevel_dir, $cache_file_name );
+    compress_file( $cache_file_name );
+}
+
+
+#-----------------------------------------------------------------------------
+
+
+# Write a QDirStat cache.
+#
+# Parameters:
+#	$toplevel_dir
+#	$cache_file_name
+
+sub write_cache_file()
+{
+    my ( $toplevel_dir, $cache_file_name ) = @_;
+    my $start_time = time();
+
+    open( CACHE,  ">" . $cache_file_name ) or die "Can't open $cache_file_name";
+    binmode( CACHE, ":bytes" );
+    write_cache_header();
+    write_cache_tree( $toplevel_dir );
+
+    my $elapsed = time() - $start_time;
+    my ( $sec, $min, $hours ) = gmtime( $elapsed );
+    printf CACHE "# Elapsed time: %d:%02d:%02d\n", $hours, $min, $sec;
+
+    close( CACHE );
+}
+
+
+#-----------------------------------------------------------------------------
+
+
+# Compress a file if its extension is ".gz".
+#
+# Parameters:
+#	$file_name
+
+sub compress_file()
+{
+    my ( $file_name ) = @_;
+
+    if ( $file_name =~ /.*\.gz$/ )
+    {
+	my $uncompressed_name = $file_name;
+	$uncompressed_name =~ s/\.gz$//;	# Cut off ".gz" extension
+	rename( $file_name, $uncompressed_name );
+	logf( "Compressing $file_name" );
+	system( "gzip $uncompressed_name" );
+    }
+
+}
+
+
+#-----------------------------------------------------------------------------
+
+
+# Write the cache file header
+#
+# Parameters:
+#	---
+
+sub write_cache_header()
+{
+    my $version = $with_uid_gid_perm ? "2.0" : "1.0";
+
+    print CACHE <<"EOF";
+[qdirstat $version cache file]
+# Generated by qdirstat-cache-writer
+# Do not edit!
+#
+EOF
+
+    if ( $with_uid_gid_perm )
+    {
+    print CACHE <<'EOF';
+# Type  path                            size     uid   gid  perm.       mtime      <optional fields>
+
+EOF
+    }
+    else
+    {
+    print CACHE <<'EOF';
+# Type  path                            size    mtime      <optional fields>
+
+EOF
+    }
+}
+
+
+#-----------------------------------------------------------------------------
+
+
+# Write cache entries for a directory tree.
+#
+# Parameters:
+#	$dir	Starting directory
+
+sub write_cache_tree($);	# Need prototype for calling recursively
+
+sub write_cache_tree($)
+{
+    my ( $dir ) = @_;
+    logf( "Reading $dir" );
+
+    my @files;
+    my @subdirs;
+
+    my $success = opendir( DIR, $dir );
+
+    if ( ! $success )
+    {
+	my $msg = "Can't open $dir: $ERRNO\n";
+	print CACHE "# $msg\n";
+	logf( $msg );
+
+	return;
+    }
+
+    my $entry;
+
+    while ( $entry = readdir( DIR ) )
+    {
+	if ( $entry ne "."  and
+	     $entry ne ".." )
+	{
+	    my $full_path = $dir . "/" . $entry;
+
+	    if ( -d   $full_path &&
+		 ! -l $full_path )
+	    {
+		push @subdirs, $entry;
+	    }
+	    else
+	    {
+		push @files, $entry;
+	    }
+	}
+    }
+
+    closedir( DIR );
+
+    if ( write_dir_entry( $dir ) )
+    {
+	my $file;
+
+	foreach $file ( @files )
+	{
+	    write_file_entry( $dir, $file );
+	}
+
+
+	my $subdir;
+
+	foreach $subdir ( @subdirs )
+	{
+	    write_cache_tree( $dir . "/" . $subdir );
+	}
+    }
+}
+
+
+#-----------------------------------------------------------------------------
+
+
+# Write a cache entry for a directory.
+#
+# If the device of this directory is not the same as the toplevel device
+# (i.e., if this is a mount point and thus filesystem boundaries would be
+# crossed) only a comment line is written and an error value '0' is returned
+# unless the "-m" command line option was used.
+#
+# Parameters:
+#	$dir	directory
+#
+# Return value:
+#	1	OK to continue
+#	0	don't continue, filesystem boundary would be crossed
+
+sub write_dir_entry()
+{
+    my ( $dir ) = @_;
+    my @lstat_result = lstat( $dir );
+
+    if ( scalar @lstat_result == 0 ) # Empty array -> lstat() failed
+    {
+        my $msg = "lstat() failed for $dir";
+        print CACHE "# $msg\n";
+        logf( $msg );
+
+        return;
+    }
+
+    my ( $dev_no,
+	 $ino,
+	 $mode,
+	 $links,
+	 $uid,
+	 $gid,
+	 $rdev,
+	 $size,
+	 $atime,
+	 $mtime,
+	 $ctime,
+	 $blksize,
+	 $blocks ) = @lstat_result;
+
+    $size = 0 if $ignore_dir_own_size; # issue #281
+
+    $dir =~ s://+:/:g;    # Replace multiple // with one
+    my $escaped_dir = uri_escape( $dir, $unsafe_chars );
+
+    # Write cache file entry for this directory (even if it's a mount point)
+
+    printf CACHE "D %-30s", $escaped_dir;
+    print CACHE "\t$size";
+    write_uid_gid_perm( $uid, $gid, $mode );
+    printf CACHE "\t0x%x\n", $mtime;
+
+    if ( ! defined( $toplevel_dev_no ) )
+    {
+	$toplevel_dev_no   = $dev_no;
+        $toplevel_dev_name = device_name( $dir );
+        print CACHE "# Device: $toplevel_dev_name\n\n";
+    }
+
+    if ( $dev_no == $toplevel_dev_no || $scan_mounted )
+    {
+	return 1;
+    }
+
+    my $dev_name = device_name( $dir );
+    my $fs_boundary = $dev_name ne $toplevel_dev_name;
+    my $msg;
+
+    if ( $fs_boundary )
+    {
+	$msg = "Filesystem boundary at mount point $dir on device $dev_name";
+    }
+    else
+    {
+        $msg = "Mount point $dir is still on the same device $dev_name";
+    }
+
+    print CACHE "# $msg\n\n";
+    logf( $msg );
+
+    return ! $fs_boundary;
+}
+
+
+#-----------------------------------------------------------------------------
+
+
+# Get the device name where a directory is on from the 'df' command.
+#
+# Parameters:
+#       $dir    directory
+#
+# Return value:
+#       device name ("/dev/sda3", "/dev/system/root")
+
+sub device_name()
+{
+    my ( $dir ) = @_;
+
+    my @df_output = `df "$dir" 2>/dev/null`;
+    return "<unknown>" if scalar @df_output < 1;
+
+    shift @df_output; # Remove header line
+    my ( $line ) = @df_output;
+    my ( $device_name ) = split( '\s+', $line );
+    deb( "Directory $dir is on device $device_name" );
+
+    return $device_name;
+}
+
+
+#-----------------------------------------------------------------------------
+
+
+# Write a cache entry for a plain file (or other non-directory i-node)
+#
+# Parameters:
+#	$dir	directory
+#	$name	file name (without path)
+
+sub write_file_entry()
+{
+    my ( $dir, $name ) = @_;
+    my @lstat_result = lstat( $dir . "/" . $name );
+
+    if ( scalar @lstat_result == 0 ) # Empty array -> lstat() failed
+    {
+        my $msg = "lstat() failed for $dir/$name";
+        print CACHE "# $msg\n";
+        logf( $msg );
+
+        return;
+    }
+
+    my ( $dev,
+	 $ino,
+	 $mode,
+	 $links,
+	 $uid,
+	 $gid,
+	 $rdev,
+	 $size,
+	 $atime,
+	 $mtime,
+	 $ctime,
+	 $blksize,
+	 $blocks ) = @lstat_result;
+
+    my $type = "F";
+
+    if    ( S_ISREG ( $mode ) )		{ $type = "F";		}
+    elsif ( S_ISLNK ( $mode ) )		{ $type = "L";		}
+    elsif ( S_ISBLK ( $mode ) )		{ $type = "BlockDev";	}
+    elsif ( S_ISCHR ( $mode ) )		{ $type = "CharDev";	}
+    elsif ( S_ISFIFO( $mode ) )		{ $type = "FIFO";	}
+    elsif ( S_ISSOCK( $mode ) )		{ $type = "Socket";	}
+
+    print CACHE "$type";
+
+    $name = uri_escape( $name, $unsafe_chars );
+
+    if ( $long_format )
+    {
+	$dir = uri_escape( $dir, $unsafe_chars );
+        my $full_path = $dir . "/" . $name;
+        $full_path =~ s://+:/:g; # Replace multiple // with one
+
+	printf CACHE "\t%-30s", $full_path;
+    }
+    else
+    {
+	printf CACHE "\t%-24s", $name;
+    }
+
+    print CACHE "\t$size";
+    write_uid_gid_perm( $uid, $gid, $mode );
+    printf CACHE "\t0x%x", $mtime;
+
+    print CACHE "\tblocks: $blocks"	if $blocks > 0 && $blocks * 512 < $size; # Sparse file?
+    print CACHE "\tlinks: $links"	if $links > 1;
+
+    print CACHE "\n";
+}
+
+
+#-----------------------------------------------------------------------------
+
+
+# Write the fields for uid, gid, permissions if $with_uid_gid_perm is set
+#
+# Parameters:
+#   $uid        numeric user  ID
+#   $gid        numeric group ID
+#   $mode       numeric file mode (possibly including type)
+
+sub write_uid_gid_perm()
+{
+    return unless $with_uid_gid_perm;
+
+    my ( $uid, $gid, $mode ) = @_;
+    my $perm = $mode & 07777;
+
+    printf CACHE "\t%d  %d  0%3o", $uid, $gid, $perm;
+}
+
+
+#-----------------------------------------------------------------------------
+
+
+# Log a message to stdout if verbose mode is set
+# (command line option '-v').
+#
+# Parameters:
+#	Messages to write (any number).
+
+sub logf()
+{
+    my $msg;
+
+    if ( $verbose )
+    {
+	foreach $msg( @_ )
+	{
+	    print $msg . " ";
+	}
+
+	$OUTPUT_AUTOFLUSH = 1;	# inhibit buffering
+	print "\n";
+    }
+}
+
+
+#-----------------------------------------------------------------------------
+
+
+# Log a debugging message to stdout if debug mode is set
+# (command line option '-d').
+#
+# Parameters:
+#	Messages to write (any number).
+
+sub deb()
+{
+    my $msg;
+
+    if ( $debug )
+    {
+	foreach $msg( @_ )
+	{
+	    print $msg . " ";
+	}
+
+	$OUTPUT_AUTOFLUSH = 1;	# inhibit buffering
+	print "\n";
+    }
+}
+
+
+#-----------------------------------------------------------------------------
+
+
+# Print usage message and abort program.
+#
+# Parameters:
+#	---
+
+sub usage()
+{
+    die <<"USAGE-END";
+
+qdirstat-cache-writer - script to write QDirStat cache files from cron jobs
+
+QDirStat can read its information from cache files. This is a lot faster than
+reading all the directories in a directory tree and obtaining detailed
+information (size, type, last modification time) for each file and directory
+with the opendir() / readdir() and lstat() system calls for each individual
+file and directory.
+
+QDirStat can also write those cache files (\"Write Cache File...\" from the
+\"File\" menu), but the whole point of cache files is being able to do that in
+the background when the user does not have to wait for it - like in a cron
+job running in the middle of the night. QDirStat itself cannot be used to do
+that because it is a KDE program and thus an X program that needs access to
+an X display - which cron does not provide.
+
+This is what this Perl script is for.
+
+Usage:
+	$0 [-ldvhi] <directory> [<cache-file-name>]
+
+	If not specified, <cache-file-name> defaults to \"$default_cache_file_name\"
+	in <directory>.
+
+	If <cache-file-name> ends with \".gz\", it will be compressed with gzip.
+	qdirstat can read gzipped and plain text cache files.
+
+	-l	long format - always add full path, even for plain files
+	-1	file format 1.0 without UID/GID/permissions
+	-2	(default) file format 2.0 with UID/GID/permissions
+	-m	scan mounted filesystems (cross filesystem boundaries)
+	-i	ignore directory own size. Uuseful if the filesystem reports
+		the subtree size as the size of the directory (like CephFS).
+	-v	verbose
+	-d	debug
+	-h	help (this usage message)
+
+USAGE-END
+
+}

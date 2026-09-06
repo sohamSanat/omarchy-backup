@@ -1,0 +1,7 @@
+[Desktop Entry]
+Exec=/home/soham/.local/share/freedownloadmanager/fdm %u
+Icon=freedownloadmanager_fdm_up
+MimeType=x-scheme-handler/fdm
+Name=Free Download Manager
+NoDisplay=true
+Type=Application

@@ -1,5 +1,7 @@
-brave-origin-nightly-bin
-fetch-git
-libfprint-fpc1022
-libfprint-fpc1022-debug
-meteobar-bin
+brave-origin-nightly-bin 1.96.23-1
+fetch-git 2.3.0.r8.g12bac6e-1
+libfprint-fpc1022 1.94.10.r2.gba10c93-1
+libfprint-fpc1022-debug 1.94.10.r2.gba10c93-1
+meteobar-bin 0.5.1-1
+qdirstat 2.0-1
+qdirstat-debug 2.0-1

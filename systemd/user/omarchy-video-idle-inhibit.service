@@ -1,0 +1,14 @@
+[Unit]
+Description=Omarchy Video and Media Idle Inhibitor
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/home/soham/.local/bin/omarchy-video-idle-inhibit
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=graphical-session.target default.target

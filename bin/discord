@@ -55,4 +55,23 @@ if [ ! -x "$discord_host" ]; then
         exit 2
     fi
 fi
+
+# Ensure duplicate Discord.desktop symlink is removed
+rm -f "$HOME/.local/share/applications/Discord.desktop" 2>/dev/null || true
+
+# Ensure Omarchy Discord theme hook is present
+HOOK_SCRIPT="$HOME/.local/share/omarchy/discord/omarchy-discord.js"
+for core_idx in "$config_home/$DIR"/app-*/modules/discord_desktop_core-*/discord_desktop_core/index.js; do
+    if [ -f "$core_idx" ] && [ -f "$HOOK_SCRIPT" ]; then
+        if ! grep -q "omarchy-discord" "$core_idx"; then
+            sed -i 's|module.exports = require(..core.asar.);|try { require("'"$HOOK_SCRIPT"'"); } catch(e){} module.exports = require("./core.asar");|' "$core_idx"
+        fi
+    fi
+done
+
+# Ensure theme CSS is generated if missing
+if [ ! -f "$HOME/.local/state/omarchy/current/theme/discord-theme.css" ] && [ -x "$HOME/.config/omarchy/hooks/theme-set.d/discord-sync.sh" ]; then
+    "$HOME/.config/omarchy/hooks/theme-set.d/discord-sync.sh" >/dev/null 2>&1 || true
+fi
+
 exec "$discord_host" "$@" >> "$log_file" 2>&1 < /dev/null

@@ -1,0 +1,274 @@
+#!/usr/bin/gjs-console -m
+// =============================================================================
+// Omarchy Dynamic Theme Launcher for Foliate
+// -----------------------------------------------------------------------------
+// Wraps Foliate with real-time OS theme watching, hot-reloading custom themes,
+// and synchronized GTK4/Libadwaita color scheme & sidebar adaptation.
+// =============================================================================
+
+const MESON = true
+
+import Gtk from 'gi://Gtk?version=4.0'
+import Gdk from 'gi://Gdk?version=4.0'
+import Gio from 'gi://Gio?version=2.0'
+import GLib from 'gi://GLib?version=2.0'
+import Adw from 'gi://Adw?version=1'
+import 'gi://WebKit?version=6.0'
+import { programInvocationName, programArgs, exit } from 'system'
+import { bindtextdomain, textdomain, gettext as _ } from 'gettext'
+import { setConsoleLogDomain } from 'console'
+
+globalThis.pkg = {
+    name: 'com.github.johnfactotum.Foliate',
+    version: '3.3.0',
+    MESON,
+}
+pkg.userAgent = `Foliate/${pkg.version}`
+
+GLib.set_prgname(pkg.name)
+setConsoleLogDomain(pkg.name)
+Gtk.Window.set_default_icon_name(pkg.name)
+bindtextdomain(pkg.name, GLib.build_filenamev(['/usr/local/share', 'locale']))
+textdomain(pkg.name)
+
+pkg.localeName = _('Foliate')
+GLib.set_application_name(pkg.localeName)
+
+pkg.datadir = GLib.build_filenamev([GLib.get_user_data_dir(), pkg.name])
+pkg.datapath = path => GLib.build_filenamev([pkg.datadir, path])
+pkg.datafile = path => Gio.File.new_for_path(pkg.datapath(path))
+
+pkg.configdir = GLib.build_filenamev([GLib.get_user_config_dir(), pkg.name])
+pkg.configpath = path => GLib.build_filenamev([pkg.configdir, path])
+
+pkg.cachedir = GLib.build_filenamev([GLib.get_user_cache_dir(), pkg.name])
+pkg.cachepath = path => GLib.build_filenamev([pkg.cachedir, path])
+
+Gio.Resource
+    .load(GLib.build_filenamev(['/usr/local/share', pkg.name, `${pkg.name}.gresource`]))
+    ._register()
+const moduledir = '/' + pkg.name.replaceAll('.', '/')
+pkg.modulepath = path => GLib.build_filenamev([moduledir, path])
+pkg.moduleuri = path => `resource://${pkg.modulepath(path)}`
+pkg.useResource = MESON
+
+// Ensure themes directory exists
+GLib.mkdir_with_parents(pkg.configpath('themes'), 0o755)
+
+const { Application } = await import(pkg.moduleuri('app.js'))
+const { themes, themeCssProvider } = await import(pkg.moduleuri('themes.js'))
+const utils = await import(pkg.moduleuri('utils.js'))
+
+const foliateCssProvider = new Gtk.CssProvider()
+
+function reloadThemes() {
+    try {
+        const themeDir = pkg.configpath('themes')
+        for (const { file, name } of utils.listDir(themeDir)) {
+            if (!/\.json$/.test(name)) continue
+            try {
+                const themeData = utils.readJSONFile(file)
+                const existing = themes.find(t => t.name === name)
+                if (existing) {
+                    existing.label = themeData.label ?? name.replace(/\.json$/, '')
+                    existing.light = {
+                        fg: themeData.light.fg,
+                        bg: themeData.light.bg,
+                        link: themeData.light.link,
+                    }
+                    existing.dark = {
+                        fg: themeData.dark.fg,
+                        bg: themeData.dark.bg,
+                        link: themeData.dark.link,
+                    }
+                } else {
+                    themes.push({
+                        name,
+                        label: themeData.label ?? name.replace(/\.json$/, ''),
+                        light: {
+                            fg: themeData.light.fg,
+                            bg: themeData.light.bg,
+                            link: themeData.light.link,
+                        },
+                        dark: {
+                            fg: themeData.dark.fg,
+                            bg: themeData.dark.bg,
+                            link: themeData.dark.link,
+                        },
+                        id: `theme-${GLib.uuid_string_random()}`,
+                    })
+                }
+            } catch (err) {
+                console.error('[Foliate Theme Sync] Error reading theme file:', err)
+            }
+        }
+
+        themeCssProvider.load_from_data(`
+            .theme-container .card {
+                padding: 9px;
+            }
+        ` + themes.map(theme => `
+            .${theme.id}, .sidebar-${theme.id}:not(.background) {
+                color: ${theme.light.fg};
+                background: ${theme.light.bg};
+            }
+            .sidebar-${theme.id}:not(.background) toolbarview {
+                background: rgba(0, 0, 0, .08);
+            }
+            .is-dark .${theme.id}, .is-dark .sidebar-${theme.id}:not(.background) {
+                color: ${theme.dark.fg};
+                background: ${theme.dark.bg};
+            }
+            .is-dark .sidebar-${theme.id}:not(.background) toolbarview {
+                background: rgba(255, 255, 255, .05);
+            }
+            .${theme.id} highlight {
+                background: ${theme.light.link};
+            }
+            .is-dark .${theme.id} highlight {
+                background: ${theme.dark.link};
+            }
+            .${theme.id} popover highlight, .is-dark .${theme.id} popover highlight {
+                background: @accent_bg_color;
+            }
+        `).join(''), -1)
+
+        const defaultApp = Gio.Application.get_default()
+        if (defaultApp) {
+            for (const win of defaultApp.get_windows()) {
+                const stack = win.content?.child
+                if (stack) {
+                    const pages = stack.get_pages()
+                    for (let i = 0; i < pages.get_n_items(); i++) {
+                        const page = pages.get_item(i)
+                        const child = page.get_child()
+                        if (child?._view?.viewSettings) {
+                            child._view.viewSettings.notify('theme')
+                        }
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[Foliate Theme Sync] Error in reloadThemes:', e)
+    }
+}
+
+function syncFoliateTheme() {
+    try {
+        const foliateCssPath = pkg.configpath('foliate.css')
+        const gtkCssPath = GLib.build_filenamev([GLib.get_home_dir(), '.config', 'gtk-4.0', 'gtk.css'])
+
+        let loaded = false
+        if (GLib.file_test(foliateCssPath, GLib.FileTest.EXISTS)) {
+            try {
+                foliateCssProvider.load_from_path(foliateCssPath)
+                loaded = true
+            } catch (err) {
+                console.error('[Foliate Theme Sync] Error loading foliate.css:', err)
+            }
+        }
+        if (!loaded && GLib.file_test(gtkCssPath, GLib.FileTest.EXISTS)) {
+            try {
+                foliateCssProvider.load_from_path(gtkCssPath)
+                loaded = true
+            } catch (err) {
+                console.error('[Foliate Theme Sync] Error loading gtk.css:', err)
+            }
+        }
+
+        reloadThemes()
+
+        const themeModePath = GLib.build_filenamev([GLib.get_home_dir(), '.local', 'state', 'omarchy', 'current', 'theme', 'mode'])
+        let isLight = false
+        if (GLib.file_test(themeModePath, GLib.FileTest.EXISTS)) {
+            const [ok, modeBytes] = GLib.file_get_contents(themeModePath)
+            if (ok) {
+                const modeStr = new TextDecoder().decode(modeBytes).trim()
+                isLight = (modeStr === 'light')
+            }
+        }
+        const styleManager = Adw.StyleManager.get_default()
+        const newScheme = isLight ? Adw.ColorScheme.FORCE_LIGHT : Adw.ColorScheme.FORCE_DARK
+        if (styleManager.color_scheme !== newScheme) {
+            styleManager.color_scheme = newScheme
+        }
+    } catch (e) {
+        console.error('[Foliate Theme Sync] Error in syncFoliateTheme:', e)
+    }
+}
+
+// Watch themes directory and config files for live theme changes
+try {
+    let debounceTimer = null
+    const scheduleSync = () => {
+        if (debounceTimer) GLib.source_remove(debounceTimer)
+        debounceTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 80, () => {
+            debounceTimer = null
+            syncFoliateTheme()
+            return GLib.SOURCE_REMOVE
+        })
+    }
+
+    const watchPath = (path, isDir = false) => {
+        try {
+            const file = Gio.File.new_for_path(path)
+            const monitor = isDir
+                ? file.monitor_directory(Gio.FileMonitorFlags.NONE, null)
+                : file.monitor_file(Gio.FileMonitorFlags.NONE, null)
+            monitor.connect('changed', (mon, f, other, eventType) => {
+                if (eventType === Gio.FileMonitorEvent.CHANGES_DONE_HINT ||
+                    eventType === Gio.FileMonitorEvent.CREATED ||
+                    eventType === Gio.FileMonitorEvent.CHANGED) {
+                    scheduleSync()
+                }
+            })
+        } catch (err) {
+            console.error('[Foliate Theme Sync] Error monitoring path:', path, err)
+        }
+    }
+
+    watchPath(pkg.configpath('themes'), true)
+    watchPath(pkg.configpath('foliate.css'), false)
+    watchPath(pkg.configpath('user-stylesheet.css'), false)
+    watchPath(GLib.build_filenamev([GLib.get_home_dir(), '.config', 'gtk-4.0', 'gtk.css']), false)
+} catch (e) {
+    console.error('[Foliate Theme Sync] Could not set up file monitors:', e)
+}
+
+// Ensure color-scheme GSettings is dynamically connected to Adw.StyleManager
+try {
+    const foliateSettings = utils.settings()
+    if (foliateSettings) {
+        const styleManager = Adw.StyleManager.get_default()
+        foliateSettings.connect('changed::color-scheme', () => {
+            styleManager.color_scheme = foliateSettings.get_int('color-scheme')
+        })
+    }
+} catch (e) {
+    console.error('[Foliate Theme Sync] Could not bind color-scheme setting:', e)
+}
+
+const app = new Application()
+app.connect('startup', () => {
+    try {
+        const display = Gdk.Display.get_default()
+        if (display) {
+            Gtk.StyleContext.add_provider_for_display(
+                display,
+                foliateCssProvider,
+                Gtk.STYLE_PROVIDER_PRIORITY_USER
+            )
+            Gtk.StyleContext.add_provider_for_display(
+                display,
+                themeCssProvider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
+        }
+        syncFoliateTheme()
+    } catch (e) {
+        console.error('[Foliate Theme Sync] Startup styling error:', e)
+    }
+})
+
+exit(await app.runAsync([programInvocationName, ...programArgs]))

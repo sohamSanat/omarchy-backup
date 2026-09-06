@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Free Download Manager
+Comment=Powerful download accelerator and organizer
+Exec=/home/soham/.local/bin/fdm %u
+Icon=/home/soham/.local/share/freedownloadmanager/icon.png
+Terminal=false
+Type=Application
+Categories=Network;FileTransfer;Utility;
+MimeType=x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/fdm;
+StartupNotify=true
+StartupWMClass=fdm

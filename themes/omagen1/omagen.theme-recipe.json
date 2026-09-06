@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "kind": "omagen.theme.recipe",
+  "theme_name": "omagen1",
+  "source_theme": "osaka-jade",
+  "source_kind": "generated",
+  "managed_scopes": [
+    "shell-bar",
+    "window-motion",
+    "terminal"
+  ],
+  "palette": {
+    "Mode": "dark",
+    "Accent": "#de555d",
+    "Selection": "#45111b",
+    "Muted": "#715555",
+    "Background": "#0d0506",
+    "DarkBackground": "#070203",
+    "DarkerBackground": "#020001",
+    "LighterBackground": "#1b1011",
+    "Foreground": "#ffc8c6",
+    "DarkForeground": "#9d6b6b",
+    "LightForeground": "#ffe4e3",
+    "BrightForeground": "#fff6f6",
+    "Red": "#c64b5c",
+    "Yellow": "#c44d5d",
+    "Orange": "#c8495b",
+    "Green": "#c84a5c",
+    "Cyan": "#c54d5d",
+    "Blue": "#c9475a",
+    "Magenta": "#c34f5e",
+    "Brown": "#a2595f",
+    "BrightRed": "#ee5f72",
+    "BrightYellow": "#f05d71",
+    "BrightGreen": "#ec6173",
+    "BrightCyan": "#f05e72",
+    "BrightBlue": "#ed6173",
+    "BrightMagenta": "#f15b70"
+  },
+  "shell": {
+    "preset": "glass",
+    "surface": "layered",
+    "detail": "native",
+    "tooltip": "native",
+    "notifications": "native"
+  },
+  "desktop": {
+    "border_style": "neon",
+    "border_size": 4,
+    "border_size_mode": "fixed",
+    "border_speed": 28,
+    "shape": "rounded",
+    "spacing": "native",
+    "depth": "shadow",
+    "window_opacity": 100,
+    "active_style": "native",
+    "inactive_style": "shadow_only"
+  },
+  "bar": {
+    "surface": "native",
+    "density": "compact",
+    "attention": "accent",
+    "form": "continuous",
+    "visibility": "native",
+    "profile": {
+      "schema_version": 1,
+      "ownership": "overlay",
+      "implementation": "replacement",
+      "bar": {
+        "id": "pretty.omagen.bar"
+      },
+      "behavior": {
+        "form": "floating",
+        "visibility": "always",
+        "reveal": "edge",
+        "expansion": "none",
+        "workspace": "native"
+      }
+    },
+    "spec": {
+      "version": 2,
+      "preset": "orbit",
+      "engine": "omagen",
+      "topology": "floating",
+      "position": "top",
+      "surface": {
+        "treatment": "preset",
+        "role": "background",
+        "opacity": 1,
+        "blur": 0,
+        "border_role": "accent",
+        "border_opacity": 0.42,
+        "border_width": 1,
+        "shadow": "raised"
+      },
+      "geometry": {
+        "density": "compact",
+        "thickness": 0,
+        "edge_offset": 10,
+        "outer_margin": 10,
+        "inner_padding": 0,
+        "section_gap": 8,
+        "widget_gap": 0,
+        "radius": 18,
+        "length_mode": "full",
+        "length_value": 0,
+        "alignment": "center"
+      },
+      "attention": {
+        "mode": "semantic"
+      },
+      "behavior": {
+        "visibility": "always",
+        "exclusive_zone": "reserve",
+        "hover_expand": false,
+        "hide_delay_ms": 5000,
+        "reveal_delay_ms": 50,
+        "edge_sensor": 3,
+        "keep_visible_while_popup_open": true
+      },
+      "regions": {
+        "left": {
+          "mode": "native"
+        },
+        "center": {
+          "mode": "native"
+        },
+        "right": {
+          "mode": "native"
+        }
+      },
+      "workspace": {
+        "mode": "native"
+      },
+      "clock": {
+        "style": "neon"
+      },
+      "dock": {
+        "closed": "ellipsis",
+        "glyph": "✦"
+      },
+      "motion": {
+        "preset": "smooth",
+        "duration_ms": 220,
+        "easing": "out_cubic"
+      }
+    }
+  },
+  "animations": {
+    "version": 1,
+    "preset": "cyberpunk",
+    "window": "digital",
+    "window_open": "gnomed",
+    "window_close": "slide",
+    "window_move": "digital",
+    "window_amount": 94,
+    "window_opacity": 82,
+    "window_speed": 2,
+    "workspace": "slide",
+    "workspace_axis": "horizontal",
+    "workspace_travel": 12,
+    "special_workspace": "slidevert",
+    "focus": "digital",
+    "layers": "slide",
+    "curve": "digital",
+    "border": "static",
+    "border_speed": 36,
+    "glitch": "medium",
+    "reduced_motion": false
+  },
+  "look_feel": {
+    "schema_version": 1,
+    "preset": "cyberpunk-glitch",
+    "preset_revision": 7,
+    "customized": {
+      "animations": false,
+      "bar": true,
+      "shell": true,
+      "terminal": false,
+      "window": false
+    }
+  },
+  "terminal": {
+    "schema_version": 1,
+    "mode": "preserve",
+    "opacity": 1,
+    "cell_mode": "background"
+  }
+}

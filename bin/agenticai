@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""
+Agentic AI Workflow Stack Banner & Quick Guide
+Displays the architecture, components, and status of the local Agentic AI stack:
+Herdr + Firstmate + AXI + Treehouse + Compound Engineering.
+Uses omarchy_theme for universal, dynamic high-contrast theme adaptation.
+"""
+
+import sys
+import os
+import shutil
+import subprocess
+import omarchy_theme
+
+BOLD = omarchy_theme.BOLD
+RESET = omarchy_theme.RESET
+get_palette = omarchy_theme.get_palette
+
+NOTE_VAULT_PATH = "/home/soham/Obsidian/Pandoras-Vault/07 Notes/Agentic AI Workflow Stack.md"
+NOTE_LOCAL_PATH = "/home/soham/AGENTIC_STACK.md"
+
+
+def print_banner():
+    p = get_palette()
+    term_width = shutil.get_terminal_size((80, 24)).columns
+    divider = f"{p['divider']}{'━' * min(term_width - 2, 76)}{RESET}"
+    thin_div = f"{p['thin_div']}{'─' * min(term_width - 2, 76)}{RESET}"
+
+    print()
+    print(f" {p['title']}{BOLD}⚡ STATE-OF-THE-ART AGENTIC AI WORKFLOW STACK ⚡{RESET}")
+    print(f" {p['cyan']}Herdr{RESET} {p['bullet']}•{RESET} {p['magenta']}Firstmate{RESET} {p['bullet']}•{RESET} {p['orange']}AXI{RESET} {p['bullet']}•{RESET} {p['green']}Treehouse{RESET} {p['bullet']}•{RESET} {p['purple']}Compound Engineering{RESET}")
+    print(f" {divider}")
+
+    # Core Components
+    components = [
+        ("🖥️  HERDR", "Terminal Multiplexer & Flight Control", "Manages agent workspaces, tabs & panes; tracks live agent states (idle, working, blocked, done).", p["blue"]),
+        ("🚢  FIRSTMATE", "Autonomous Fleet Commander", "Your primary liaison agent. Breaks down complex goals and directs parallel AI crewmates.", p["magenta"]),
+        ("🌳  TREEHOUSE", "Zero-Collision Git Worktree Pools", "Provides instant isolated git worktrees with cached dependencies so agents never clobber files.", p["green"]),
+        ("⚡  AXI", "Agent eXperience Interface", "Cuts token spend by 40-60% using TOON formatting and minimal, deterministic CLI schemas.", p["orange"]),
+        ("🧠  COMPOUND ENG", "Systematic Lifecycle & Institutional Memory", "Guides rigor (plan ➔ work ➔ review) and captures learnings to docs/solutions/ so agents compound skill.", p["purple"]),
+    ]
+
+    for name, subtitle, desc, color in components:
+        print(f"  {color}{BOLD}{name}{RESET}  {p['muted']}— {subtitle}{RESET}")
+        print(f"    {p['text']}{desc}{RESET}\n")
+
+    print(f" {thin_div}")
+    print(f"  {BOLD}{p['head']}🔄 THE COLLABORATIVE LIFECYCLE{RESET}")
+    print(f"    {p['cyan']}1. Architecture & Scope{RESET}  {p['muted']}➔{RESET} {p['yellow']}Compound Engineering (/ce-plan, /ce-brainstorm){RESET}")
+    print(f"    {p['cyan']}2. Fleet Dispatch{RESET}        {p['muted']}➔{RESET} {p['magenta']}Firstmate (fm launch / fm send) coordinates the crew{RESET}")
+    print(f"    {p['cyan']}3. Sandbox Isolation{RESET}     {p['muted']}➔{RESET} {p['green']}Treehouse allocates dedicated worktrees with warm caches{RESET}")
+    print(f"    {p['cyan']}4. Flight Control{RESET}        {p['muted']}➔{RESET} {p['blue']}Herdr streams outputs, tracks idle/working states in tabs{RESET}")
+    print(f"    {p['cyan']}5. Token-Lean Actions{RESET}    {p['muted']}➔{RESET} {p['orange']}AXI CLIs (gh-axi, tasks-axi) execute with ~50% fewer tokens{RESET}")
+    print(f"    {p['cyan']}6. Verification & Merge{RESET}  {p['muted']}➔{RESET} {p['purple']}ce-code-review + no-mistakes safely merge into main branch{RESET}")
+    print(f"    {p['cyan']}7. Knowledge Capture{RESET}     {p['muted']}➔{RESET} {p['yellow']}ce-compound records non-obvious fixes into docs/solutions/{RESET}")
+
+    print(f" {divider}")
+    print(f"  {BOLD}{p['head']}💡 QUICK COMMANDS & SHORTCUTS{RESET}")
+    print(f"    {p['green']}agenticai note{RESET}    {p['muted']}│ View full comprehensive architectural guide (bat/less){RESET}")
+    print(f"    {p['green']}agenticai status{RESET}  {p['muted']}│ Check live system health (Herdr, Firstmate, Treehouse, AXI){RESET}")
+    print(f"    {p['green']}agenticai vault{RESET}   {p['muted']}│ Print path to Obsidian note in Pandora's Vault{RESET}")
+    print(f"    {p['muted']}Obsidian Note: {NOTE_VAULT_PATH}{RESET}")
+    print()
+
+
+def show_note():
+    p = get_palette()
+    viewer = "bat" if shutil.which("bat") else ("less -R" if shutil.which("less") else "cat")
+    path = NOTE_LOCAL_PATH if os.path.exists(NOTE_LOCAL_PATH) else NOTE_VAULT_PATH
+    if os.path.exists(path):
+        os.system(f"{viewer} '{path}'")
+    else:
+        print(f"{p['red']}Error: Note file not found at {path}{RESET}")
+
+
+def check_status():
+    p = get_palette()
+    print(f"\n{BOLD}{p['yellow']}🔍 Inspecting Agentic Stack Status...{RESET}\n")
+
+    # 1. Herdr
+    print(f"{BOLD}{p['blue']}1. Herdr (Multiplexer):{RESET}")
+    if shutil.which("herdr"):
+        try:
+            res = subprocess.run(["herdr", "workspace", "list"], capture_output=True, text=True, timeout=3)
+            if res.returncode == 0:
+                print(f"   {p['green']}✓ Herdr is active and responsive.{RESET}")
+                if res.stdout.strip():
+                    for line in res.stdout.strip().split("\n")[:4]:
+                        print(f"     {p['muted']}{line}{RESET}")
+            else:
+                print(f"   {p['yellow']}! Herdr CLI available (not currently running as daemon or inside Herdr pane).{RESET}")
+        except Exception as e:
+            print(f"   {p['yellow']}! Herdr check timed out or errored: {e}{RESET}")
+    else:
+        print(f"   {p['red']}✗ herdr CLI not found in PATH{RESET}")
+
+    # 2. Firstmate
+    print(f"\n{BOLD}{p['magenta']}2. Firstmate (Fleet Manager):{RESET}")
+    if shutil.which("firstmate") or shutil.which("fm"):
+        fm_bin = shutil.which("fm") or shutil.which("firstmate")
+        try:
+            res = subprocess.run([fm_bin, "fleet"], capture_output=True, text=True, timeout=3)
+            if res.returncode == 0:
+                print(f"   {p['green']}✓ Firstmate fleet active.{RESET}")
+                for line in res.stdout.strip().split("\n")[:4]:
+                    print(f"     {p['muted']}{line}{RESET}")
+            else:
+                print(f"   {p['yellow']}! Firstmate installed at {fm_bin}. (No active fleet running){RESET}")
+        except Exception:
+            print(f"   {p['green']}✓ Firstmate CLI is ready at {fm_bin}.{RESET}")
+    else:
+        print(f"   {p['red']}✗ firstmate CLI not found in PATH{RESET}")
+
+    # 3. Treehouse
+    print(f"\n{BOLD}{p['green']}3. Treehouse (Worktrees):{RESET}")
+    if shutil.which("treehouse"):
+        try:
+            res = subprocess.run(["treehouse", "status"], capture_output=True, text=True, timeout=3)
+            if res.returncode == 0:
+                print(f"   {p['green']}✓ Treehouse worktree pools healthy.{RESET}")
+                if res.stdout.strip():
+                    for line in res.stdout.strip().split("\n")[:4]:
+                        print(f"     {p['muted']}{line}{RESET}")
+            else:
+                print(f"   {p['yellow']}! Treehouse installed at {shutil.which('treehouse')}.{RESET}")
+        except Exception:
+            print(f"   {p['green']}✓ Treehouse is installed and ready.{RESET}")
+    else:
+        print(f"   {p['red']}✗ treehouse CLI not found in PATH{RESET}")
+
+    # 4. AXI Tools
+    print(f"\n{BOLD}{p['orange']}4. AXI (Agent eXperience Interface Tools):{RESET}")
+    axi_tools = ["gh-axi", "tasks-axi", "quota-axi", "chrome-devtools-axi", "lavish-axi"]
+    found_axi = [t for t in axi_tools if shutil.which(t)]
+    if found_axi:
+        print(f"   {p['green']}✓ Installed AXI tools ({len(found_axi)}/{len(axi_tools)}):{RESET} {', '.join(found_axi)}")
+    else:
+        print(f"   {p['yellow']}! AXI tools configured in skills (~/axi).{RESET}")
+
+    # 5. Compound Engineering Skills
+    print(f"\n{BOLD}{p['purple']}5. Compound Engineering Skills:{RESET}")
+    ce_skills_dir = "/home/soham/.agents/skills"
+    if os.path.isdir(ce_skills_dir):
+        ce_skills = [s for s in os.listdir(ce_skills_dir) if s.startswith("ce-")]
+        print(f"   {p['green']}✓ Installed Compound Engineering skills ({len(ce_skills)} available):{RESET}")
+        print(f"     {p['muted']}{', '.join(sorted(ce_skills)[:8])} ...{RESET}")
+    print()
+
+
+def main():
+    if len(sys.argv) > 1:
+        arg = sys.argv[1].lower().strip("-")
+        if arg in ("note", "doc", "docs", "help", "guide"):
+            show_note()
+            return
+        elif arg in ("status", "health", "check"):
+            check_status()
+            return
+        elif arg in ("vault", "path"):
+            print(NOTE_VAULT_PATH)
+            return
+
+    print_banner()
+
+
+if __name__ == "__main__":
+    main()

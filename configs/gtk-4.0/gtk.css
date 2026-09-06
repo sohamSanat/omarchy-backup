@@ -1,0 +1,157 @@
+/* Omarchy GTK 4 / Libadwaita System & Foliate Styling */
+@define-color accent_color #798186;
+@define-color accent_bg_color #798186;
+@define-color accent_fg_color #000000;
+@define-color window_bg_color #101315;
+@define-color window_fg_color #cacccc;
+@define-color view_bg_color #101315;
+@define-color view_fg_color #cacccc;
+@define-color headerbar_bg_color #0c0e10;
+@define-color headerbar_fg_color #cacccc;
+@define-color headerbar_border_color color-mix(in srgb, #4b4e55 40%, transparent);
+@define-color headerbar_backdrop_color #0c0e10;
+@define-color sidebar_bg_color #080a0b;
+@define-color sidebar_fg_color #cacccc;
+@define-color sidebar_backdrop_color #080a0b;
+@define-color sidebar_shade_color rgba(0, 0, 0, 0.25);
+@define-color sidebar_border_color color-mix(in srgb, #4b4e55 40%, transparent);
+@define-color secondary_sidebar_bg_color #080a0b;
+@define-color secondary_sidebar_fg_color #cacccc;
+@define-color secondary_sidebar_backdrop_color #080a0b;
+@define-color secondary_sidebar_border_color color-mix(in srgb, #4b4e55 40%, transparent);
+@define-color secondary_sidebar_shade_color rgba(0, 0, 0, 0.25);
+@define-color card_bg_color rgba(255, 255, 255, 0.08);
+@define-color card_fg_color #cacccc;
+@define-color popover_bg_color #0c0e10;
+@define-color popover_fg_color #cacccc;
+@define-color dialog_bg_color #0c0e10;
+@define-color dialog_fg_color #cacccc;
+
+/* --- Foliate Library View & Navigation Sidebar --- */
+
+/* Split view sidebar pane container */
+.sidebar-pane,
+overlay-split-view > .sidebar-pane,
+splitview > sidebar,
+navigation-split-view > .sidebar-pane {
+    background-color: @sidebar_bg_color;
+    color: @sidebar_fg_color;
+}
+
+.sidebar-pane toolbarview,
+.sidebar-pane scrolledwindow {
+    background-color: transparent;
+    color: @sidebar_fg_color;
+}
+
+/* Sidebar Top HeaderBar (housing hamburger Main Menu button) */
+.sidebar-pane headerbar,
+.sidebar-pane toolbarview > .top-bar headerbar,
+.sidebar-pane .top-bar.raised {
+    background-color: @sidebar_bg_color;
+    color: @sidebar_fg_color;
+    box-shadow: none;
+    border-bottom: 1px solid @sidebar_border_color;
+}
+
+.sidebar-pane headerbar button,
+.sidebar-pane headerbar menubutton > button {
+    color: @sidebar_fg_color;
+    border-radius: 6px;
+}
+
+.sidebar-pane headerbar button:hover,
+.sidebar-pane headerbar menubutton > button:hover {
+    background-color: alpha(@sidebar_fg_color, 0.12);
+    color: @sidebar_fg_color;
+}
+
+/* Split view divider line */
+overlay-split-view > border {
+    background-color: @sidebar_border_color;
+    min-width: 1px;
+}
+
+/* Navigation Sidebar ListBox */
+.navigation-sidebar {
+    background-color: transparent;
+    padding: 8px 6px;
+}
+
+/* Section Headings: LIBRARY, CATALOGS */
+.navigation-sidebar .caption-heading,
+.navigation-sidebar .dim-label,
+.navigation-sidebar header label,
+.navigation-sidebar > .header > .heading {
+    color: #a5aeb4;
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    opacity: 1;
+    margin-left: 12px;
+    margin-top: 14px;
+    margin-bottom: 4px;
+}
+
+/* Sidebar Navigation Items */
+.navigation-sidebar row {
+    border-radius: 8px;
+    margin: 2px 4px;
+    padding: 6px 10px;
+    color: @sidebar_fg_color;
+    transition: background-color 150ms ease, color 150ms ease;
+    font-size: 0.95rem;
+}
+
+.navigation-sidebar row:not(:selected):hover {
+    background-color: alpha(@accent_bg_color, 0.16);
+    color: @sidebar_fg_color;
+}
+
+.navigation-sidebar row:not(:selected):active {
+    background-color: alpha(@accent_bg_color, 0.26);
+}
+
+/* Active Selected Row (Theme accent pill) */
+.navigation-sidebar row:selected,
+.navigation-sidebar row:selected:hover,
+.navigation-sidebar row:selected:focus,
+.navigation-sidebar row.activatable:selected,
+.navigation-sidebar child:selected,
+.navigation-sidebar flowboxchild:selected {
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
+    font-weight: 600;
+}
+
+/* Text and Icons inside Selected Row */
+.navigation-sidebar row:selected label,
+.navigation-sidebar row:selected image,
+.navigation-sidebar row:selected .icon {
+    color: @accent_fg_color;
+}
+
+/* Main Content Area in Library */
+#library-toolbar-view,
+#catalog-toolbar-view,
+overlay-split-view > .content-pane {
+    background-color: @window_bg_color;
+    color: @window_fg_color;
+}
+
+#library-toolbar-view headerbar,
+#catalog-toolbar-view headerbar {
+    background-color: @headerbar_bg_color;
+    color: @headerbar_fg_color;
+    border-bottom: 1px solid @sidebar_border_color;
+}
+
+#search-bar {
+    background-color: @headerbar_bg_color;
+    border-bottom: 1px solid @sidebar_border_color;
+}
+
+#search-bar entry {
+    background-color: @view_bg_color;
+    color: @view_fg_color;
+}

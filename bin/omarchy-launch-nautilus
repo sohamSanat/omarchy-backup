@@ -1,0 +1,3 @@
+#!/bin/bash
+# Omarchy file manager launcher redirect to Strata
+exec setsid uwsm-app -- /home/soham/.local/bin/strata "$@"

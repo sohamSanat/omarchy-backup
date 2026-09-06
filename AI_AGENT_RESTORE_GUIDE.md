@@ -177,6 +177,16 @@ This repository contains the full snapshot of user customizations:
    - `configs/antigravity-app/`: Desktop app state, Preferences, and `~/.gemini/config/` plugin/hook configurations.
    - `restore.sh` automatically links `omarchy-theme` to active `vscode-theme.json` so editors match Omarchy Linux themes.
 
+
+15. **New Applications, Portals & Daemons**:
+   - `configs/foliate/` & `bin/foliate`: Dynamic Foliate e-book reader.
+   - `configs/qdirstat/` & `bin/qdirstat`: QDirStat disk analyzer.
+   - `configs/xdg-desktop-portal/` & `configs/dbus-services/`: Strata as default file manager & Wayland file chooser portal.
+   - `bin/omarchy-video-idle-inhibit` & `systemd/user/`: Video/media idle inhibitor daemon.
+   - `configs/fdm/` & `lib/libomarchy-fdm-theme.so`: Free Download Manager theming and browser native messaging host.
+   - `themes/omagen1` & `themes/omarchy_signature`: New themes.
+   - `plugins/pretty.omagen`: Visual theme designer studio plugin.
+
 ## 3. Fast Restoration (Automated)
 
 To apply everything at once, simply clone this repository onto the target Omarchy machine and execute:
@@ -278,7 +288,7 @@ cp -a configs/shell/bash_profile ~/.bash_profile
 ### Step 7: Apply Theming & Restart Services
 ```bash
 # 1. Apply theme and font
-omarchy theme set "Akaito"
+omarchy theme set "Solitude"
 omarchy font set "JetBrainsMono Nerd Font"
 
 # 2. Rescan plugins and restart quickshell
@@ -299,7 +309,7 @@ Run these commands after restoration to verify system health:
 
 | Component | Verification Command | Expected Outcome |
 |-----------|----------------------|------------------|
-| **Theme** | `omarchy theme current` | Prints `Akaito` |
+| **Theme** | `omarchy theme current` | Prints `Solitude` |
 | **Font** | `omarchy font current` | Prints `JetBrainsMono Nerd Font` |
 | **Hyprland** | `hyprctl configerrors` | Prints `ok` (no syntax errors) |
 | **Default Agent** | `omarchy-default-agent` | Prints `antigravity` |

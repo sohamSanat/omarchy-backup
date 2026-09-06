@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Force start if requested
+if [[ ${1:-} == "force" ]]; then
+  exec /usr/share/omarchy/bin/omarchy-launch-screensaver "$@"
+fi
+
+# Check screensaver-off toggle
+if [[ -f "$HOME/.local/state/omarchy/toggles/screensaver-off" ]]; then
+  exit 0
+fi
+
+# Check stay-awake flag
+if [[ -f "$HOME/.local/state/omarchy/indicators/stay-awake" ]]; then
+  exit 0
+fi
+
+# Check if any browser or media player has an active (uncorked) audio stream in PipeWire
+if pactl list sink-inputs 2>/dev/null | grep -B 10 -A 10 "Corked: no" | grep -qE "application.name = \"([Zz]en|[Ff]irefox|[Cc]hrom|[Bb]rave|[Ee]dge|[Vv]ivaldi|[Mm]pv|[Vv]lc|[Ss]potify)\""; then
+  exit 0
+fi
+
+# Check if any MPRIS player is currently playing
+for p in $(busctl --user list 2>/dev/null | awk '/org.mpris.MediaPlayer2/{print $1}'); do
+  status=$(busctl --user get-property "$p" /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null)
+  if [[ $status == *"Playing"* ]]; then
+    exit 0
+  fi
+done
+
+# Otherwise, run the default screensaver
+exec /usr/share/omarchy/bin/omarchy-launch-screensaver "$@"

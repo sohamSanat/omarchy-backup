@@ -1,0 +1,53 @@
+/* ==============================================================================
+ * Omarchy Foliate Reader User Stylesheet
+ * Generated automatically from active Omarchy theme
+ * ============================================================================== */
+
+::selection {
+    background-color: #343d41 !important;
+    color: #ffffff !important;
+}
+
+/* Clean Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #4b4e5555;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #798186;
+}
+
+/* Typography Accents */
+h1, h2, h3, h4, h5, h6 {
+    color: #a5aeb4;
+}
+
+a, a:any-link {
+    color: #798186 !important;
+    text-underline-offset: 0.15em;
+}
+
+code, pre {
+    background-color: #080a0b !important;
+    color: #a5aeb4 !important;
+    border-radius: 4px;
+}
+pre {
+    border-left: 3px solid #798186 !important;
+    padding: 10px 14px !important;
+}
+
+blockquote {
+    border-left: 3px solid #798186 !important;
+    padding-left: 14px !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    color: #4b4e55 !important;
+}
