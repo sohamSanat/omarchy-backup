@@ -8,25 +8,25 @@
 
 :root {
   /* Omarchy System Theme Tokens */
-  --omarchy-bg: #f3e4cb;
-  --omarchy-fg: #4d2e1a;
-  --omarchy-accent: #a32f1a;
-  --omarchy-muted: #9f8253;
-  --omarchy-selection-bg: #a32f1a;
-  --omarchy-selection-fg: #4d2e1a;
+  --omarchy-bg: #1E3061;
+  --omarchy-fg: #E8EEFF;
+  --omarchy-accent: #4D8FFF;
+  --omarchy-muted: #6080C0;
+  --omarchy-selection-bg: #4D8FFF;
+  --omarchy-selection-fg: #FFFFFF;
 
   /* Surfaces & Interactivity */
-  --omarchy-surface: color-mix(in srgb, #4d2e1a 8%, #f3e4cb);
-  --omarchy-surface-hover: color-mix(in srgb, #4d2e1a 15%, #f3e4cb);
-  --omarchy-surface-active: color-mix(in srgb, #4d2e1a 22%, #f3e4cb);
-  --omarchy-border: color-mix(in srgb, #4d2e1a 20%, transparent);
+  --omarchy-surface: color-mix(in srgb, #E8EEFF 8%, #1E3061);
+  --omarchy-surface-hover: color-mix(in srgb, #E8EEFF 15%, #1E3061);
+  --omarchy-surface-active: color-mix(in srgb, #E8EEFF 22%, #1E3061);
+  --omarchy-border: color-mix(in srgb, #E8EEFF 20%, transparent);
 }
 
 /* Omarchy Toggle Button in Dark Reader Popup */
 .omarchy-toggle-btn {
   align-items: center;
-  background-color: color-mix(in srgb, #a32f1a 12%, #141e24);
-  border: 0.125rem solid var(--omarchy-accent, #a32f1a);
+  background-color: color-mix(in srgb, #4D8FFF 12%, #141e24);
+  border: 0.125rem solid var(--omarchy-accent, #4D8FFF);
   border-radius: 0.25rem;
   box-sizing: border-box;
   color: #ffffff;
@@ -46,9 +46,9 @@
 }
 
 .omarchy-toggle-btn:hover {
-  background-color: color-mix(in srgb, var(--omarchy-accent, #a32f1a) 25%, #141e24);
-  border-color: var(--omarchy-accent, #a32f1a);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--omarchy-accent, #a32f1a) 35%, transparent);
+  background-color: color-mix(in srgb, var(--omarchy-accent, #4D8FFF) 25%, #141e24);
+  border-color: var(--omarchy-accent, #4D8FFF);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--omarchy-accent, #4D8FFF) 35%, transparent);
 }
 
 .omarchy-toggle-btn .button__wrapper {
@@ -74,7 +74,7 @@
 
 .omarchy-toggle-btn__indicator {
   background-color: color-mix(in srgb, #ffffff 40%, transparent);
-  border: 1px solid color-mix(in srgb, var(--omarchy-accent, #a32f1a) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--omarchy-accent, #4D8FFF) 60%, transparent);
   border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;
@@ -86,9 +86,9 @@
 /* Active / Toggled State */
 .omarchy-toggle-btn:active,
 .omarchy-toggle-btn.omarchy-toggle-btn--active {
-  background-color: var(--omarchy-accent, #a32f1a) !important;
-  border-color: var(--omarchy-accent, #a32f1a) !important;
-  box-shadow: 0 0 12px color-mix(in srgb, var(--omarchy-accent, #a32f1a) 50%, transparent);
+  background-color: var(--omarchy-accent, #4D8FFF) !important;
+  border-color: var(--omarchy-accent, #4D8FFF) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--omarchy-accent, #4D8FFF) 50%, transparent);
   color: #ffffff !important;
 }
 

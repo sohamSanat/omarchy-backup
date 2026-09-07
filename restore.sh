@@ -167,6 +167,13 @@ fi
 if [[ -d "${SCRIPT_DIR}/configs/zen" ]]; then
   echo "  -> Restoring Zen Browser customizations, Dark Reader mod & styles..."
   mkdir -p "${USER_HOME}/.config/zen"
+  if [[ -f "${SCRIPT_DIR}/configs/zen/MODS.md" ]]; then
+    cp -a "${SCRIPT_DIR}/configs/zen/MODS.md" "${USER_HOME}/.config/zen/"
+  fi
+  if [[ -d "${SCRIPT_DIR}/configs/zen/native-messaging-hosts" ]]; then
+    mkdir -p "${USER_HOME}/.config/zen/native-messaging-hosts"
+    cp -a "${SCRIPT_DIR}/configs/zen/native-messaging-hosts/." "${USER_HOME}/.config/zen/native-messaging-hosts/"
+  fi
   if [[ -d "${SCRIPT_DIR}/configs/zen/mods/darkreader" ]]; then
     mkdir -p "${USER_HOME}/.config/zen/mods/darkreader"
     cp -a "${SCRIPT_DIR}/configs/zen/mods/darkreader/." "${USER_HOME}/.config/zen/mods/darkreader/"
@@ -177,13 +184,13 @@ if [[ -d "${SCRIPT_DIR}/configs/zen" ]]; then
       cp -a "${SCRIPT_DIR}/configs/zen/chrome/." "$profile_dir/chrome/"
       cp -a "${SCRIPT_DIR}/configs/zen/user.js" "$profile_dir/user.js" 2>/dev/null || true
       cp -a "${SCRIPT_DIR}/configs/zen/"*.json "$profile_dir/" 2>/dev/null || true
-      if [[ -f "${SCRIPT_DIR}/configs/zen/extensions/addon@darkreader.org.xpi" ]]; then
+      if [[ -d "${SCRIPT_DIR}/configs/zen/extensions" ]]; then
         mkdir -p "$profile_dir/extensions"
-        cp -a "${SCRIPT_DIR}/configs/zen/extensions/addon@darkreader.org.xpi" "$profile_dir/extensions/"
+        cp -a "${SCRIPT_DIR}/configs/zen/extensions/." "$profile_dir/extensions/"
       fi
     fi
   done
-  echo "  [OK] Zen Browser chrome CSS, Dark Reader mod, shortcuts, and preferences restored."
+  echo "  [OK] Zen Browser chrome CSS, Dark Reader mod, extensions, shortcuts, and preferences restored."
 fi
 if [[ -d "${SCRIPT_DIR}/configs/herdr" ]]; then
   mkdir -p "${USER_HOME}/.config/herdr"

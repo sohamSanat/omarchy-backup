@@ -167,16 +167,21 @@ This repository contains the full snapshot of user customizations:
 
 
 11. **Zen Browser Customization & Theming Engine**:
-   - `configs/zen/chrome/` contains `userChrome.css`, `userContent.css`, `matugen-retro.css`, and `matugen-retro-content.css`.
-   - `bin/omarchy-sync-zen` compiles active theme palette into `omarchy-theme.css`.
-   - `restore.sh` distributes stylesheets to all Zen profiles and runs the sync engine.
+   - `configs/zen/chrome/` contains `userChrome.css`, `userContent.css`, `zen-themes.css`, and modular mods (`omarchy-theme`, `omarchy-zen-glass`, `omarchy-darkreader`).
+   - `configs/zen/MODS.md`: Full architectural specification of the 4-layer glass architecture (Hyprland blur/opacity -> Gecko transparency -> Chrome window canvas -> Solid tab content).
+   - `configs/zen/extensions/`: Packaged XPIs for Dark Reader, Free Download Manager, SponsorBlock, Return YouTube Dislike, and uBlock Origin.
+   - `bin/omarchy-sync-zen` compiles active theme palette into `zen-themes.css` and dynamic variables.
+   - `restore.sh` distributes stylesheets and extensions to all Zen profiles and runs the sync engine.
+
 12. **Printer Suite**:
    - `bin/printer` & `bin/printbar` provide complete hardware monitoring for Canon PIXMA G2060.
-
 
 13. **Omarchy Dark Reader Mod for Zen Browser**:
    - Source: `configs/zen/mods/darkreader/`
    - Prebuilt XPI: `configs/zen/extensions/addon@darkreader.org.xpi`
+   - Perceptual luminance calculation (`OmarchyManager.isColorLight`) using ITU-R BT.601 formula to prevent dark backgrounds from being misclassified as light mode.
+   - Dual-mode light/dark color math (`modifyOmarchyDarkSchemeColor`, `modifyOmarchyLightBgColor`, `modifyOmarchyLightFgColor`), converting light foregrounds to high-contrast dark tones (`#4d2e1a`) in light themes.
+   - Dynamic stylesheet injection for major web platforms including comprehensive YouTube interface styling (`#page-manager`, `ytd-masthead`, searchbox, filters, video titles, channel names, player controls) and Reddit (Shreddit).
    - Templates: `configs/omarchy/themed/zen-darkreader*.tpl`
    - Synced via `omarchy-sync-zen --sync` and auto-hooked to theme switches.
 

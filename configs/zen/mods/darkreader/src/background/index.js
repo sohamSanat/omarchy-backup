@@ -4241,8 +4241,31 @@
             return OmarchyManager.tokens || OmarchyManager.FALLBACK_TOKENS;
         }
 
+        static isColorLight(hex) {
+            if (!hex || typeof hex !== "string") return false;
+            const clean = hex.replace("#", "").trim();
+            let r = 0, g = 0, b = 0;
+            if (clean.length === 3) {
+                r = parseInt(clean[0] + clean[0], 16);
+                g = parseInt(clean[1] + clean[1], 16);
+                b = parseInt(clean[2] + clean[2], 16);
+            } else if (clean.length === 6) {
+                r = parseInt(clean.substring(0, 2), 16);
+                g = parseInt(clean.substring(2, 4), 16);
+                b = parseInt(clean.substring(4, 6), 16);
+            } else {
+                return false;
+            }
+            if (isNaN(r) || isNaN(g) || isNaN(b)) return false;
+            const lum = (r * 299 + g * 587 + b * 114) / 1000;
+            return lum > 128;
+        }
+
         static buildTheme(tokens, baseTheme) {
-            const isLight = tokens.mode === "light";
+            // Perceptual luminance ground truth for background color:
+            // Never trust tokens.mode blindly if background is dark!
+            const bgLumIsLight = tokens.background ? OmarchyManager.isColorLight(tokens.background) : false;
+            const isLight = tokens.background ? bgLumIsLight : (tokens.mode === "light");
             const bg = tokens.background || (isLight ? "#f3e4cb" : "#181a1b");
             const fg = tokens.foreground || (isLight ? "#4d2e1a" : "#e8e6e3");
             const accent = tokens.accent || "#a32f1a";
@@ -6208,7 +6231,74 @@
         }
         return {h: hx, s, l: lx, a};
     }
+    function modifyOmarchyDarkSchemeColor(rgb, theme) {
+        const poleBg = getBgPole(theme);
+        const poleFg = getFgPole(theme);
+        return modifyColorWithCache(
+            rgb,
+            theme,
+            modifyOmarchyDarkModeHSL,
+            poleBg,
+            poleFg
+        );
+    }
+    function modifyOmarchyDarkModeHSL({h, s, l, a}, poleBg, poleFg) {
+        const isNeutral = s < 0.18 ||
+            (h >= 160 && h <= 280 && s < 0.38) ||
+            (l <= 0.25 && s < 0.40) ||
+            l < 0.05 ||
+            l > 0.95;
+        if (isNeutral) {
+            const hx = poleBg.h;
+            const sx = poleBg.s;
+            let elevation = 0;
+            if (l > 0.5) {
+                const dist = 1 - l;
+                elevation = Math.min(0.25, dist * 0.55);
+            } else {
+                if (l > 0.08) {
+                    const dist = l - 0.08;
+                    elevation = Math.min(0.25, (dist / 0.42) * 0.22);
+                }
+            }
+            let lx = Math.min(0.70, poleBg.l + elevation);
+            if (a < 0.9 && l > 0.6) {
+                return {h: poleBg.h, s: poleBg.s, l: poleFg.l, a};
+            }
+            return {h: hx, s: sx, l: lx, a};
+        }
+        let lx;
+        if (l > 0.5) {
+            lx = scale(l, 0.5, 1, 0.22, 0.38);
+        } else {
+            lx = scale(l, 0, 0.5, 0.16, 0.32);
+        }
+        const sx = Math.min(s, 0.85);
+        return {h, s: sx, l: lx, a};
+    }
+    function modifyOmarchyLightBgColor(rgb, theme) {
+        const pole = getBgPole(theme);
+        return modifyColorWithCache(rgb, theme, modifyOmarchyLightBgHSL, pole);
+    }
+    function modifyOmarchyLightBgHSL({h, s, l, a}, pole) {
+        const isNeutral = s < 0.20 || l < 0.08 || l > 0.92;
+        let hx = isNeutral ? pole.h : h;
+        let sx = isNeutral ? pole.s : s;
+        let lx;
+        if (l < 0.5) {
+            lx = scale(l, 0, 0.5, pole.l, Math.min(0.98, pole.l + 0.06));
+        } else {
+            lx = scale(l, 0.5, 1, Math.max(0.72, pole.l - 0.08), pole.l);
+        }
+        return {h: hx, s: sx, l: lx, a};
+    }
     function _modifyBackgroundColor(rgb, theme) {
+        if (theme.omarchyThemeActive) {
+            if (theme.mode === 0) {
+                return modifyOmarchyLightBgColor(rgb, theme);
+            }
+            return modifyOmarchyDarkSchemeColor(rgb, theme);
+        }
         if (theme.mode === 0) {
             return modifyLightSchemeColor(rgb, theme);
         }
@@ -6267,7 +6357,32 @@
         }
         return {h: hx, s, l: lx, a};
     }
+    function modifyOmarchyLightFgColor(rgb, theme) {
+        const pole = getFgPole(theme);
+        return modifyColorWithCache(rgb, theme, modifyOmarchyLightFgHSL, pole);
+    }
+    function modifyOmarchyLightFgHSL({h, s, l, a}, pole) {
+        const isNeutral = s < 0.20 || l < 0.08 || l > 0.92;
+        let hx = isNeutral ? pole.h : h;
+        let sx = isNeutral ? pole.s : s;
+        let lx;
+        if (l > 0.5) {
+            // White or light text (e.g. from dark theme page) -> invert to dark text
+            lx = scale(l, 0.5, 1, Math.max(0.10, pole.l - 0.05), Math.min(0.35, pole.l + 0.08));
+        } else {
+            // Already dark text -> keep dark near pole.l
+            lx = scale(l, 0, 0.5, pole.l, Math.min(0.38, pole.l + 0.12));
+        }
+        return {h: hx, s: sx, l: lx, a};
+    }
     function _modifyForegroundColor(rgb, theme) {
+        if (theme.omarchyThemeActive) {
+            if (theme.mode === 0) {
+                return modifyOmarchyLightFgColor(rgb, theme);
+            }
+            const pole = getFgPole(theme);
+            return modifyColorWithCache(rgb, theme, modifyFgHSL, pole);
+        }
         if (theme.mode === 0) {
             return modifyLightSchemeColor(rgb, theme);
         }

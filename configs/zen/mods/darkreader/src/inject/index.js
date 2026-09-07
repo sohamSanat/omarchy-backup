@@ -3002,7 +3002,11 @@
         );
     }
     function modifyOmarchyDarkModeHSL({h, s, l, a}, poleBg, poleFg) {
-        const isNeutral = s < 0.18 || (h >= 200 && h <= 280 && s < 0.32) || l < 0.05 || l > 0.95;
+        const isNeutral = s < 0.18 ||
+            (h >= 160 && h <= 280 && s < 0.38) ||
+            (l <= 0.25 && s < 0.40) ||
+            l < 0.05 ||
+            l > 0.95;
         if (isNeutral) {
             const hx = poleBg.h;
             const sx = poleBg.s;
@@ -3031,12 +3035,31 @@
         const sx = Math.min(s, 0.85);
         return {h, s: sx, l: lx, a};
     }
+    function modifyOmarchyLightBgColor(rgb, theme) {
+        const pole = getBgPole(theme);
+        return modifyColorWithCache(rgb, theme, modifyOmarchyLightBgHSL, pole);
+    }
+    function modifyOmarchyLightBgHSL({h, s, l, a}, pole) {
+        const isNeutral = s < 0.20 || l < 0.08 || l > 0.92;
+        let hx = isNeutral ? pole.h : h;
+        let sx = isNeutral ? pole.s : s;
+        let lx;
+        if (l < 0.5) {
+            lx = scale(l, 0, 0.5, pole.l, Math.min(0.98, pole.l + 0.06));
+        } else {
+            lx = scale(l, 0.5, 1, Math.max(0.72, pole.l - 0.08), pole.l);
+        }
+        return {h: hx, s: sx, l: lx, a};
+    }
     function _modifyBackgroundColor(rgb, theme) {
+        if (theme.omarchyThemeActive) {
+            if (theme.mode === 0) {
+                return modifyOmarchyLightBgColor(rgb, theme);
+            }
+            return modifyOmarchyDarkSchemeColor(rgb, theme);
+        }
         if (theme.mode === 0) {
             return modifyLightSchemeColor(rgb, theme);
-        }
-        if (theme.omarchyThemeActive) {
-            return modifyOmarchyDarkSchemeColor(rgb, theme);
         }
         const pole = getBgPole(theme);
         return modifyColorWithCache(rgb, theme, modifyBgHSL, pole);
@@ -3093,7 +3116,32 @@
         }
         return {h: hx, s, l: lx, a};
     }
+    function modifyOmarchyLightFgColor(rgb, theme) {
+        const pole = getFgPole(theme);
+        return modifyColorWithCache(rgb, theme, modifyOmarchyLightFgHSL, pole);
+    }
+    function modifyOmarchyLightFgHSL({h, s, l, a}, pole) {
+        const isNeutral = s < 0.20 || l < 0.08 || l > 0.92;
+        let hx = isNeutral ? pole.h : h;
+        let sx = isNeutral ? pole.s : s;
+        let lx;
+        if (l > 0.5) {
+            // White or light text (e.g. from dark theme page) -> invert to dark text
+            lx = scale(l, 0.5, 1, Math.max(0.10, pole.l - 0.05), Math.min(0.35, pole.l + 0.08));
+        } else {
+            // Already dark text -> keep dark near pole.l
+            lx = scale(l, 0, 0.5, pole.l, Math.min(0.38, pole.l + 0.12));
+        }
+        return {h: hx, s: sx, l: lx, a};
+    }
     function _modifyForegroundColor(rgb, theme) {
+        if (theme.omarchyThemeActive) {
+            if (theme.mode === 0) {
+                return modifyOmarchyLightFgColor(rgb, theme);
+            }
+            const pole = getFgPole(theme);
+            return modifyColorWithCache(rgb, theme, modifyFgHSL, pole);
+        }
         if (theme.mode === 0) {
             return modifyLightSchemeColor(rgb, theme);
         }
@@ -8998,13 +9046,28 @@
             ? (tokens.lighterBackground || theme.lightSchemeBackgroundColor || `color-mix(in srgb, ${fg} 10%, ${bg})`)
             : (tokens.lighterBackground || "#ffffff");
         const darkerBg = tokens.darkerBackground || (isDark ? `color-mix(in srgb, black 35%, ${bg})` : bg);
-        const muted = tokens.muted || `color-mix(in srgb, ${fg} 40%, ${bg})`;
+        const muted = isDark
+            ? (tokens.muted || `color-mix(in srgb, ${fg} 55%, ${bg})`)
+            : `color-mix(in srgb, ${fg} 75%, ${bg})`;
         const selectionBg = theme.selectionColor || tokens.selectionBackground || accent;
         const selectionFg = tokens.selectionForeground || (isDark ? "#ffffff" : "#ffffff");
 
+        const searchBg = isDark
+            ? (tokens.darkerBackground || `color-mix(in srgb, black 25%, ${bg})`)
+            : (tokens.lighterBackground || "#ffffff");
+        const searchBorder = isDark
+            ? (tokens.muted ? `color-mix(in srgb, ${tokens.muted} 40%, transparent)` : `color-mix(in srgb, ${fg} 25%, transparent)`)
+            : `color-mix(in srgb, ${fg} 25%, ${bg})`;
+        const chipBg = isDark
+            ? (tokens.lighterBackground || `color-mix(in srgb, ${fg} 10%, ${bg})`)
+            : `color-mix(in srgb, ${fg} 8%, ${bg})`;
+        const chipHoverBg = isDark
+            ? `color-mix(in srgb, ${fg} 18%, ${bg})`
+            : `color-mix(in srgb, ${fg} 16%, ${bg})`;
+
         return [
             "/* Omarchy System Theme Overrides */",
-            ":root, html[dark], [dark], [data-color-mode=\"dark\"], [data-theme=\"dark\"] {",
+            "html, html:not(.style-scope), :root, [dark], html[dark], [data-color-mode], [data-theme], ytd-app, ytd-app[dark], ytd-masthead, ytd-browse, ytd-watch-flexy {",
             `   --darkreader-neutral-background: ${bg} !important;`,
             `   --darkreader-neutral-text: ${fg} !important;`,
             `   --darkreader-selection-background: ${selectionBg} !important;`,
@@ -9017,14 +9080,50 @@
             `   --yt-spec-menu-background: ${raisedBg} !important;`,
             `   --yt-spec-general-background-a: ${bg} !important;`,
             `   --yt-spec-general-background-b: ${raisedBg} !important;`,
-            `   --yt-spec-badge-chip-background: ${raisedBg} !important;`,
+            `   --yt-spec-general-background-c: ${darkerBg} !important;`,
+            `   --yt-spec-feed-background-a: ${bg} !important;`,
+            `   --yt-spec-feed-background-b: ${raisedBg} !important;`,
+            `   --yt-spec-feed-background-c: ${darkerBg} !important;`,
+            `   --yt-app-background: ${bg} !important;`,
+            `   --yt-main-app-background: ${bg} !important;`,
+            `   --yt-main-app-background-tmp: ${bg} !important;`,
+            `   --yt-guide-background: ${bg} !important;`,
+            `   --yt-sidebar-background: ${bg} !important;`,
+            `   --yt-dialog-background: ${raisedBg} !important;`,
+            `   --yt-searchbox-background: ${searchBg} !important;`,
+            `   --ytd-searchbox-background: ${searchBg} !important;`,
+            `   --yt-material-searchbox-active: ${searchBg} !important;`,
+            `   --yt-material-searchbox-inactive: ${searchBg} !important;`,
+            `   --ytd-searchbox-border-color: ${searchBorder} !important;`,
+            `   --ytd-searchbox-legacy-border-color: ${searchBorder} !important;`,
+            `   --ytd-searchbox-legacy-border-shadow-color: transparent !important;`,
+            `   --ytd-searchbox-legacy-button-border-color: ${searchBorder} !important;`,
+            `   --ytd-searchbox-legacy-button-color: ${raisedBg} !important;`,
+            `   --ytd-searchbox-legacy-button-hover-color: ${chipHoverBg} !important;`,
+            `   --ytd-searchbox-legacy-button-icon-color: ${fg} !important;`,
+            `   --yt-spec-badge-chip-background: ${chipBg} !important;`,
+            `   --yt-spec-button-chip-background-hover: ${chipHoverBg} !important;`,
             `   --yt-spec-call-to-action: ${accent} !important;`,
+            `   --yt-spec-call-to-action-inverse: ${accent} !important;`,
             `   --yt-spec-brand-link-text: ${accent} !important;`,
             `   --yt-spec-themed-blue: ${accent} !important;`,
             `   --yt-spec-suggested-action: ${accent} !important;`,
-            `   --yt-spec-button-chip-background-hover: color-mix(in srgb, ${accent} 20%, ${raisedBg}) !important;`,
-            `   --ytd-searchbox-background: ${bg} !important;`,
-            `   --ytd-searchbox-legacy-border-color: ${muted} !important;`,
+            `   --yt-spec-text-primary: ${fg} !important;`,
+            `   --yt-spec-text-primary-inverse: ${isDark ? "#000000" : "#ffffff"} !important;`,
+            `   --yt-spec-text-secondary: ${muted} !important;`,
+            `   --yt-spec-text-disabled: color-mix(in srgb, ${muted} 60%, transparent) !important;`,
+            `   --yt-spec-wordmark-text: ${fg} !important;`,
+            `   --yt-spec-icon-active-other: ${fg} !important;`,
+            `   --yt-spec-icon-inactive: ${muted} !important;`,
+            `   --yt-spec-icon-disabled: color-mix(in srgb, ${muted} 50%, transparent) !important;`,
+            `   --yt-primary-text-color: ${fg} !important;`,
+            `   --yt-secondary-text-color: ${muted} !important;`,
+            `   --yt-primary-color: ${fg} !important;`,
+            `   --yt-icon-color: ${fg} !important;`,
+            `   --yt-icon-active-color: ${fg} !important;`,
+            `   --yt-icon-hover-color: ${fg} !important;`,
+            `   --yt-spec-10-percent-layer: color-mix(in srgb, ${fg} 10%, transparent) !important;`,
+            `   --yt-spec-static-brand-red: ${accent} !important;`,
             "",
             "   /* GitHub Theme Custom Properties */",
             `   --bgColor-default: ${bg} !important;`,
@@ -9036,17 +9135,310 @@
             `   --borderColor-default: color-mix(in srgb, ${muted} 35%, transparent) !important;`,
             `   --borderColor-muted: color-mix(in srgb, ${muted} 25%, transparent) !important;`,
             "",
+            "   /* Reddit Theme Custom Properties */",
+            `   --shreddit-content-background: ${bg} !important;`,
+            `   --color-neutral-background: ${bg} !important;`,
+            `   --color-neutral-background-weak: ${bg} !important;`,
+            `   --color-neutral-background-strong: ${raisedBg} !important;`,
+            `   --color-neutral-background-hover: ${raisedBg} !important;`,
+            `   --color-secondary-background: ${raisedBg} !important;`,
+            `   --color-secondary-background-hover: color-mix(in srgb, ${fg} 8%, ${raisedBg}) !important;`,
+            `   --color-secondary-background-selected: color-mix(in srgb, ${accent} 20%, ${raisedBg}) !important;`,
+            `   --color-tone-1: ${fg} !important;`,
+            `   --color-tone-2: ${muted} !important;`,
+            `   --color-tone-3: ${darkerBg} !important;`,
+            `   --color-tone-4: ${raisedBg} !important;`,
+            `   --color-tone-5: ${raisedBg} !important;`,
+            `   --color-tone-6: ${bg} !important;`,
+            `   --color-tone-7: ${bg} !important;`,
+            `   --color-neutral-border: color-mix(in srgb, ${muted} 30%, transparent) !important;`,
+            `   --color-neutral-border-weak: color-mix(in srgb, ${muted} 20%, transparent) !important;`,
+            `   --color-neutral-border-medium: color-mix(in srgb, ${muted} 35%, transparent) !important;`,
+            `   --color-neutral-border-strong: color-mix(in srgb, ${muted} 50%, transparent) !important;`,
+            `   --color-neutral-content: ${fg} !important;`,
+            `   --color-neutral-content-strong: ${fg} !important;`,
+            `   --color-neutral-content-weak: ${muted} !important;`,
+            `   --color-primary-background: ${accent} !important;`,
+            `   --color-primary: ${accent} !important;`,
+            `   --newCommunityTheme-body: ${bg} !important;`,
+            `   --newCommunityTheme-bodyText: ${fg} !important;`,
+            `   --newCommunityTheme-canvas: ${bg} !important;`,
+            `   --newCommunityTheme-content: ${bg} !important;`,
+            `   --newCommunityTheme-metaText: ${muted} !important;`,
+            `   --newCommunityTheme-highlight: ${accent} !important;`,
+            `   --newCommunityTheme-actionIcon: ${muted} !important;`,
+            `   --newCommunityTheme-post: ${raisedBg} !important;`,
+            `   --newCommunityTheme-line: color-mix(in srgb, ${muted} 30%, transparent) !important;`,
+            `   --plain-background: ${bg} !important;`,
+            `   --background: ${bg} !important;`,
+            `   --canvas: ${bg} !important;`,
+            `   --comments-overlay-background: ${bg} !important;`,
+            `   --commentswrapper-gradient-color: ${bg} !important;`,
+            `   --fakelightbox-overlay-background: ${bg} !important;`,
+            "",
+            "   /* Dark Reader generated variable overrides for Reddit */",
+            `   --darkreader-bg--shreddit-content-background: ${bg} !important;`,
+            `   --darkreader-bg--color-neutral-background: ${bg} !important;`,
+            `   --darkreader-bg--color-neutral-background-weak: ${bg} !important;`,
+            `   --darkreader-bg--color-neutral-background-strong: ${raisedBg} !important;`,
+            `   --darkreader-bg--color-neutral-background-hover: ${raisedBg} !important;`,
+            `   --darkreader-bg--color-secondary-background: ${raisedBg} !important;`,
+            `   --darkreader-bg--color-secondary-background-selected: color-mix(in srgb, ${accent} 20%, ${raisedBg}) !important;`,
+            `   --darkreader-bg--color-tone-3: ${darkerBg} !important;`,
+            `   --darkreader-bg--newCommunityTheme-body: ${bg} !important;`,
+            `   --darkreader-bg--newCommunityTheme-canvas: ${bg} !important;`,
+            `   --darkreader-bg--newCommunityTheme-content: ${bg} !important;`,
+            `   --darkreader-bg--newCommunityTheme-metaText: ${muted} !important;`,
+            `   --darkreader-text--color-neutral-content: ${fg} !important;`,
+            `   --darkreader-text--color-neutral-content-strong: ${fg} !important;`,
+            `   --darkreader-text--color-neutral-content-weak: ${muted} !important;`,
+            `   --darkreader-text--color-tone-1: ${fg} !important;`,
+            `   --darkreader-text--color-secondary: ${muted} !important;`,
+            `   --darkreader-text--color-secondary-weak: ${muted} !important;`,
+            `   --darkreader-border--color-neutral: color-mix(in srgb, ${muted} 30%, transparent) !important;`,
+            `   --darkreader-border--color-neutral-border-medium: color-mix(in srgb, ${muted} 35%, transparent) !important;`,
+            "",
             "   /* Universal Controls */",
             `   accent-color: ${accent} !important;`,
             "}",
             "",
-            "/* YouTube Components & Accents */",
-            "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer[selected] #chip-container,",
-            "yt-chip-cloud-chip-renderer[selected] #chip-container {",
+            "/* Reddit Components & Layout */",
+            "shreddit-app,",
+            "#main-content,",
+            "main#main-content,",
+            "main,",
+            ".subgrid-container,",
+            ".grid-container,",
+            "shreddit-feed,",
+            "shreddit-post,",
+            "shreddit-comment-tree,",
+            "shreddit-comment,",
+            ".bg-neutral-background,",
+            ".bg-neutral-background-weak,",
+            ".self-start,",
+            "#comment-fold-button,",
+            "button.w-lg {",
+            `   background-color: ${bg} !important;`,
+            "}",
+            "",
+            "/* Reddit Navigation & Sidebars */",
+            "aside,",
+            "aside#left-sidebar-container,",
+            "aside.left-sidebar,",
+            "nav#left-sidebar,",
+            "nav[aria-label=\"Subreddit Navigation\"],",
+            "#left-sidebar-container,",
+            ".reddit-sidebar,",
+            "div#left-sidebar-container,",
+            "div#left-sidebar-container nav,",
+            "div#left-sidebar-container aside,",
+            "div#left-sidebar-container [class*=\"bg-\"],",
+            "aside#right-sidebar-container,",
+            "aside.right-sidebar,",
+            "#right-sidebar-container,",
+            ".right-sidebar {",
+            `   background-color: ${bg} !important;`,
+            "}",
+            "",
+            "/* Reddit Post Container, Comments & Media Shells */",
+            "div[slot=\"post-media-container\"],",
+            "div[slot=\"post-content\"],",
+            "shreddit-post article,",
+            "shreddit-comment article,",
+            ".comment-body,",
+            "#comment-tree {",
+            `   background-color: ${bg} !important;`,
+            "}",
+            "",
+            "/* Reddit Elevated Cards & Menus */",
+            "shreddit-post[view-type=\"card\"],",
+            "faceplate-hovercard > div > div > div,",
+            "faceplate-menu,",
+            "faceplate-dropdown-menu,",
+            "div[role=\"menu\"],",
+            "#COIN_PURCHASE_DROPDOWN_ID > div {",
+            `   background-color: ${raisedBg} !important;`,
+            "}",
+            "",
+            "/* Reddit Search Bar */",
+            ".reddit-search-bar,",
+            "#search-input-chip {",
+            `   background-color: ${raisedBg} !important;`,
+            `   border-color: color-mix(in srgb, ${muted} 35%, transparent) !important;`,
+            "}",
+            "",
+            "/* Reddit Upvote, Downvote, and Accent Highlights */",
+            "button[noun=\"upvote\"][aria-pressed=\"true\"] svg,",
+            "button[noun=\"upvote\"][aria-pressed=\"true\"] faceplate-number {",
+            `   color: ${accent} !important;`,
+            `   fill: ${accent} !important;`,
+            "}",
+            "",
+            "button[noun=\"downvote\"][aria-pressed=\"true\"] svg,",
+            "button[noun=\"downvote\"][aria-pressed=\"true\"] faceplate-number {",
+            `   color: ${isDark ? "#7aa2f7" : "#3b82f6"} !important;`,
+            `   fill: ${isDark ? "#7aa2f7" : "#3b82f6"} !important;`,
+            "}",
+            "",
+            "/* Primary Action & Join Buttons */",
+            "button[noun=\"join\"],",
+            "button.button-primary,",
+            "shreddit-join-button button {",
             `   background-color: ${accent} !important;`,
             `   color: ${isDark ? bg : "#ffffff"} !important;`,
             "}",
             "",
+            "/* Reddit Video Player Controls */",
+            ".reddit-video-player-root .seek-bar-progress,",
+            ".reddit-video-player-root .volume-slider-progress,",
+            ".reddit-video-player-root .volume-slider-thumb,",
+            ".reddit-video-seek-bar-root {",
+            `   background: ${accent} !important;`,
+            `   background-color: ${accent} !important;`,
+            "}",
+            "",
+            "/* Override Inline Style Properties That Carry Subreddit Colors */",
+            "[style*=\"--shreddit-content-background\"] {",
+            `   --shreddit-content-background: ${bg} !important;`,
+            "}",
+            "[style*=\"--background\"] {",
+            `   --background: ${bg} !important;`,
+            "}",
+            "[style*=\"--canvas\"] {",
+            `   --canvas: ${bg} !important;`,
+            "}",
+            "[style*=\"--comments-overlay-background\"] {",
+            `   --comments-overlay-background: ${bg} !important;`,
+            "}",
+            "[style*=\"--commentswrapper-gradient-color\"] {",
+            `   --comments-overlay-background: ${bg} !important;`,
+            "}",
+            "",
+            "/* YouTube Components & Accents */",
+            "/* Core App & Layout Containers */",
+            "ytd-app,",
+            "ytd-app[dark],",
+            "#page-manager,",
+            "#page-manager.ytd-app,",
+            "ytd-browse,",
+            "ytd-two-column-browse-results-renderer,",
+            "#primary.ytd-two-column-browse-results-renderer,",
+            "#contents.ytd-rich-grid-renderer,",
+            "ytd-rich-grid-renderer,",
+            "ytd-rich-item-renderer,",
+            "ytd-rich-section-renderer,",
+            "ytd-watch-flexy,",
+            "#columns.ytd-watch-flexy,",
+            "#primary.ytd-watch-flexy,",
+            "#secondary.ytd-watch-flexy {",
+            `   background-color: ${bg} !important;`,
+            `   background: ${bg} !important;`,
+            "}",
+            "",
+            "/* Top Masthead Container */",
+            "ytd-masthead,",
+            "#masthead-container,",
+            "#background.ytd-masthead {",
+            `   background-color: ${bg} !important;`,
+            `   background: ${bg} !important;`,
+            "}",
+            "",
+            "/* Sidebars & Mini Guides */",
+            "ytd-mini-guide-renderer,",
+            "ytd-mini-guide-entry-renderer,",
+            "ytd-guide-renderer,",
+            "#guide-content.ytd-guide-renderer,",
+            "#sections.ytd-guide-renderer {",
+            `   background-color: ${bg} !important;`,
+            `   background: ${bg} !important;`,
+            "}",
+            "",
+            "/* Search Bar */",
+            "#container.ytd-searchbox,",
+            "ytd-searchbox[has-focus] #container.ytd-searchbox,",
+            "#search-form #container {",
+            `   background-color: ${searchBg} !important;`,
+            `   border-color: ${searchBorder} !important;`,
+            "   box-shadow: none !important;",
+            "}",
+            "",
+            "#search-input input#search,",
+            "input#search.ytd-searchbox {",
+            `   color: ${fg} !important;`,
+            "   background-color: transparent !important;",
+            "}",
+            "",
+            "#search-icon-legacy.ytd-searchbox {",
+            `   background-color: ${raisedBg} !important;`,
+            `   border-color: ${searchBorder} !important;`,
+            "}",
+            "",
+            "#search-icon-legacy.ytd-searchbox yt-icon {",
+            `   color: ${fg} !important;`,
+            `   fill: ${fg} !important;`,
+            "}",
+            "",
+            "/* Filter Chips */",
+            "yt-chip-cloud-chip-renderer:not([selected]) #chip-container {",
+            `   background-color: ${chipBg} !important;`,
+            `   color: ${fg} !important;`,
+            "   border-color: transparent !important;",
+            "}",
+            "",
+            "yt-chip-cloud-chip-renderer:not([selected]) #chip-container:hover {",
+            `   background-color: ${chipHoverBg} !important;`,
+            "}",
+            "",
+            "yt-chip-cloud-chip-renderer[selected] #chip-container,",
+            "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer[selected] #chip-container {",
+            `   background-color: ${accent} !important;`,
+            `   color: ${isDark ? bg : "#ffffff"} !important;`,
+            "}",
+            "",
+            "/* Video Titles & Channel Names */",
+            "#video-title,",
+            "#video-title.ytd-rich-grid-media,",
+            "#video-title.ytd-compact-video-renderer,",
+            "#video-title.ytd-video-renderer,",
+            "ytd-rich-grid-media a#video-title-link,",
+            "ytd-compact-video-renderer a#video-title-link,",
+            "#video-title-link yt-formatted-string,",
+            "ytd-rich-item-renderer #video-title,",
+            "h1.ytd-watch-metadata,",
+            "#title.ytd-watch-metadata yt-formatted-string,",
+            "#channel-name yt-formatted-string,",
+            "ytd-channel-name yt-formatted-string,",
+            "#text.ytd-channel-name,",
+            "yt-formatted-string.ytd-channel-name,",
+            "ytd-rich-grid-media yt-formatted-string#text,",
+            "ytd-compact-video-renderer yt-formatted-string#text {",
+            `   color: ${fg} !important;`,
+            "}",
+            "",
+            "/* Metadata & Subtitles */",
+            "#metadata-line span,",
+            "#byline-container,",
+            "ytd-video-meta-block span,",
+            "#text.ytd-video-meta-block,",
+            "#metadata-line yt-formatted-string span {",
+            `   color: ${muted} !important;`,
+            "}",
+            "",
+            "/* Header & Navigation Icons */",
+            "ytd-masthead yt-icon,",
+            "ytd-masthead yt-icon-button button,",
+            "ytd-mini-guide-entry-renderer yt-icon,",
+            "ytd-guide-entry-renderer yt-icon,",
+            "#guide-icon.ytd-masthead,",
+            "#guide-button.ytd-app yt-icon,",
+            "ytd-topbar-logo-renderer yt-icon,",
+            "yt-icon.ytd-masthead,",
+            "ytd-masthead #buttons yt-icon {",
+            `   color: ${fg} !important;`,
+            `   fill: ${fg} !important;`,
+            "}",
+            "",
+            "/* Video Player Controls */",
             ".ytp-play-progress,",
             ".ytp-scrubber-button,",
             ".ytp-volume-slider-handle,",
@@ -9055,6 +9447,7 @@
             `   background-color: ${accent} !important;`,
             "}",
             "",
+            "/* Action Buttons */",
             "ytd-button-renderer.style-suggested-action yt-button-shape button,",
             "ytd-button-renderer.style-call-to-action yt-button-shape button {",
             `   background-color: ${accent} !important;`,
