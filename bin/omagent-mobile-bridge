@@ -1,0 +1,512 @@
+#!/usr/bin/env python3
+"""
+omagent-mobile-bridge: HTTP + WebSocket bridge for Nothing Phone PWA.
+Connects Nothing Phone voice intercom to omagent-route, Herdr socket,
+local Voxtype/Whisper transcription, and Lavish review surfaces.
+"""
+
+import asyncio
+import html
+import json
+import os
+import re
+import shutil
+import ssl
+import subprocess
+import tempfile
+import time
+from pathlib import Path
+from aiohttp import web
+
+WEB_DIR = Path.home() / ".config/omagent/mobile-web"
+ROUTE_BIN = Path.home() / ".config/omarchy/plugins/io.github.ellion369.omagent/omagent-route"
+PORT = 7890
+HOST = "0.0.0.0"
+SSL_DIR = Path.home() / ".config/omagent/ssl"
+SSL_CERT = SSL_DIR / "cert.pem"
+SSL_KEY = SSL_DIR / "key.pem"
+INTERNAL_HTTP_PORT = 7892
+INTERNAL_HTTPS_PORT = 7893
+
+# Connected WebSockets
+ws_clients = set()
+active_subproc = None
+
+
+async def broadcast(message: dict):
+    """Sends JSON message to all connected mobile WebSockets."""
+    if not ws_clients:
+        return
+    payload = json.dumps(message)
+    dead = set()
+    for ws in ws_clients:
+        try:
+            await ws.send_str(payload)
+        except Exception:
+            dead.add(ws)
+    for ws in dead:
+        ws_clients.discard(ws)
+
+
+async def handle_index(request):
+    return web.FileResponse(WEB_DIR / "index.html")
+
+
+async def handle_manifest(request):
+    return web.FileResponse(WEB_DIR / "manifest.json")
+
+
+async def handle_icon(request):
+    return web.FileResponse(WEB_DIR / "icon.svg")
+
+
+async def handle_sw(request):
+    return web.FileResponse(WEB_DIR / "service-worker.js")
+
+
+async def handle_websocket(request):
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+    ws_clients.add(ws)
+    try:
+        async for msg in ws:
+            pass
+    finally:
+        ws_clients.discard(ws)
+    return ws
+
+
+async def handle_transcribe(request):
+    """Accepts uploaded audio blob, converts to 16kHz WAV, and runs voxtype transcribe."""
+    reader = await request.multipart()
+    field = await reader.next()
+    if not field or field.name != "audio":
+        return web.json_response({"error": "No audio field provided"}, status=400)
+
+    filename = getattr(field, "filename", None) or "recording.webm"
+    ext = Path(filename).suffix or ".webm"
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as temp_in:
+        in_path = temp_in.name
+        while True:
+            chunk = await field.read_chunk()
+            if not chunk:
+                break
+            temp_in.write(chunk)
+
+    out_wav = in_path + ".wav"
+    try:
+        # Convert to 16kHz mono WAV for Whisper
+        conv = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-y", "-i", in_path, "-ar", "16000", "-ac", "1", out_wav,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await conv.wait()
+
+        # Run voxtype transcribe
+        trans = await asyncio.create_subprocess_exec(
+            "voxtype", "transcribe", out_wav,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await trans.communicate()
+        raw_output = stdout.decode("utf-8", errors="ignore").strip()
+
+        # Extract transcription from voxtype log output
+        m = re.search(r'Transcription completed in [^:]+:\s*"(.*?)"', raw_output, re.DOTALL)
+        if m:
+            text = m.group(1).strip()
+        else:
+            lines = [
+                l.strip() for l in raw_output.splitlines()
+                if l.strip()
+                and not l.startswith("Loading audio")
+                and not l.startswith("Audio format")
+                and not l.startswith("Processing")
+                and not l.startswith("whisper_")
+                and not re.match(r"^\d{4}-\d{2}-\d{2}", l)
+            ]
+            text = " ".join(lines)
+
+        # Clean trailing Whisper artifacts
+        text = re.sub(r"^\[.*?\]\s*", "", text).strip()
+
+        return web.json_response({"text": text})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+    finally:
+        for p in (in_path, out_wav):
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+
+
+async def handle_dispatch(request):
+    """Executes omagent-route and streams real-time highlights to WebSockets."""
+    global active_subproc
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+
+    prompt = data.get("prompt", "").strip()
+    if not prompt:
+        return web.json_response({"error": "Empty prompt"}, status=400)
+
+    # Spawn omagent-route asynchronously and stream lines
+    async def run_route_task(task_text: str):
+        global active_subproc
+        proc = await asyncio.create_subprocess_exec(
+            str(ROUTE_BIN), "--", task_text,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        active_subproc = proc
+
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            line_str = line.decode("utf-8", errors="ignore").strip()
+            if not line_str:
+                continue
+
+            # Parse JSON events emitted by omagent-route
+            try:
+                evt = json.loads(line_str)
+                kind = evt.get("kind")
+                if kind == "text":
+                    txt = evt.get("text", "").strip()
+                    if txt:
+                        is_active = "Now doing" in txt or "Doing" in txt
+                        await broadcast({"type": "highlight", "text": txt, "active": is_active})
+                elif kind == "agent":
+                    lbl = evt.get("label", "")
+                    await broadcast({"type": "status", "status": f"AGENT: {lbl}"})
+                elif kind == "done":
+                    await broadcast({"type": "highlight", "text": "• Voice dispatch complete • Agent running in Herdr (Tap 02 // HERDR)", "done": True})
+                    await broadcast({"type": "status", "status": "AGENT ACTIVE IN HERDR • READY FOR NEXT COMMAND"})
+            except Exception:
+                # Raw text fallback
+                await broadcast({"type": "highlight", "text": line_str, "active": False})
+
+        await proc.wait()
+        active_subproc = None
+
+    asyncio.create_task(run_route_task(prompt))
+    return web.json_response({"status": "dispatched", "prompt": prompt})
+
+
+async def handle_cancel(request):
+    """Cancels active omagent-route task."""
+    global active_subproc
+    if active_subproc and active_subproc.returncode is None:
+        try:
+            active_subproc.terminate()
+            await broadcast({"type": "highlight", "text": "• Task was aborted by mobile client", "done": True})
+        except Exception:
+            pass
+    return web.json_response({"status": "cancelled"})
+
+
+async def handle_herdr_pane(request):
+    """Queries Herdr for active workspace pane text."""
+    if not shutil.which("herdr"):
+        return web.json_response({"output": "Herdr multiplexer not found", "label": "N/A", "state": "offline"})
+
+    try:
+        # Get active workspace & pane
+        ws_res = await asyncio.create_subprocess_exec(
+            "herdr", "workspace", "list",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        ws_out, _ = await ws_res.communicate()
+        ws_data = json.loads(ws_out.decode())
+        workspaces = ws_data.get("result", {}).get("workspaces", [])
+
+        focused_ws = next((w for w in workspaces if w.get("focused")), None) or (workspaces[-1] if workspaces else None)
+        if not focused_ws:
+            return web.json_response({"output": "No active Herdr workspaces", "label": "None", "state": "idle"})
+
+        ws_id = focused_ws.get("workspace_id")
+        ws_label = focused_ws.get("label", "workspace")
+        agent_state = focused_ws.get("agent_status", "unknown")
+
+        # Get pane ID
+        p_res = await asyncio.create_subprocess_exec(
+            "herdr", "pane", "list", "--workspace", ws_id,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        p_out, _ = await p_res.communicate()
+        p_data = json.loads(p_out.decode())
+        panes = p_data.get("result", {}).get("panes", [])
+        if not panes:
+            return web.json_response({"output": "No panes in workspace", "label": ws_label, "state": agent_state})
+
+        pane_id = panes[0].get("pane_id")
+
+        # Read pane text
+        read_res = await asyncio.create_subprocess_exec(
+            "herdr", "pane", "read", pane_id, "--lines", "40",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        read_out, _ = await read_res.communicate()
+        output_text = read_out.decode("utf-8", errors="ignore")
+        # Smart active detection for Antigravity & AI agents
+        lower_out = output_text.lower()
+        if any(marker in lower_out for marker in ("subagent(s)", "working...", "running command...", "generating...", "thinking...", "evaluating...", "reviewing...", "testing...")):
+            agent_state = "working"
+        elif "● agent(" in lower_out or "thought for" in lower_out:
+            if "ctrl+c to cancel" in lower_out or "esc to cancel" in lower_out:
+                agent_state = "working"
+
+        return web.json_response({
+            "output": output_text,
+            "label": ws_label,
+            "state": agent_state,
+            "pane_id": pane_id,
+        })
+    except Exception as e:
+        return web.json_response({"output": f"Error reading Herdr: {e}", "label": "Error", "state": "error"})
+
+
+async def handle_herdr_key(request):
+    """Sends key press to active Herdr pane."""
+    try:
+        data = await request.json()
+        key = data.get("key", "").lower()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+
+    try:
+        ws_res = await asyncio.create_subprocess_exec(
+            "herdr", "workspace", "list",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        ws_out, _ = await ws_res.communicate()
+        ws_data = json.loads(ws_out.decode())
+        workspaces = ws_data.get("result", {}).get("workspaces", [])
+        focused_ws = next((w for w in workspaces if w.get("focused")), None) or (workspaces[-1] if workspaces else None)
+        if focused_ws:
+            ws_id = focused_ws.get("workspace_id")
+            p_res = await asyncio.create_subprocess_exec(
+                "herdr", "pane", "list", "--workspace", ws_id,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            p_out, _ = await p_res.communicate()
+            panes = json.loads(p_out.decode()).get("result", {}).get("panes", [])
+            if panes:
+                pane_id = panes[0].get("pane_id")
+                if key == "ctrl-c":
+                    await asyncio.create_subprocess_exec("herdr", "pane", "send-keys", pane_id, "ctrl-c")
+                elif key == "enter":
+                    await asyncio.create_subprocess_exec("herdr", "pane", "send-keys", pane_id, "enter")
+    except Exception:
+        pass
+
+    return web.json_response({"status": "ok"})
+
+
+async def handle_artifacts(request):
+    """Lists recent .lavish HTML and docs/plans artifacts."""
+    artifacts = []
+    scan_dirs = [
+        Path.home() / "Work/docs/plans",
+        Path.home() / "Work/.lavish",
+        Path.home() / ".lavish",
+        Path.home() / ".config/omarchy/plugins/io.github.ellion369.omagent/docs/plans",
+    ]
+    seen_paths = set()
+    for s_dir in scan_dirs:
+        if s_dir.is_dir():
+            files = []
+            for ext in ("*.html", "*.md"):
+                files.extend(s_dir.glob(ext))
+            for f in sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)[:10]:
+                if str(f) in seen_paths:
+                    continue
+                seen_paths.add(str(f))
+                artifacts.append({
+                    "name": f.name,
+                    "path": str(f),
+                    "url": f"/api/artifact?path={f.resolve()}",
+                    "time": time.strftime("%H:%M", time.localtime(f.stat().st_mtime)),
+                })
+    return web.json_response({"artifacts": artifacts})
+
+
+async def handle_get_artifact(request):
+    """Serves an artifact HTML or renders markdown cleanly."""
+    path_str = request.query.get("path", "")
+    if not path_str:
+        return web.Response(text="Path parameter required", status=400)
+
+    target = Path(path_str).resolve()
+    # Safety: ensure inside home directory
+    if not str(target).startswith(str(Path.home())) or not target.is_file():
+        return web.Response(text="Forbidden or not found", status=403)
+
+    if target.suffix.lower() == ".md":
+        content = target.read_text(encoding="utf-8", errors="ignore")
+        escaped = html.escape(content)
+        rendered_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{html.escape(target.name)}</title>
+  <style>
+    body {{
+      background: #000000;
+      color: #e0e0e0;
+      font-family: "Courier New", Courier, monospace, -apple-system, sans-serif;
+      padding: 16px;
+      margin: 0;
+      line-height: 1.6;
+    }}
+    pre {{
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #0d0d0d;
+      border: 1px solid #222222;
+      border-radius: 8px;
+      padding: 14px;
+      color: #ffffff;
+      font-size: 11px;
+    }}
+  </style>
+</head>
+<body>
+  <pre>{escaped}</pre>
+</body>
+</html>"""
+        return web.Response(text=rendered_html, content_type="text/html")
+
+    return web.FileResponse(target)
+
+
+def make_app():
+    app = web.Application()
+    app.router.add_get("/", handle_index)
+    app.router.add_get("/manifest.json", handle_manifest)
+    app.router.add_get("/icon.svg", handle_icon)
+    app.router.add_get("/service-worker.js", handle_sw)
+    app.router.add_get("/ws", handle_websocket)
+    app.router.add_post("/api/transcribe", handle_transcribe)
+    app.router.add_post("/api/dispatch", handle_dispatch)
+    app.router.add_post("/api/cancel", handle_cancel)
+    app.router.add_get("/api/herdr/pane", handle_herdr_pane)
+    app.router.add_post("/api/herdr/send-key", handle_herdr_key)
+    app.router.add_get("/api/artifacts", handle_artifacts)
+    app.router.add_get("/api/artifact", handle_get_artifact)
+    return app
+
+
+def get_ssl_context():
+    if SSL_CERT.is_file() and SSL_KEY.is_file():
+        try:
+            ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ctx.load_cert_chain(str(SSL_CERT), str(SSL_KEY))
+            return ctx
+        except Exception as e:
+            print(f"Warning: Failed to load SSL cert: {e}")
+            return None
+    return None
+
+
+async def run_server():
+    app = make_app()
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    ssl_ctx = get_ssl_context()
+
+    # If no SSL certificate available, run plain HTTP on PORT directly
+    if not ssl_ctx:
+        site = web.TCPSite(runner, HOST, PORT)
+        await site.start()
+        print(f"Omagent Mobile Bridge running (HTTP only) on http://{HOST}:{PORT}")
+        while True:
+            await asyncio.sleep(3600)
+
+    # Start internal HTTP and HTTPS listeners on 127.0.0.1
+    site_http = web.TCPSite(runner, "127.0.0.1", INTERNAL_HTTP_PORT)
+    await site_http.start()
+
+    site_https = web.TCPSite(runner, "127.0.0.1", INTERNAL_HTTPS_PORT, ssl_context=ssl_ctx)
+    await site_https.start()
+
+    async def proxy_client(client_reader, client_writer):
+        target_writer = None
+        try:
+            first_byte = await client_reader.read(1)
+            if not first_byte:
+                client_writer.close()
+                return
+
+            # TLS record starts with 0x16 (ClientHello)
+            target_port = INTERNAL_HTTPS_PORT if first_byte == b'\x16' else INTERNAL_HTTP_PORT
+
+            target_reader, target_writer = await asyncio.open_connection("127.0.0.1", target_port)
+            target_writer.write(first_byte)
+            await target_writer.drain()
+
+            async def pipe(src, dst):
+                try:
+                    while True:
+                        data = await src.read(65536)
+                        if not data:
+                            break
+                        dst.write(data)
+                        await dst.drain()
+                except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError):
+                    pass
+                finally:
+                    try:
+                        dst.close()
+                    except Exception:
+                        pass
+
+            await asyncio.gather(
+                pipe(client_reader, target_writer),
+                pipe(target_reader, client_writer)
+            )
+        except Exception:
+            pass
+        finally:
+            try:
+                client_writer.close()
+            except Exception:
+                pass
+            if target_writer:
+                try:
+                    target_writer.close()
+                except Exception:
+                    pass
+
+    server = await asyncio.start_server(proxy_client, HOST, PORT)
+    print(f"Omagent Mobile Bridge listening on {HOST}:{PORT}")
+    print(f"  • Dual Mode: Transparent HTTP & HTTPS multiplexing active")
+    print(f"  • Plain HTTP:  http://192.168.29.65:{PORT}")
+    print(f"  • Secure HTTPS: https://192.168.29.65:{PORT}")
+
+    async with server:
+        await server.serve_forever()
+
+
+def main():
+    try:
+        asyncio.run(run_server())
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == "__main__":
+    main()

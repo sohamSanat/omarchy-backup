@@ -1,0 +1,2834 @@
+diff --git i/Omagent.qml w/Omagent.qml
+index 0b118e2..4d40952 100644
+--- i/Omagent.qml
++++ w/Omagent.qml
+@@ -37,6 +37,12 @@ Item {
+   property double runStartedAt: 0
+   property int elapsedMs: 0
+   property bool copied: false
++  property bool showingHistory: false
++  property bool historyLoading: false
++  property int historySelectedIndex: 0
++
++  ListModel { id: historyListModel }
++  ListModel { id: filteredHistoryModel }
+ 
+   property bool restored: false
+   property int runPid: 0
+@@ -85,15 +91,23 @@ Item {
+ 
+   function snapshot() {
+     var rows = []
+-    for (var i = Math.max(0, entries.count - 120); i < entries.count; i++) {
++    var firstPrompt = ""
++    for (var i = 0; i < entries.count; i++) {
+       var row = entries.get(i)
+-      rows.push({ "rowKind": row.rowKind, "rowText": row.rowText,
+-                  "rowCount": row.rowCount, "rowLines": row.rowLines,
+-                  "rowAuto": row.rowAuto })
++      if (!firstPrompt && row.rowKind === "you") {
++        firstPrompt = row.rowText
++      }
++      if (i >= Math.max(0, entries.count - 120)) {
++        rows.push({ "rowKind": row.rowKind, "rowText": row.rowText,
++                    "rowCount": row.rowCount, "rowLines": row.rowLines,
++                    "rowAuto": row.rowAuto })
++      }
+     }
+     return {
+       "version": 1,
+       "entries": rows,
++      "title": firstPrompt || "New Chat",
++      "updatedAt": Date.now(),
+       "agentName": root.agentName,
+       "agentLabel": root.agentLabel,
+       "sessionId": root.sessionId,
+@@ -113,7 +127,12 @@ Item {
+ 
+   function save() {
+     if (!root.restored) return
+-    stateFile.setText(JSON.stringify(root.snapshot(), null, 2) + "\n")
++    var snap = root.snapshot()
++    var raw = JSON.stringify(snap, null, 2) + "\n"
++    stateFile.setText(raw)
++    if (root.sessionId !== "" && entries.count > 0) {
++      sessionSaveFile.setText(raw)
++    }
+   }
+ 
+   function restore(raw) {
+@@ -203,12 +222,18 @@ Item {
+     }
+     if (payload && payload.auto === true) root.autoMode = true
+     root.opened = true
++    if (payload && payload.history === true) {
++      root.openHistory()
++    } else {
++      root.showingHistory = false
++    }
+     prompt.text = ""
+     Qt.callLater(function() { panel.keepInBounds() })
+     Qt.callLater(function() { prompt.forceActiveFocus() })
+   }
+ 
+   function close() {
++    root.showingHistory = false
+     root.opened = false
+   }
+ 
+@@ -226,7 +251,11 @@ Item {
+   function pushRow(kind, text, auto) {
+     if (!text) return
+     var last = entries.count > 0 ? entries.get(entries.count - 1) : null
+-    if (kind === "tool" && last && last.rowKind === "tool") {
++    if (kind === "text" && last && last.rowKind === "text") {
++      var combined = last.rowText + String(text)
++      entries.setProperty(entries.count - 1, "rowText", combined)
++      entries.setProperty(entries.count - 1, "rowLines", combined)
++    } else if (kind === "tool" && last && last.rowKind === "tool") {
+       var steps = last.rowLines.split("\n")
+       steps.push(String(text))
+       while (steps.length > 40) steps.shift()
+@@ -429,6 +458,9 @@ Item {
+       return
+     }
+     root.stopRun()
++    if (root.sessionId !== "" && entries.count > 0) {
++      sessionSaveFile.setText(JSON.stringify(root.snapshot(), null, 2) + "\n")
++    }
+     entries.clear()
+     root.agentName = ""
+     root.agentLabel = ""
+@@ -449,10 +481,133 @@ Item {
+     root.runStartedAt = 0
+     root.elapsedMs = 0
+     root.runPid = 0
++    root.showingHistory = false
+     root.save()
++    prompt.text = ""
+     prompt.forceActiveFocus()
+   }
+ 
++  function toggleHistory() {
++    if (root.busy) {
++      root.pushRow("status", "Still working. Ctrl+C stops it")
++      return
++    }
++    if (root.showingHistory) {
++      root.showingHistory = false
++      prompt.text = ""
++      prompt.forceActiveFocus()
++      return
++    }
++    root.openHistory()
++  }
++
++  function openHistory() {
++    console.log("Omagent: openHistory() called with routerPath: " + root.routerPath)
++    if (root.sessionId !== "" && entries.count > 0) {
++      root.save()
++    }
++    root.showingHistory = true
++    root.historyLoading = true
++    root.historySelectedIndex = 0
++    historyListModel.clear()
++    filteredHistoryModel.clear()
++    prompt.text = ""
++    prompt.forceActiveFocus()
++    historyLister.command = [root.routerPath, "--list-sessions"]
++    historyLister.running = false
++    historyLister.running = true
++  }
++
++  function applyHistoryFilter() {
++    filteredHistoryModel.clear()
++    var query = prompt.text.trim().toLowerCase()
++    for (var i = 0; i < historyListModel.count; i++) {
++      var item = historyListModel.get(i)
++      var t = String(item.title || "").toLowerCase()
++      var p = String(item.preview || "").toLowerCase()
++      var a = String(item.agentLabel || "").toLowerCase()
++      if (!query || t.indexOf(query) !== -1 || p.indexOf(query) !== -1 || a.indexOf(query) !== -1) {
++        filteredHistoryModel.append({
++          "id": item.id,
++          "title": item.title,
++          "agentLabel": item.agentLabel,
++          "agentName": item.agentName,
++          "timeAgo": item.timeAgo,
++          "preview": item.preview,
++          "messageCount": item.messageCount
++        })
++      }
++    }
++    if (root.historySelectedIndex >= filteredHistoryModel.count) {
++      root.historySelectedIndex = Math.max(0, filteredHistoryModel.count - 1)
++    }
++  }
++
++  function populateHistory(raw) {
++    console.log("Omagent: populateHistory() raw text length: " + (raw ? raw.length : 0))
++    root.historyLoading = false
++    historyListModel.clear()
++    var list = []
++    try {
++      list = JSON.parse(String(raw || ""))
++    } catch (e) {
++      console.warn("Omagent: failed to parse history JSON:", e, "raw:", raw)
++      return
++    }
++    if (!list || !Array.isArray(list)) {
++      console.warn("Omagent: history list is not an array:", list)
++      return
++    }
++    console.log("Omagent: successfully parsed " + list.length + " history chats")
++    for (var i = 0; i < list.length; i++) {
++      historyListModel.append(list[i])
++    }
++    root.applyHistoryFilter()
++  }
++
++  function loadSession(id) {
++    if (!id) return
++    if (root.sessionId !== "" && root.sessionId !== id && entries.count > 0) {
++      root.save()
++    }
++    root.historyLoading = true
++    sessionFetcher.command = [root.routerPath, "--get-session", id]
++    sessionFetcher.running = false
++    sessionFetcher.running = true
++  }
++
++  function finishLoadSession(raw) {
++    root.historyLoading = false
++    root.restore(raw)
++    root.showingHistory = false
++    prompt.text = ""
++    prompt.forceActiveFocus()
++  }
++
++  function deleteSession(id) {
++    if (!id) return
++    Quickshell.execDetached([root.routerPath, "--delete-session", id])
++    for (var i = 0; i < historyListModel.count; i++) {
++      if (historyListModel.get(i).id === id) {
++        historyListModel.remove(i)
++        break
++      }
++    }
++    root.applyHistoryFilter()
++    if (root.sessionId === id) {
++      root.newSession()
++      root.showingHistory = true
++    }
++  }
++
++  function clearAllHistory() {
++    Quickshell.execDetached([root.routerPath, "--clear-history"])
++    historyListModel.clear()
++    filteredHistoryModel.clear()
++    root.newSession()
++    root.showingHistory = false
++  }
++
+   function toggleAuto() {
+     root.autoMode = !root.autoMode
+     prompt.forceActiveFocus()
+@@ -490,7 +645,7 @@ Item {
+     onTriggered: root.save()
+   }
+ 
+-  Component.onCompleted: Quickshell.execDetached(["mkdir", "-p", root.stateDir])
++  Component.onCompleted: Quickshell.execDetached(["mkdir", "-p", root.stateDir + "/sessions"])
+ 
+   FileView {
+     id: stateFile
+@@ -501,6 +656,52 @@ Item {
+     onLoadFailed: root.restored = true
+   }
+ 
++  FileView {
++    id: sessionSaveFile
++    path: root.sessionId !== "" ? (root.stateDir + "/sessions/" + root.sessionId + ".json") : ""
++    atomicWrites: true
++    printErrors: false
++  }
++
++  Process {
++    id: historyLister
++    command: [root.routerPath, "--list-sessions"]
++    stdout: StdioCollector {
++      id: historyCollector
++      waitForEnd: true
++      onStreamFinished: root.populateHistory(historyCollector.text)
++    }
++    onExited: function(exitCode) {
++      if (exitCode === 0) {
++        if (historyListModel.count === 0) {
++          root.populateHistory(historyCollector.text)
++        }
++      } else {
++        root.historyLoading = false
++        console.warn("Omagent: historyLister exited with code", exitCode)
++      }
++    }
++  }
++
++  Process {
++    id: sessionFetcher
++    stdout: StdioCollector {
++      id: sessionCollector
++      waitForEnd: true
++      onStreamFinished: root.finishLoadSession(sessionCollector.text)
++    }
++    onExited: function(exitCode) {
++      if (exitCode === 0) {
++        if (root.historyLoading) {
++          root.finishLoadSession(sessionCollector.text)
++        }
++      } else {
++        root.historyLoading = false
++        console.warn("Omagent: sessionFetcher exited with code", exitCode)
++      }
++    }
++  }
++
+   Process {
+     id: probe
+     onExited: function(exitCode) {
+@@ -547,14 +748,14 @@ Item {
+       : WlrKeyboardFocus.None
+ 
+     readonly property int gap: Style.space(12)
+-    readonly property int surfaceWidth: Math.min(Style.space(440), panel.width - Style.space(32))
+-    readonly property int pillTop: entries.count > 0
+-      ? Math.round(panel.height * 0.16)
+-      : Math.round((panel.height - pill.height) / 2)
++    readonly property int surfaceWidth: Math.min(Style.space(520), panel.width - Style.space(32))
++    readonly property int pillTop: (entries.count > 0 || root.showingHistory)
++      ? Math.round(panel.height * 0.13)
++      : Math.round(panel.height * 0.28)
+     readonly property int cardTop: pillTop + pill.height + gap
+     readonly property int cardMax: Math.max(
+       Style.space(80),
+-      Math.min(Math.round(panel.height * 0.6),
++      Math.min(Math.round(panel.height * 0.68),
+                panel.height - cardTop - panel.clampY(root.dragY) - Style.space(24)))
+ 
+     function clampX(value) {
+@@ -696,7 +897,7 @@ Item {
+         }
+ 
+         Item {
+-          width: parent.width - Style.space(54) - Style.space(42) - parent.spacing * 2
++          width: parent.width - Style.space(54) - Style.space(42) * 2 - parent.spacing * 3
+             - (autoBadge.visible ? autoBadge.width + parent.spacing : 0)
+           height: parent.height
+ 
+@@ -718,31 +919,63 @@ Item {
+               color: Color.accent
+             }
+ 
++            onTextChanged: {
++              if (root.showingHistory) {
++                root.applyHistoryFilter()
++              }
++            }
++
+             Keys.priority: Keys.BeforeItem
+ 
+             Keys.onPressed: function(event) {
++              if (event.modifiers & Qt.ControlModifier) {
++                if (event.key === Qt.Key_H) {
++                  root.toggleHistory()
++                  event.accepted = true
++                  return
++                } else if (event.key === Qt.Key_E) {
++                  root.expand()
++                  event.accepted = true
++                  return
++                } else if (event.key === Qt.Key_C && prompt.selectedText.length === 0) {
++                  root.stopRun()
++                  event.accepted = true
++                  return
++                } else if (event.key === Qt.Key_N) {
++                  root.newSession()
++                  event.accepted = true
++                  return
++                } else if (event.key === Qt.Key_Y) {
++                  root.copyLast()
++                  event.accepted = true
++                  return
++                }
++              }
++
++              if (root.showingHistory) {
++                if (event.key === Qt.Key_Down) {
++                  root.historySelectedIndex = Math.min(filteredHistoryModel.count - 1, root.historySelectedIndex + 1)
++                  event.accepted = true
++                  return
++                } else if (event.key === Qt.Key_Up) {
++                  root.historySelectedIndex = Math.max(0, root.historySelectedIndex - 1)
++                  event.accepted = true
++                  return
++                } else if (event.key === Qt.Key_Delete) {
++                  if (root.historySelectedIndex >= 0 && root.historySelectedIndex < filteredHistoryModel.count) {
++                    root.deleteSession(filteredHistoryModel.get(root.historySelectedIndex).id)
++                  }
++                  event.accepted = true
++                  return
++                }
++              }
++
+               if (event.key === Qt.Key_Backtab
+                   || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))) {
+                 root.toggleAuto()
+                 event.accepted = true
+                 return
+               }
+-              if (event.modifiers & Qt.ControlModifier) {
+-                if (event.key === Qt.Key_E) {
+-                  root.expand()
+-                  event.accepted = true
+-                } else if (event.key === Qt.Key_C && prompt.selectedText.length === 0) {
+-                  root.stopRun()
+-                  event.accepted = true
+-                } else if (event.key === Qt.Key_N) {
+-                  root.newSession()
+-                  event.accepted = true
+-                } else if (event.key === Qt.Key_Y) {
+-                  root.copyLast()
+-                  event.accepted = true
+-                }
+-                return
+-              }
+               if (event.key === Qt.Key_PageUp) {
+                 root.followTail = false
+                 list.contentY = Math.max(0, list.contentY - list.height * 0.8)
+@@ -757,16 +990,46 @@ Item {
+             }
+ 
+             Keys.onEscapePressed: function(event) {
++              if (root.showingHistory) {
++                root.showingHistory = false
++                prompt.text = ""
++                event.accepted = true
++                return
++              }
+               root.dismiss()
+               event.accepted = true
+             }
+ 
+             Keys.onReturnPressed: function(event) {
++              if (root.showingHistory) {
++                if (filteredHistoryModel.count > 0 && root.historySelectedIndex >= 0 && root.historySelectedIndex < filteredHistoryModel.count) {
++                  root.loadSession(filteredHistoryModel.get(root.historySelectedIndex).id)
++                  event.accepted = true
++                  return
++                } else if (prompt.text.trim().length > 0) {
++                  root.showingHistory = false
++                  root.submit()
++                  event.accepted = true
++                  return
++                }
++              }
+               root.submit()
+               event.accepted = true
+             }
+ 
+             Keys.onEnterPressed: function(event) {
++              if (root.showingHistory) {
++                if (filteredHistoryModel.count > 0 && root.historySelectedIndex >= 0 && root.historySelectedIndex < filteredHistoryModel.count) {
++                  root.loadSession(filteredHistoryModel.get(root.historySelectedIndex).id)
++                  event.accepted = true
++                  return
++                } else if (prompt.text.trim().length > 0) {
++                  root.showingHistory = false
++                  root.submit()
++                  event.accepted = true
++                  return
++                }
++              }
+               root.submit()
+               event.accepted = true
+             }
+@@ -779,7 +1042,9 @@ Item {
+               ? "Listening…"
+               : (root.dictationState === "transcribing"
+                 ? "Transcribing…"
+-                : (root.hasSession ? "Follow up…" : "Do anything"))
++                : (root.showingHistory
++                  ? "Search past chats…"
++                  : (root.hasSession ? "Follow up…" : "Personal Assistance Active")))
+             color: Color.menu.text
+             opacity: root.dictationState === "idle" ? 0.44 : 0.72
+             font.family: Style.font.menuFamily
+@@ -825,6 +1090,38 @@ Item {
+           }
+         }
+ 
++        Item {
++          width: Style.space(42)
++          height: parent.height
++
++          Rectangle {
++            anchors.centerIn: parent
++            width: Style.space(38)
++            height: width
++            radius: width / 2
++            color: root.showingHistory
++              ? Color.menu.selectedBackground
++              : (historyBtnArea.containsMouse ? Color.menu.selectedBackground : "transparent")
++
++            Text {
++              anchors.centerIn: parent
++              text: "󰋚"
++              color: root.showingHistory ? Color.accent : Color.menu.text
++              opacity: root.showingHistory ? 1.0 : 0.62
++              font.family: Style.font.family
++              font.pixelSize: Style.font.iconLarge
++            }
++
++            MouseArea {
++              id: historyBtnArea
++              anchors.fill: parent
++              hoverEnabled: true
++              cursorShape: Qt.PointingHandCursor
++              onClicked: root.toggleHistory()
++            }
++          }
++        }
++
+         Item {
+           width: Style.space(42)
+           height: parent.height
+@@ -862,16 +1159,18 @@ Item {
+     BorderSurface {
+       id: card
+ 
+-      visible: entries.count > 0
++      visible: entries.count > 0 || root.showingHistory
+       width: panel.surfaceWidth
+       x: Math.round((panel.width - width) / 2) + panel.clampX(root.dragX)
+       y: panel.cardTop + panel.clampY(root.dragY)
+-      height: Math.min(
+-        card.contentTopInset + card.contentBottomInset
+-          + header.height + Style.space(12)
+-          + rows.height + Style.space(12)
+-          + footer.height,
+-        panel.cardMax)
++      height: root.showingHistory
++        ? Math.min(Style.space(380), panel.cardMax)
++        : Math.min(
++            card.contentTopInset + card.contentBottomInset
++              + header.height + Style.space(12)
++              + rows.height + Style.space(12)
++              + footer.height,
++            panel.cardMax)
+       radius: Style.space(20)
+       color: Qt.rgba(Color.menu.background.r,
+                      Color.menu.background.g,
+@@ -895,7 +1194,12 @@ Item {
+         anchors.margins: card.contentTopInset
+ 
+         Item {
+-          id: header
++          id: chatView
++          anchors.fill: parent
++          visible: !root.showingHistory
++
++          Item {
++            id: header
+           width: parent.width
+           height: Style.space(20)
+ 
+@@ -1054,12 +1358,17 @@ Item {
+                   x: row.padX
+                   y: row.leadIn + row.padY + row.opticalShift
+                   width: rows.width - row.padX * 2 - row.tagSpace
+-                  wrapMode: (row.isNote && !row.rowExpanded) ? Text.NoWrap : Text.Wrap
++                  wrapMode: (row.isNote && !row.rowExpanded) ? Text.NoWrap : Text.WordWrap
+                   elide: (row.isNote && !row.rowExpanded) ? Text.ElideRight : Text.ElideNone
+-                  textFormat: (row.isError || row.rowKind === "status")
+-                    ? Text.StyledText : Text.PlainText
++                  textFormat: {
++                    if (row.isError || row.rowKind === "status") return Text.StyledText
++                    if (row.isProse) return Text.MarkdownText
++                    return Text.PlainText
++                  }
+                   lineHeightMode: Text.ProportionalHeight
+                   lineHeight: row.isProse ? row.leading : 1.0
++                  linkColor: Color.accent
++                  onLinkActivated: function(link) { Qt.openUrlExternally(link) }
+                   font.family: Style.font.menuFamily
+                   font.pixelSize: row.isNote ? Style.font.caption : Style.font.body
+                   color: row.isNote ? Color.muted : Color.menu.text
+@@ -1257,6 +1566,16 @@ Item {
+               verticalPadding: Style.space(3)
+               onClicked: root.newSession()
+             }
++
++            Button {
++              text: "History ^H"
++              tooltipText: "Ctrl+H \u2014 browse past chat sessions"
++              fontSize: Style.font.caption
++              foreground: Color.muted
++              horizontalPadding: Style.space(7)
++              verticalPadding: Style.space(3)
++              onClicked: root.toggleHistory()
++            }
+           }
+ 
+           Text {
+@@ -1270,7 +1589,330 @@ Item {
+           }
+         }
+       }
++
++      Item {
++        id: historyView
++        anchors.fill: parent
++        visible: root.showingHistory
++
++        Item {
++          id: historyHeader
++          width: parent.width
++          height: Style.space(20)
++
++          Row {
++            anchors.left: parent.left
++            anchors.verticalCenter: parent.verticalCenter
++            spacing: Style.space(8)
++
++            Text {
++              text: "󰋚"
++              color: Color.accent
++              font.family: Style.font.family
++              font.pixelSize: Style.font.bodySmall
++            }
++
++            Text {
++              text: "Chat History"
++              color: Color.menu.text
++              font.family: Style.font.menuFamily
++              font.pixelSize: Style.font.bodySmall
++              font.weight: Font.DemiBold
++            }
++
++            Text {
++              visible: filteredHistoryModel.count > 0
++              text: "\u00b7 " + filteredHistoryModel.count + (filteredHistoryModel.count === 1 ? " chat" : " chats")
++              color: Color.muted
++              font.family: Style.font.menuFamily
++              font.pixelSize: Style.font.bodySmall
++            }
++          }
++
++          Text {
++            anchors.right: parent.right
++            anchors.verticalCenter: parent.verticalCenter
++            text: "Esc to close"
++            color: Color.muted
++            font.family: Style.font.menuFamily
++            font.pixelSize: Style.font.caption
++          }
++        }
++
++        ListView {
++          id: historyList
++          anchors.top: historyHeader.bottom
++          anchors.topMargin: Style.space(10)
++          anchors.bottom: historyFooter.top
++          anchors.bottomMargin: Style.space(10)
++          width: parent.width
++          clip: true
++          model: filteredHistoryModel
++          spacing: Style.space(6)
++          boundsBehavior: Flickable.StopAtBounds
++
++          currentIndex: root.historySelectedIndex
++          onCurrentIndexChanged: {
++            if (currentIndex >= 0) root.historySelectedIndex = currentIndex
++          }
++
++          Item {
++            anchors.fill: parent
++            visible: !root.historyLoading && filteredHistoryModel.count === 0
++
++            Column {
++              anchors.centerIn: parent
++              spacing: Style.space(8)
++
++              Text {
++                anchors.horizontalCenter: parent.horizontalCenter
++                text: "󰋚"
++                color: Color.muted
++                opacity: 0.45
++                font.family: Style.font.family
++                font.pixelSize: Style.space(32)
++              }
++
++              Text {
++                anchors.horizontalCenter: parent.horizontalCenter
++                text: prompt.text.trim().length > 0 ? "No matching chats" : "No saved chats yet"
++                color: Color.menu.text
++                font.family: Style.font.menuFamily
++                font.pixelSize: Style.font.body
++                font.weight: Font.Medium
++              }
++
++              Text {
++                anchors.horizontalCenter: parent.horizontalCenter
++                text: prompt.text.trim().length > 0
++                  ? "Try a different search term"
++                  : "Conversations are saved automatically"
++                color: Color.muted
++                font.family: Style.font.menuFamily
++                font.pixelSize: Style.font.caption
++              }
++            }
++          }
++
++          Item {
++            anchors.fill: parent
++            visible: root.historyLoading
++
++            Text {
++              anchors.centerIn: parent
++              text: "Loading history…"
++              color: Color.muted
++              font.family: Style.font.menuFamily
++              font.pixelSize: Style.font.bodySmall
++            }
++          }
++
++          delegate: Item {
++            id: historyRow
++            width: historyList.width
++            height: Style.space(58)
++
++            required property string id
++            required property string title
++            required property string agentLabel
++            required property string agentName
++            required property string timeAgo
++            required property string preview
++            required property int messageCount
++            required property int index
++
++            readonly property bool isCurrent: historyRow.id === root.sessionId
++            readonly property bool isSelected: historyRow.index === root.historySelectedIndex
++
++            Rectangle {
++              id: bg
++              anchors.fill: parent
++              radius: Style.cornerRadius
++              color: (historyRow.isSelected || rowHover.hovered)
++                ? Color.menu.selectedBackground
++                : (historyRow.isCurrent ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.08) : "transparent")
++              opacity: (historyRow.isSelected || rowHover.hovered) ? 0.9 : 1.0
++
++              border.width: historyRow.isCurrent ? 1 : 0
++              border.color: historyRow.isCurrent ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4) : "transparent"
++
++              Behavior on color {
++                ColorAnimation { duration: 80 }
++              }
++            }
++
++            Item {
++              anchors.fill: parent
++              anchors.leftMargin: Style.space(12)
++              anchors.rightMargin: Style.space(10)
++              anchors.topMargin: Style.space(8)
++              anchors.bottomMargin: Style.space(8)
++
++              Row {
++                id: topRow
++                anchors.left: parent.left
++                anchors.right: delBtn.visible ? delBtn.left : parent.right
++                anchors.rightMargin: Style.space(8)
++                anchors.top: parent.top
++                spacing: Style.space(6)
++
++                Rectangle {
++                  visible: historyRow.isCurrent
++                  width: Style.space(6)
++                  height: Style.space(6)
++                  radius: width / 2
++                  color: Color.accent
++                  anchors.verticalCenter: parent.verticalCenter
++                }
++
++                Text {
++                  width: parent.width - (historyRow.isCurrent ? Style.space(12) : 0) - timeText.implicitWidth - Style.space(8)
++                  text: historyRow.title || "Untitled Chat"
++                  color: Color.menu.text
++                  font.family: Style.font.menuFamily
++                  font.pixelSize: Style.font.bodySmall
++                  font.weight: Font.DemiBold
++                  elide: Text.ElideRight
++                  maximumLineCount: 1
++                }
++
++                Text {
++                  id: timeText
++                  text: historyRow.timeAgo || ""
++                  color: Color.muted
++                  font.family: Style.font.menuFamily
++                  font.pixelSize: Style.font.caption
++                  anchors.verticalCenter: parent.verticalCenter
++                }
++              }
++
++              Row {
++                anchors.left: parent.left
++                anchors.right: delBtn.visible ? delBtn.left : parent.right
++                anchors.rightMargin: Style.space(8)
++                anchors.bottom: parent.bottom
++                spacing: Style.space(6)
++
++                Rectangle {
++                  width: agentTag.implicitWidth + Style.space(8)
++                  height: agentTag.implicitHeight + Style.space(2)
++                  radius: Style.space(4)
++                  color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.14)
++                  anchors.verticalCenter: parent.verticalCenter
++
++                  Text {
++                    id: agentTag
++                    anchors.centerIn: parent
++                    text: historyRow.agentLabel || "Jarvis"
++                    color: Color.accent
++                    font.family: Style.font.menuFamily
++                    font.pixelSize: Style.font.caption
++                    font.weight: Font.Medium
++                  }
++                }
++
++                Text {
++                  width: parent.width - (agentTag.implicitWidth + Style.space(14))
++                  text: historyRow.preview || ""
++                  color: Color.muted
++                  font.family: Style.font.menuFamily
++                  font.pixelSize: Style.font.caption
++                  elide: Text.ElideRight
++                  maximumLineCount: 1
++                  anchors.verticalCenter: parent.verticalCenter
++                }
++              }
++
++              Rectangle {
++                id: delBtn
++                anchors.right: parent.right
++                anchors.verticalCenter: parent.verticalCenter
++                width: Style.space(24)
++                height: Style.space(24)
++                radius: width / 2
++                color: delHover.hovered ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.2) : "transparent"
++                visible: rowHover.hovered || historyRow.isSelected
++
++                Text {
++                  anchors.centerIn: parent
++                  text: "󰆴"
++                  color: delHover.hovered ? Color.urgent : Color.muted
++                  font.family: Style.font.family
++                  font.pixelSize: Style.font.bodySmall
++                }
++
++                HoverHandler {
++                  id: delHover
++                  cursorShape: Qt.PointingHandCursor
++                }
++
++                TapHandler {
++                  onTapped: root.deleteSession(historyRow.id)
++                }
++              }
++            }
++
++            HoverHandler {
++              id: rowHover
++              cursorShape: Qt.PointingHandCursor
++              onHoveredChanged: {
++                if (rowHover.hovered) root.historySelectedIndex = historyRow.index
++              }
++            }
++
++            TapHandler {
++              onTapped: root.loadSession(historyRow.id)
++            }
++          }
++        }
++
++        Item {
++          id: historyFooter
++          anchors.bottom: parent.bottom
++          width: parent.width
++          height: Style.space(24)
++
++          Row {
++            anchors.left: parent.left
++            anchors.leftMargin: -Style.space(7)
++            anchors.verticalCenter: parent.verticalCenter
++            spacing: Style.space(4)
++
++            Button {
++              text: "Back Esc"
++              tooltipText: "Esc \u2014 return to current chat"
++              fontSize: Style.font.caption
++              foreground: Color.muted
++              horizontalPadding: Style.space(7)
++              verticalPadding: Style.space(3)
++              onClicked: root.toggleHistory()
++            }
++
++            Button {
++              text: "Clear All"
++              tooltipText: "Delete all chat history"
++              visible: filteredHistoryModel.count > 0
++              fontSize: Style.font.caption
++              foreground: Color.urgent
++              horizontalPadding: Style.space(7)
++              verticalPadding: Style.space(3)
++              onClicked: root.clearAllHistory()
++            }
++          }
++
++          Text {
++            anchors.right: parent.right
++            anchors.verticalCenter: parent.verticalCenter
++            text: "Enter to open \u00b7 Del to remove"
++            color: Color.muted
++            font.family: Style.font.menuFamily
++            font.pixelSize: Style.font.caption
++          }
++        }
++      }
+     }
+ 
+   }
+ }
++}
++
+diff --git i/omagent-route w/omagent-route
+index 8ff0dcc..6aeab0b 100755
+--- i/omagent-route
++++ w/omagent-route
+@@ -1,7 +1,15 @@
+ #!/usr/bin/env python3
++"""
++Omagent Multi-Lane Jarvis Router for Omarchy Linux
++Lanes:
++  1. Instant General Knowledge (Direct Google Gemini 3.8 Flash SSE streaming)
++  2. Live Internet & Web Search (DuckDuckGo retrieval + Gemini 3.8 Flash grounded synthesis)
++  3. Coding & Engineering Tasks (Herdr + Firstmate + Pi Harness + Treehouse + AXI + CE)
++"""
+ 
+ from __future__ import annotations
+ 
++import html
+ import json
+ import os
+ import re
+@@ -11,28 +19,464 @@ import signal
+ import subprocess
+ import sys
+ import threading
++import time
++import urllib.error
++import urllib.parse
++import urllib.request
+ import uuid
+-from collections import deque
+ from pathlib import Path
+ 
+-
+-MAX_REQUEST_CHARS = 2000
++MAX_REQUEST_CHARS = 2500
+ MAX_TEXT_CHARS = 4000
+ MAX_TOOL_CHARS = 160
+-MAX_STDERR_CHARS = 600
++
++CONFIG_PATH = Path.home() / ".config/omagent/config.json"
++STATE_DIR = Path.home() / ".local/state/omagent"
++SESSION_DIR = STATE_DIR / "sessions"
++
+ DRY_RUN = os.environ.get("OMAGENT_DRY_RUN") == "1"
+ DEBUG = os.environ.get("OMAGENT_DEBUG") == "1"
+ 
+-PREAMBLE = (
+-    "You are answering from Omagent, a small desktop overlay on Omarchy Linux "
+-    "with very limited display space. Keep the reply concise, plain text, no "
+-    "headings; do the task rather than describing a plan."
+-)
+-
+-
+ EMITTED_ERROR = False
+ 
+ 
++def format_time_ago(updated_at_ms: int) -> str:
++    now_ms = int(time.time() * 1000)
++    diff = max(0, (now_ms - updated_at_ms) // 1000)
++    if diff < 60:
++        return "Just now"
++    if diff < 3600:
++        mins = max(1, diff // 60)
++        return f"{mins}m ago"
++    if diff < 86400:
++        hours = diff // 3600
++        return f"{hours}h ago"
++    if diff < 86400 * 2:
++        return "Yesterday"
++    if diff < 86400 * 7:
++        days = diff // 86400
++        return f"{days}d ago"
++    return time.strftime("%b %d", time.localtime(updated_at_ms / 1000))
++
++
++def clean_preview_text(text: str) -> str:
++    s = re.sub(r"```[\s\S]*?```", "", text)
++    s = re.sub(r"`[^`]*`", "", s)
++    s = re.sub(r"[#*_\-•]", " ", s)
++    s = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", s)
++    return clip(" ".join(s.split()), 90)
++
++
++def load_session_history(session_id: str) -> list[dict]:
++    """Loads past conversation turns for session_id from session storage or last.json."""
++    if not session_id:
++        return []
++
++    # 1. Try dedicated session file first
++    session_file = SESSION_DIR / f"{session_id}.json"
++    if session_file.is_file():
++        try:
++            data = json.loads(session_file.read_text("utf-8"))
++            if isinstance(data, list) and len(data) > 0:
++                return data
++            if isinstance(data, dict):
++                if "history" in data and isinstance(data["history"], list) and len(data["history"]) > 0:
++                    return data["history"]
++                if "entries" in data and isinstance(data["entries"], list):
++                    hist = []
++                    for item in data["entries"]:
++                        kind = item.get("rowKind")
++                        text = item.get("rowText", "").strip()
++                        if not text:
++                            continue
++                        if kind == "you":
++                            if hist and hist[-1]["role"] == "user":
++                                hist[-1]["parts"][0]["text"] += "\n" + text
++                            else:
++                                hist.append({"role": "user", "parts": [{"text": text}]})
++                        elif kind == "text":
++                            if hist and hist[-1]["role"] == "model":
++                                hist[-1]["parts"][0]["text"] += "\n" + text
++                            elif hist and hist[-1]["role"] == "user":
++                                hist.append({"role": "model", "parts": [{"text": text}]})
++                    return hist
++        except Exception as e:
++            if DEBUG:
++                print(f"Error reading session file {session_file}: {e}", file=sys.stderr)
++
++    # 2. Try last.json fallback
++    last_file = STATE_DIR / "last.json"
++    if last_file.is_file():
++        try:
++            state = json.loads(last_file.read_text("utf-8"))
++            if state.get("sessionId") != session_id:
++                return []
++            entries = state.get("entries", [])
++            history = []
++            for item in entries:
++                kind = item.get("rowKind")
++                text = item.get("rowText", "").strip()
++                if not text:
++                    continue
++                if kind == "you":
++                    if history and history[-1]["role"] == "user":
++                        history[-1]["parts"][0]["text"] += "\n" + text
++                    else:
++                        history.append({"role": "user", "parts": [{"text": text}]})
++                elif kind == "text":
++                    if history and history[-1]["role"] == "model":
++                        history[-1]["parts"][0]["text"] += "\n" + text
++                    elif history and history[-1]["role"] == "user":
++                        history.append({"role": "model", "parts": [{"text": text}]})
++            return history
++        except Exception as e:
++            if DEBUG:
++                print(f"Error reading last.json: {e}", file=sys.stderr)
++
++    return []
++
++
++def build_conversation_contents(history: list[dict], current_user_text: str) -> list[dict]:
++    """Constructs alternating user/model turns for Gemini API with current prompt."""
++    clean_req = current_user_text.strip()
++    contents: list[dict] = []
++    for turn in history:
++        role = turn.get("role")
++        parts = turn.get("parts", [])
++        if role in ("user", "model") and parts and parts[0].get("text"):
++            contents.append({
++                "role": role,
++                "parts": [{"text": parts[0]["text"]}]
++            })
++
++    if contents and contents[-1]["role"] == "user":
++        if contents[-1]["parts"][0]["text"].strip() != clean_req:
++            contents[-1]["parts"][0]["text"] = clean_req
++    else:
++        contents.append({"role": "user", "parts": [{"text": clean_req}]})
++
++    while contents and contents[0]["role"] != "user":
++        contents.pop(0)
++
++    sanitized: list[dict] = []
++    for turn in contents:
++        if sanitized and sanitized[-1]["role"] == turn["role"]:
++            sanitized[-1]["parts"][0]["text"] += "\n" + turn["parts"][0]["text"]
++        else:
++            sanitized.append(turn)
++
++    if len(sanitized) > 16:
++        sanitized = sanitized[-16:]
++        while sanitized and sanitized[0]["role"] != "user":
++            sanitized.pop(0)
++
++    return sanitized
++
++
++def save_session_history(session_id: str, contents: list[dict], model_response: str) -> None:
++    """Persists updated conversation turns to session file."""
++    if not session_id or not model_response.strip():
++        return
++    updated = list(contents)
++    updated.append({"role": "model", "parts": [{"text": model_response.strip()}]})
++    try:
++        SESSION_DIR.mkdir(parents=True, exist_ok=True)
++        session_file = SESSION_DIR / f"{session_id}.json"
++        data = {}
++        if session_file.is_file():
++            try:
++                parsed = json.loads(session_file.read_text("utf-8"))
++                if isinstance(parsed, dict):
++                    data = parsed
++            except Exception:
++                data = {}
++
++        data["sessionId"] = session_id
++        data["history"] = updated
++        data["updatedAt"] = int(time.time() * 1000)
++
++        # Sync entries and metadata from last.json if active
++        last_file = STATE_DIR / "last.json"
++        if last_file.is_file():
++            try:
++                last_data = json.loads(last_file.read_text("utf-8"))
++                if last_data.get("sessionId") == session_id:
++                    for k in ("entries", "agentName", "agentLabel", "agentCwd", "resumeLabel", "resumeArgv", "title", "priorTokens", "priorCost", "sawCost", "elapsedMs"):
++                        if k in last_data and last_data[k] is not None:
++                            data[k] = last_data[k]
++            except Exception:
++                pass
++
++        if "title" not in data or not data["title"]:
++            for turn in updated:
++                if turn.get("role") == "user" and turn.get("parts"):
++                    data["title"] = clip(turn["parts"][0].get("text", ""), 80, collapse=True)
++                    break
++
++        session_file.write_text(json.dumps(data, indent=2), "utf-8")
++    except Exception as e:
++        if DEBUG:
++            print(f"Error saving session history for {session_id}: {e}", file=sys.stderr)
++
++
++def cmd_list_sessions() -> int:
++    SESSION_DIR.mkdir(parents=True, exist_ok=True)
++    sessions = []
++
++    # Also check if last.json has an unsaved session with entries
++    last_file = STATE_DIR / "last.json"
++    if last_file.is_file():
++        try:
++            last_data = json.loads(last_file.read_text("utf-8"))
++            last_id = last_data.get("sessionId")
++            if last_id and not (SESSION_DIR / f"{last_id}.json").exists() and last_data.get("entries"):
++                cmd_save_session(last_id)
++        except Exception:
++            pass
++
++    for p in SESSION_DIR.glob("*.json"):
++        try:
++            raw = p.read_text("utf-8")
++            data = json.loads(raw)
++            sid = p.stem
++            title = ""
++            agent_label = "Jarvis"
++            agent_name = "jarvis"
++            preview = ""
++            updated_at = int(p.stat().st_mtime * 1000)
++            msg_count = 0
++
++            if isinstance(data, dict):
++                sid = data.get("sessionId") or sid
++                title = data.get("title", "")
++                agent_label = data.get("agentLabel", "Jarvis")
++                agent_name = data.get("agentName", "jarvis")
++                updated_at = data.get("updatedAt") or updated_at
++                entries = data.get("entries", [])
++                msg_count = len(entries) if entries else len(data.get("history", []))
++                if not title:
++                    for e in entries:
++                        if e.get("rowKind") == "you":
++                            title = e.get("rowText", "")
++                            break
++                    if not title and data.get("history"):
++                        for h in data["history"]:
++                            if h.get("role") == "user" and h.get("parts"):
++                                title = h["parts"][0].get("text", "")
++                                break
++                for e in reversed(entries):
++                    if e.get("rowKind") in ("text", "error"):
++                        preview = clean_preview_text(e.get("rowText", ""))
++                        break
++                if not preview and data.get("history"):
++                    for h in reversed(data["history"]):
++                        if h.get("role") == "model" and h.get("parts"):
++                            preview = clean_preview_text(h["parts"][0].get("text", ""))
++                            break
++
++            elif isinstance(data, list):
++                msg_count = len(data)
++                for item in data:
++                    if item.get("role") == "user" and item.get("parts"):
++                        title = item["parts"][0].get("text", "")
++                        break
++                for item in reversed(data):
++                    if item.get("role") == "model" and item.get("parts"):
++                        preview = clean_preview_text(item["parts"][0].get("text", ""))
++                        break
++
++            if not title:
++                continue
++
++            sessions.append({
++                "id": sid,
++                "title": clip(title, 75, collapse=True),
++                "agentLabel": agent_label or "Jarvis",
++                "agentName": agent_name or "jarvis",
++                "timeAgo": format_time_ago(updated_at),
++                "updatedAt": updated_at,
++                "preview": preview,
++                "messageCount": msg_count,
++            })
++        except Exception as e:
++            if DEBUG:
++                print(f"Error parsing session file {p}: {e}", file=sys.stderr)
++
++    sessions.sort(key=lambda s: s["updatedAt"], reverse=True)
++    print(json.dumps(sessions[:100]))
++    return 0
++
++
++def cmd_get_session(session_id: str) -> int:
++    session_file = SESSION_DIR / f"{session_id}.json"
++    if not session_file.is_file():
++        last_file = STATE_DIR / "last.json"
++        if last_file.is_file():
++            try:
++                state = json.loads(last_file.read_text("utf-8"))
++                if state.get("sessionId") == session_id:
++                    print(json.dumps(state))
++                    return 0
++            except Exception:
++                pass
++        print(json.dumps({}))
++        return 1
++
++    try:
++        data = json.loads(session_file.read_text("utf-8"))
++        if isinstance(data, dict):
++            if not data.get("entries") and data.get("history"):
++                entries = []
++                for turn in data["history"]:
++                    role = turn.get("role")
++                    parts = turn.get("parts", [{}])
++                    txt = parts[0].get("text", "") if parts else ""
++                    if role == "user":
++                        entries.append({"rowKind": "you", "rowText": txt, "rowCount": 1, "rowLines": txt, "rowExpanded": False, "rowAuto": False})
++                    elif role == "model":
++                        entries.append({"rowKind": "text", "rowText": txt, "rowCount": 1, "rowLines": txt, "rowExpanded": False, "rowAuto": False})
++                data["entries"] = entries
++            if "version" not in data:
++                data["version"] = 1
++            if "agentName" not in data:
++                data["agentName"] = "jarvis"
++            if "agentLabel" not in data:
++                data["agentLabel"] = "Jarvis"
++            if "sessionId" not in data:
++                data["sessionId"] = session_id
++        elif isinstance(data, list):
++            entries = []
++            for turn in data:
++                role = turn.get("role")
++                parts = turn.get("parts", [{}])
++                txt = parts[0].get("text", "") if parts else ""
++                if role == "user":
++                    entries.append({"rowKind": "you", "rowText": txt, "rowCount": 1, "rowLines": txt, "rowExpanded": False, "rowAuto": False})
++                elif role == "model":
++                    entries.append({"rowKind": "text", "rowText": txt, "rowCount": 1, "rowLines": txt, "rowExpanded": False, "rowAuto": False})
++            data = {
++                "version": 1,
++                "sessionId": session_id,
++                "agentName": "jarvis",
++                "agentLabel": "Jarvis",
++                "entries": entries,
++                "history": data,
++                "updatedAt": int(session_file.stat().st_mtime * 1000)
++            }
++        print(json.dumps(data))
++        return 0
++    except Exception as e:
++        if DEBUG:
++            print(f"Error loading session {session_id}: {e}", file=sys.stderr)
++        print(json.dumps({}))
++        return 1
++
++
++def cmd_save_session(session_id: str) -> int:
++    if not session_id:
++        print(json.dumps({"ok": False, "error": "Missing session ID"}))
++        return 1
++
++    SESSION_DIR.mkdir(parents=True, exist_ok=True)
++    session_file = SESSION_DIR / f"{session_id}.json"
++    last_file = STATE_DIR / "last.json"
++
++    data: dict = {}
++    if session_file.is_file():
++        try:
++            existing = json.loads(session_file.read_text("utf-8"))
++            if isinstance(existing, dict):
++                data = existing
++        except Exception:
++            pass
++
++    if last_file.is_file():
++        try:
++            last_state = json.loads(last_file.read_text("utf-8"))
++            if isinstance(last_state, dict) and last_state.get("sessionId") == session_id:
++                for key in ("entries", "agentName", "agentLabel", "agentCwd", "resumeLabel",
++                            "resumeArgv", "priorTokens", "priorCost", "sawCost", "elapsedMs", "title"):
++                    if key in last_state:
++                        data[key] = last_state[key]
++        except Exception as e:
++            if DEBUG:
++                print(f"Error merging last.json for session {session_id}: {e}", file=sys.stderr)
++
++    data["sessionId"] = session_id
++    data["updatedAt"] = int(time.time() * 1000)
++
++    if "title" not in data or not data["title"]:
++        entries = data.get("entries", [])
++        for e in entries:
++            if e.get("rowKind") == "you":
++                data["title"] = clip(e.get("rowText", ""), 80, collapse=True)
++                break
++
++    try:
++        session_file.write_text(json.dumps(data, indent=2), "utf-8")
++        print(json.dumps({"ok": True}))
++        return 0
++    except Exception as e:
++        print(json.dumps({"ok": False, "error": str(e)}))
++        return 1
++
++
++def cmd_delete_session(session_id: str) -> int:
++    if not session_id:
++        print(json.dumps({"ok": False, "error": "Missing session ID"}))
++        return 1
++
++    session_file = SESSION_DIR / f"{session_id}.json"
++    if session_file.is_file():
++        try:
++            session_file.unlink()
++        except Exception as e:
++            if DEBUG:
++                print(f"Error deleting session file: {e}", file=sys.stderr)
++
++    last_file = STATE_DIR / "last.json"
++    if last_file.is_file():
++        try:
++            data = json.loads(last_file.read_text("utf-8"))
++            if data.get("sessionId") == session_id:
++                data["entries"] = []
++                data["sessionId"] = ""
++                data["agentName"] = ""
++                data["agentLabel"] = ""
++                data["title"] = ""
++                last_file.write_text(json.dumps(data, indent=2), "utf-8")
++        except Exception:
++            pass
++
++    print(json.dumps({"ok": True}))
++    return 0
++
++
++def cmd_clear_history() -> int:
++    SESSION_DIR.mkdir(parents=True, exist_ok=True)
++    for p in SESSION_DIR.glob("*.json"):
++        try:
++            p.unlink()
++        except Exception:
++            pass
++
++    last_file = STATE_DIR / "last.json"
++    if last_file.is_file():
++        try:
++            data = json.loads(last_file.read_text("utf-8"))
++            data["entries"] = []
++            data["sessionId"] = ""
++            data["agentName"] = ""
++            data["agentLabel"] = ""
++            data["title"] = ""
++            last_file.write_text(json.dumps(data, indent=2), "utf-8")
++        except Exception:
++            pass
++
++    print(json.dumps({"ok": True}))
++    return 0
++
++
+ def emit(kind: str, **fields: object) -> None:
+     global EMITTED_ERROR
+     if kind == "error":
+@@ -45,62 +489,27 @@ def clip(text: str, limit: int, *, collapse: bool = False) -> str:
+     return text if len(text) <= limit else text[: limit - 1] + "…"
+ 
+ 
+-TOKEN_FIELDS = ("input", "output", "reasoning", "input_tokens", "output_tokens")
+-
+-
+-def token_total(usage: object) -> int:
+-    if not isinstance(usage, dict):
+-        return 0
+-    total = usage.get("total")
+-    if isinstance(total, (int, float)):
+-        return int(total)
+-    return sum(int(usage[field]) for field in TOKEN_FIELDS
+-               if isinstance(usage.get(field), (int, float)))
+-
+-
+-def record_usage(state: dict, tokens: int, cost: object, *, cumulative: bool = False) -> None:
+-    money = float(cost) if isinstance(cost, (int, float)) else None
+-    if cumulative:
+-        state["tokens"] = tokens
+-        if money is not None:
+-            state["cost"] = money
+-    else:
+-        state["tokens"] = state.get("tokens", 0) + tokens
+-        if money is not None:
+-            state["cost"] = state.get("cost", 0.0) + money
+-    spent = state.get("cost")
+-    seen = (state["tokens"], None if spent is None else round(spent, 6))
+-    if seen == state.get("usageSeen") or not state["tokens"]:
+-        return
+-    state["usageSeen"] = seen
+-    emit("usage", tokens=seen[0], cost=seen[1])
+-
+-
+-def detached(command: list[str], *, cwd: Path | None = None) -> None:
+-    if DRY_RUN:
+-        emit("status", text="Would run: " + shlex.join(command))
+-        return
+-    subprocess.Popen(
+-        command,
+-        cwd=str(cwd) if cwd else None,
+-        stdin=subprocess.DEVNULL,
+-        stdout=subprocess.DEVNULL,
+-        stderr=subprocess.DEVNULL,
+-        start_new_session=True,
+-    )
+-
+-
+-AGENT_LABELS = {
+-    "pi": "Pi",
+-    "omp": "Oh My Pi",
+-    "opencode": "OpenCode",
+-    "claude": "Claude Code",
+-    "codex": "Codex",
+-    "crush": "Crush",
+-    "grok": "Grok",
+-    "gemini": "Gemini",
+-    "copilot": "GitHub Copilot",
+-}
++def load_config() -> dict:
++    config = {
++        "gemini_api_key": os.environ.get("GEMINI_API_KEY", ""),
++        "fast_model": "gemini-3.8-flash",
++        "web_model": "gemini-3.8-flash",
++        "coding_harness": "pi",
++        "use_herdr": True,
++        "use_firstmate": True,
++        "use_treehouse": True,
++    }
++    if CONFIG_PATH.is_file():
++        try:
++            user_cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
++            if isinstance(user_cfg, dict):
++                config.update({k: v for k, v in user_cfg.items() if v is not None})
++        except Exception as e:
++            if DEBUG:
++                print(f"Error loading config: {e}", file=sys.stderr)
++    if not config["gemini_api_key"] and os.environ.get("GEMINI_API_KEY"):
++        config["gemini_api_key"] = os.environ.get("GEMINI_API_KEY")
++    return config
+ 
+ 
+ def work_dir() -> Path:
+@@ -108,461 +517,860 @@ def work_dir() -> Path:
+     return work if work.is_dir() else Path.home()
+ 
+ 
+-def agent_label(slug: str) -> str:
+-    return AGENT_LABELS.get(slug, slug)
+-
+-
+-def default_agent() -> str:
+-    agent_file = Path.home() / ".config/omarchy/defaults/agent"
+-    try:
+-        first = agent_file.read_text(errors="ignore").splitlines()[0].strip()
+-        if first:
+-            return first
+-    except (OSError, IndexError):
+-        pass
+-    try:
+-        result = subprocess.run(
+-            ["omarchy-default-agent"],
+-            capture_output=True, text=True, timeout=10, check=False,
+-        )
+-    except (OSError, subprocess.TimeoutExpired):
+-        return ""
+-    return result.stdout.strip()
+-
+-
+ def extend_path() -> None:
+     home = Path.home()
+-    extra = [str(home / ".local/bin"), str(home / ".local/share/mise/shims")]
++    extra = [
++        str(home / ".local/bin"),
++        str(home / ".local/share/mise/shims"),
++        "/usr/local/bin",
++        "/usr/bin",
++    ]
+     current = os.environ.get("PATH", "").split(os.pathsep)
+     os.environ["PATH"] = os.pathsep.join(current + [p for p in extra if p not in current])
+ 
+ 
+-def short_path(value: object) -> str:
+-    text = str(value or "")
+-    home = str(Path.home())
+-    if text.startswith(home + "/"):
+-        text = "~" + text[len(home):]
+-    return text.rsplit("/", 1)[-1] if len(text) > 48 else text
++# =====================================================================
++# INTENT CLASSIFICATION
++# =====================================================================
++
++LANE_GENERAL = "general"
++LANE_WEB = "web"
++LANE_CODE = "code"
++
++CODE_INDICATORS = [
++    r"```",
++    r"\bdef\s+\w+",
++    r"\bclass\s+\w+",
++    r"\bfn\s+\w+",
++    r"\bfunction\s+\w+",
++    r"\bimport\s+[\w\.]+",
++    r"\bconst\s+\w+\s*=",
++    r"\b(git|worktree|commit|pull request|pr|branch|merge|rebase|repo|repository)\b",
++    r"\b(fix bug|refactor|unit test|write code|implement|build|compile|deploy)\b",
++    r"\b(write|create|build|implement|debug|fix|refactor|test|run)\b.*\b(script|program|code|function|class|app|module|api|tests?)\b",
++    r"\b(python|javascript|typescript|rust|golang|bash|c\+\+|html|css|sql)\b.*\b(script|code|program|file|function)\b",
++    r"\b(cargo|npm|pnpm|pip|pytest|docker|herdr|firstmate|treehouse|harness|axi|compound)\b",
++    r"\b(ce-[a-z0-9\-]+|lfg)\b",
++    r"\.(py|rs|ts|js|lua|go|c|cpp|sh|json|toml|ya?ml|html|css)\b",
++]
++
++WEB_INDICATORS = [
++    r"\b(today|yesterday|this week|current weather|forecast|breaking news)\b",
++    r"\b(latest version|who won|stock price|crypto price|score of)\b",
++    r"\b(search for|google|search web|lookup online|check online|browse)\b",
++    r"https?://\S+",
++]
+ 
+ 
+-def summarize_tool(name: str, detail: object) -> str:
+-    return clip(f"{name} {detail}".strip(), MAX_TOOL_CHARS, collapse=True)
++def classify_intent(request: str, prior_agent: str = "") -> str:
++    req_lower = request.strip().lower()
++
++    # Explicit prefix overrides
++    if req_lower.startswith(("/code ", "code: ")):
++        return LANE_CODE
++    if req_lower.startswith(("/web ", "web: ", "/search ", "search: ")):
++        return LANE_WEB
++    if req_lower.startswith(("/ask ", "ask: ")):
++        return LANE_GENERAL
++
++    # Regex heuristic check
++    for pattern in CODE_INDICATORS:
++        if re.search(pattern, req_lower, re.IGNORECASE):
++            return LANE_CODE
++
++    for pattern in WEB_INDICATORS:
++        if re.search(pattern, req_lower, re.IGNORECASE):
++            return LANE_WEB
++
++    # Sticky lane: If continuing a coding session and user didn't explicitly override
++    if prior_agent in ("firstmate-pi", "antigravity-agy") and not req_lower.startswith(("/ask", "ask:", "/web", "web:")):
++        return LANE_CODE
++
++    return LANE_GENERAL
+ 
+ 
+-def opencode_argv(prompt: str, session: str, auto: bool) -> list[str]:
+-    argv = ["opencode", "run", "--format", "json"]
+-    if auto:
+-        argv.append("--auto")
+-    if session:
+-        argv += ["-s", session]
+-    return argv + ["--", prompt]
++def clean_prefix(request: str) -> str:
++    for prefix in ["/code ", "code: ", "/web ", "web: ", "/search ", "search: ", "/ask ", "ask: "]:
++        if request.lower().startswith(prefix):
++            return request[len(prefix):].strip()
++    return request.strip()
+ 
+ 
+-def claude_argv(prompt: str, session: str, pinned: str, auto: bool) -> list[str]:
+-    argv = ["claude", "-p", "--output-format", "stream-json", "--verbose"]
+-    if auto:
+-        argv += ["--permission-mode", "auto"]
+-    argv += ["--resume", session] if session else ["--session-id", pinned]
+-    return argv + ["--", prompt]
++# =====================================================================
++# GOOGLE GEMINI STREAMING CLIENT
++# =====================================================================
+ 
++def stream_gemini_api(
++    prompt: str | list[dict],
++    api_key: str,
++    model: str = "gemini-3.8-flash",
++    fallback_models: list[str] | None = None,
++    system_instruction: str = "",
++) -> tuple[bool, str, str]:
++    """Streams tokens directly from Google Gemini API via SSE."""
++    if fallback_models is None:
++        fallback_models = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3-flash-preview"]
+ 
+-def codex_argv(prompt: str, session: str, auto: bool) -> list[str]:
+-    argv = ["codex", "exec", "--json", "--skip-git-repo-check"]
+-    if auto:
+-        argv.append("--approve-for-me")
+-    if session:
+-        argv += ["resume", session]
+-    return argv + ["--", prompt]
++    candidate_models = [model] + [m for m in fallback_models if m != model]
+ 
++    if isinstance(prompt, str):
++        contents = [{"parts": [{"text": prompt}]}]
++    else:
++        contents = prompt
+ 
+-def gemini_argv(prompt: str, session: str, pinned: str, auto: bool) -> list[str]:
+-    argv = ["gemini", "-p", prompt, "-o", "stream-json"]
+-    if auto:
+-        argv.append("--yolo")
+-    return argv + (["--resume", "latest"] if session else ["--session-id", pinned])
++    for current_model in candidate_models:
++        url = (
++            f"https://generativelanguage.googleapis.com/v1beta/models/"
++            f"{current_model}:streamGenerateContent?alt=sse&key={api_key}"
++        )
++        body: dict = {
++            "contents": contents,
++            "generationConfig": {
++                "temperature": 0.7,
++                "maxOutputTokens": 2048,
++            },
++        }
++        if system_instruction:
++            body["systemInstruction"] = {"parts": [{"text": system_instruction}]}
+ 
+-
+-def opencode_resume(session: str) -> list[str]:
+-    return ["opencode", "-s", session] if session else []
+-
+-
+-def claude_resume(session: str) -> list[str]:
+-    return ["claude", "--resume", session] if session else []
+-
+-
+-def codex_resume(session: str) -> list[str]:
+-    return ["codex", "resume", session] if session else []
+-
+-
+-def gemini_resume(session: str) -> list[str]:
+-    return ["gemini", "--resume", "latest"] if session else []
+-
+-
+-PERMISSION_REFUSED = re.compile(
+-    r"permission requested:\s*(\S+)\s*\(([^)]*)\);\s*auto-rejecting")
+-
+-
+-def permission_notice(line: str) -> str | None:
+-    match = PERMISSION_REFUSED.search(line)
+-    return match.group(1) if match else None
+-
+-
+-OPENCODE_INPUT_FIELDS = ("filePath", "command", "pattern", "url", "query", "path")
+-
+-
+-def opencode_event(event: dict, state: dict) -> None:
+-    session = event.get("sessionID")
+-    if isinstance(session, str) and session:
+-        state["session"] = session
+-    part = event.get("part")
+-    if not isinstance(part, dict):
+-        return
+-    session = part.get("sessionID")
+-    if isinstance(session, str) and session:
+-        state["session"] = session
+-    if part.get("type") == "step-finish":
+-        record_usage(state, token_total(part.get("tokens")), part.get("cost"))
+-        return
+-    kind = event.get("type")
+-    if kind == "text":
+-        text = part.get("text")
+-        if isinstance(text, str) and text.strip():
+-            emit("text", text=clip(text, MAX_TEXT_CHARS))
+-        return
+-    if kind != "tool_use":
+-        return
+-    status = part.get("state") if isinstance(part.get("state"), dict) else {}
+-    phase = status.get("status")
+-    if phase not in {"completed", "error"}:
+-        return
+-    name = str(part.get("tool") or "tool")
+-    title = status.get("title")
+-    if not title:
+-        args = status.get("input") if isinstance(status.get("input"), dict) else {}
+-        detail = next((args[f] for f in OPENCODE_INPUT_FIELDS if args.get(f)), "")
+-        title = summarize_tool(name.capitalize(), short_path(detail))
+-    if phase == "error":
+-        emit("tool", text=summarize_tool(name.capitalize(), "failed"))
+-        error = str(status.get("error") or "")
+-        needed = state.get("permission")
+-        if needed and "rejected permission" in error:
+-            error = (f"opencode asks before {needed}, and this pill cannot show "
+-                     "you that question. Press Shift+Tab to turn on auto-approve "
+-                     "and ask again, or Ctrl+E to answer it in opencode's own "
+-                     "terminal.")
+-        elif "specified a rule which prevents" in error:
+-            error = ("Blocked by a deny rule in your opencode config. That rule "
+-                     "applies in opencode too, so change it there if you want "
+-                     "the agent doing this — or do this one yourself.")
+-        elif "rejected permission" in error:
+-            error = ("opencode needed permission this pill cannot ask for. "
+-                     "Press Shift+Tab to turn on auto-approve and ask again, or "
+-                     "Ctrl+E to answer it in opencode's own terminal.")
+-        if error:
+-            emit("error", text=clip(error, MAX_TEXT_CHARS))
+-        return
+-    emit("tool", text=clip(title, MAX_TOOL_CHARS, collapse=True))
+-
+-
+-CLAUDE_TOOL_FIELDS = {
+-    "Read": "file_path", "Edit": "file_path", "Write": "file_path",
+-    "Glob": "pattern", "Grep": "pattern",
+-    "WebFetch": "url", "WebSearch": "query",
+-    "Task": "description",
+-}
+-
+-
+-def claude_event(event: dict, state: dict) -> None:
+-    session = event.get("session_id")
+-    if isinstance(session, str) and session:
+-        state["session"] = session
+-    if event.get("type") == "result":
+-        record_usage(state, token_total(event.get("usage")),
+-                     event.get("total_cost_usd"), cumulative=True)
+-        if event.get("is_error"):
+-            emit("error", text=clip(event.get("result") or "Claude reported an error", MAX_TEXT_CHARS))
+-        return
+-    if event.get("type") != "assistant":
+-        return
+-    message = event.get("message")
+-    blocks = message.get("content") if isinstance(message, dict) else None
+-    if not isinstance(blocks, list):
+-        return
+-    for block in blocks:
+-        if not isinstance(block, dict):
+-            continue
+-        if block.get("type") == "text":
+-            text = block.get("text")
+-            if isinstance(text, str) and text.strip():
+-                emit("text", text=clip(text, MAX_TEXT_CHARS))
+-        elif block.get("type") == "tool_use":
+-            name = str(block.get("name") or "tool")
+-            args = block.get("input") if isinstance(block.get("input"), dict) else {}
+-            if name == "Bash":
+-                detail = args.get("description") or args.get("command") or ""
+-            else:
+-                detail = args.get(CLAUDE_TOOL_FIELDS.get(name, ""), "")
+-            emit("tool", text=summarize_tool(name, short_path(detail)))
+-
+-
+-def codex_event(event: dict, state: dict) -> None:
+-    kind = event.get("type")
+-    if kind == "thread.started":
+-        thread = event.get("thread_id")
+-        if isinstance(thread, str) and thread:
+-            state["session"] = thread
+-        return
+-    if kind == "turn.completed":
+-        record_usage(state, token_total(event.get("usage")), None, cumulative=True)
+-        return
+-    if kind == "error":
+-        emit("error", text=clip(event.get("message") or "Codex reported an error", MAX_TEXT_CHARS))
+-        return
+-    if kind != "item.completed":
+-        return
+-    item = event.get("item")
+-    if not isinstance(item, dict):
+-        return
+-    item_type = item.get("item_type") or item.get("type")
+-    if item_type == "agent_message":
+-        text = item.get("text")
+-        if isinstance(text, str) and text.strip():
+-            emit("text", text=clip(text, MAX_TEXT_CHARS))
+-    elif item_type == "command_execution":
+-        emit("tool", text=summarize_tool("Ran", item.get("command") or ""))
+-    elif item_type == "file_change":
+-        changes = item.get("changes")
+-        paths = [short_path(c.get("path")) for c in changes if isinstance(c, dict)] \
+-            if isinstance(changes, list) else []
+-        emit("tool", text=summarize_tool("Edited", ", ".join(paths) or short_path(item.get("path"))))
+-    elif item_type == "mcp_tool_call":
+-        emit("tool", text=summarize_tool(str(item.get("tool") or "MCP"), item.get("server") or ""))
+-    elif item_type == "web_search":
+-        emit("tool", text=summarize_tool("Searched", item.get("query") or ""))
+-
+-
+-def flush_buffer(state: dict) -> None:
+-    text = "".join(state.get("buffer") or []).strip()
+-    state["buffer"] = []
+-    if text:
+-        emit("text", text=clip(text, MAX_TEXT_CHARS))
+-
+-
+-def gemini_event(event: dict, state: dict) -> None:
+-    kind = event.get("type")
+-    if kind == "init":
+-        session = event.get("session_id")
+-        if isinstance(session, str) and session:
+-            state["session"] = session
+-        return
+-    if kind == "message":
+-        if event.get("role") == "assistant":
+-            content = event.get("content")
+-            if isinstance(content, str):
+-                state.setdefault("buffer", []).append(content)
+-        return
+-    if kind == "tool_use":
+-        flush_buffer(state)
+-        params = event.get("parameters") if isinstance(event.get("parameters"), dict) else {}
+-        detail = params.get("file_path") or params.get("path") or params.get("command") \
+-            or params.get("pattern") or params.get("query") or ""
+-        emit("tool", text=summarize_tool(str(event.get("tool_name") or "tool"), short_path(detail)))
+-        return
+-    if kind == "error":
+-        flush_buffer(state)
+-        emit("error", text=clip(event.get("message") or "Gemini reported an error", MAX_TEXT_CHARS))
+-        return
+-    if kind == "result":
+-        flush_buffer(state)
+-
+-
+-ADAPTERS = {
+-    "opencode": {
+-        "run": lambda prompt, session, pinned, auto: opencode_argv(prompt, session, auto),
+-        "resume": opencode_resume,
+-        "event": opencode_event,
+-        "pins_session": False,
+-    },
+-    "claude": {
+-        "run": claude_argv,
+-        "resume": claude_resume,
+-        "event": claude_event,
+-        "pins_session": True,
+-    },
+-    "codex": {
+-        "run": lambda prompt, session, pinned, auto: codex_argv(prompt, session, auto),
+-        "resume": codex_resume,
+-        "event": codex_event,
+-        "pins_session": False,
+-    },
+-    "gemini": {
+-        "run": gemini_argv,
+-        "resume": gemini_resume,
+-        "event": gemini_event,
+-        "pins_session": True,
+-    },
+-}
+-
+-
+-def run_agent(request: str, agent: str, session: str, auto: bool) -> int:
+-    adapter = ADAPTERS[agent]
+-    label = agent_label(agent)
+-    cwd = work_dir()
+-    prompt = request if session else PREAMBLE + "\n\n" + request
+-    pinned = str(uuid.uuid4()) if adapter["pins_session"] and not session else ""
+-    argv = adapter["run"](prompt, session, pinned, auto)
+-
+-    state: dict = {"session": session or pinned, "buffer": []}
+-
+-    def announce() -> None:
+-        emit(
+-            "agent",
+-            name=agent,
+-            label=label,
+-            session=state["session"],
+-            cwd=str(cwd),
+-            resume=adapter["resume"](state["session"]),
+-            resumeLabel="Expand",
+-            pid=state.get("pid", 0),
++        data = json.dumps(body).encode("utf-8")
++        req = urllib.request.Request(
++            url, data=data, headers={"Content-Type": "application/json"}
+         )
+ 
+-    announce()
++        accumulated_text = ""
++        try:
++            with urllib.request.urlopen(req, timeout=25) as resp:
++                for raw_line in resp:
++                    line = raw_line.decode("utf-8", errors="ignore").strip()
++                    if not line.startswith("data: "):
++                        continue
++                    payload_str = line[6:]
++                    try:
++                        chunk = json.loads(payload_str)
++                    except ValueError:
++                        continue
+ 
+-    if DRY_RUN:
+-        emit("status", text="Would run: " + shlex.join(argv))
+-        emit("done", ok=True, code=0, stopped=False)
+-        return 0
+-
+-    try:
+-        proc = subprocess.Popen(
+-            argv,
+-            cwd=str(cwd),
+-            stdin=subprocess.DEVNULL,
+-            stdout=subprocess.PIPE,
+-            stderr=subprocess.PIPE,
+-            text=True,
+-            bufsize=1,
+-            start_new_session=True,
+-        )
+-    except OSError as error:
+-        emit("error", text=f"Could not start {label}: {error}")
+-        emit("done", ok=False, code=1, stopped=False)
+-        return 1
+-
+-    state["pid"] = proc.pid
+-    announce()
+-
+-    stderr_tail: deque[str] = deque(maxlen=20)
+-
+-    def drain_stderr() -> None:
+-        assert proc.stderr is not None
+-        for line in proc.stderr:
+-            line = line.rstrip("\n")
+-            if not line:
++                    candidates = chunk.get("candidates", [])
++                    if candidates:
++                        parts = candidates[0].get("content", {}).get("parts", [])
++                        for p in parts:
++                            text = p.get("text", "")
++                            if text:
++                                accumulated_text += text
++                                emit("text", text=text)
++                return True, "", accumulated_text
++        except urllib.error.HTTPError as e:
++            err_body = e.read().decode("utf-8", errors="ignore")
++            # 503 (high demand) or 404 or 429: try next candidate model
++            if e.code in (503, 404, 429) and current_model != candidate_models[-1]:
++                if DEBUG:
++                    print(f"Model {current_model} returned {e.code}, falling back...", file=sys.stderr)
++                time.sleep(0.5)
+                 continue
+-            stderr_tail.append(line)
+-            permission = permission_notice(line)
+-            if permission:
+-                state["permission"] = permission
++            return False, f"Google Gemini API error ({e.code}): {err_body[:200]}", ""
++        except Exception as e:
++            if current_model != candidate_models[-1]:
++                continue
++            return False, f"Network error connecting to Gemini API: {e}", ""
+ 
+-    stderr_thread = threading.Thread(target=drain_stderr, daemon=True)
+-    stderr_thread.start()
++    return False, "All Gemini candidate models were unavailable.", ""
+ 
+-    def stop(_signum: int, _frame: object) -> None:
++
++# =====================================================================
++# LANE 1: INSTANT GENERAL KNOWLEDGE
++# =====================================================================
++
++def run_lane_general(request: str, config: dict, session_id: str) -> int:
++    api_key = config.get("gemini_api_key", "").strip()
++    cwd = work_dir()
++
++    emit(
++        "agent",
++        name="jarvis",
++        label="Jarvis",
++        session=session_id,
++        cwd=str(cwd),
++        resume=[],
++        resumeLabel="Expand",
++        pid=0,
++    )
++
++    if not api_key:
++        emit("error", text="Gemini API key is missing. Please add it to ~/.config/omagent/config.json")
++        emit("done", ok=False, code=1, stopped=False)
++        return 1
++
++    # Load prior conversation history for multi-turn context
++    history = load_session_history(session_id)
++    contents = build_conversation_contents(history, request)
++
++    system_instruction = (
++        "You are Jarvis on Omarchy Linux, rendering on a compact desktop overlay card. "
++        "Formatting rules for user-friendly display:\n"
++        "- Give the direct answer immediately with bold highlights for key facts.\n"
++        "- Maintain full context of prior turns in this conversation.\n"
++        "- Use clean bullet points for lists; avoid walls of text.\n"
++        "- NEVER output horizontal dividers (---) or stacked headers like '### **Heading**'.\n"
++        "- Keep spacing natural, scannable, and clean."
++    )
++
++    ok, err, full_text = stream_gemini_api(
++        prompt=contents,
++        api_key=api_key,
++        model=config.get("fast_model", "gemini-3.8-flash"),
++        system_instruction=system_instruction,
++    )
++
++    if not ok:
++        emit("error", text=err)
++        emit("done", ok=False, code=1, stopped=False)
++        return 1
++
++    # Persist the full multi-turn conversation
++    save_session_history(session_id, contents, full_text)
++
++    emit("done", ok=True, code=0, stopped=False)
++    return 0
++
++
++# =====================================================================
++# LANE 2: LIVE INTERNET / WEB SEARCH
++# =====================================================================
++
++def search_duckduckgo(query: str, max_results: int = 4) -> list[dict]:
++    url = "https://html.duckduckgo.com/html/?q=" + urllib.parse.quote(query)
++    req = urllib.request.Request(
++        url,
++        headers={
++            "User-Agent": (
++                "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0"
++            )
++        },
++    )
++    try:
++        with urllib.request.urlopen(req, timeout=8) as resp:
++            content = resp.read().decode("utf-8", errors="ignore")
++            snippets = re.findall(r'<a class="result__snippet[^>]*>(.*?)</a>', content, re.DOTALL)
++            links = re.findall(r'<a class="result__url[^>]*>(.*?)</a>', content, re.DOTALL)
++            results = []
++            for i, s in enumerate(snippets[:max_results]):
++                snippet_clean = html.unescape(re.sub(r"<[^>]+>", "", s)).strip()
++                link_clean = html.unescape(re.sub(r"<[^>]+>", "", links[i])).strip() if i < len(links) else ""
++                if snippet_clean:
++                    results.append({"snippet": snippet_clean, "link": link_clean})
++            return results
++    except Exception as e:
++        if DEBUG:
++            print(f"DuckDuckGo search error: {e}", file=sys.stderr)
++        return []
++
++
++def resolve_contextual_query(query: str, history: list[dict], api_key: str) -> str:
++    """Expands pronouns and references in search queries using conversation context."""
++    if not history or not api_key:
++        return query
++
++    needs_context = bool(re.search(
++        r"\b(he|she|it|they|his|her|their|them|this|that|these|those|the 1st|the 2nd|the first|the second|1st|2nd|former|latter)\b",
++        query, re.IGNORECASE
++    ))
++    if not needs_context:
++        return query
++
++    snippet_lines = []
++    for turn in history[-4:]:
++        role = "User" if turn.get("role") == "user" else "Assistant"
++        parts = turn.get("parts", [{}])
++        txt = parts[0].get("text", "").strip() if parts else ""
++        if txt:
++            snippet_lines.append(f"{role}: {clip(txt, 150)}")
++    history_ctx = "\n".join(snippet_lines)
++
++    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
++    prompt = (
++        f"Conversation history:\n{history_ctx}\n\n"
++        f"Current user query: {query}\n\n"
++        f"Rewrite the current query into a standalone search query that resolves all pronouns and references. "
++        f"Return ONLY the search query, nothing else."
++    )
++    body = {"contents": [{"parts": [{"text": prompt}]}]}
++    req = urllib.request.Request(
++        url,
++        data=json.dumps(body).encode("utf-8"),
++        headers={"Content-Type": "application/json"}
++    )
++    try:
++        with urllib.request.urlopen(req, timeout=3) as resp:
++            data = json.loads(resp.read().decode("utf-8"))
++            resolved = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
++            if resolved and len(resolved) < 150:
++                return resolved.strip("\"'")
++    except Exception:
++        pass
++    return query
++
++
++def run_lane_web(request: str, config: dict, session_id: str) -> int:
++    api_key = config.get("gemini_api_key", "").strip()
++    cwd = work_dir()
++
++    emit(
++        "agent",
++        name="jarvis-web",
++        label="Jarvis (Web)",
++        session=session_id,
++        cwd=str(cwd),
++        resume=[],
++        resumeLabel="Expand",
++        pid=0,
++    )
++
++    if not api_key:
++        emit("error", text="Gemini API key is missing. Please add it to ~/.config/omagent/config.json")
++        emit("done", ok=False, code=1, stopped=False)
++        return 1
++
++    emit("tool", text="Searching web...")
++    search_query = clean_prefix(request)
++
++    # Load prior conversation history for multi-turn context
++    history = load_session_history(session_id)
++    search_query_resolved = resolve_contextual_query(search_query, history, api_key)
++    results = search_duckduckgo(search_query_resolved)
++
++    if results:
++        snippets_text = "\n".join(
++            f"[{i+1}] {r['snippet']} (Source: {r['link']})"
++            for i, r in enumerate(results)
++        )
++        prompt_text = (
++            f"User Query: {search_query}\n\n"
++            f"Live Web Search Results:\n{snippets_text}\n\n"
++            f"Synthesize an accurate, grounded, and concise answer using the web results above and the ongoing conversation context. "
++            f"Cite relevant sources where helpful."
++        )
++    else:
++        prompt_text = (
++            f"User Query: {search_query}\n\n"
++            f"Provide an up-to-date, accurate answer for this query considering our ongoing conversation context."
++        )
++
++    contents = build_conversation_contents(history, prompt_text)
++
++    system_instruction = (
++        "You are Jarvis with live web browsing on Omarchy Linux, rendering on a compact desktop overlay card. "
++        "Formatting rules for user-friendly display:\n"
++        "- State the core answer/result immediately with bold highlights (e.g. scores, dates, status).\n"
++        "- Maintain full context of prior turns in this conversation.\n"
++        "- Use clean bullet points for key details, reactions, or timeline.\n"
++        "- NEVER output horizontal rules (---) or stacked headers like '### **Heading**'.\n"
++        "- Keep the output punchy, scannable, and clean without text walls."
++    )
++
++    ok, err, full_text = stream_gemini_api(
++        prompt=contents,
++        api_key=api_key,
++        model=config.get("web_model", "gemini-3.8-flash"),
++        system_instruction=system_instruction,
++    )
++
++    if not ok:
++        emit("error", text=err)
++        emit("done", ok=False, code=1, stopped=False)
++        return 1
++
++    # Save clean user prompt and assistant response
++    history_to_save = list(history)
++    history_to_save.append({"role": "user", "parts": [{"text": search_query}]})
++    save_session_history(session_id, history_to_save, full_text)
++
++    emit("done", ok=True, code=0, stopped=False)
++    return 0
++
++
++# =====================================================================
++# LANE 3: CODING & ENGINEERING FLEET (HERDR + PI + FIRSTMATE + TREEHOUSE)
++# =====================================================================
++
++COMPOUND_SKILLS_MAP = {
++    "ce-debug": {
++        "keywords": [
++            r"\b(debug|fix\b.*(?:bug|error|issue|crash|exception|traceback|fail|broken)|broken|crash|segfault|traceback|failing|why did.*crash|not working|diagnose)\b",
++            r"\b(solve\b.*error|fix\b.*problem|syntax error|type error|runtime error|coredump|crash dump)\b",
++        ],
++        "desc": "Systematic root-cause diagnosis, crash investigation, and regression testing",
++        "aux": ["diagnose-crash", "treehouse", "axi"],
++    },
++    "ce-code-review": {
++        "keywords": [
++            r"\b(code[- ]?review|review\b.*(?:code|pr|diff|changes|patch|commit)|audit code|inspect diff|security review|check code)\b",
++        ],
++        "desc": "Structured code review for bugs, security, edge cases, and standards",
++        "aux": ["axi"],
++    },
++    "ce-simplify-code": {
++        "keywords": [
++            r"\b(simplify|refactor|clean up|cleanup|tidy|deduplicate|reduce complexity)\b",
++        ],
++        "desc": "Simplifying settled code for clarity and maintainability while preserving behavior",
++        "aux": ["ce-code-review"],
++    },
++    "ce-commit-push-pr": {
++        "keywords": [
++            r"\b(open pr|create pr|make pr|submit pr|push and pr|push pr)\b",
++        ],
++        "desc": "Git commit, branch push, and PR creation",
++        "aux": ["ce-commit", "axi"],
++    },
++    "ce-commit": {
++        "keywords": [
++            r"\b(commit|git commit|stage and commit|save changes)\b",
++        ],
++        "desc": "Atomic value-communicating git commit",
++        "aux": ["axi"],
++    },
++    "ce-brainstorm": {
++        "keywords": [
++            r"\b(brainstorm|ideate|explore ideas|what should we build|architecture options|scope what to build)\b",
++        ],
++        "desc": "Exploratory design and requirements framing",
++        "aux": ["ce-plan"],
++    },
++    "lfg": {
++        "keywords": [
++            r"\b(lfg|autonomously ship|build and ship|full autonomous)\b",
++        ],
++        "desc": "End-to-end autonomous shipping pipeline without check-ins",
++        "aux": ["ce-plan", "ce-work", "ce-code-review", "ce-commit-push-pr", "treehouse"],
++    },
++    "ce-work": {
++        "keywords": [
++            r"\b(work|build|implement|create|write|add feature|code|script|develop|update)\b",
++        ],
++        "desc": "Phased implementation, dual-agent review, and local verification loop",
++        "aux": ["ce-plan", "ce-code-review", "ce-compound", "treehouse", "axi"],
++    },
++}
++
++
++def resolve_compound_skill(prompt: str) -> tuple[str, list[str], str]:
++    prompt_lower = prompt.lower()
++    for skill in COMPOUND_SKILLS_MAP:
++        if skill in prompt_lower:
++            meta = COMPOUND_SKILLS_MAP[skill]
++            return skill, meta["aux"], meta["desc"]
++
++    for skill, data in COMPOUND_SKILLS_MAP.items():
++        for pattern in data["keywords"]:
++            if re.search(pattern, prompt_lower, re.IGNORECASE):
++                return skill, data["aux"], data["desc"]
++
++    return "ce-work", COMPOUND_SKILLS_MAP["ce-work"]["aux"], COMPOUND_SKILLS_MAP["ce-work"]["desc"]
++
++
++def load_prior_learnings(cwd: Path) -> str:
++    """Scans for prior repo and system learnings (ce-compound) to inform the agent before coding."""
++    learning_dirs = [
++        cwd / "solutions",
++        cwd / "docs/solutions",
++        cwd / ".agents/learnings",
++        Path.home() / ".agents/learnings",
++    ]
++    learnings = []
++    seen_files = set()
++    for d in learning_dirs:
++        if d.is_dir():
++            for f in sorted(d.glob("*.md"))[:5]:
++                if f.name in seen_files:
++                    continue
++                seen_files.add(f.name)
++                try:
++                    content = f.read_text(encoding="utf-8", errors="ignore").strip()
++                    if content:
++                        lines = [line.strip() for line in content.splitlines() if line.strip() and not line.startswith("---")]
++                        snippet = " - ".join(lines[:2])
++                        learnings.append(f"• [{f.name}]: {clip(snippet, 180)}")
++                except Exception:
++                    continue
++    if learnings:
++        return "[Prior Repository Learnings & Caveats (ce-compound)]\n" + "\n".join(learnings[:8]) + "\n\n"
++    return ""
++
++
++def extract_crash_context(prompt: str) -> str:
++    """If prompt is about a crash or coredump, extracts recent coredumpctl info."""
++    if not re.search(r"\b(crash|coredump|segfault|sigsegv|sigabrt)\b", prompt, re.IGNORECASE):
++        return ""
++    m = re.search(r"\b(?:crash|coredump|pid)\s*#?(\d+)\b", prompt, re.IGNORECASE)
++    pid = m.group(1) if m else None
++    cmd = ["coredumpctl", "info", pid] if pid else ["coredumpctl", "info", "-n", "1"]
++    try:
++        res = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
++        if res.returncode == 0 and res.stdout.strip():
++            lines = res.stdout.splitlines()
++            header = []
++            trace = []
++            in_trace = False
++            for line in lines:
++                if "Stack trace of thread" in line:
++                    in_trace = True
++                if in_trace:
++                    trace.append(line)
++                    if len(trace) > 16:
++                        break
++                elif any(k in line for k in ("PID:", "Signal:", "Executable:", "Command Line:", "Message:")):
++                    header.append(line.strip())
++            return (
++                "[Crash Telemetry from coredumpctl (diagnose-crash)]\n"
++                + "\n".join(header)
++                + "\n"
++                + "\n".join(trace)
++                + "\n\n"
++            )
++    except Exception:
++        pass
++    return ""
++
++
++def resolve_coding_model(config: dict) -> str:
++    """Selects coding model honoring explicit config preferences."""
++    preferred = config.get("coding_model", "gemini-3.8-flash")
++    return preferred
++
++
++def get_latest_pi_session_file(cwd: Path) -> Path | None:
++    slug = "--" + str(cwd.resolve()).strip("/").replace("/", "-") + "--"
++    session_dir = Path.home() / ".pi/agent/sessions" / slug
++    if not session_dir.is_dir():
++        return None
++    files = sorted(session_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
++    return files[-1] if files else None
++
++
++def get_latest_agy_session_file() -> Path | None:
++    brain_dir = Path.home() / ".gemini/antigravity-cli/brain"
++    if not brain_dir.is_dir():
++        return None
++    dirs = [d for d in brain_dir.iterdir() if d.is_dir()]
++    if not dirs:
++        return None
++    latest_dir = max(dirs, key=lambda d: d.stat().st_mtime)
++    log_file = latest_dir / ".system_generated/logs/transcript.jsonl"
++    return log_file if log_file.is_file() else None
++
++
++def run_lane_coding(request: str, config: dict, session_id: str) -> int:
++    cwd = work_dir()
++    task_prompt = clean_prefix(request)
++    primary_skill, aux_skills, skill_desc = resolve_compound_skill(task_prompt)
++    short_title = clip(task_prompt, 30, collapse=True).replace(" ", "-")
++    coding_harness = config.get("coding_harness", "antigravity").lower()
++    is_agy = coding_harness in ("antigravity", "agy")
++
++    harness_name = "antigravity-agy" if is_agy else "firstmate-pi"
++    harness_label = f"Antigravity ({primary_skill})" if is_agy else f"Firstmate ({primary_skill})"
++    ws_prefix = "AGY" if is_agy else "Pi"
++    ws_label = f"{ws_prefix}: {primary_skill} - {short_title}"
++
++    # Resume command connects the user straight into Herdr
++    resume_cmd = ["omarchy-launch-terminal", "herdr"]
++
++    emit(
++        "agent",
++        name=harness_name,
++        label=harness_label,
++        session=session_id,
++        cwd=str(cwd),
++        resume=resume_cmd,
++        resumeLabel="Expand in Herdr",
++        pid=0,
++    )
++
++    emit("text", text=f"• **Engaging** Compound Engineering skill: `{primary_skill}`\n")
++    emit("text", text="• **Doing** workspace setup in Herdr\n")
++
++    # Check if Treehouse is available and applicable
++    if config.get("use_treehouse", True) and shutil.which("treehouse"):
+         try:
+-            os.killpg(proc.pid, signal.SIGTERM)
+-            proc.wait(timeout=2)
+-        except subprocess.TimeoutExpired:
+-            try:
+-                os.killpg(proc.pid, signal.SIGKILL)
+-            except OSError:
+-                pass
+-        except OSError:
++            th_stat = subprocess.run(["treehouse", "status"], capture_output=True, text=True, timeout=3)
++            if th_stat.returncode == 0:
++                emit("text", text="• **Now doing** worktree & branch isolation checks\n")
++        except Exception:
+             pass
+-        emit("status", text="Stopped")
+-        emit("done", ok=False, code=130, stopped=True)
+-        os._exit(130)
+ 
+-    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+-        signal.signal(sig, stop)
+-
+-    known_session = state["session"]
+-    assert proc.stdout is not None
+-    for line in proc.stdout:
+-        line = line.strip()
+-        if not line:
+-            continue
++    # Ensure Herdr workspace is set up
++    pane_id = None
++    if config.get("use_herdr", True) and shutil.which("herdr"):
+         try:
+-            event = json.loads(line)
+-        except ValueError:
++            stat_res = subprocess.run(["herdr", "status"], capture_output=True, text=True, timeout=3)
++            if "status: running" in stat_res.stdout:
++                ws_create = subprocess.run(
++                    ["herdr", "workspace", "create", "--label", ws_label, "--cwd", str(cwd)],
++                    capture_output=True, text=True, timeout=5,
++                )
++                if ws_create.returncode == 0:
++                    try:
++                        ws_data = json.loads(ws_create.stdout)
++                        res_obj = ws_data.get("result", {})
++                        pane_id = res_obj.get("root_pane", {}).get("pane_id")
++                        ws_id = res_obj.get("workspace", {}).get("workspace_id")
++                        if ws_id:
++                            subprocess.run(["herdr", "workspace", "focus", ws_id], capture_output=True, text=True, timeout=3)
++                    except Exception as e:
++                        if DEBUG:
++                            print(f"Herdr pane setup error: {e}", file=sys.stderr)
++        except Exception as e:
+             if DEBUG:
+-                print(line, file=sys.stderr)
+-            continue
+-        if not isinstance(event, dict):
+-            continue
+-        try:
+-            adapter["event"](event, state)
+-        except (KeyError, TypeError, ValueError) as error:
+-            if DEBUG:
+-                print(f"adapter error: {error}", file=sys.stderr)
+-            continue
+-        if state["session"] != known_session:
+-            known_session = state["session"]
+-            announce()
++                print(f"Herdr error: {e}", file=sys.stderr)
+ 
+-    flush_buffer(state)
+-    code = proc.wait()
+-    stderr_thread.join(timeout=1)
+-    if code != 0 and not EMITTED_ERROR:
+-        tail = clip("\n".join(stderr_tail), MAX_STDERR_CHARS, collapse=True)
+-        emit("error", text=tail or f"{label} exited with code {code}")
+-    emit("done", ok=code == 0, code=code, stopped=False)
+-    return 0 if code == 0 else 1
++    coding_model = resolve_coding_model(config)
++    prompt_file = Path.home() / ".config/omagent/coding_agent_prompt.md"
++    prompt_flag = f"--append-system-prompt {shlex.quote(str(prompt_file))}" if prompt_file.is_file() else ""
++
++    skill_dir = Path.home() / f".pi/agent/skills/{primary_skill}"
++    skill_flag = f"--skill {shlex.quote(str(skill_dir))}" if skill_dir.is_dir() else ""
++
++    prior_learnings = load_prior_learnings(cwd)
++    crash_context = extract_crash_context(task_prompt)
++    if crash_context:
++        emit("text", text="• **Extracting** coredump & crash telemetry\n")
++
++    ce_directive = (
++        f"[Compound Engineering Mandate]\n"
++        f"Active Skill: {primary_skill} ({skill_desc})\n"
++        f"Skill Reference: ~/.agents/skills/{primary_skill}/SKILL.md\n"
++        f"Auxiliary Skills: {', '.join(aux_skills)}\n\n"
++        f"Execution Instructions:\n"
++        f"1. You MUST execute this task strictly according to the {primary_skill} methodology.\n"
++        f"2. Inspect ~/.agents/skills/{primary_skill}/SKILL.md using your read/view tools if you need its phased checklist.\n"
++        f"3. Follow the phases: workspace check -> bounded implementation/diagnosis -> verification tests -> dual-agent review gate.\n"
++        f"4. Coordinate with Treehouse for isolated branches if working in a git repository.\n"
++        f"5. Prefer token-efficient AXI tools (gh-axi, tasks-axi, no-mistakes, lavish-axi).\n"
++        f"6. Auto-compound: If you solve a non-obvious problem, record it as a durable repository learning.\n\n"
++    )
++
++    # Load prior conversation history for multi-turn context
++    history = load_session_history(session_id)
++    history_block = ""
++    if history:
++        prior_lines = []
++        for turn in history[-4:]:
++            role = "User" if turn.get("role") == "user" else "Assistant"
++            parts = turn.get("parts", [{}])
++            txt = parts[0].get("text", "").strip() if parts else ""
++            if txt:
++                prior_lines.append(f"{role}: {clip(txt, 250)}")
++        if prior_lines:
++            history_block = f"[Prior Conversation Context]\n" + "\n".join(prior_lines) + "\n\n"
++
++    effective_task_prompt = (
++        f"{ce_directive}"
++        f"{crash_context}"
++        f"{prior_learnings}"
++        f"{history_block}"
++        f"[Current Task]\n{task_prompt}"
++    )
++
++    if is_agy:
++        # Antigravity CLI uses user's Google AI Pro subscription natively
++        agy_model = config.get("coding_model", "gemini-3.8-flash-high")
++        if agy_model in ("gemini-3.8-flash", "3.8-flash"):
++            agy_model = "gemini-3.8-flash-high"
++        launch_cmd = f"agy --model {shlex.quote(agy_model)} --dangerously-skip-permissions -i {shlex.quote(effective_task_prompt)}\n"
++    else:
++        # Pi harness with GEMINI_API_KEY
++        thinking_level = config.get("thinking_level", "high")
++        launch_cmd = (
++            f"export GEMINI_API_KEY={shlex.quote(config.get('gemini_api_key', ''))}; "
++            f"pi --provider google --model {shlex.quote(coding_model)} --thinking {shlex.quote(thinking_level)} {skill_flag} {prompt_flag} "
++            f"{shlex.quote(effective_task_prompt)}\n"
++        )
++
++    initial_agy_session = get_latest_agy_session_file() if is_agy else None
++    initial_agy_mtime = initial_agy_session.stat().st_mtime if initial_agy_session else 0
++
++    initial_session = get_latest_pi_session_file(cwd) if not is_agy else None
++    initial_mtime = initial_session.stat().st_mtime if initial_session else 0
++
++    if pane_id:
++        subprocess.run(["herdr", "pane", "send-text", pane_id, launch_cmd], capture_output=True, text=True, timeout=5)
++        emit("text", text=f"• **Doing** task dispatch to {harness_label}\n")
++
++    # Monitor Pi execution in Herdr and emit clean live highlights
++    start_monitor = time.time()
++    seen_actions: set[str] = set()
++    read_offset = 0
++    active_session_file = None
++
++    time.sleep(0.8)
++
++    while time.time() - start_monitor < 25.0:
++        if not active_session_file:
++            if is_agy:
++                latest = get_latest_agy_session_file()
++                if latest and (latest != initial_agy_session or latest.stat().st_mtime > initial_agy_mtime):
++                    active_session_file = latest
++            else:
++                latest = get_latest_pi_session_file(cwd)
++                if latest and (latest != initial_session or latest.stat().st_mtime > initial_mtime):
++                    active_session_file = latest
++
++        if active_session_file and active_session_file.is_file():
++            try:
++                with open(active_session_file, "r", encoding="utf-8", errors="ignore") as f:
++                    f.seek(read_offset)
++                    new_lines = f.readlines()
++                    read_offset = f.tell()
++
++                for line in new_lines:
++                    line_str = line.strip()
++                    if not line_str:
++                        continue
++                    try:
++                        evt = json.loads(line_str)
++                    except Exception:
++                        continue
++
++                    if is_agy:
++                        # Parse Antigravity transcript format
++                        tool_calls = evt.get("tool_calls", [])
++                        for tc in tool_calls:
++                            name = tc.get("name")
++                            args = tc.get("args") or {}
++                            if name in ("view_file", "read_url_content", "grep_search", "find_by_name", "list_dir"):
++                                if "inspect" not in seen_actions:
++                                    seen_actions.add("inspect")
++                                    emit("text", text="• **Now doing** codebase & file inspection\n")
++                            elif name in ("write_to_file", "replace_file_content"):
++                                target_p = str(args.get("TargetFile") or "")
++                                if ".lavish" in target_p and target_p.endswith(".html"):
++                                    clean_p = Path(target_p).resolve()
++                                    if f"lavish_{clean_p.name}" not in seen_actions:
++                                        seen_actions.add(f"lavish_{clean_p.name}")
++                                        emit("text", text=f"• **Visual Artifact**: [Open Review Surface](file://{clean_p})\n")
++                                elif "impl" not in seen_actions:
++                                    seen_actions.add("impl")
++                                    emit("text", text="• **Doing** code changes & implementation\n")
++                            elif name == "run_command":
++                                cmd = str(args.get("CommandLine") or "")
++                                if any(k in cmd for k in ("git diff", "code-review", "review")) and "review_pass" not in seen_actions:
++                                    seen_actions.add("review_pass")
++                                    emit("text", text="• **Now doing** dual-agent code review & verification\n")
++                                elif any(k in cmd for k in ("ce-compound", "solutions/")) and "compound_pass" not in seen_actions:
++                                    seen_actions.add("compound_pass")
++                                    emit("text", text="• **Compounding** durable repository learning for future runs\n")
++                                elif "exec" not in seen_actions:
++                                    seen_actions.add("exec")
++                                    emit("text", text="• **Now doing** test & command execution\n")
++                        if evt.get("type") == "PLANNER_RESPONSE" and evt.get("status") == "DONE" and not tool_calls:
++                            seen_actions.add("done")
++                            break
++                    else:
++                        # Parse Pi session JSONL format
++                        msg = evt.get("message", {})
++                        content = msg.get("content", [])
++                        if isinstance(content, list):
++                            for part in content:
++                                if part.get("type") == "toolCall":
++                                    name = part.get("name")
++                                    args = part.get("args") or {}
++                                    if name == "read":
++                                        p = str(args.get("path") or args.get("file") or "")
++                                        if "skills" in p or "SKILL.md" in p:
++                                            s_name = Path(p).parent.name if "SKILL.md" in p else Path(p).name
++                                            if f"skill_{s_name}" not in seen_actions:
++                                                seen_actions.add(f"skill_{s_name}")
++                                                emit("text", text=f"• **Applying** Compound Engineering methodology ({s_name})\n")
++                                        elif ("solutions" in p or "learnings" in p) and "learnings_read" not in seen_actions:
++                                            seen_actions.add("learnings_read")
++                                            emit("text", text="• **Recalling** prior repository learnings & conventions\n")
++                                        elif "inspect" not in seen_actions:
++                                            seen_actions.add("inspect")
++                                            emit("text", text="• **Now doing** codebase & file inspection\n")
++                                    elif name in ("find", "ls", "grep") and "inspect" not in seen_actions:
++                                        seen_actions.add("inspect")
++                                        emit("text", text="• **Now doing** codebase & file inspection\n")
++                                    elif name in ("write", "edit"):
++                                        p = str(args.get("path") or args.get("file") or args.get("target") or "")
++                                        if ".lavish" in p and p.endswith(".html"):
++                                            clean_p = Path(p).resolve()
++                                            if f"lavish_{clean_p.name}" not in seen_actions:
++                                                seen_actions.add(f"lavish_{clean_p.name}")
++                                                emit("text", text=f"• **Visual Artifact**: [Open Review Surface](file://{clean_p})\n")
++                                        elif "impl" not in seen_actions:
++                                            seen_actions.add("impl")
++                                            emit("text", text="• **Doing** code changes & implementation\n")
++                                    elif name == "bash":
++                                        cmd_str = str(args.get("command") or args.get("cmd") or "")
++                                        if any(k in cmd_str for k in ("git diff", "code-review", "review")) and "review_pass" not in seen_actions:
++                                            seen_actions.add("review_pass")
++                                            emit("text", text="• **Now doing** dual-agent code review & verification\n")
++                                        elif any(k in cmd_str for k in ("ce-compound", "solutions/")) and "compound_pass" not in seen_actions:
++                                            seen_actions.add("compound_pass")
++                                            emit("text", text="• **Compounding** durable repository learning for future runs\n")
++                                        elif "lavish-axi" in cmd_str:
++                                            m_html = re.search(r"(\S+\.html)", cmd_str)
++                                            if m_html and "lavish_cmd" not in seen_actions:
++                                                seen_actions.add("lavish_cmd")
++                                                clean_p = Path(m_html.group(1)).resolve()
++                                                emit("text", text=f"• **Visual Artifact**: [Open Review Surface](file://{clean_p})\n")
++                                        elif "exec" not in seen_actions:
++                                            seen_actions.add("exec")
++                                            emit("text", text="• **Now doing** test & command execution\n")
++                        if msg.get("stopReason") in ("stop", "endTurn"):
++                            seen_actions.add("done")
++                            break
++            except Exception:
++                pass
++
++        if "done" in seen_actions:
++            break
++
++        if pane_id:
++            try:
++                p_res = subprocess.run(
++                    ["herdr", "pane", "process-info", "--pane", pane_id],
++                    capture_output=True, text=True, timeout=2,
++                )
++                if p_res.returncode == 0:
++                    p_data = json.loads(p_res.stdout).get("result", {}).get("process_info", {})
++                    procs = [p.get("name") for p in p_data.get("foreground_processes", [])]
++                    target_proc = "agy" if is_agy else "pi"
++                    if target_proc not in procs and (time.time() - start_monitor > 2.5):
++                        break
++            except Exception:
++                pass
++
++        time.sleep(0.7)
++
++    if "done" in seen_actions or (time.time() - start_monitor < 20.0):
++        emit("text", text=f"• **Completed** {primary_skill} execution in Herdr\n")
++    else:
++        emit("text", text=f"• **Now doing** background execution in Herdr ({primary_skill})\n")
++
++    # Save the coding task turn so subsequent follow-ups in any lane retain context
++    history_to_save = list(history)
++    history_to_save.append({"role": "user", "parts": [{"text": task_prompt}]})
++    save_session_history(
++        session_id,
++        history_to_save,
++        f"Executed coding task ({primary_skill}) in Herdr workspace '{ws_label}': {task_prompt}"
++    )
++
++    emit("text", text="\n*Press Ctrl+E or click 'Expand in Herdr' to view terminal.*")
++    emit("done", ok=True, code=0, stopped=False)
++    return 0
+ 
+ 
+-def route_agent(request: str, agent: str, session: str, auto: bool) -> int:
++# =====================================================================
++# MAIN ROUTER ENTRYPOINT
++# =====================================================================
++
++def route_request(raw_request: str, *, session: str = "", agent: str = "") -> int:
+     extend_path()
+-    current = default_agent()
+-    if agent and agent != current:
+-        session = ""
+-    slug = current
+-    if not slug:
+-        emit(
+-            "agent",
+-            name="", label="", session="", cwd=str(work_dir()),
+-            resume=["omarchy-agent", "--pick"], resumeLabel="Choose agent",
+-        )
+-        emit("error", text="No default agent set. Press Ctrl+E to choose one.")
+-        emit("done", ok=False, code=1, stopped=False)
+-        return 1
++    config = load_config()
+ 
+-    label = agent_label(slug)
+-    if not shutil.which(slug):
+-        emit(
+-            "agent",
+-            name=slug, label=label, session="", cwd=str(work_dir()),
+-            resume=["omarchy-default-agent", slug], resumeLabel="Install",
+-        )
+-        emit("error", text=f"{label} is not installed. Press Ctrl+E to install it.")
+-        emit("done", ok=False, code=1, stopped=False)
+-        return 1
+-
+-    if slug not in ADAPTERS:
+-        emit(
+-            "agent",
+-            name=slug, label=label, session="", cwd=str(work_dir()),
+-            resume=["omarchy-agent"], resumeLabel="Expand",
+-        )
+-        detached(["omarchy-agent", "--prompt", request])
+-        emit("status", text=f"Opened {label}")
+-        emit("done", ok=True, code=0, stopped=False)
+-        return 0
+-
+-    return run_agent(request, slug, session, auto)
+-
+-
+-def route_request(raw_request: str, *, agent: str = "", session: str = "",
+-                  auto: bool = False) -> int:
+     if len(raw_request) > MAX_REQUEST_CHARS:
+         emit("error", text=f"Requests are limited to {MAX_REQUEST_CHARS} characters")
+         emit("done", ok=False, code=1, stopped=False)
+@@ -573,14 +1381,40 @@ def route_request(raw_request: str, *, agent: str = "", session: str = "",
+         emit("error", text="Request is empty")
+         emit("done", ok=False, code=1, stopped=False)
+         return 1
+-    return route_agent(request, agent, session, auto)
++
++    session_id = session or str(uuid.uuid4())
++    lane = classify_intent(request, prior_agent=agent)
++
++    if lane == LANE_CODE:
++        return run_lane_coding(request, config, session_id)
++    elif lane == LANE_WEB:
++        return run_lane_web(request, config, session_id)
++    else:
++        return run_lane_general(request, config, session_id)
+ 
+ 
+ def main() -> int:
+     arguments = sys.argv[1:]
+-    agent = ""
++    if not arguments:
++        print("Usage: omagent-route [--list-sessions | --get-session ID | --save-session ID | --delete-session ID | --clear-history | [--auto] [--agent SLUG --session ID] <request>]", file=sys.stderr)
++        return 2
++
++    # CLI actions for session history
++    if arguments[0] == "--list-sessions":
++        return cmd_list_sessions()
++    if arguments[0] == "--get-session" and len(arguments) > 1:
++        return cmd_get_session(arguments[1])
++    if arguments[0] == "--save-session" and len(arguments) > 1:
++        return cmd_save_session(arguments[1])
++    if arguments[0] == "--delete-session" and len(arguments) > 1:
++        return cmd_delete_session(arguments[1])
++    if arguments[0] == "--clear-history":
++        return cmd_clear_history()
++
+     session = ""
++    agent = ""
+     auto = False
++
+     while arguments and arguments[0].startswith("--"):
+         option = arguments.pop(0)
+         if option == "--":
+@@ -594,11 +1428,12 @@ def main() -> int:
+         else:
+             print(f"Unknown option: {option}", file=sys.stderr)
+             return 2
++
+     if len(arguments) != 1 or not arguments[0].strip():
+-        print("Usage: omagent-route [--auto] [--agent SLUG --session ID] <request>",
+-              file=sys.stderr)
++        print("Usage: omagent-route [--auto] [--agent SLUG --session ID] <request>", file=sys.stderr)
+         return 2
+-    return route_request(arguments[0], agent=agent, session=session, auto=auto)
++
++    return route_request(arguments[0], session=session, agent=agent)
+ 
+ 
+ if __name__ == "__main__":

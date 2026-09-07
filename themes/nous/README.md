@@ -1,0 +1,72 @@
+# Nous Research — Omarchy theme
+
+<img width="2560" height="1440" alt="screenshot-2026-08-11_16-46-22" src="https://github.com/user-attachments/assets/08415f54-6c3b-4b67-b564-23c8ec8da307" />
+
+An original Omarchy theme built around the Nous Research visual language: cool blue paper, electric cobalt, engraved linework, and precise research-instrument UI.
+
+The desktop stays white and precise, with pale blue paper surfaces, deep-blue text, and electric cobalt reserved for focus and selection.
+
+## Install
+
+Install directly with Omarchy:
+
+```bash
+omarchy-theme-install https://github.com/notkisk/omarchy-nous-theme.git
+```
+
+Then select the installed Nous Research theme if Omarchy does not activate it automatically.
+
+The included `install.sh` also installs the scoped global theme hook required for Fastfetch, Waybar's full layout, GTK, Starship, btop refresh, and Kitty's final caret override. This matters because Omarchy does not execute hooks stored inside a theme directory.
+
+The wallpaper is selected automatically from `backgrounds/` by Omarchy. To cycle it later:
+
+```bash
+omarchy theme bg next
+```
+
+### Optional Waybar layout(only works for Omarchy versions prior to Omarchy quatro)
+
+To overwrite the active Waybar configuration with this theme's layout:
+
+```bash
+waybar_theme_dir="$(mktemp -d)"
+trap 'rm -rf "$waybar_theme_dir"' EXIT
+git clone --depth 1 https://github.com/notkisk/nous-theme.git "$waybar_theme_dir/nous-theme"
+mkdir -p ~/.config/waybar
+cp "$waybar_theme_dir/nous-theme/waybar/config.jsonc" \
+  "$waybar_theme_dir/nous-theme/waybar/style.css" ~/.config/waybar/
+omarchy restart waybar
+```
+
+
+## Included components
+
+- `colors.toml` — source palette for Omarchy's dynamic templates.
+- `kitty.conf` — paper terminal, complete ANSI palette, selection/tabs/borders, and a smooth beam caret with Kitty's cursor trail.
+- `fastfetch.jsonc` + `fastfetch-logo.txt` — compact blue line-art Nous mark with a clean terminal fallback.
+- `assets/nous-research-girl.png` — the supplied Nous Research girl artwork used by Neovim through `3rd/image.nvim` and Kitty's Graphics Protocol.
+- `lua/nous/` + `colors/nous.lua` — standalone Neovim colorscheme with Treesitter, LSP, completion, Telescope, WhichKey, statusline/tabline, floats, search, folds, Git signs, inactive-pane groups, and the optional artwork layer.
+- `waybar/` — an optional full Waybar configuration and matching layout CSS using only real Waybar modules.
+- `walker.css` + `fuzzel.ini` — native Omarchy launcher styling plus a matching Fuzzel profile.
+- `mako.ini`, `gtk.css`, `hyprland.conf`, `hyprlock.conf`, `swayosd.css`, and supporting terminal/editor files.
+
+## Design notes
+
+The palette is intentionally not a generic blue-black hacker palette. White and pale blue paper provide the ground, cobalt is reserved for focus and decisions, and restrained coral/teal/ochre colors make diagnostics and status states legible. Existing wallpaper and illustration assets are left untouched.
+
+The default Fastfetch portrait is compact Unicode linework, so it works in any terminal. Kitty users can preview the supplied PNG beside the same system modules with `fastfetch --kitty ~/.config/omarchy/current/theme/assets/nous-research-girl.png`; the fallback remains defined in `fastfetch-logo.txt`.
+
+## Dark themed version of this
+
+[Dark themed version](https://github.com/notkisk/Omarchy-nous-research-purple)
+
+<img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/2b1825be-4831-409b-b6b2-2d71c74ffa84" />
+
+Install directly with Omarchy:
+
+```
+omarchy-theme-install https://github.com/notkisk/Omarchy-nous-research-purple
+```
+
+
+

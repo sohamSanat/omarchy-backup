@@ -25,6 +25,11 @@ node_modules/
 *token*.json
 *secret*
 keyrings/
+*.pem
+*.key
+**/ssl/*.pem
+**/ssl/*.key
 
 # Ignore authentication cookie secrets
 **/cookie.txt
+

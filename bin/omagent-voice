@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# omagent-voice: Push-to-talk voice intercom for Omagent
+set -euo pipefail
+
+# 1. Ensure Omagent HUD is visible and focused
+omarchy-shell shell open io.github.ellion369.omagent 2>/dev/null || omarchy-shell shell toggle io.github.ellion369.omagent 2>/dev/null || true
+
+# Give the compositor a split second to place focus into the text input
+sleep 0.12
+
+# 2. Toggle Voxtype recording
+if command -v voxtype >/dev/null 2>&1; then
+    voxtype record toggle
+else
+    notify-send -u normal -a "Omagent" "Voice Unavailable" "Voxtype is not installed or running."
+fi

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "type": "file",
+    "source": "~/.local/state/omarchy/current/theme/fastfetch-logo.txt",
+    "padding": { "top": 0, "right": 4, "left": 0 }
+  },
+  "display": { "separator": "  ", "color": "#A8BDED", "brightColor": false },
+  "modules": [
+    { "type": "custom", "format": "\u001b[38;2;77;143;255m  +-- NOUS RESEARCH / FIELD NOTE ----------------+" },
+    { "type": "host",    "key": "  | host",     "keyColor": "#6BA3FF" },
+    { "type": "cpu",     "key": "  | cpu",      "keyColor": "#6BA3FF", "showPeCoreCount": true },
+    { "type": "gpu",     "key": "  | gpu",      "keyColor": "#6BA3FF", "detectionMethod": "pci" },
+    { "type": "display", "key": "  | display",  "keyColor": "#6BA3FF" },
+    { "type": "memory",  "key": "  | memory",   "keyColor": "#6BA3FF" },
+    { "type": "disk",    "key": "  + disk",     "keyColor": "#6BA3FF", "folders": "/" },
+    { "type": "custom", "format": "\u001b[38;2;77;143;255m  +---------------------------------------------+" },
+    { "type": "custom", "format": "\u001b[38;2;107;163;255m  +-- SOFTWARE / SESSION -----------------------+" },
+    { "type": "command", "key": "  | omarchy",  "keyColor": "#9BB0E8", "text": "omarchy-version" },
+    { "type": "kernel",  "key": "  | kernel",   "keyColor": "#9BB0E8" },
+    { "type": "wm",      "key": "  | wm",       "keyColor": "#9BB0E8" },
+    { "type": "terminal","key": "  | terminal", "keyColor": "#9BB0E8" },
+    { "type": "packages","key": "  + packages", "keyColor": "#9BB0E8" },
+    { "type": "custom", "format": "\u001b[38;2;107;163;255m  +---------------------------------------------+" },
+    { "type": "uptime",  "key": "  o uptime",   "keyColor": "#4ECDE6" },
+    { "type": "command", "key": "  o theme",    "keyColor": "#4ECDE6", "text": "omarchy-theme-current" },
+    { "type": "command", "key": "  o signal",   "keyColor": "#4ECDE6", "text": "printf '\\033[38;2;77;143;255m● \\033[38;2;46;196;160m● \\033[38;2;107;163;255m● \\033[38;2;240;96;112m●\\033[0m'" }
+  ]
+}

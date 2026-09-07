@@ -1,0 +1,10 @@
+{
+  "gemini_api_key": "YOUR_GEMINI_API_KEY",
+  "fast_model": "gemini-3.8-flash",
+  "web_model": "gemini-3.8-flash",
+  "coding_harness": "antigravity",
+  "coding_model": "gemini-3.8-flash-high",
+  "thinking_level": "high",
+  "use_herdr": true,
+  "use_treehouse": true
+}

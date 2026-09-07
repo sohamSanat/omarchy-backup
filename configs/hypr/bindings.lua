@@ -41,6 +41,11 @@ o.bind("SUPER + Y", "HomeLab launcher", "omarchy-shell shell toggle io.github.el
 -- YouTube Music (ytkew)
 o.bind("SUPER + M", "YouTube Music", { tui = "ytkew", focus = true })
 
+-- Omagent (omaagent)
+o.bind("ALT + SPACE", "Omagent", "omarchy-shell shell toggle io.github.ellion369.omagent")
+o.bind("SUPER + V", "Omagent Voice Intercom", "omagent-voice")
+hl.layer_rule({ match = { namespace = "omarchy-omagent" }, blur = true, ignore_alpha = 0.6 })
+
 
 -- Workspace Switcher: begin
 do

@@ -1,0 +1,29 @@
+# Nous Research — a small field-note prompt for shells that use Starship.
+add_newline = true
+format = "$directory$git_branch$git_status$cmd_duration$character"
+
+[directory]
+style = "bold #164BFF"
+format = "[$path]($style) "
+truncation_length = 4
+truncate_to_repo = false
+truncation_symbol = "…/"
+
+[git_branch]
+symbol = "⌁ "
+style = "#1237B8"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+style = "#B4233C"
+format = "([$all_status$ahead_behind]($style)) "
+
+[cmd_duration]
+min_time = 2000
+style = "#6076A8"
+format = "[$duration]($style) "
+
+[character]
+success_symbol = "[❯](bold #164BFF)"
+error_symbol = "[❯](bold #B4233C)"
+vimcmd_symbol = "[❮](bold #1237B8)"

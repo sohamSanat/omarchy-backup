@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.ellion369.omagent",
+  "name": "Omagent",
+  "version": "0.1.0",
+  "author": "ellion369",
+  "license": "MIT",
+  "description": "A command pill that runs your Omarchy default coding agent under the overlay",
+  "kinds": [
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Omagent.qml"
+  }
+}

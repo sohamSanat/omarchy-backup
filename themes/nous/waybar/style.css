@@ -1,0 +1,111 @@
+/* Nous Research — light white waybar, all hex hardcoded */
+
+* {
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+  font-family: "JetBrainsMono Nerd Font", monospace;
+  font-size: 11px;
+  color: #12327A;
+  background: transparent;
+}
+
+window#waybar {
+  background: transparent;
+}
+
+#waybar > box {
+  margin: 10px 16px 0;
+  padding: 0 10px;
+  background-color: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(22, 75, 255, 0.28);
+  box-shadow: 0 6px 22px rgba(18, 50, 122, 0.12);
+}
+
+#custom-omarchy {
+  min-width: 94px;
+  padding: 0 8px;
+  color: #164BFF;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+#workspaces {
+  margin: 0 10px;
+}
+
+#workspaces button {
+  all: unset;
+  padding: 0 8px;
+  margin: 7px 2px;
+  color: #6076A8;
+}
+
+#workspaces button:hover {
+  color: #164BFF;
+}
+
+#workspaces button.active {
+  color: #FFFFFF;
+  background-color: #164BFF;
+  padding: 0 8px;
+}
+
+#workspaces button.empty {
+  opacity: 0.55;
+}
+
+#window {
+  padding: 0 10px;
+  color: #6076A8;
+  font-size: 10px;
+}
+
+#clock {
+  padding: 0 18px;
+  margin: 0 4px;
+  color: #12327A;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  background-color: transparent;
+  opacity: 1;
+}
+
+#network,
+#pulseaudio,
+#cpu,
+#memory,
+#battery,
+#bluetooth,
+#tray {
+  padding: 0 9px;
+  margin: 7px 0;
+  border-left: 1px solid rgba(184, 201, 245, 0.8);
+}
+
+#network   { color: #245CFF; }
+#pulseaudio { color: #245CFF; }
+#cpu       { color: #6076A8; }
+#memory    { color: #6076A8; }
+#battery   { color: #157A5B; }
+#bluetooth { color: #245CFF; }
+#tray      { padding-right: 3px; }
+
+#battery.warning,
+#cpu.warning,
+#memory.warning { color: #9A6700; }
+
+#battery.critical:not(.charging),
+#cpu.critical,
+#memory.critical { color: #B4233C; }
+
+#pulseaudio.muted    { color: #6076A8; }
+#network.disconnected { color: #6076A8; }
+
+tooltip {
+  padding: 8px 10px;
+  background-color: #FFFFFF;
+  border: 1px solid #164BFF;
+  color: #12327A;
+}

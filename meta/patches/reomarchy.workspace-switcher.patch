@@ -1,11 +1,244 @@
 diff --git i/WorkspaceSwitcher.qml w/WorkspaceSwitcher.qml
-index fb8e271..2d876e7 100644
+index fb8e271..74c2132 100644
 --- i/WorkspaceSwitcher.qml
 +++ w/WorkspaceSwitcher.qml
-@@ -272,6 +272,48 @@ Item {
+@@ -2,6 +2,7 @@ import Quickshell
+ import Quickshell.Hyprland
+ import Quickshell.Wayland
+ import QtQuick
++import QtQuick.Layouts
+ import qs.Commons
+ 
+ Item {
+@@ -13,6 +14,7 @@ Item {
+   property bool revealed: false
+   property bool quickSwitchPending: false
+   property int selectedIndex: 0
++  property int selectedWindowIndex: 0
+   property var workspaceRows: []
+   property var recentWorkspaceIds: []
+   property var retainedPreviewIds: []
+@@ -21,26 +23,99 @@ Item {
+   readonly property int maxWindowsPerWorkspace: 24
+   readonly property int maxRetainedPreviewCount: maxWorkspaceCount
+ 
++  // Search and HUD State
++  property string searchQuery: ""
++  property string hudActionText: "SUPER + TAB"
++  property bool cursorBlink: true
++  property string currentTimeStr: Qt.formatTime(new Date(), "hh:mm:ss")
++  property string currentDateStr: Qt.formatDate(new Date(), "yyyy-MM-dd")
++
++  // Theming & Colors: Dynamically bonded to the active Omarchy OS Theme
++  readonly property bool isLightMode: {
++    var bg = Color.background
++    return (bg.r * 0.299 + bg.g * 0.587 + bg.b * 0.114) > 0.5
++  }
++
++  function ensureContrast(c, isLight) {
++    var lum = c.r * 0.299 + c.g * 0.587 + c.b * 0.114
++    if (isLight && lum > 0.55) return Qt.darker(c, 1.45)
++    if (!isLight && lum < 0.22) return Qt.lighter(c, 1.7)
++    return c
++  }
++
++  readonly property color accentColor: ensureContrast(Color.accent, isLightMode)
++  readonly property color dimAccentColor: isLightMode
++    ? Qt.darker(accentColor, 1.3)
++    : Util.alpha(accentColor, 0.75)
++  readonly property color textColor: Color.foreground
++  readonly property color mutedColor: {
++    if (Color.muted && Color.muted !== Color.foreground) return Color.muted
++    return isLightMode ? "#475569" : Util.alpha(Color.foreground, 0.65)
++  }
++  readonly property color scrimColor: isLightMode
++    ? Qt.rgba(Color.background.r, Color.background.g, Color.background.b, 0.97)
++    : Qt.rgba(Color.background.r * 0.22, Color.background.g * 0.22, Color.background.b * 0.22, 0.985)
++  readonly property color cardBgColor: isLightMode
++    ? Color.background
++    : Qt.rgba(Color.background.r, Color.background.g, Color.background.b, 0.95)
++  readonly property color surfaceBgColor: isLightMode
++    ? Qt.rgba(Color.background.r * 0.96, Color.background.g * 0.96, Color.background.b * 0.96, 0.85)
++    : Qt.rgba(Color.background.r * 1.35, Color.background.g * 1.35, Color.background.b * 1.35, 0.85)
++  readonly property string monoFont: Style.fontFamily || "JetBrainsMono Nerd Font, monospace"
++
++  // Geometry
++  readonly property int cardWidth: Math.round(Math.min(panel.width * 0.48, Style.space(680)))
++  readonly property int previewHeight: Math.round(cardWidth * 0.58)
++  readonly property int labelHeight: Style.space(56)
++
++  // Derived counts
++  readonly property int totalWindowsCount: {
++    var count = 0
++    for (var i = 0; i < root.workspaceRows.length; i++) {
++      if (root.workspaceRows[i] && root.workspaceRows[i].windows)
++        count += root.workspaceRows[i].windows.length
++    }
++    return count
++  }
++  readonly property int occupiedCount: root.workspaceRows.length
++
++  // Decorative ambient constellation matrix tiles
++  readonly property var matrixTiles: [
++    { x: 0.04, y: 0.14, w: 72, h: 46, op: 0.08 },
++    { x: 0.11, y: 0.22, w: 96, h: 58, op: 0.12 },
++    { x: 0.06, y: 0.36, w: 68, h: 42, op: 0.06 },
++    { x: 0.16, y: 0.44, w: 110, h: 72, op: 0.13 },
++    { x: 0.03, y: 0.60, w: 84, h: 52, op: 0.09 },
++    { x: 0.13, y: 0.72, w: 64, h: 40, op: 0.07 },
++    { x: 0.21, y: 0.82, w: 92, h: 60, op: 0.11 },
++    { x: 0.86, y: 0.14, w: 82, h: 52, op: 0.10 },
++    { x: 0.93, y: 0.26, w: 68, h: 44, op: 0.07 },
++    { x: 0.82, y: 0.38, w: 118, h: 74, op: 0.13 },
++    { x: 0.89, y: 0.54, w: 64, h: 38, op: 0.08 },
++    { x: 0.83, y: 0.68, w: 104, h: 64, op: 0.12 },
++    { x: 0.91, y: 0.80, w: 76, h: 48, op: 0.06 },
++    { x: 0.76, y: 0.86, w: 88, h: 56, op: 0.09 },
++    { x: 0.31, y: 0.15, w: 58, h: 36, op: 0.06 },
++    { x: 0.69, y: 0.17, w: 72, h: 46, op: 0.08 },
++    { x: 0.32, y: 0.86, w: 80, h: 50, op: 0.09 },
++    { x: 0.66, y: 0.87, w: 90, h: 58, op: 0.10 },
++    { x: 0.24, y: 0.26, w: 70, h: 45, op: 0.07 },
++    { x: 0.75, y: 0.24, w: 85, h: 55, op: 0.09 },
++    { x: 0.02, y: 0.48, w: 55, h: 35, op: 0.05 },
++    { x: 0.95, y: 0.44, w: 60, h: 38, op: 0.06 },
++    { x: 0.28, y: 0.74, w: 65, h: 42, op: 0.08 },
++    { x: 0.71, y: 0.74, w: 75, h: 48, op: 0.08 },
++    { x: 0.08, y: 0.88, w: 80, h: 52, op: 0.07 },
++    { x: 0.88, y: 0.92, w: 70, h: 44, op: 0.07 },
++    { x: 0.15, y: 0.05, w: 64, h: 40, op: 0.06 },
++    { x: 0.82, y: 0.06, w: 75, h: 48, op: 0.08 }
++  ]
++
+   ListModel {
+     id: workspaceModel
+     dynamicRoles: true
+   }
+ 
+-  property color background: Color.menu.background
+-  property color foreground: Color.menu.text
+-  property color borderColor: Color.menu.border
+-  property color selectedBackground: Color.menu.selectedBackground
+-  property color selectedText: Color.menu.selectedText
+-  property color scrim: Color.menu.scrim
+-
+-  readonly property int outerMargin: Style.space(40)
+-  readonly property int cardGap: Style.space(18)
+-  readonly property int cardWidth: Math.max(Style.space(180), Math.min(Style.space(300),
+-    (panel.width - outerMargin * 2 - cardGap * Math.max(0, Math.min(4, workspaceRows.length - 1)))
+-      / Math.max(1, Math.min(5, workspaceRows.length))))
+-  readonly property int previewHeight: Math.round(cardWidth * 0.625)
+-  readonly property int labelHeight: Style.space(42)
+-
+   function friendlyAppName(className) {
+     var name = String(className || "App")
+     var normalized = name.toLowerCase()
+@@ -62,9 +137,12 @@ Item {
+       var waylandAppId = window.wayland ? window.wayland.appId : ""
+       var at = ipc.at || [monitor ? monitor.x : 0, monitor ? monitor.y : 0]
+       var size = ipc.size || [Style.space(300), Style.space(200)]
++      var addr = window.address || (ipc.address ? ipc.address : "")
+       windows.push({
+         title: window.title || ipc.title || "Window",
+         className: root.friendlyAppName(ipc.class || waylandAppId || "App"),
++        address: addr,
++        rawWindow: window,
+         x: at[0],
+         y: at[1],
+         width: size[0],
+@@ -87,9 +165,6 @@ Item {
+   }
+ 
+   function syncWorkspaceModel(rows) {
+-    // Reconcile by workspace id instead of replacing the entire model. This
+-    // preserves existing delegates and the screenshot buffers they own when
+-    // a workspace is added, removed, or reordered.
+     for (var i = 0; i < rows.length; i++) {
+       var existingIndex = -1
+       for (var j = i; j < workspaceModel.count; j++) {
+@@ -170,8 +245,6 @@ Item {
+     }
+     if (insertAt >= root.maxWorkspaceCount) return
+ 
+-    // Replace in place so even the temporary candidate collection never
+-    // exceeds maxWorkspaceCount.
+     for (var i = root.maxWorkspaceCount - 1; i > insertAt; i--)
+       candidates[i] = candidates[i - 1]
+     candidates[insertAt] = candidate
+@@ -191,14 +264,9 @@ Item {
+         root.retainWorkspaceCandidate(candidates, workspace)
+     }
+ 
+-    // Produce full rows, including their window data, only after the bounded
+-    // candidate set has been selected. Prefer current/recent workspaces and
+-    // then the lowest numbered occupied workspaces.
+     for (var candidateIndex = 0; candidateIndex < candidates.length; candidateIndex++)
+       rows.push(root.rowForWorkspace(candidates[candidateIndex].workspace))
+ 
+-    // Card positions are spatial and stable: workspace 1 is always before 2,
+-    // 2 before 3, and so on. Sorting is limited to maxWorkspaceCount rows.
+     rows.sort(function(left, right) { return left.id - right.id })
+ 
+     root.syncWorkspaceModel(rows)
+@@ -257,21 +325,107 @@ Item {
+   function select(direction) {
+     if (root.workspaceRows.length < 2) return
+     root.selectedIndex = (root.selectedIndex + direction + root.workspaceRows.length) % root.workspaceRows.length
+-    workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
++    root.selectedWindowIndex = 0
++    workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Center)
++  }
++
++  function applyFilter() {
++    var q = root.searchQuery.trim().toLowerCase()
++    if (q === "") {
++      root.selectedWindowIndex = 0
++      return
++    }
++
++    for (var i = 0; i < root.workspaceRows.length; i++) {
++      var row = root.workspaceRows[i]
++      if (String(row.name).toLowerCase().indexOf(q) >= 0) {
++        root.selectedIndex = i
++        root.selectedWindowIndex = 0
++        workspaceList.positionViewAtIndex(i, ListView.Center)
++        return
++      }
++      for (var w = 0; w < row.windows.length; w++) {
++        var win = row.windows[w]
++        if (win.title.toLowerCase().indexOf(q) >= 0 || win.className.toLowerCase().indexOf(q) >= 0) {
++          root.selectedIndex = i
++          root.selectedWindowIndex = w
++          workspaceList.positionViewAtIndex(i, ListView.Center)
++          return
++        }
++      }
++    }
+   }
+ 
+   function open(payloadJson) {
+     var payload = ({})
+     try { payload = JSON.parse(payloadJson || "{}") } catch (e) { payload = ({}) }
+ 
+-    // Hyprland owns the global Command/Super binding, so it also reports the
+-    // modifier release. Ignore unrelated Command releases when the switcher
+-    // is closed; commit the current selection when it is open.
+     if (payload.commit === true) {
+       if (root.opened) root.activate()
        return
      }
  
++    if (payload.windowNav !== undefined) {
++      if (root.selectedIndex >= 0 && root.selectedIndex < root.workspaceRows.length) {
++        var numWins = root.workspaceRows[root.selectedIndex].windows.length
++        if (numWins > 0) {
++          root.selectedWindowIndex = (root.selectedWindowIndex + payload.windowNav + numWins) % numWins
++          root.hudActionText = (payload.windowNav > 0 ? "↓" : "↑") + " WINDOW [" + (root.selectedWindowIndex + 1) + "/" + numWins + "]"
++        }
++      }
++      return
++    }
++
 +    if (payload.selectWorkspace !== undefined) {
 +      if (!root.opened) {
 +        root.rebuild()
@@ -15,19 +248,21 @@ index fb8e271..2d876e7 100644
 +      }
 +      var targetId = payload.selectWorkspace
 +      var idx = root.rowIndexForWorkspace(targetId)
++      root.hudActionText = "WORKSPACE 0" + targetId
 +      if (idx >= 0) {
 +        if (root.selectedIndex === idx) {
 +          root.activate()
 +        } else {
 +          root.selectedIndex = idx
-+          workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
++          root.selectedWindowIndex = 0
++          workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Center)
 +          Qt.callLater(function() { keyCatcher.forceActiveFocus() })
 +        }
 +      } else {
 +        Quickshell.execDetached([
 +          "hyprctl",
 +          "dispatch",
-+          "hl.dsp.focus({ workspace = \"" + targetId + "\" })"
++          'hl.dsp.focus({ workspace = "' + targetId + '" })'
 +        ])
 +        root.dismiss()
 +      }
@@ -35,166 +270,1023 @@ index fb8e271..2d876e7 100644
 +    }
 +
 +    if (payload.immediate === true || payload.direction === 0) {
++      console.log("SWITCHER: open immediate called. opened:", root.opened);
 +      if (!root.opened) {
-+        root.rebuild()
-+        if (root.workspaceRows.length === 0) return
-+        root.selectedIndex = root.focusedIndex()
-+        root.opened = true
-+        root.revealed = true
-+        root.quickSwitchPending = false
-+        workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
-+        Qt.callLater(function() { keyCatcher.forceActiveFocus() })
++        root.rebuild();
++        console.log("SWITCHER: rebuild finished. rows count:", root.workspaceRows.length);
++        if (root.workspaceRows.length === 0) return;
++        root.selectedIndex = root.focusedIndex();
++        root.selectedWindowIndex = 0;
++        root.opened = true;
++        root.revealed = true;
++        root.quickSwitchPending = false;
++        root.searchQuery = "";
++        root.hudActionText = "SUPER + TAB";
++        console.log("SWITCHER: opened and revealed set to true!");
++        workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Center);
++        Qt.callLater(function() { keyCatcher.forceActiveFocus(); });
 +      }
-+      return
++      return;
 +    }
 +
      var direction = payload.direction === -1 ? -1 : 1
  
      if (!root.opened) {
-@@ -314,6 +356,11 @@ Item {
+@@ -282,30 +436,30 @@ Item {
+       root.selectedIndex = direction < 0
+         ? (currentIndex - 1 + root.workspaceRows.length) % root.workspaceRows.length
+         : root.previousWorkspaceIndex(currentId)
++      root.selectedWindowIndex = 0
+       root.opened = true
+       root.revealed = false
+       root.quickSwitchPending = true
++      root.searchQuery = ""
++      root.hudActionText = direction > 0 ? "SUPER + TAB" : "SUPER + SHIFT + TAB"
+       revealTimer.restart()
+     } else {
+-      // The first press is reserved for a quick MRU switch. If another Tab
+-      // arrives while Super is still held, begin visible traversal from the
+-      // workspace the user is actually in.
+       if (root.quickSwitchPending) {
+         root.selectedIndex = root.focusedIndex()
+         root.quickSwitchPending = false
+       }
+-      // Visible traversal follows the stable card layout: Tab moves right and
+-      // Shift+Tab left, wrapping at the ends.
+       root.select(direction)
++      root.hudActionText = direction > 0 ? "SUPER + TAB" : "SUPER + SHIFT + TAB"
+     }
+ 
+-    workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
++    workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Center)
+   }
+ 
+   function close() {
+     root.opened = false
      root.revealed = false
      root.quickSwitchPending = false
++    root.searchQuery = ""
+     revealTimer.stop()
+   }
+ 
+@@ -313,7 +467,13 @@ Item {
+     root.opened = false
+     root.revealed = false
+     root.quickSwitchPending = false
++    root.searchQuery = ""
      revealTimer.stop()
 +    Quickshell.execDetached([
 +      "hyprctl",
 +      "dispatch",
-+      "hl.dsp.submap(\"reset\")"
++      'hl.dsp.submap("reset")'
 +    ])
      if (root.shell && typeof root.shell.hide === "function")
        root.shell.hide((root.manifest && root.manifest.id) || "reomarchy.workspace-switcher")
    }
-@@ -404,14 +451,18 @@ Item {
+@@ -324,13 +484,27 @@ Item {
+       return
+     }
+ 
+-    var workspaceId = root.workspaceRows[root.selectedIndex].id
+-    // Omarchy runs Hyprland's Lua configuration, so dispatch the Lua helper
+-    // instead of the legacy `workspace N` dispatcher.
++    var row = root.workspaceRows[root.selectedIndex]
++    var workspaceId = row.id
++
++    if (root.selectedWindowIndex >= 0 && root.selectedWindowIndex < row.windows.length) {
++      var win = row.windows[root.selectedWindowIndex]
++      if (win && win.address) {
++        Quickshell.execDetached([
++          "hyprctl",
++          "dispatch",
++          "focuswindow",
++          "address:" + win.address
++        ])
++        root.dismiss()
++        return
++      }
++    }
++
+     Quickshell.execDetached([
+       "hyprctl",
+       "dispatch",
+-      "hl.dsp.focus({ workspace = \"" + workspaceId + "\" })"
++      'hl.dsp.focus({ workspace = "' + workspaceId + '" })'
+     ])
+     root.dismiss()
+   }
+@@ -351,18 +525,14 @@ Item {
+ 
+   Timer {
+     id: revealTimer
+-    // A quick Command-Tab should feel like an instantaneous toggle, not flash
+-    // a large overlay. Holding Command past this threshold reveals the UI.
+     interval: 180
+     repeat: false
+     onTriggered: {
+       if (!root.opened) return
+-      // A held invocation is navigation, not the quick-toggle gesture. Show
+-      // the current workspace selected until the user presses Tab again.
+       if (root.quickSwitchPending) {
+         root.selectedIndex = root.focusedIndex()
+         root.quickSwitchPending = false
+-        workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
++        workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Center)
+       }
+       root.revealed = true
+       Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+@@ -371,21 +541,34 @@ Item {
+ 
+   Timer {
+     id: initialCaptureTimer
+-    // Screencopy contexts are initialized asynchronously. The later first
+-    // capture avoids racing that setup when the shell itself has just started.
+     interval: 1500
+     repeat: false
+     onTriggered: root.captureFocusedWorkspace()
+   }
+ 
++  Timer {
++    interval: 1000
++    running: root.revealed
++    repeat: true
++    onTriggered: {
++      root.currentTimeStr = Qt.formatTime(new Date(), "hh:mm:ss")
++      root.currentDateStr = Qt.formatDate(new Date(), "yyyy-MM-dd")
++    }
++  }
++
++  Timer {
++    interval: 500
++    running: root.revealed
++    repeat: true
++    onTriggered: root.cursorBlink = !root.cursorBlink
++  }
++
+   Connections {
+     target: Hyprland
+ 
+     function onFocusedWorkspaceChanged() {
+       if (Hyprland.focusedWorkspace) {
+         root.rememberWorkspace(Hyprland.focusedWorkspace.id)
+-        // Let the compositor finish switching before taking the one cached
+-        // frame. Nothing is captured continuously.
+         captureTimer.restart()
+       }
+     }
+@@ -393,9 +576,6 @@ Item {
+ 
+   PanelWindow {
+     id: panel
+-    // Keep the surface mapped so ListView does not destroy the delegates that
+-    // own our cached screencopy buffers. While closed it is transparent,
+-    // unfocused, and has an empty input region.
+     visible: true
+     anchors { top: true; bottom: true; left: true; right: true }
+     color: "transparent"
+@@ -404,22 +584,61 @@ Item {
      WlrLayershell.keyboardFocus: root.revealed ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
      exclusionMode: ExclusionMode.Ignore
      mask: Region {
 -      width: root.revealed ? panel.width : 0
 -      height: root.revealed ? panel.height : 0
-+      width: (root.revealed || switcher.opacity > 0) ? panel.width : 0
-+      height: (root.revealed || switcher.opacity > 0) ? panel.height : 0
++      width: (root.revealed || root.opened) ? panel.width : 0
++      height: (root.revealed || root.opened) ? panel.height : 0
      }
  
++    // Deep Dark Scrim Overlay
      Rectangle {
        anchors.fill: parent
 -      visible: root.revealed
+-      color: root.scrim
 +      visible: opacity > 0
 +      opacity: root.revealed ? 1 : 0
-       color: root.scrim
++      color: root.scrimColor
++
 +      Behavior on opacity {
-+        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
++        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
++      }
++
++      // Constellation / Space Matrix Background Tiles
++      Item {
++        anchors.fill: parent
++        visible: !root.isLightMode
++
++        Repeater {
++          model: root.matrixTiles
++
++          Rectangle {
++            required property var modelData
++            x: modelData.x * panel.width
++            y: modelData.y * panel.height
++            width: Style.space(modelData.w)
++            height: Style.space(modelData.h)
++            color: Util.alpha(Color.background, Math.min(1.0, modelData.op * 1.5))
++            border.width: 1
++            border.color: Util.alpha(root.accentColor, modelData.op * 1.6)
++            radius: 2
++
++            Column {
++              anchors.fill: parent
++              anchors.margins: 4
++              spacing: 3
++              Rectangle { width: parent.width * 0.72; height: 1; color: Util.alpha(Color.foreground, modelData.op * 1.2) }
++              Rectangle { width: parent.width * 0.44; height: 1; color: Util.alpha(Color.foreground, modelData.op * 0.9) }
++              Rectangle { width: parent.width * 0.86; height: 1; color: Util.alpha(root.accentColor, modelData.op * 0.8) }
++            }
++          }
++        }
 +      }
      }
  
++    // Dismiss click area
      MouseArea {
-@@ -443,6 +494,44 @@ Item {
+       anchors.fill: parent
+       enabled: root.revealed
+       onClicked: root.dismiss()
+     }
+ 
++    // Key catcher for navigation & typing
+     Item {
+       id: keyCatcher
+       anchors.fill: parent
+@@ -429,200 +648,606 @@ Item {
+       Keys.priority: Keys.BeforeItem
+       Keys.onPressed: function(event) {
+         if (event.key === Qt.Key_Escape) {
+-          root.dismiss()
++          if (root.searchQuery.length > 0) {
++            root.searchQuery = ""
++            root.applyFilter()
++            root.hudActionText = "CLEAR FILTER"
++          } else {
++            root.dismiss()
++          }
+           event.accepted = true
+         } else if (event.key === Qt.Key_Tab) {
+-          root.select((event.modifiers & Qt.ShiftModifier) ? -1 : 1)
++          var dir = (event.modifiers & Qt.ShiftModifier) ? -1 : 1
++          root.select(dir)
++          root.hudActionText = dir > 0 ? "SUPER + TAB" : "SUPER + SHIFT + TAB"
+           event.accepted = true
+         } else if (event.key === Qt.Key_Left) {
+           root.select(-1)
++          root.hudActionText = "← WORKSPACE"
+           event.accepted = true
+         } else if (event.key === Qt.Key_Right) {
+           root.select(1)
++          root.hudActionText = "→ WORKSPACE"
++          event.accepted = true
++        } else if (event.key === Qt.Key_Up) {
++          if (root.selectedIndex >= 0 && root.selectedIndex < root.workspaceRows.length) {
++            var numWins = root.workspaceRows[root.selectedIndex].windows.length
++            if (numWins > 0) {
++              root.selectedWindowIndex = (root.selectedWindowIndex - 1 + numWins) % numWins
++              root.hudActionText = "↑ WINDOW [" + (root.selectedWindowIndex + 1) + "/" + numWins + "]"
++            }
++          }
++          event.accepted = true
++        } else if (event.key === Qt.Key_Down) {
++          if (root.selectedIndex >= 0 && root.selectedIndex < root.workspaceRows.length) {
++            var numWins = root.workspaceRows[root.selectedIndex].windows.length
++            if (numWins > 0) {
++              root.selectedWindowIndex = (root.selectedWindowIndex + 1) % numWins
++              root.hudActionText = "↓ WINDOW [" + (root.selectedWindowIndex + 1) + "/" + numWins + "]"
++            }
++          }
+           event.accepted = true
          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
            root.activate()
            event.accepted = true
-+        } else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
++        } else if (event.key === Qt.Key_Backspace) {
++          if (root.searchQuery.length > 0) {
++            root.searchQuery = root.searchQuery.substring(0, root.searchQuery.length - 1)
++            root.applyFilter()
++            root.hudActionText = root.searchQuery.length > 0 ? ("SORT: " + root.searchQuery.toUpperCase()) : "SUPER + TAB"
++          }
++          event.accepted = true
++        } else if (root.searchQuery === "" && event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
 +          var targetId = event.key - Qt.Key_0
 +          var idx = root.rowIndexForWorkspace(targetId)
++          root.hudActionText = "WORKSPACE 0" + targetId
 +          if (idx >= 0) {
 +            if (root.selectedIndex === idx) {
 +              root.activate()
 +            } else {
 +              root.selectedIndex = idx
-+              workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
++              root.selectedWindowIndex = 0
++              workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Center)
 +            }
 +          } else {
 +            Quickshell.execDetached([
 +              "hyprctl",
 +              "dispatch",
-+              "hl.dsp.focus({ workspace = \"" + targetId + "\" })"
++              'hl.dsp.focus({ workspace = "' + targetId + '" })'
 +            ])
 +            root.dismiss()
 +          }
 +          event.accepted = true
-+        } else if (event.key === Qt.Key_0) {
++        } else if (root.searchQuery === "" && event.key === Qt.Key_0) {
 +          var targetId = 10
 +          var idx = root.rowIndexForWorkspace(targetId)
++          root.hudActionText = "WORKSPACE 10"
 +          if (idx >= 0) {
 +            if (root.selectedIndex === idx) {
 +              root.activate()
 +            } else {
 +              root.selectedIndex = idx
-+              workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
++              root.selectedWindowIndex = 0
++              workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Center)
 +            }
 +          } else {
 +            Quickshell.execDetached([
 +              "hyprctl",
 +              "dispatch",
-+              "hl.dsp.focus({ workspace = \"" + targetId + "\" })"
++              'hl.dsp.focus({ workspace = "' + targetId + '" })'
 +            ])
 +            root.dismiss()
 +          }
 +          event.accepted = true
++        } else if (event.text && event.text.length > 0 && !event.modifiers) {
++          var ch = event.text
++          if (ch >= ' ' && ch <= '~') {
++            root.searchQuery += ch
++            root.applyFilter()
++            root.hudActionText = "SORT: " + root.searchQuery.toUpperCase()
++            event.accepted = true
++          }
          }
        }
+-
+     }
  
-@@ -450,7 +539,9 @@ Item {
- 
-     Rectangle {
-       id: switcher
--      visible: root.revealed
-+      visible: opacity > 0
+-    Rectangle {
+-      id: switcher
++    // ==========================================
++    // TOP STATUS HUD
++    // ==========================================
++    Item {
++      anchors.top: parent.top
++      anchors.topMargin: Style.space(48)
++      anchors.left: parent.left
++      anchors.leftMargin: Style.space(38)
++      anchors.right: parent.right
++      anchors.rightMargin: Style.space(38)
++      height: Style.space(64)
+       visible: root.revealed
+-      width: Math.min(panel.width - root.outerMargin * 2,
+-        root.workspaceRows.length * (root.cardWidth + root.cardGap) - root.cardGap + Style.space(32))
+-      height: root.previewHeight + root.labelHeight + Style.space(32)
+-      anchors.centerIn: parent
+-      radius: Style.cornerRadius
+-      color: root.background
+-      border.width: Math.max(1, Style.space(1))
+-      border.color: root.borderColor
 +      opacity: root.revealed ? 1 : 0
-+      scale: root.revealed ? 1 : 0.95
-       width: Math.min(panel.width - root.outerMargin * 2,
-         root.workspaceRows.length * (root.cardWidth + root.cardGap) - root.cardGap + Style.space(32))
-       height: root.previewHeight + root.labelHeight + Style.space(32)
-@@ -460,6 +551,13 @@ Item {
-       border.width: Math.max(1, Style.space(1))
-       border.color: root.borderColor
  
+-      MouseArea { anchors.fill: parent; onClicked: {} }
 +      Behavior on opacity {
-+        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
++        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
 +      }
-+      Behavior on scale {
-+        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+ 
+-      ListView {
+-        id: workspaceList
+-        anchors.fill: parent
+-        anchors.margins: Style.space(16)
+-        orientation: ListView.Horizontal
+-        spacing: root.cardGap
+-        clip: true
+-        boundsBehavior: Flickable.StopAtBounds
+-        // Keep delegate creation bounded near the visible strip. Preview
+-        // retention is independently limited and evicted buffers are cleared.
+-        cacheBuffer: root.maxRetainedPreviewCount * (root.cardWidth + root.cardGap)
+-        reuseItems: false
+-        model: workspaceModel
++      // Top Left: Workspace numbers & live clock
++      Column {
++        anchors.left: parent.left
++        anchors.top: parent.top
++        spacing: Style.space(8)
+ 
+-        delegate: Item {
+-          id: workspaceCard
+-          required property int index
+-          required property var row
+-          readonly property bool hovered: previewMouse.containsMouse
+-          readonly property bool retainPreview:
+-            root.retainedPreviewIds.indexOf(row.id) >= 0
+-          width: root.cardWidth
+-          height: root.previewHeight + root.labelHeight
++        Row {
++          spacing: Style.space(10)
+ 
+-          function capturePreview() {
+-            root.retainPreview(row.id)
+-            var source = root.screenForMonitorName(row.monitorName)
+-            if (workspaceCapture.captureSource !== source)
+-              workspaceCapture.captureSource = source
+-
+-            if (workspaceCapture.hasContent)
+-              workspaceCapture.captureFrame()
+-            else
+-              // Starting live mode requests the first frame once the newly
+-              // created screencopy context is ready. It is disabled again as
+-              // soon as that frame arrives.
+-              workspaceCapture.live = true
+-          }
+-
+-          onRetainPreviewChanged: {
+-            if (!retainPreview) {
+-              workspaceCapture.live = false
+-              workspaceCapture.captureSource = null
+-            }
+-          }
+-
+-          Rectangle {
+-            id: preview
+-            width: parent.width
+-            height: root.previewHeight
+-            radius: Style.cornerRadius
+-            scale: workspaceCard.hovered ? 1.015 : 1
+-            color: index === root.selectedIndex
+-              ? root.selectedBackground
+-              : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b,
+-                  workspaceCard.hovered ? 0.10 : 0.06)
+-            border.width: index === root.selectedIndex
+-              ? Style.space(3)
+-              : (workspaceCard.hovered ? Style.space(2) : Math.max(1, Style.space(1)))
+-            border.color: index === root.selectedIndex
+-              ? root.selectedText
+-              : (workspaceCard.hovered
+-                  ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.72)
+-                  : root.borderColor)
+-            clip: true
+-
+-            Behavior on scale {
+-              NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+-            }
+-
+-            ScreencopyView {
+-              id: workspaceCapture
+-              anchors.fill: parent
+-              anchors.margins: preview.border.width
+-              captureSource: null
+-              live: false
+-              paintCursor: false
+-              visible: hasContent
+-              onHasContentChanged: {
+-                if (hasContent && live) live = false
+-              }
+-            }
+-
+-            // Repeater delegates are siblings rather than visual children of
+-            // the Repeater itself, so hiding the Repeater does not hide them.
+-            // This container owns the fallback rectangles and suppresses them
+-            // once the real cached screenshot is ready.
+-            Item {
+-              anchors.fill: parent
+-              visible: !workspaceCapture.hasContent
+-
+-              Repeater {
+-                model: workspaceCard.row.windows
+-
+-                Rectangle {
+-                  required property var modelData
+-                  readonly property real availableWidth: preview.width - Style.space(16)
+-                  readonly property real availableHeight: preview.height - Style.space(16)
+-                  x: Style.space(8) + Math.max(0, (modelData.x - workspaceCard.row.monitorX)
+-                    / Math.max(1, workspaceCard.row.monitorWidth) * availableWidth)
+-                  y: Style.space(8) + Math.max(0, (modelData.y - workspaceCard.row.monitorY)
+-                    / Math.max(1, workspaceCard.row.monitorHeight) * availableHeight)
+-                  width: Math.max(Style.space(42), Math.min(availableWidth,
+-                    modelData.width / Math.max(1, workspaceCard.row.monitorWidth) * availableWidth))
+-                  height: Math.max(Style.space(30), Math.min(availableHeight,
+-                    modelData.height / Math.max(1, workspaceCard.row.monitorHeight) * availableHeight))
+-                  radius: Math.max(2, Style.cornerRadius / 2)
+-                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b,
+-                    index === root.selectedIndex ? 0.22 : 0.12)
+-                  border.width: 1
+-                  border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.32)
+-
+-                  Text {
+-                    anchors.fill: parent
+-                    anchors.margins: Style.space(6)
+-                    text: modelData.className
+-                    textFormat: Text.PlainText
+-                    color: index === root.selectedIndex ? root.selectedText : root.foreground
+-                    font.family: Style.font.menuFamily
+-                    font.pixelSize: Style.font.caption
+-                    elide: Text.ElideRight
+-                    verticalAlignment: Text.AlignVCenter
++          Row {
++            spacing: Style.space(6)
++            Repeater {
++              model: 9
++              Text {
++                required property int index
++                readonly property int wsId: index + 1
++                readonly property bool isCurrentWs: {
++                  if (root.selectedIndex >= 0 && root.selectedIndex < root.workspaceRows.length) {
++                    return root.workspaceRows[root.selectedIndex].id === wsId
+                   }
++                  return false
+                 }
+-              }
+-            }
+-
+-            Rectangle {
+-              anchors.fill: parent
+-              anchors.margins: preview.border.width
+-              radius: Math.max(0, preview.radius - preview.border.width)
+-              color: workspaceCard.hovered && index !== root.selectedIndex
+-                ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.055)
+-                : "transparent"
+-            }
+-
+-            MouseArea {
+-              id: previewMouse
+-              anchors.fill: parent
+-              hoverEnabled: true
+-              cursorShape: Qt.PointingHandCursor
+-              onClicked: {
+-                root.selectedIndex = index
+-                root.activate()
++                text: isCurrentWs ? ("[ " + wsId + " ]") : (" " + wsId + " ")
++                color: isCurrentWs ? root.accentColor : root.mutedColor
++                font.family: root.monoFont
++                font.bold: isCurrentWs
++                font.pixelSize: Style.space(12)
+               }
+             }
+           }
+ 
+           Text {
+-            anchors.top: preview.bottom
+-            anchors.topMargin: Style.space(10)
+-            anchors.horizontalCenter: parent.horizontalCenter
+-            text: "Workspace " + workspaceCard.row.name
+-            textFormat: Text.PlainText
+-            color: index === root.selectedIndex || workspaceCard.hovered
+-              ? root.foreground
+-              : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.62)
+-            font.family: Style.font.menuFamily
+-            font.pixelSize: Style.font.body
+-            font.bold: index === root.selectedIndex || workspaceCard.hovered
++            text: "|"
++            color: Util.alpha(Color.foreground, 0.28)
++            font.family: root.monoFont
++            font.pixelSize: Style.space(12)
+           }
++
++          Text {
++            text: "SYSTEM // OBSERVING"
++            color: root.dimAccentColor
++            font.family: root.monoFont
++            font.pixelSize: Style.space(12)
++            font.letterSpacing: 1.2
++          }
++        }
++
++        Column {
++          spacing: Style.space(2)
++
++          Text {
++            text: root.currentTimeStr
++            color: root.textColor
++            font.family: root.monoFont
++            font.bold: true
++            font.pixelSize: Style.space(18)
++          }
++
++          Text {
++            text: root.currentDateStr + " • " + (panel.screen ? panel.screen.name : "DP-1")
++            color: root.mutedColor
++            font.family: root.monoFont
++            font.pixelSize: Style.space(11)
++          }
++        }
 +      }
 +
-       MouseArea { anchors.fill: parent; onClicked: {} }
- 
-       ListView {
-@@ -513,7 +611,7 @@ Item {
-             width: parent.width
-             height: root.previewHeight
-             radius: Style.cornerRadius
--            scale: workspaceCard.hovered ? 1.015 : 1
-+            scale: index === root.selectedIndex ? 1.025 : (workspaceCard.hovered ? 1.015 : 1)
-             color: index === root.selectedIndex
-               ? root.selectedBackground
-               : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b,
-@@ -529,7 +627,13 @@ Item {
-             clip: true
- 
-             Behavior on scale {
--              NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
-+              NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
++      // Top Center: Window count badge
++      Row {
++        anchors.horizontalCenter: parent.horizontalCenter
++        anchors.top: parent.top
++
++        Rectangle {
++          anchors.verticalCenter: parent.verticalCenter
++          height: Style.space(24)
++          width: windowBadgeText.implicitWidth + Style.space(16)
++          color: root.surfaceBgColor
++          border.width: 1
++          border.color: Util.alpha(Color.foreground, 0.22)
++          radius: 2
++
++          Text {
++            id: windowBadgeText
++            anchors.centerIn: parent
++            text: root.totalWindowsCount + (root.totalWindowsCount === 1 ? " WINDOW" : " WINDOWS")
++            color: root.mutedColor
++            font.family: root.monoFont
++            font.pixelSize: Style.space(11)
++          }
++        }
++      }
++
++      // Top Right: Occupied, shown & urgent counters
++      Column {
++        anchors.right: parent.right
++        anchors.top: parent.top
++        spacing: Style.space(4)
++
++        Text {
++          anchors.right: parent.right
++          text: root.occupiedCount + " OCCUPIED • " + root.workspaceRows.length + " SHOWN"
++          color: root.mutedColor
++          font.family: root.monoFont
++          font.pixelSize: Style.space(11)
++        }
++
++        Text {
++          anchors.right: parent.right
++          text: "0 URGENT"
++          color: root.mutedColor
++          font.family: root.monoFont
++          font.pixelSize: Style.space(11)
++        }
++      }
++    }
++
++    // ==========================================
++    // MAIN CAROUSEL LISTVIEW
++    // ==========================================
++    ListView {
++      id: workspaceList
++      anchors.verticalCenter: parent.verticalCenter
++      anchors.left: parent.left
++      anchors.right: parent.right
++      height: root.previewHeight + root.labelHeight + Style.space(24)
++      orientation: ListView.Horizontal
++      spacing: Style.space(28)
++      clip: false
++      boundsBehavior: Flickable.StopAtBounds
++      preferredHighlightBegin: (panel.width - root.cardWidth) / 2
++      preferredHighlightEnd: (panel.width + root.cardWidth) / 2
++      highlightRangeMode: ListView.StrictlyEnforceRange
++      currentIndex: root.selectedIndex
++      highlightMoveDuration: 200
++      cacheBuffer: root.maxRetainedPreviewCount * (root.cardWidth + Style.space(28))
++      reuseItems: false
++      model: workspaceModel
++
++      visible: opacity > 0
++      opacity: root.revealed ? 1 : 0
++
++      Behavior on opacity {
++        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
++      }
++
++      delegate: Item {
++        id: workspaceCard
++        required property int index
++        required property var row
++
++        readonly property bool isCurrent: index === root.selectedIndex
++        readonly property bool isHovered: previewMouse.containsMouse
++        readonly property bool retainPreview: root.retainedPreviewIds.indexOf(row.id) >= 0
++
++        width: root.cardWidth
++        height: root.previewHeight + root.labelHeight
++        scale: isCurrent ? 1.0 : (isHovered ? 0.88 : 0.84)
++        opacity: isCurrent ? 1.0 : (isHovered ? 0.55 : 0.35)
++        z: isCurrent ? 10 : 1
++
++        Behavior on scale {
++          NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
++        }
++        Behavior on opacity {
++          NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
++        }
++
++        function capturePreview() {
++          root.retainPreview(row.id)
++          var source = root.screenForMonitorName(row.monitorName)
++          if (workspaceCapture.captureSource !== source)
++            workspaceCapture.captureSource = source
++
++          if (workspaceCapture.hasContent)
++            workspaceCapture.captureFrame()
++          else
++            workspaceCapture.live = true
++        }
++
++        onRetainPreviewChanged: {
++          if (!retainPreview) {
++            workspaceCapture.live = false
++            workspaceCapture.captureSource = null
++          }
++        }
++
++        // Preview Box with Cyber Frame & Corners
++        Rectangle {
++          id: preview
++          width: parent.width
++          height: root.previewHeight
++          radius: 2
++          color: root.cardBgColor
++          border.width: 1
++          border.color: workspaceCard.isCurrent
++            ? Util.alpha(root.accentColor, 0.5)
++            : Util.alpha(Color.foreground, 0.22)
++          clip: true
++
++          // Screencopy Live Screenshot
++          ScreencopyView {
++            id: workspaceCapture
++            anchors.fill: parent
++            anchors.margins: 1
++            captureSource: null
++            live: false
++            paintCursor: false
++            visible: hasContent
++            onHasContentChanged: {
++              if (hasContent && live) live = false
 +            }
-+            Behavior on color {
-+              ColorAnimation { duration: 120 }
++          }
++
++          // Fallback Wireframe Window Layout
++          Item {
++            anchors.fill: parent
++            visible: !workspaceCapture.hasContent
++
++            Repeater {
++              model: workspaceCard.row.windows
++
++              Rectangle {
++                required property var modelData
++                readonly property real availableWidth: preview.width - Style.space(24)
++                readonly property real availableHeight: preview.height - Style.space(24)
++                x: Style.space(12) + Math.max(0, (modelData.x - workspaceCard.row.monitorX)
++                  / Math.max(1, workspaceCard.row.monitorWidth) * availableWidth)
++                y: Style.space(12) + Math.max(0, (modelData.y - workspaceCard.row.monitorY)
++                  / Math.max(1, workspaceCard.row.monitorHeight) * availableHeight)
++                width: Math.max(Style.space(46), Math.min(availableWidth,
++                  modelData.width / Math.max(1, workspaceCard.row.monitorWidth) * availableWidth))
++                height: Math.max(Style.space(32), Math.min(availableHeight,
++                  modelData.height / Math.max(1, workspaceCard.row.monitorHeight) * availableHeight))
++                radius: 2
++                color: Util.alpha(Color.background, 0.88)
++                border.width: 1
++                border.color: Util.alpha(root.accentColor, 0.35)
++
++                Text {
++                  anchors.fill: parent
++                  anchors.margins: Style.space(6)
++                  text: modelData.className
++                  textFormat: Text.PlainText
++                  color: root.textColor
++                  font.family: root.monoFont
++                  font.pixelSize: Style.space(10)
++                  elide: Text.ElideRight
++                  verticalAlignment: Text.AlignVCenter
++                }
++              }
 +            }
-+            Behavior on border.color {
-+              ColorAnimation { duration: 120 }
-             }
- 
-             ScreencopyView {
++          }
++
++          // Top-Left Inside Badge: Two-digit Workspace Number (e.g. 03)
++          Text {
++            anchors.top: parent.top
++            anchors.left: parent.left
++            anchors.margins: Style.space(12)
++            text: (row.id < 10 ? "0" + row.id : "" + row.id)
++            color: workspaceCard.isCurrent ? root.accentColor : root.mutedColor
++            font.family: root.monoFont
++            font.bold: true
++            font.pixelSize: Style.space(14)
++          }
++
++          // Bottom-Right Inside Badge: Window Count (e.g. 1 WINDOW)
++          Text {
++            anchors.bottom: parent.bottom
++            anchors.right: parent.right
++            anchors.margins: Style.space(10)
++            text: row.windows.length + (row.windows.length === 1 ? " WINDOW" : " WINDOWS")
++            color: workspaceCard.isCurrent ? root.textColor : root.mutedColor
++            font.family: root.monoFont
++            font.pixelSize: Style.space(10)
++            opacity: 0.85
++          }
++
++          MouseArea {
++            id: previewMouse
++            anchors.fill: parent
++            hoverEnabled: true
++            cursorShape: Qt.PointingHandCursor
++            onClicked: {
++              root.selectedIndex = index
++              root.activate()
++            }
++          }
++        }
++
++        // Four Amber / Gold Corner Brackets Framing Active & Hovered Card
++        Item {
++          anchors.fill: preview
++          anchors.margins: -Style.space(4)
++          visible: workspaceCard.isCurrent || workspaceCard.isHovered
++          z: 20
++
++          // Top-Left ┌
++          Rectangle { anchors.top: parent.top; anchors.left: parent.left; width: Style.space(22); height: 2; color: root.accentColor }
++          Rectangle { anchors.top: parent.top; anchors.left: parent.left; width: 2; height: Style.space(22); color: root.accentColor }
++
++          // Top-Right ┐
++          Rectangle { anchors.top: parent.top; anchors.right: parent.right; width: Style.space(22); height: 2; color: root.accentColor }
++          Rectangle { anchors.top: parent.top; anchors.right: parent.right; width: 2; height: Style.space(22); color: root.accentColor }
++
++          // Bottom-Left └
++          Rectangle { anchors.bottom: parent.bottom; anchors.left: parent.left; width: Style.space(22); height: 2; color: root.accentColor }
++          Rectangle { anchors.bottom: parent.bottom; anchors.left: parent.left; width: 2; height: Style.space(22); color: root.accentColor }
++
++          // Bottom-Right ┘
++          Rectangle { anchors.bottom: parent.bottom; anchors.right: parent.right; width: Style.space(22); height: 2; color: root.accentColor }
++          Rectangle { anchors.bottom: parent.bottom; anchors.right: parent.right; width: 2; height: Style.space(22); color: root.accentColor }
++        }
++
++        // ==========================================
++        // BELOW-CARD STATUS PANEL & WINDOW TITLE
++        // ==========================================
++        Column {
++          anchors.top: preview.bottom
++          anchors.topMargin: Style.space(12)
++          anchors.left: parent.left
++          anchors.right: parent.right
++          spacing: Style.space(5)
++
++          // Line 1: ■ WORKSPACE 03 ──────────────────────────── 1 WINDOW
++          RowLayout {
++            anchors.left: parent.left
++            anchors.right: parent.right
++            spacing: Style.space(10)
++
++            Text {
++              text: "■ WORKSPACE " + (row.id < 10 ? "0" + row.id : "" + row.id)
++              color: workspaceCard.isCurrent ? root.accentColor : root.mutedColor
++              font.family: root.monoFont
++              font.bold: true
++              font.pixelSize: Style.space(12)
++            }
++
++            Rectangle {
++              Layout.fillWidth: true
++              height: 1
++              color: workspaceCard.isCurrent
++                ? Util.alpha(root.accentColor, 0.35)
++                : Util.alpha(Color.foreground, 0.22)
++            }
++
++            Text {
++              text: row.windows.length + (row.windows.length === 1 ? " WINDOW" : " WINDOWS")
++              color: workspaceCard.isCurrent ? root.textColor : root.mutedColor
++              font.family: root.monoFont
++              font.pixelSize: Style.space(11)
++            }
++          }
++
++          // Line 2: ▮ Active Window Title
++          RowLayout {
++            anchors.left: parent.left
++            anchors.right: parent.right
++            spacing: Style.space(8)
++
++            Text {
++              text: "▮"
++              color: workspaceCard.isCurrent ? root.accentColor : root.mutedColor
++              font.family: root.monoFont
++              font.pixelSize: Style.space(12)
++            }
++
++            Text {
++              readonly property int winIdx: (workspaceCard.isCurrent && root.selectedWindowIndex < row.windows.length)
++                ? root.selectedWindowIndex : 0
++              readonly property var activeWin: (row.windows.length > 0) ? row.windows[winIdx] : null
++              text: activeWin ? (activeWin.title || activeWin.className || "Window") : "Desktop"
++              color: workspaceCard.isCurrent ? root.textColor : root.mutedColor
++              font.family: root.monoFont
++              font.pixelSize: Style.space(12)
++              elide: Text.ElideRight
++              Layout.fillWidth: true
++            }
++          }
++        }
++      }
++    }
++
++    // ==========================================
++    // BOTTOM NAVIGATION HUD
++    // ==========================================
++    Item {
++      anchors.left: parent.left
++      anchors.right: parent.right
++      anchors.bottom: parent.bottom
++      anchors.bottomMargin: Style.space(26)
++      anchors.leftMargin: Style.space(38)
++      anchors.rightMargin: Style.space(38)
++      height: Style.space(36)
++      visible: root.revealed
++      opacity: root.revealed ? 1 : 0
++
++      Behavior on opacity {
++        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
++      }
++
++      // Bottom Left: Keybind Guide
++      Row {
++        anchors.left: parent.left
++        anchors.verticalCenter: parent.verticalCenter
++        spacing: Style.space(14)
++
++        Row {
++          spacing: Style.space(4)
++          Text { text: "← →"; color: root.accentColor; font.family: root.monoFont; font.pixelSize: Style.space(11); font.bold: true }
++          Text { text: "workspace"; color: root.mutedColor; font.family: root.monoFont; font.pixelSize: Style.space(11) }
++        }
++        Row {
++          spacing: Style.space(4)
++          Text { text: "↑ ↓"; color: root.accentColor; font.family: root.monoFont; font.pixelSize: Style.space(11); font.bold: true }
++          Text { text: "window"; color: root.mutedColor; font.family: root.monoFont; font.pixelSize: Style.space(11) }
++        }
++        Row {
++          spacing: Style.space(4)
++          Text { text: "1-9"; color: root.accentColor; font.family: root.monoFont; font.pixelSize: Style.space(11); font.bold: true }
++          Text { text: "go"; color: root.mutedColor; font.family: root.monoFont; font.pixelSize: Style.space(11) }
++        }
++        Row {
++          spacing: Style.space(4)
++          Text { text: "↵"; color: root.accentColor; font.family: root.monoFont; font.pixelSize: Style.space(11); font.bold: true }
++          Text { text: "open"; color: root.mutedColor; font.family: root.monoFont; font.pixelSize: Style.space(11) }
++        }
++        Row {
++          spacing: Style.space(4)
++          Text { text: "esc"; color: root.accentColor; font.family: root.monoFont; font.pixelSize: Style.space(11); font.bold: true }
++          Text { text: "close"; color: root.mutedColor; font.family: root.monoFont; font.pixelSize: Style.space(11) }
++        }
++      }
++
++      // Bottom Center: Keypress HUD Box with Corner Marks
++      Rectangle {
++        anchors.centerIn: parent
++        height: Style.space(28)
++        width: keyHistoryRow.implicitWidth + Style.space(28)
++        color: root.surfaceBgColor
++        border.width: 1
++        border.color: Util.alpha(root.accentColor, 0.4)
++        radius: 2
++
++        Rectangle { anchors.top: parent.top; anchors.left: parent.left; width: 6; height: 1; color: root.accentColor }
++        Rectangle { anchors.top: parent.top; anchors.left: parent.left; width: 1; height: 6; color: root.accentColor }
++        Rectangle { anchors.top: parent.top; anchors.right: parent.right; width: 6; height: 1; color: root.accentColor }
++        Rectangle { anchors.top: parent.top; anchors.right: parent.right; width: 1; height: 6; color: root.accentColor }
++        Rectangle { anchors.bottom: parent.bottom; anchors.left: parent.left; width: 6; height: 1; color: root.accentColor }
++        Rectangle { anchors.bottom: parent.bottom; anchors.left: parent.left; width: 1; height: 6; color: root.accentColor }
++        Rectangle { anchors.bottom: parent.bottom; anchors.right: parent.right; width: 6; height: 1; color: root.accentColor }
++        Rectangle { anchors.bottom: parent.bottom; anchors.right: parent.right; width: 1; height: 6; color: root.accentColor }
++
++        Row {
++          id: keyHistoryRow
++          anchors.centerIn: parent
++          spacing: Style.space(10)
++
++          Text {
++            text: root.hudActionText
++            color: root.accentColor
++            font.family: root.monoFont
++            font.pixelSize: Style.space(11)
++            font.bold: true
++          }
++        }
++      }
++
++      // Bottom Right: Type indicator
++      Row {
++        anchors.right: parent.right
++        anchors.verticalCenter: parent.verticalCenter
++        spacing: Style.space(6)
++
++        Text {
++          text: root.searchQuery !== "" ? ("FILTER: '" + root.searchQuery.toUpperCase() + "'") : "TYPE TO SORT"
++          color: root.searchQuery !== "" ? root.accentColor : root.mutedColor
++          font.family: root.monoFont
++          font.pixelSize: Style.space(11)
++          font.bold: root.searchQuery !== ""
+         }
+       }
+     }
 diff --git i/bindings.lua w/bindings.lua
-index 8483a9e..c095197 100644
+index 8483a9e..b092ba9 100644
 --- i/bindings.lua
 +++ w/bindings.lua
-@@ -5,6 +5,10 @@ hl.unbind("SUPER + SHIFT + TAB")
- local workspace_switcher_active = false
- local workspace_switcher_submap = "reomarchy-workspace-switcher"
- local release_watchdog
-+local hold_timer
-+local super_is_down = false
-+local other_key_pressed = false
-+local hold_ticks = 0
- 
- local function finish_workspace_switcher(commit)
-   if not workspace_switcher_active then return end
-@@ -31,28 +35,84 @@ release_watchdog = hl.timer(function()
+@@ -31,23 +31,45 @@ release_watchdog = hl.timer(function()
  end, { timeout = 100, type = "repeat" })
  release_watchdog:set_enabled(false)
  
@@ -215,31 +1307,18 @@ index 8483a9e..c095197 100644
 +  hl.exec_cmd("omarchy-shell shell summon reomarchy.workspace-switcher '" .. payload .. "'")
  end
  
-+-- Hold timer: polls every 50ms while Super is held.
-+-- After 4 ticks (~200ms) of holding Super with no other keys pressed,
-+-- it brings up the workspace switcher visual overlay.
-+hold_timer = hl.timer(function()
-+  if not super_is_down or other_key_pressed or (not hl.is_key_down(133) and not hl.is_key_down(134)) then
-+    hold_timer:set_enabled(false)
-+    return
-+  end
-+
-+  hold_ticks = hold_ticks + 1
-+  if hold_ticks >= 4 then
-+    hold_timer:set_enabled(false)
-+    if not workspace_switcher_active then
-+      summon_workspace_switcher(0, true)
-+    end
-+  end
-+end, { timeout = 50, type = "repeat" })
-+hold_timer:set_enabled(false)
-+
  hl.define_submap(workspace_switcher_submap, function()
 -  hl.bind("SUPER + TAB", function() summon_workspace_switcher(1) end)
 -  hl.bind("SUPER + SHIFT + TAB", function() summon_workspace_switcher(-1) end)
 +  hl.bind("SUPER + TAB", function() summon_workspace_switcher(1, false) end)
 +  hl.bind("SUPER + SHIFT + TAB", function() summon_workspace_switcher(-1, false) end)
    hl.bind("escape", function() finish_workspace_switcher(false) end, { ignore_mods = true })
++
++  hl.bind("left", function() summon_workspace_switcher(-1, false) end, { ignore_mods = true })
++  hl.bind("right", function() summon_workspace_switcher(1, false) end, { ignore_mods = true })
++  hl.bind("up", function() hl.exec_cmd("omarchy-shell shell summon reomarchy.workspace-switcher '{\"windowNav\":-1}'") end, { ignore_mods = true })
++  hl.bind("down", function() hl.exec_cmd("omarchy-shell shell summon reomarchy.workspace-switcher '{\"windowNav\":1}'") end, { ignore_mods = true })
++  hl.bind("return", function() finish_workspace_switcher(true) end, { ignore_mods = true })
 +
 +  -- Allow direct workspace selection by digit (1-9, 0 for 10) while the switcher is open
 +  for workspace = 1, 10 do
@@ -257,34 +1336,5 @@ index 8483a9e..c095197 100644
 +hl.bind("SUPER + TAB", function() summon_workspace_switcher(1, false) end, { description = "Visual workspace switcher" })
 +hl.bind("SUPER + SHIFT + TAB", function() summon_workspace_switcher(-1, false) end, { description = "Visual workspace switcher (reverse)" })
  
---- XKB keycodes 133/134 are left/right Command/Super; state 0 is release.
-+-- XKB keycodes 133/134 are left/right Command/Super; state 1 is press, 0 is release.
+ -- XKB keycodes 133/134 are left/right Command/Super; state 0 is release.
  hl.on("input.keyboard.key", function(keycode, _, state)
--  if workspace_switcher_active and state == 0 and (keycode == 133 or keycode == 134) then
--    finish_workspace_switcher(true)
-+  if keycode == 133 or keycode == 134 then
-+    if state == 1 then
-+      if not workspace_switcher_active then
-+        super_is_down = true
-+        other_key_pressed = false
-+        hold_ticks = 0
-+        hold_timer:set_enabled(false)
-+        hold_timer:set_enabled(true)
-+      end
-+    elseif state == 0 then
-+      super_is_down = false
-+      hold_timer:set_enabled(false)
-+      if workspace_switcher_active then
-+        finish_workspace_switcher(true)
-+      end
-+    end
-+  else
-+    if state == 1 then
-+      if not workspace_switcher_active then
-+        other_key_pressed = true
-+        hold_timer:set_enabled(false)
-+      end
-+    end
-   end
- end)
- 

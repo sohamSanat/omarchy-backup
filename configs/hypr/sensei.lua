@@ -177,6 +177,7 @@ if hl and not _G.omarchy_sensei_original_hl_bind then
     ["YouTube"] = { action = "youtube", title = "YouTube" },
     ["Monitor scaling up"] = { action = "monitor-scaling-up", title = "Monitor scaling up" },
     ["Visual workspace switcher"] = { action = "visual-workspace-switcher", title = "Visual workspace switcher" },
+    ["HomeLab launcher"] = { action = "homelab-launcher", title = "HomeLab launcher" },
     ["Switch to group window 1"] = { action = "switch-to-group-window-1", title = "Switch to group window 1" },
     ["Switch to group window 2"] = { action = "switch-to-group-window-2", title = "Switch to group window 2" },
     ["Switch to group window 3"] = { action = "switch-to-group-window-3", title = "Switch to group window 3" },

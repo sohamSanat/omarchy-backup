@@ -1,0 +1,11 @@
+[Unit]
+Description=Omagent Proactive Crash Watcher
+After=graphical-session.target
+
+[Service]
+ExecStart=/home/soham/.local/bin/omagent-crash-watch
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

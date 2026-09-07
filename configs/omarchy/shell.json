@@ -142,6 +142,9 @@
     },
     {
       "id": "reomarchy.workspace-switcher"
+    },
+    {
+      "id": "io.github.ellion369.omagent"
     }
   ],
   "version": 1

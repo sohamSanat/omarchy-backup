@@ -47,6 +47,12 @@
     "has_local_changes": false,
     "dirty_files": []
   },
+  "nous": {
+    "remote": "https://github.com/notkisk/omarchy-nous-theme.git",
+    "commit": "b5e1587c7d4cf13f72297daddd56f8ce6211eb5a",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
   "quattrocento-light": {
     "remote": "https://github.com/r-bart/omarchy-quattrocento-light-theme.git",
     "commit": "c3e4cbaf0b7b5fc1f42df98cd9623f5f0aa6a9c4",

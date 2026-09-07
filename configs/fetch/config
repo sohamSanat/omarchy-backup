@@ -1,0 +1,35 @@
+# fetch configuration for Omarchy
+os
+host
+kernel
+uptime
+packages
+shell
+display
+wm
+theme
+font
+terminal
+cpu
+gpu
+memory
+swap
+disk
+disk=/home
+ip
+battery
+locale
+colors
+
+# Appearance & rendering
+# Shading mode: ascii (crisp classic donut.c look, no blurry dithering)
+shading_mode=ascii
+
+# 3D rotation & geometry
+spin=y
+depth=0.35
+size=0.85
+box=0
+
+# Label color: defaults to Omarchy theme accent
+# label_color=green

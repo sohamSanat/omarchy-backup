@@ -10,17 +10,18 @@ if [[ -f "$HOME/.local/state/omarchy/toggles/screensaver-off" ]]; then
   exit 0
 fi
 
-# Check stay-awake flag
+# Check stay-awake flag (manual user toggle)
 if [[ -f "$HOME/.local/state/omarchy/indicators/stay-awake" ]]; then
   exit 0
 fi
 
-# Check if any browser or media player has an active (uncorked) audio stream in PipeWire
-if pactl list sink-inputs 2>/dev/null | grep -B 10 -A 10 "Corked: no" | grep -qE "application.name = \"([Zz]en|[Ff]irefox|[Cc]hrom|[Bb]rave|[Ee]dge|[Vv]ivaldi|[Mm]pv|[Vv]lc|[Ss]potify)\""; then
+# Safety check: do not launch if any browser or media player has an active uncorked audio stream
+has_active_audio=$(pactl -f json list sink-inputs 2>/dev/null | jq 'any(.[]?; (.corked == false) and (.properties["application.name"] // "" | test("^(PipeWire ALSA \\[voxtype|system-sounds)"; "i") | not))' 2>/dev/null)
+if [[ "$has_active_audio" == "true" ]]; then
   exit 0
 fi
 
-# Check if any MPRIS player is currently playing
+# Safety check: do not launch if any MPRIS player is currently playing
 for p in $(busctl --user list 2>/dev/null | awk '/org.mpris.MediaPlayer2/{print $1}'); do
   status=$(busctl --user get-property "$p" /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null)
   if [[ $status == *"Playing"* ]]; then

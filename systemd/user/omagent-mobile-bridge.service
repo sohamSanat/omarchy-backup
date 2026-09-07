@@ -1,0 +1,12 @@
+[Unit]
+Description=Omagent Mobile Bridge Daemon (Nothing Phone PWA)
+After=network.target
+
+[Service]
+ExecStart=/home/soham/.local/bin/omagent-mobile-bridge
+Restart=always
+RestartSec=3s
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

@@ -73,17 +73,18 @@ This repository contains the full snapshot of user customizations:
 - `bashrc` and `bash_profile`.
 
 ### D. Themes (`themes/` -> `~/.config/omarchy/themes/`)
-9 themes with all assets and wallpapers included:
-- `sakura-mochi` (**Active theme**)
-- `aetheria`, `artzen`, `harbor`, `harbordark`, `moodpeak`, `purple-moon`, `quattrocento-light`, `aether`.
+16 themes with all assets and wallpapers included:
+- `moodpeak` (**Active theme**)
+- `sakura-mochi`, `aetheria`, `akaito`, `amekoji`, `artzen`, `city-783`, `harbor`, `harbordark`, `nous` (light-mode research theme), `omagen1`, `omarchy_signature`, `quattrocento-light`, `synthetica`.
 
 ### E. Shell Plugins (`plugins/` -> `~/.config/omarchy/plugins/`)
-22 plugins included with complete source code:
+24 plugins included with complete source code:
+- **`io.github.ellion369.omagent`**: Personal AI Assistant with 3-lane multi-intent router (Flash chat, Web search, Herdr coding execution), Nothing Phone PWA intercom bridge, and Quickshell glass HUD overlay.
+- **`reomarchy.workspace-switcher`**: Visual workspace switcher with hold-Super activation, live screencopy previews, active window titles, corner marks, bottom navigation HUD (`← →`, `↑ ↓`, `1-9`, `↵`, `esc`), and type-to-filter search (includes custom patch).
 - **`kenny.nightlight`**: Night light color temperature bar control widget.
 - **`mryll.printbar`**: Printer hardware status and G2060 maintenance panel (includes custom patch).
 - **`soham.agents`**: Bespoke user-forked Omarchy agents selector.
 - **`mahmoodkhalil57.qrgen`**: QR generator bar widget with dynamic theme foreground/background adaptation (includes custom patch).
-- **`reomarchy.workspace-switcher`**: Visual workspace switcher with hold-Super activation, live screencopy previews, and digit jumping (includes custom patch).
 - **`io.github.adamcbrewer.voxtype-aura`**: Native audio recording OSD for Voxtype dictation.
 - **`io.github.weedwhitesandwine.obsiduous`**: Obsidian status & indexing bar widget (includes custom vault path resolution patch).
 - **`x692137x.powerwave`**: PowerWave audio wave animation indicator.
@@ -102,8 +103,17 @@ This repository contains the full snapshot of user customizations:
 - **`mryll.meteobar`**: Weather bar widget.
 - **`omaconnect`**: KDE Connect bar integration.
 - **`omamail`**: Email notification widget.
+- **`pretty.omagen`**: Dynamic palette generation bar plugin.
 
 ### F. Custom Binaries & Helper Scripts (`bin/` -> `~/.local/bin/`)
+- `omaagent` & `omagent`: Launch and toggle Omagent Quickshell assistant overlay.
+- `omagent-crash-watch`: Proactive systemd-coredump monitor; triggers automated debugging via `diagnose-crash` and `ce-debug` in Herdr.
+- `omagent-voice`: Push-to-talk voice intercom triggering Voxtype dictation into Omagent HUD (`Super+V`).
+- `omagent-mobile-bridge`: Async HTTP + WebSocket daemon (port 7890) serving Nothing Phone PWA with end-to-end voice streaming and Lavish artifact integration.
+- `fetch`: Ultra-fast C/ASCII 3D spinning donut system fetcher configured for Omarchy.
+- `omarchy-wayland-inhibit`: Compiled C Wayland protocol idle-inhibitor client.
+- `omarchy-video-idle-inhibit`: Daemon monitoring MPRIS and PipeWire audio streams to prevent screensaver interruption during media playback.
+- `omarchy-launch-screensaver`: Intelligent screensaver launcher respecting media and user stay-awake flags.
 - `omarchy-agent`: Launch coding agents; updated to natively support **Antigravity** (`agy`).
 - `omarchy-default-agent`: Get/set default coding agent; updated to support Antigravity.
 - `omarchy-sensei`: Sensei coaching tool CLI.
@@ -192,6 +202,24 @@ This repository contains the full snapshot of user customizations:
    - `bin/ytkew` & `configs/ytkew/`: Terminal music player with dynamic cover art and spectrum bars.
    - `configs/omarchy/hooks/theme-set.d/`: Full hook suite synchronizing ytkew, Foliate, Discord, Zen, FDM, and editors on theme switch.
    - `configs/hypr/input.lua`: 3-finger touchpad swipe gestures for workspace switcher.
+
+17. **Omagent Personal Assistant Ecosystem**:
+   - **`plugins/io.github.ellion369.omagent`**: Quickshell glass overlay HUD invoked via `ALT + SPACE` or CLI `omaagent`/`omagent`.
+   - **`omagent-route`**: High-performance multi-intent router:
+     - **Lane 1 (General)**: Instant answers streamed via Google Gemini 3.8 Flash SSE (`streamGenerateContent`).
+     - **Lane 2 (Web Research)**: Real-time web retrieval via DuckDuckGo and grounded synthesis with Gemini 3.8 Flash.
+     - **Lane 3 (Autonomous Coding & Engineering)**: Automatically creates isolated Herdr workspaces, generates branch-isolated Treehouse worktrees, selects optimal Compound Engineering skills (`ce-work`, `ce-debug`, `ce-optimize`), executes via Google Antigravity CLI (`agy`) or Pi Harness, and performs dual-agent code review.
+   - **Nothing Phone PWA & Voice Intercom (`omagent-mobile-bridge`)**:
+     - Daemon running on port 7890 (HTTPS/WSS) serving `~/.config/omagent/mobile-web`.
+     - Real-time bidirectional voice streaming from mobile to Linux host via WebSocket, transcribing with local Voxtype/Whisper and generating responses.
+     - Mobile interface renders interactive Lavish feedback surfaces.
+   - **`omagent-crash-watch`**:
+     - Background systemd user service monitoring `systemd-coredump` journal logs.
+     - On application crash, displays an interactive notification allowing 1-click automatic debugging and symbolization via `diagnose-crash` and `ce-debug`.
+   - **Security & TLS**:
+     - `~/.config/omagent/config.json` is configured with `"coding_harness": "antigravity"`, `"fast_model": "gemini-3.8-flash"`.
+     - API keys are protected (`YOUR_GEMINI_API_KEY` placeholder in backup).
+     - Local self-signed TLS certificates (`cert.pem`, `key.pem`) are generated in `~/.config/omagent/ssl/` automatically by `restore.sh`.
 
 ## 3. Fast Restoration (Automated)
 

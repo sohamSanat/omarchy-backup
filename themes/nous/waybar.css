@@ -1,0 +1,12 @@
+/* Nous Research — source palette for Waybar. White paper surface. */
+@define-color foreground #12327A;
+@define-color background #FFFFFF;
+@define-color surface #F7F9FC;
+@define-color surface-strong #EEF3FA;
+@define-color accent #164BFF;
+@define-color accent-soft #245CFF;
+@define-color muted #6076A8;
+@define-color line #B8C9F5;
+@define-color success #157A5B;
+@define-color warning #9A6700;
+@define-color urgent #B4233C;

@@ -296,6 +296,42 @@ if [[ -d "${SCRIPT_DIR}/configs/ristretto" ]]; then
   mkdir -p "${USER_HOME}/.config/ristretto"
   cp -a "${SCRIPT_DIR}/configs/ristretto/." "${USER_HOME}/.config/ristretto/"
 fi
+if [[ -d "${SCRIPT_DIR}/configs/xfce4" ]]; then
+  mkdir -p "${USER_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml"
+  cp -a "${SCRIPT_DIR}/configs/xfce4/xfconf/xfce-perchannel-xml/." "${USER_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/" 2>/dev/null || true
+fi
+if [[ -d "${SCRIPT_DIR}/configs/fetch" ]]; then
+  echo "  -> Restoring fetch configuration..."
+  mkdir -p "${USER_HOME}/.config/fetch"
+  cp -a "${SCRIPT_DIR}/configs/fetch/config" "${USER_HOME}/.config/fetch/" 2>/dev/null || true
+  ln -nsf "${USER_HOME}/.config/omarchy/branding/about.txt" "${USER_HOME}/.config/fetch/logo.txt"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/omagent" ]]; then
+  echo "  -> Restoring Omagent AI assistant configurations & mobile web PWA..."
+  mkdir -p "${USER_HOME}/.config/omagent/ssl" "${USER_HOME}/.local/state/omagent/sessions"
+  cp -a "${SCRIPT_DIR}/configs/omagent/coding_agent_prompt.md" "${USER_HOME}/.config/omagent/" 2>/dev/null || true
+  if [[ -d "${SCRIPT_DIR}/configs/omagent/mobile-web" ]]; then
+    mkdir -p "${USER_HOME}/.config/omagent/mobile-web"
+    cp -a "${SCRIPT_DIR}/configs/omagent/mobile-web/." "${USER_HOME}/.config/omagent/mobile-web/"
+  fi
+  if [[ ! -f "${USER_HOME}/.config/omagent/config.json" ]]; then
+    cp -a "${SCRIPT_DIR}/configs/omagent/config.json" "${USER_HOME}/.config/omagent/config.json"
+    echo "  [INFO] Installed template ~/.config/omagent/config.json. Please update with your Gemini API key."
+  fi
+  # Generate self-signed TLS cert if missing for secure mobile PWA / WebSocket
+  if [[ ! -f "${USER_HOME}/.config/omagent/ssl/cert.pem" || ! -f "${USER_HOME}/.config/omagent/ssl/key.pem" ]]; then
+    echo "  -> Generating local self-signed TLS certificates for Omagent mobile bridge..."
+    openssl req -x509 -newkey rsa:2048 -nodes \
+      -keyout "${USER_HOME}/.config/omagent/ssl/key.pem" \
+      -out "${USER_HOME}/.config/omagent/ssl/cert.pem" \
+      -days 365 -subj "/CN=omagent.local" 2>/dev/null || true
+    chmod 600 "${USER_HOME}/.config/omagent/ssl/key.pem" 2>/dev/null || true
+  fi
+fi
+if [[ -d "${SCRIPT_DIR}/configs/omarchy/homelab-launcher" ]]; then
+  mkdir -p "${USER_HOME}/.config/omarchy/homelab-launcher"
+  cp -a "${SCRIPT_DIR}/configs/omarchy/homelab-launcher/." "${USER_HOME}/.config/omarchy/homelab-launcher/"
+fi
 if [[ -d "${SCRIPT_DIR}/configs/strata" ]]; then
   mkdir -p "${USER_HOME}/.config/strata"
   cp -a "${SCRIPT_DIR}/configs/strata/." "${USER_HOME}/.config/strata/"
@@ -312,10 +348,13 @@ if [[ -d "${SCRIPT_DIR}/configs/dbus-services" ]]; then
   cp -a "${SCRIPT_DIR}/configs/dbus-services/." "${USER_HOME}/.local/share/dbus-1/services/"
 fi
 if [[ -d "${SCRIPT_DIR}/agents" ]]; then
-  mkdir -p "${USER_HOME}/.agents/rules" "${USER_HOME}/.agents/skills"
+  mkdir -p "${USER_HOME}/.agents/rules" "${USER_HOME}/.agents/skills" "${USER_HOME}/.agents/learnings"
   cp -a "${SCRIPT_DIR}/agents/rules/." "${USER_HOME}/.agents/rules/"
   cp -a "${SCRIPT_DIR}/agents/skills/." "${USER_HOME}/.agents/skills/"
-  echo "  [OK] Agent rules and skills restored."
+  if [[ -d "${SCRIPT_DIR}/agents/learnings" ]]; then
+    cp -a "${SCRIPT_DIR}/agents/learnings/." "${USER_HOME}/.agents/learnings/"
+  fi
+  echo "  [OK] Agent rules, skills, and learnings restored."
   mkdir -p "${USER_HOME}/.pi/agent/skills"
   for sk in "${USER_HOME}/.agents/skills"/*; do
     if [[ -e "$sk" ]]; then
@@ -375,6 +414,9 @@ for script_path in "${SCRIPT_DIR}/bin"/*; do
 done
 
 # Set up symlinks for plugins if necessary
+if [[ -f "${USER_HOME}/.local/bin/omaagent" ]]; then
+  ln -nsf "${USER_HOME}/.local/bin/omaagent" "${USER_HOME}/.local/bin/omagent"
+fi
 if [[ -f "${USER_HOME}/.local/bin/firstmate" ]]; then
   ln -nsf "${USER_HOME}/.local/bin/firstmate" "${USER_HOME}/.local/bin/fm"
 fi
@@ -407,6 +449,7 @@ if [[ -d "${SCRIPT_DIR}/desktop-entries" ]]; then
     update-desktop-database "${USER_HOME}/.local/share/applications" 2>/dev/null || true
   fi
   echo "  [OK] Desktop applications registered."
+fi
 if [[ -d "${SCRIPT_DIR}/pixmaps" ]]; then
   mkdir -p "${USER_HOME}/.local/share/pixmaps"
   cp -a "${SCRIPT_DIR}/pixmaps/." "${USER_HOME}/.local/share/pixmaps/"
@@ -426,15 +469,18 @@ if command -v flatpak >/dev/null 2>&1; then
   fi
 fi
 
-fi
-
 echo ""
 echo "==> Step 11: Applying customizations and restarting components..."
+if command -v systemctl >/dev/null 2>&1; then
+  echo "  -> Reloading systemd user daemon and enabling user services..."
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user enable omagent-crash-watch.service omagent-mobile-bridge.service 2>/dev/null || true
+fi
+
 if command -v omarchy >/dev/null 2>&1; then
   echo "  -> Setting theme: Moodpeak"
   omarchy theme set "Moodpeak" || true
 
-  
   if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-zen" ]]; then
     echo "  -> Syncing Zen Browser with active Omarchy theme..."
     "${USER_HOME}/.local/bin/omarchy-sync-zen" 2>/dev/null || true

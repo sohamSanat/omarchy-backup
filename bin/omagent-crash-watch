@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""
+omagent-crash-watch: Proactive systemd-coredump listener for Omagent.
+Listens for process crashes and presents an interactive notification
+to immediately dispatch ce-debug + diagnose-crash into a Herdr workspace.
+"""
+
+import json
+import os
+import subprocess
+import sys
+import time
+
+ROUTE_BIN = os.path.expanduser("~/.config/omarchy/plugins/io.github.ellion369.omagent/omagent-route")
+DEBOUNCE_WINDOW = 10.0
+last_crashes: dict[str, float] = {}
+
+
+def handle_crash(comm: str, pid: str, signal: str):
+    now = time.time()
+    if comm in last_crashes and (now - last_crashes[comm] < DEBOUNCE_WINDOW):
+        return
+    last_crashes[comm] = now
+
+    summary = f"💥 Process Crashed: {comm}"
+    body = f"Process {comm} (PID {pid}) dumped core ({signal or 'crash'}). Click to diagnose & fix in Herdr."
+
+    # Show notification with interactive action
+    cmd = [
+        "notify-send",
+        "-u", "critical",
+        "-a", "Omagent",
+        "-i", "dialog-error",
+        "-A", "diagnose=Diagnose in Herdr",
+        summary,
+        body,
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if "diagnose" in res.stdout.strip():
+            # User accepted diagnosis! Dispatch to omagent-route
+            subprocess.Popen([ROUTE_BIN, "--", f"/code diagnose crash {pid} of {comm}"])
+    except Exception as e:
+        print(f"Error presenting notification: {e}", file=sys.stderr)
+
+
+def main():
+    journal_cmd = [
+        "journalctl",
+        "-f",
+        "-t", "systemd-coredump",
+        "-o", "json",
+    ]
+    proc = subprocess.Popen(journal_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+
+    for line in proc.stdout:
+        line_str = line.strip()
+        if not line_str:
+            continue
+        try:
+            entry = json.loads(line_str)
+            msg = entry.get("MESSAGE", "")
+            if "dumped core" in msg:
+                comm = entry.get("COREDUMP_COMM") or entry.get("_COMM") or "unknown"
+                pid = entry.get("COREDUMP_PID") or entry.get("_PID") or ""
+                signal = entry.get("COREDUMP_SIGNAL_NAME") or entry.get("COREDUMP_SIGNAL") or ""
+                handle_crash(comm, str(pid), str(signal))
+        except Exception:
+            continue
+
+
+if __name__ == "__main__":
+    main()

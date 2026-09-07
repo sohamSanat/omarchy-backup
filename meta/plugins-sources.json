@@ -42,6 +42,16 @@
       "?? BarWidget.qml.bak.1788189441"
     ]
   },
+  "io.github.ellion369.omagent": {
+    "remote": "https://github.com/ellion369/Omarchy-Omagent.git",
+    "commit": "2979e9728b11ada6a29c9b315a2ac8e0a48380c4",
+    "has_local_changes": true,
+    "dirty_files": [
+      " M Omagent.qml",
+      " M omagent-route",
+      "?? docs/"
+    ]
+  },
   "io.github.nilszeilon.omarchy-sensei": {
     "remote": "https://github.com/nilszeilon/omarchy-sensei.git",
     "commit": "f8817e9a84478304eb4409103983d11f05c419e4",

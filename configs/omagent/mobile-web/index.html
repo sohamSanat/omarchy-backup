@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>OMAGENT // FLEET</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <style>
+    :root {
+      --bg: #000000;
+      --card-bg: #0d0d0d;
+      --card-border: #222222;
+      --text: #ffffff;
+      --text-muted: #757575;
+      --text-dim: #424242;
+      --red: #d71920;
+      --red-glow: rgba(215, 25, 32, 0.4);
+      --font-mono: "Courier New", Courier, monospace, -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: radial-gradient(#1a1a1a 1px, transparent 1px);
+      background-size: 16px 16px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Status Bar */
+    header {
+      padding: 16px 20px;
+      border-bottom: 1px dashed var(--card-border);
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      letter-spacing: 2px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .brand .led {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
+      animation: blink 2.4s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .status-badge {
+      font-size: 11px;
+      color: var(--text-muted);
+      border: 1px solid var(--card-border);
+      padding: 3px 8px;
+      border-radius: 12px;
+      letter-spacing: 1px;
+    }
+
+    /* Tab Navigation */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--card-border);
+      background: #050505;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 6px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab-btn.active {
+      color: var(--text);
+      border-bottom: 2px solid var(--red);
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      max-width: 680px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .tab-pane {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      gap: 16px;
+    }
+
+    .tab-pane.active {
+      display: flex;
+    }
+
+    /* Glyph Push to Talk Hero */
+    .intercom-hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 0 16px 0;
+      gap: 14px;
+    }
+
+    .glyph-button-container {
+      position: relative;
+      width: 130px;
+      height: 130px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .glyph-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 2px dashed rgba(255, 255, 255, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .glyph-button {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: #111111;
+      border: 2px solid #333333;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+      transition: all 0.2s ease;
+      z-index: 2;
+    }
+
+    .glyph-button svg {
+      width: 32px;
+      height: 32px;
+      fill: #ffffff;
+      transition: all 0.2s ease;
+    }
+
+    .glyph-button .btn-label {
+      font-size: 8px;
+      margin-top: 4px;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+    }
+
+    /* Active Recording State */
+    .glyph-button-container.recording .glyph-ring {
+      border-color: var(--red);
+      transform: scale(1.18);
+      animation: rotate 6s linear infinite;
+    }
+
+    .glyph-button-container.recording .glyph-button {
+      background: var(--red);
+      border-color: #ff4d52;
+      box-shadow: 0 0 35px var(--red-glow);
+      transform: scale(0.95);
+    }
+
+    .glyph-button-container.recording .glyph-button svg {
+      fill: #ffffff;
+    }
+
+    .glyph-button-container.processing .glyph-ring {
+      border-color: #ffffff;
+      animation: pulse 1s infinite alternate;
+    }
+
+    @keyframes rotate {
+      from { transform: rotate(0deg) scale(1.18); }
+      to { transform: rotate(360deg) scale(1.18); }
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1.05); opacity: 0.5; }
+      to { transform: scale(1.22); opacity: 1; }
+    }
+
+    .intercom-status {
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      text-align: center;
+      min-height: 16px;
+    }
+
+    /* Dictation & Manual Input Box */
+    .input-bar {
+      display: flex;
+      gap: 8px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 6px 10px;
+    }
+
+    .input-bar input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 6px 0;
+      user-select: text;
+    }
+
+    .input-bar input::placeholder {
+      color: var(--text-dim);
+      font-size: 11px;
+    }
+
+    .send-btn {
+      background: #222222;
+      color: var(--text);
+      border: 1px solid #333333;
+      border-radius: 6px;
+      padding: 0 12px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s ease;
+    }
+
+    .send-btn:active {
+      background: var(--red);
+      border-color: var(--red);
+    }
+
+    .mic-input-btn {
+      background: #1a1a1a;
+      color: var(--text);
+      border: 1px solid #333333;
+      border-radius: 6px;
+      padding: 0 10px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .mic-input-btn:active {
+      background: var(--red);
+      border-color: #ff4d52;
+    }
+
+    .ssl-banner {
+      background: #1a0808;
+      border-bottom: 1px solid var(--red);
+      padding: 8px 16px;
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: #ff9999;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .ssl-banner a {
+      color: #ffffff;
+      text-decoration: underline;
+      font-weight: bold;
+      margin-left: 6px;
+    }
+
+    /* Live Stream Cards */
+    .stream-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px dashed var(--card-border);
+    }
+
+    .stream-header h3 {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .stream-box {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 180px;
+      max-height: 380px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .stream-item {
+      padding: 6px 8px;
+      border-left: 2px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 0 4px 4px 0;
+      word-break: break-word;
+      white-space: pre-wrap;
+      user-select: text;
+    }
+
+    .stream-item.active {
+      border-left-color: var(--red);
+      background: rgba(215, 25, 32, 0.08);
+    }
+
+    .stream-item.done {
+      border-left-color: #4caf50;
+    }
+
+    .action-bar {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 10px;
+      background: #111111;
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      text-transform: uppercase;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .action-btn:active {
+      background: #222222;
+      border-color: #ffffff;
+    }
+
+    .action-btn.danger:active {
+      background: var(--red);
+      border-color: var(--red);
+    }
+
+    /* Herdr Terminal Tab */
+    .terminal-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      height: 100%;
+    }
+
+    .terminal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      background: #0a0a0a;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      font-size: 10px;
+      letter-spacing: 1px;
+    }
+
+    .terminal-output {
+      flex: 1;
+      min-height: 360px;
+      background: #030303;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      color: #e0e0e0;
+      font-size: 11px;
+      line-height: 1.4;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      user-select: text;
+    }
+
+    .keybar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .key-btn {
+      padding: 8px 4px;
+      background: #141414;
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .key-btn:active {
+      background: #333333;
+    }
+
+    /* Artifacts Tab */
+    .artifacts-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .artifact-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .artifact-card:active {
+      border-color: var(--red);
+    }
+
+    .artifact-card h4 {
+      font-size: 13px;
+      margin-bottom: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .artifact-card p {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .artifact-viewer {
+      width: 100%;
+      height: 420px;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      font-size: 9px;
+      color: var(--text-dim);
+      padding: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      border-top: 1px dashed rgba(255, 255, 255, 0.05);
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <div class="led"></div>
+      <span>OMAGENT // FLEET</span>
+    </div>
+    <div class="status-badge" id="fleet-status">CONNECTED</div>
+  </header>
+
+  <!-- Insecure Context / SSL Notice -->
+  <div id="ssl-banner" class="ssl-banner" style="display: none;">
+    ⚡ HTTP MODE (BROWSER RESTRICTS WEBAUDIO) • <a id="ssl-switch-link" href="#">SWITCH TO HTTPS</a> FOR GLYPH HOLD-TO-TALK
+  </div>
+
+  <!-- Native Audio Input for Direct Phone Sound Recorder Fallback -->
+  <input type="file" id="native-audio-input" accept="audio/*" capture="microphone" style="display: none;">
+
+  <!-- Tabs Navigation -->
+  <nav class="tabs">
+    <button class="tab-btn active" onclick="switchTab('intercom')">01 // VOICE</button>
+    <button class="tab-btn" onclick="switchTab('herdr')">02 // HERDR</button>
+    <button class="tab-btn" onclick="switchTab('artifacts')">03 // ARTIFACTS</button>
+  </nav>
+
+  <!-- Main View Area -->
+  <main>
+    <!-- TAB 1: Voice & Intercom -->
+    <div class="tab-pane active" id="pane-intercom">
+      <div class="intercom-hero">
+        <div class="glyph-button-container" id="glyph-container">
+          <div class="glyph-ring"></div>
+          <button class="glyph-button" id="glyph-btn">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </svg>
+            <span class="btn-label" id="btn-label">HOLD</span>
+          </button>
+        </div>
+        <div class="intercom-status" id="intercom-status">READY FOR VOICE COMMAND</div>
+      </div>
+
+      <!-- Native Dictation & Voice Input Field -->
+      <div class="input-bar">
+        <input type="text" id="prompt-input" placeholder="Type or dictate with Nothing keyboard..." autocomplete="off">
+        <button class="mic-input-btn" id="mic-input-btn" title="Open Native Voice Recorder">🎙️</button>
+        <button class="send-btn" id="send-btn">➔</button>
+      </div>
+      <div style="font-size: 9px; color: var(--text-dim); text-align: center; margin-top: -8px; letter-spacing: 0.5px;">
+        💡 TIP: Tap 🎙️ for native recorder or use Nothing keyboard mic in the box above
+      </div>
+
+      <!-- Realtime Highlights Stream -->
+      <div class="stream-header">
+        <h3>Live Fleet Telemetry</h3>
+        <span id="active-skill" style="font-size: 10px; color: var(--red);">IDLE</span>
+      </div>
+
+      <div class="stream-box" id="stream-box">
+        <div class="stream-item">• System online. Waiting for instructions...</div>
+      </div>
+
+      <!-- Quick Action Controls -->
+      <div class="action-bar">
+        <button class="action-btn danger" onclick="cancelTask()">⏹ Abort</button>
+        <button class="action-btn" onclick="switchTab('herdr')">⚡ View Herdr</button>
+        <button class="action-btn" onclick="clearStream()">Clear</button>
+      </div>
+    </div>
+
+    <!-- TAB 2: Herdr Live Terminal -->
+    <div class="tab-pane" id="pane-herdr">
+      <div class="terminal-container">
+        <div class="terminal-header">
+          <span id="herdr-ws-label">WORKSPACE: N/A</span>
+          <span id="herdr-pane-status" style="color: #4caf50;">STATUS: IDLE</span>
+        </div>
+        <div class="terminal-output" id="terminal-output">Connecting to Herdr pane...</div>
+        <div class="keybar">
+          <button class="key-btn" onclick="sendKey('ctrl-c')">CTRL + C</button>
+          <button class="key-btn" onclick="sendKey('enter')">ENTER ↵</button>
+          <button class="key-btn" onclick="refreshTerminal()">REFRESH</button>
+          <button class="key-btn" onclick="scrollTerminalBottom()">SCROLL ↓</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: Lavish Artifacts -->
+    <div class="tab-pane" id="pane-artifacts">
+      <div class="artifacts-container">
+        <div class="stream-header">
+          <h3>Generated Review Artifacts</h3>
+          <button class="key-btn" style="padding: 2px 8px;" onclick="loadArtifacts()">REFRESH</button>
+        </div>
+        <div id="artifacts-list" style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="artifact-card">
+            <p>Scanning for Lavish artifacts...</p>
+          </div>
+        </div>
+        <div id="viewer-container" style="display: none; flex-direction: column; gap: 8px; margin-top: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 id="viewer-title" style="font-size: 11px;">Preview</h4>
+            <button class="key-btn" style="padding: 2px 8px;" onclick="closeViewer()">CLOSE</button>
+          </div>
+          <iframe class="artifact-viewer" id="artifact-frame" src="about:blank"></iframe>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    NOTHING OS // OMAGENT MOBILE BRIDGE • TAILSCALE MESH
+  </footer>
+
+  <script>
+    // Tab Switching
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      if (name === 'intercom') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('pane-intercom').classList.add('active');
+      } else if (name === 'herdr') {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('pane-herdr').classList.add('active');
+        refreshTerminal();
+      } else if (name === 'artifacts') {
+        document.querySelectorAll('.tab-btn')[2].classList.add('active');
+        document.getElementById('pane-artifacts').classList.add('active');
+        loadArtifacts();
+      }
+      vibrate(10);
+    }
+
+    // Haptics helper
+    function vibrate(pattern) {
+      if (navigator.vibrate) {
+        navigator.vibrate(pattern);
+      }
+    }
+
+    // WebSocket Connection
+    let ws = null;
+    function connectWS() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+      ws.onopen = () => {
+        document.getElementById('fleet-status').innerText = 'CONNECTED';
+        document.getElementById('fleet-status').style.color = '#4caf50';
+      };
+
+      ws.onclose = () => {
+        document.getElementById('fleet-status').innerText = 'RECONNECTING';
+        document.getElementById('fleet-status').style.color = '#ff9800';
+        setTimeout(connectWS, 2500);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleServerMessage(data);
+        } catch (e) {
+          console.error(e);
+        }
+      };
+    }
+
+    function handleServerMessage(data) {
+      if (data.type === 'highlight') {
+        addStreamItem(data.text, data.active, data.done);
+        if (data.skill) {
+          document.getElementById('active-skill').innerText = data.skill.toUpperCase();
+        }
+      } else if (data.type === 'status') {
+        document.getElementById('intercom-status').innerText = data.status;
+      } else if (data.type === 'terminal_update') {
+        updateTerminal(data.output, data.label, data.state);
+      }
+    }
+
+    function addStreamItem(text, isActive, isDone) {
+      const box = document.getElementById('stream-box');
+      const item = document.createElement('div');
+      item.className = 'stream-item' + (isActive ? ' active' : '') + (isDone ? ' done' : '');
+      item.innerText = text;
+      box.appendChild(item);
+      box.scrollTop = box.scrollHeight;
+      vibrate(12);
+    }
+
+    function clearStream() {
+      document.getElementById('stream-box').innerHTML = '';
+      vibrate(10);
+    }
+
+    // Audio Engine: Native Android Recorder fallback on HTTP + Direct Push-to-Talk on HTTPS
+    let mediaRecorder = null;
+    let audioChunks = [];
+    const glyphContainer = document.getElementById('glyph-container');
+    const glyphBtn = document.getElementById('glyph-btn');
+    const statusLabel = document.getElementById('intercom-status');
+    const btnLabel = document.getElementById('btn-label');
+    const sslBanner = document.getElementById('ssl-banner');
+    const sslSwitchLink = document.getElementById('ssl-switch-link');
+    const nativeAudioInput = document.getElementById('native-audio-input');
+    const micInputBtn = document.getElementById('mic-input-btn');
+
+    const hasMediaDevices = !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
+    const isSecure = window.isSecureContext && hasMediaDevices;
+
+    // Insecure HTTP detection & banner setup
+    if (!isSecure) {
+      if (sslBanner) sslBanner.style.display = 'block';
+      if (sslSwitchLink) sslSwitchLink.href = 'https://' + location.host + location.pathname;
+      statusLabel.innerText = 'TAP GLYPH OR USE KEYBOARD MIC TO SPEAK';
+      btnLabel.innerText = 'VOICE';
+    }
+
+    // Native audio recording via system sound recorder
+    nativeAudioInput.addEventListener('change', async (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        await uploadAudioFile(file, file.name);
+      }
+    });
+
+    micInputBtn.addEventListener('click', () => {
+      vibrate(20);
+      nativeAudioInput.click();
+    });
+
+    async function startRecording() {
+      if (!isSecure) {
+        vibrate(25);
+        nativeAudioInput.click();
+        return;
+      }
+
+      try {
+        vibrate(30);
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunks.push(e.data);
+        };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunks, { type: 'audio/webm' });
+          uploadAudioFile(blob, 'recording.webm');
+        };
+        mediaRecorder.start();
+
+        glyphContainer.classList.add('recording');
+        statusLabel.innerText = 'LISTENING... (RELEASE TO SEND)';
+        btnLabel.innerText = 'REC';
+      } catch (err) {
+        console.warn('getUserMedia error:', err);
+        statusLabel.innerText = 'LAUNCHING NATIVE RECORDER...';
+        // Seamless fallback to system voice recorder
+        nativeAudioInput.click();
+      }
+    }
+
+    function stopRecording() {
+      if (!isSecure) return;
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        vibrate([15, 40, 15]);
+        mediaRecorder.stop();
+        glyphContainer.classList.remove('recording');
+        glyphContainer.classList.add('processing');
+        statusLabel.innerText = 'TRANSCRIBING WITH WHISPER...';
+        btnLabel.innerText = 'WAIT';
+      }
+    }
+
+    async function uploadAudioFile(fileOrBlob, filename) {
+      glyphContainer.classList.remove('recording');
+      glyphContainer.classList.add('processing');
+      statusLabel.innerText = 'TRANSCRIBING WITH WHISPER...';
+      btnLabel.innerText = 'WAIT';
+
+      const fname = filename || (fileOrBlob instanceof File ? fileOrBlob.name : 'recording.webm');
+      const formData = new FormData();
+      formData.append('audio', fileOrBlob, fname);
+
+      try {
+        const resp = await fetch('/api/transcribe', {
+          method: 'POST',
+          body: formData
+        });
+        const res = await resp.json();
+        glyphContainer.classList.remove('processing');
+        btnLabel.innerText = isSecure ? 'HOLD' : 'VOICE';
+
+        if (res.text && res.text.trim()) {
+          statusLabel.innerText = 'DISPATCHING TASK...';
+          document.getElementById('prompt-input').value = res.text;
+          submitTask(res.text);
+        } else {
+          statusLabel.innerText = 'NO SPEECH DETECTED';
+          setTimeout(() => {
+            statusLabel.innerText = isSecure ? 'READY FOR VOICE COMMAND' : 'TAP GLYPH OR USE KEYBOARD MIC';
+          }, 2500);
+        }
+      } catch (e) {
+        glyphContainer.classList.remove('processing');
+        btnLabel.innerText = isSecure ? 'HOLD' : 'VOICE';
+        statusLabel.innerText = 'TRANSCRIPTION FAILED';
+        console.error(e);
+      }
+    }
+
+    // Event listeners for Push-to-Talk or Tap-to-Record
+    if (isSecure) {
+      glyphBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+      glyphBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+      glyphBtn.addEventListener('mousedown', startRecording);
+      glyphBtn.addEventListener('mouseup', stopRecording);
+    } else {
+      glyphBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        nativeAudioInput.click();
+      });
+      glyphBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        nativeAudioInput.click();
+      });
+    }
+
+    // Text Submission
+    const promptInput = document.getElementById('prompt-input');
+    const sendBtn = document.getElementById('send-btn');
+
+    sendBtn.addEventListener('click', () => {
+      const txt = promptInput.value.trim();
+      if (txt) submitTask(txt);
+    });
+
+    promptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const txt = promptInput.value.trim();
+        if (txt) submitTask(txt);
+      }
+    });
+
+    async function submitTask(prompt) {
+      vibrate(20);
+      promptInput.value = '';
+      addStreamItem(`> ${prompt}`, false, false);
+      statusLabel.innerText = 'DISPATCHED TO FLEET';
+
+      try {
+        const resp = await fetch('/api/dispatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: prompt })
+        });
+        const data = await resp.json();
+        if (data.skill) {
+          document.getElementById('active-skill').innerText = data.skill.toUpperCase();
+        }
+      } catch (e) {
+        addStreamItem('Error dispatching task to server', false, false);
+      }
+    }
+
+    async function cancelTask() {
+      vibrate([40, 20, 40]);
+      await fetch('/api/cancel', { method: 'POST' });
+      addStreamItem('• Task cancellation signal sent', false, true);
+    }
+
+    // Herdr Terminal Updates
+    async function refreshTerminal() {
+      try {
+        const resp = await fetch('/api/herdr/pane');
+        const data = await resp.json();
+        updateTerminal(data.output, data.label, data.state);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function updateTerminal(output, label, state) {
+      const term = document.getElementById('terminal-output');
+      term.innerText = output || 'No active terminal output';
+      if (label) document.getElementById('herdr-ws-label').innerText = label;
+      if (state) document.getElementById('herdr-pane-status').innerText = 'STATUS: ' + state.toUpperCase();
+    }
+
+    function scrollTerminalBottom() {
+      const term = document.getElementById('terminal-output');
+      term.scrollTop = term.scrollHeight;
+      vibrate(10);
+    }
+
+    async function sendKey(key) {
+      vibrate(15);
+      await fetch('/api/herdr/send-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: key })
+      });
+      setTimeout(refreshTerminal, 300);
+    }
+
+    // Artifacts Tab
+    async function loadArtifacts() {
+      const list = document.getElementById('artifacts-list');
+      try {
+        const resp = await fetch('/api/artifacts');
+        const data = await resp.json();
+        list.innerHTML = '';
+        if (data.artifacts && data.artifacts.length > 0) {
+          data.artifacts.forEach(art => {
+            const card = document.createElement('div');
+            card.className = 'artifact-card';
+            card.innerHTML = `<h4>${art.name}</h4><p>${art.path} • ${art.time}</p>`;
+            card.onclick = () => openArtifact(art.url, art.name);
+            list.appendChild(card);
+          });
+        } else {
+          list.innerHTML = '<div class="artifact-card"><p>No artifacts found yet. Agents generate artifacts via lavish-axi.</p></div>';
+        }
+      } catch (e) {
+        list.innerHTML = '<div class="artifact-card"><p>Error loading artifacts</p></div>';
+      }
+    }
+
+    function openArtifact(url, name) {
+      document.getElementById('viewer-container').style.display = 'flex';
+      document.getElementById('viewer-title').innerText = name;
+      document.getElementById('artifact-frame').src = url;
+      vibrate(15);
+    }
+
+    function closeViewer() {
+      document.getElementById('viewer-container').style.display = 'none';
+      document.getElementById('artifact-frame').src = 'about:blank';
+      vibrate(10);
+    }
+
+    // Initialize PWA & WebSocket
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js').catch(console.error);
+    }
+    connectWS();
+  </script>
+</body>
+</html>
