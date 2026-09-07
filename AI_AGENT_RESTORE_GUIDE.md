@@ -187,6 +187,12 @@ This repository contains the full snapshot of user customizations:
    - `themes/omagen1` & `themes/omarchy_signature`: New themes.
    - `plugins/pretty.omagen`: Visual theme designer studio plugin.
 
+
+16. **YouTube Music (ytkew) & Complete Theme Hooks Suite**:
+   - `bin/ytkew` & `configs/ytkew/`: Terminal music player with dynamic cover art and spectrum bars.
+   - `configs/omarchy/hooks/theme-set.d/`: Full hook suite synchronizing ytkew, Foliate, Discord, Zen, FDM, and editors on theme switch.
+   - `configs/hypr/input.lua`: 3-finger touchpad swipe gestures for workspace switcher.
+
 ## 3. Fast Restoration (Automated)
 
 To apply everything at once, simply clone this repository onto the target Omarchy machine and execute:
@@ -288,7 +294,7 @@ cp -a configs/shell/bash_profile ~/.bash_profile
 ### Step 7: Apply Theming & Restart Services
 ```bash
 # 1. Apply theme and font
-omarchy theme set "Solitude"
+omarchy theme set "Moodpeak"
 omarchy font set "JetBrainsMono Nerd Font"
 
 # 2. Rescan plugins and restart quickshell
@@ -309,7 +315,7 @@ Run these commands after restoration to verify system health:
 
 | Component | Verification Command | Expected Outcome |
 |-----------|----------------------|------------------|
-| **Theme** | `omarchy theme current` | Prints `Solitude` |
+| **Theme** | `omarchy theme current` | Prints `Moodpeak` |
 | **Font** | `omarchy font current` | Prints `JetBrainsMono Nerd Font` |
 | **Hyprland** | `hyprctl configerrors` | Prints `ok` (no syntax errors) |
 | **Default Agent** | `omarchy-default-agent` | Prints `antigravity` |

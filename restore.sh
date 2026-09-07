@@ -269,6 +269,11 @@ if [[ -d "${SCRIPT_DIR}/configs/foliate" ]]; then
   mkdir -p "${USER_HOME}/.config/com.github.johnfactotum.Foliate"
   cp -a "${SCRIPT_DIR}/configs/foliate/." "${USER_HOME}/.config/com.github.johnfactotum.Foliate/"
 fi
+if [[ -d "${SCRIPT_DIR}/configs/ytkew" ]]; then
+  echo "  -> Restoring ytkew YouTube Music configuration..."
+  mkdir -p "${USER_HOME}/.config/ytkew/themes"
+  cp -a "${SCRIPT_DIR}/configs/ytkew/." "${USER_HOME}/.config/ytkew/"
+fi
 if [[ -d "${SCRIPT_DIR}/configs/qdirstat" ]]; then
   echo "  -> Restoring QDirStat configurations..."
   mkdir -p "${USER_HOME}/.config/QDirStat"
@@ -408,6 +413,8 @@ if [[ -d "${SCRIPT_DIR}/pixmaps" ]]; then
   if [[ -f "${SCRIPT_DIR}/pixmaps/antigravity.png" ]]; then
     mkdir -p "${USER_HOME}/.local/share/icons/hicolor/256x256/apps"
     cp -a "${SCRIPT_DIR}/pixmaps/antigravity.png" "${USER_HOME}/.local/share/icons/hicolor/256x256/apps/"
+    mkdir -p "${USER_HOME}/.local/share/icons/hicolor/scalable/apps"
+    cp -a "${SCRIPT_DIR}/pixmaps/ytkew.svg" "${USER_HOME}/.local/share/icons/hicolor/scalable/apps/" 2>/dev/null || true
   fi
 fi
 
@@ -424,8 +431,8 @@ fi
 echo ""
 echo "==> Step 11: Applying customizations and restarting components..."
 if command -v omarchy >/dev/null 2>&1; then
-  echo "  -> Setting theme: Solitude"
-  omarchy theme set "Solitude" || true
+  echo "  -> Setting theme: Moodpeak"
+  omarchy theme set "Moodpeak" || true
 
   
   if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-zen" ]]; then
@@ -453,7 +460,7 @@ fi
 echo ""
 echo "========================================================"
 echo "  Customizations Restored Successfully!"
-echo "  - Current theme: Solitude"
+echo "  - Current theme: Moodpeak"
 echo "  - Current font: JetBrainsMono Nerd Font"
 echo "  - Bar Layout: Custom floating bar with 14 plugins"
 echo "  - Window Manager: Hyprland with blur, scale 2, and custom bindings"

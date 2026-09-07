@@ -39,27 +39,6 @@
       ],
       "right": [
         {
-          "id": "omarchy.tray"
-        },
-        {
-          "id": "omaconnect"
-        },
-        {
-          "id": "jkoestinger.vpn"
-        },
-        {
-          "id": "io.github.nilszeilon.omarchy-sensei"
-        },
-        {
-          "id": "omamail"
-        },
-        {
-          "id": "io.github.ricky.whatsapp"
-        },
-        {
-          "id": "io.github.r-witz.nothing-ear"
-        },
-        {
           "id": "mahmoodkhalil57.qrgen",
           "advancedOpen": true,
           "assetBackdrop": true,
@@ -86,8 +65,29 @@
           "transparentBackground": false
         },
         {
+          "id": "omaconnect"
+        },
+        {
+          "id": "jkoestinger.vpn"
+        },
+        {
+          "id": "io.github.nilszeilon.omarchy-sensei"
+        },
+        {
+          "id": "omamail"
+        },
+        {
+          "id": "io.github.ricky.whatsapp"
+        },
+        {
+          "id": "io.github.r-witz.nothing-ear"
+        },
+        {
+          "id": "omarchy.tray"
+        },
+        {
           "id": "jrmmhm.pocket",
-          "members": "omaconnect, jkoestinger.vpn, io.github.nilszeilon.omarchy-sensei, omamail, io.github.ricky.whatsapp, io.github.r-witz.nothing-ear, mahmoodkhalil57.qrgen, io.github.elevate08.qs-bitwarden-cli"
+          "members": "omarchy.tray, mahmoodkhalil57.qrgen, omaconnect, jkoestinger.vpn, io.github.nilszeilon.omarchy-sensei, omamail, io.github.ricky.whatsapp, io.github.r-witz.nothing-ear, io.github.elevate08.qs-bitwarden-cli"
         },
         {
           "id": "omarchy.bluetooth"
@@ -122,6 +122,9 @@
     "screensaver": 150
   },
   "plugins": [
+    {
+      "id": "pretty.omagen"
+    },
     {
       "id": "mryll.printbar"
     },

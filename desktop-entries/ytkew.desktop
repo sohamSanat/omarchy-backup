@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=ytkew
+GenericName=YouTube Music Player
+Comment=Terminal YouTube Music player with album art and visualizer
+Exec=omarchy-launch-or-focus-tui ytkew
+Icon=ytkew
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=music;youtube;player;terminal;ytkew;audio;
+StartupWMClass=org.omarchy.ytkew

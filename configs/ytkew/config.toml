@@ -1,0 +1,36 @@
+# ytkew configuration for Omarchy
+# Documentation: https://dtdhruv.github.io/ytkew/reference/configuration/
+
+# Theme: "cover" dynamically adapts to the current playing album's artwork.
+# You can also set this to "omarchy" to track your active Omarchy system theme,
+# or cycle through themes in-app using the menu.
+theme = "cover"
+
+# Navigation: "kew" (default) or "vim" (hjkl, gg, G, ctrl+d/u)
+keys = "kew"
+
+# Side pane layout: "queue", "library", or "off"
+side_pane = "queue"
+library_layout = "columns"
+
+# Cover art rendering:
+# In Ghostty, Kitty graphics protocol provides full-resolution album covers.
+cover_mode = "auto"
+cover_enabled = true
+
+# Spectrum visualizer: "bars", "braille", or "off"
+visualizer_mode = "bars"
+visualizer_height = 6
+visualizer_bar_width = 2
+
+# Audio playback
+initial_volume = 100.0
+volume_max = 100.0
+volume_step = 5.0
+seek_step = 5.0
+
+# Automatically start a YouTube Music radio mix after playing a track
+autoplay_radio = true
+
+# Remember repeat & shuffle states across sessions
+save_repeat_shuffle = true

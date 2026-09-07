@@ -38,6 +38,9 @@ o.bind("SUPER + E", "File manager", { launch = "strata" })
 -- HomeLab Launcher
 o.bind("SUPER + Y", "HomeLab launcher", "omarchy-shell shell toggle io.github.elvis-christian.homelab-launcher")
 
+-- YouTube Music (ytkew)
+o.bind("SUPER + M", "YouTube Music", { tui = "ytkew", focus = true })
+
 
 -- Workspace Switcher: begin
 do
