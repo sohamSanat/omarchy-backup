@@ -1,0 +1,175 @@
+/* ==============================================================================
+ * Omarchy Dynamic Theme for Brave-Origin New Tab Page
+ * ------------------------------------------------------------------------------
+ * Template: ~/.config/omarchy/themed/brave-ntp.css.tpl
+ * Compiled to: ~/.local/state/omarchy/current/theme/brave-ntp.css
+ * Consumed by: ~/.config/omarchy/brave-polish/ntp.html (companion MV3 ext)
+ *
+ * NOTE: Brave window stays fully opaque (no compositor transparency).
+ * Glass effect here is pure CSS backdrop-filter over the theme background,
+ * so loaded websites are never affected.
+ * ============================================================================== */
+
+:root {
+  --omarchy-bg: #1E3061;
+  --omarchy-fg: #E8EEFF;
+  --omarchy-accent: #4D8FFF;
+  --omarchy-muted: #6080C0;
+  --omarchy-surface: color-mix(in srgb, #E8EEFF 8%, #1E3061);
+  --omarchy-surface-hover: color-mix(in srgb, #E8EEFF 15%, #1E3061);
+  --omarchy-border: color-mix(in srgb, #E8EEFF 18%, transparent);
+}
+
+* { box-sizing: border-box; }
+
+/* Footer guard: Brave-Origin injects an attribution footer
+ * ("extension name" + Customize button) into extension NTPs.
+ * Only Omarchy's own elements may render. */
+body > :not(.omarchy-clock):not(.omarchy-date):not(.omarchy-search):not(.omarchy-topsites):not(script):not(style):not(link) {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  /* Transparent canvas: Hyprland wallpaper blur bleeds through on empty tabs
+   * (terminal-style glass). Loaded websites stay solid via global.js opaque
+   * base + Dark Reader fork backgrounds. */
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #E8EEFF !important;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  overflow-x: hidden;
+  /* Terminal-style veil: translucent theme background dims bright wallpapers
+   * while Hyprland blur still bleeds through. Keeps light text readable. */
+  background:
+    radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, #4D8FFF 20%, transparent), transparent 70%),
+    radial-gradient(40% 35% at 85% 90%, color-mix(in srgb, #4D8FFF 10%, transparent), transparent 70%),
+    color-mix(in srgb, #1E3061 68%, transparent) !important;
+}
+
+.omarchy-clock {
+  font-size: 64px;
+  font-weight: 200;
+  letter-spacing: 0.04em;
+  color: #E8EEFF;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+}
+
+.omarchy-date {
+  margin-top: -20px;
+  font-size: 15px;
+  color: color-mix(in srgb, #E8EEFF 70%, transparent);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.omarchy-search {
+  width: min(560px, 86vw);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 18px;
+  border-radius: 14px;
+  background: color-mix(in srgb, #1E3061 62%, transparent);
+  border: 1px solid var(--omarchy-border);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.omarchy-search:focus-within {
+  border-color: #4D8FFF;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #4D8FFF 40%, transparent), 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+
+.omarchy-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  color: #E8EEFF;
+}
+
+.omarchy-search input::placeholder {
+  color: color-mix(in srgb, #E8EEFF 55%, transparent);
+}
+
+.omarchy-search .search-icon {
+  color: #4D8FFF;
+  font-size: 17px;
+}
+
+.omarchy-topsites {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  width: min(560px, 86vw);
+}
+
+.omarchy-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px 8px 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  background: color-mix(in srgb, #1E3061 60%, transparent);
+  border: 1px solid color-mix(in srgb, #E8EEFF 14%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.omarchy-top:hover {
+  border-color: #4D8FFF;
+  transform: translateY(-2px);
+}
+
+.omarchy-top img {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.omarchy-top .tile-letter {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  background: color-mix(in srgb, #4D8FFF 25%, #1E3061);
+  color: #E8EEFF;
+}
+
+.omarchy-top span {
+  font-size: 12px;
+  color: #E8EEFF;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,0 +1,75 @@
+diff --git i/Panel.qml w/Panel.qml
+index 84d7e3b..8afab1b 100644
+--- i/Panel.qml
++++ w/Panel.qml
+@@ -929,70 +929,6 @@ Column {
+             }
+           }
+         }
+-
+-        // ---------- Hotkey script footer ----------
+-        // Explicit opt-in install for the SUPER+D selection lookup.
+-        // Nothing is written to ~/.local/bin/ until the user clicks
+-        // Install. Status comes from the host BarWidget
+-        // (installStatus/installMessage) which runs the mkdir/cmp/install
+-        // stages shell-free.
+-        PanelSeparator {
+-          foreground: root.contentForeground
+-        }
+-
+-        Column {
+-          width: parent.width
+-          spacing: Style.space(6)
+-
+-          Row {
+-            width: parent.width
+-            spacing: Style.space(10)
+-
+-            Text {
+-              id: installLabel
+-              text: "Install hotkey script"
+-              textFormat: Text.PlainText
+-              color: root.contentForeground
+-              font.family: root.contentFontFamily
+-              font.pixelSize: Style.font.body
+-              elide: Text.ElideRight
+-              width: parent.width - installButton.width - Style.space(10)
+-              anchors.verticalCenter: parent.verticalCenter
+-            }
+-
+-            Button {
+-              id: installButton
+-              text: "Install"
+-              enabled: root.hostWidget ? root.hostWidget.installStatus !== "working" : true
+-              onClicked: {
+-                if (root.hostWidget && typeof root.hostWidget.installHotkeyScript === "function")
+-                  root.hostWidget.installHotkeyScript()
+-              }
+-              foreground: root.contentForeground
+-            }
+-          }
+-
+-          Text {
+-            width: parent.width
+-            visible: text !== ""
+-            text: root.hostWidget ? root.hostWidget.installMessage : ""
+-            textFormat: Text.PlainText
+-            color: Qt.darker(root.contentForeground, 1.4)
+-            font.family: root.contentFontFamily
+-            font.pixelSize: Style.font.caption
+-            wrapMode: Text.WordWrap
+-          }
+-
+-          Text {
+-            width: parent.width
+-            text: "Enables SUPER+D lookup. Installs to ~/.local/bin/."
+-            textFormat: Text.PlainText
+-            color: Qt.darker(root.contentForeground, 1.7)
+-            font.family: root.contentFontFamily
+-            font.pixelSize: Style.font.caption
+-            wrapMode: Text.WordWrap
+-          }
+-        }
+       }
+     }
+   }

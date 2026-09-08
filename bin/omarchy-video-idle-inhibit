@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
-Omarchy Video & Media Idle Inhibitor.
-Prevents screensaver and idle lock while watching videos or listening to media,
-using Wayland idle-inhibit protocol without modifying persistent Omarchy settings.
+Omarchy Video & Media Idle Inhibitor and Lock-on-Screensaver Guard.
+1. Prevents screensaver and idle lock while watching videos or listening to media,
+   using Wayland idle-inhibit protocol without modifying persistent Omarchy settings.
+2. Ensures that whenever the animated screensaver is dismissed or closed by any means,
+   the system immediately locks and prompts for password / fingerprint authentication.
 """
 
 import os
@@ -10,12 +12,36 @@ import sys
 import time
 import signal
 import json
+import socket
 import subprocess
 import threading
 import select
 
 HOME = os.path.expanduser("~")
 INHIBIT_BIN = os.path.join(HOME, ".local/bin/omarchy-wayland-inhibit")
+
+# Ensure required environment variables exist for child processes and sockets
+def ensure_env():
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    os.environ["XDG_RUNTIME_DIR"] = runtime_dir
+
+    if not os.environ.get("WAYLAND_DISPLAY"):
+        if os.path.exists(runtime_dir):
+            for entry in sorted(os.listdir(runtime_dir)):
+                if entry.startswith("wayland-") and not entry.endswith(".lock"):
+                    os.environ["WAYLAND_DISPLAY"] = entry
+                    break
+
+    if not os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        hypr_dir = os.path.join(runtime_dir, "hypr")
+        if os.path.exists(hypr_dir):
+            for entry in sorted(os.listdir(hypr_dir)):
+                candidate = os.path.join(hypr_dir, entry, ".socket2.sock")
+                if os.path.exists(candidate):
+                    os.environ["HYPRLAND_INSTANCE_SIGNATURE"] = entry
+                    break
+
+ensure_env()
 
 IGNORED_APPS = {
     "speech-dispatcher-dummy",
@@ -33,6 +59,7 @@ class MediaIdleInhibitor:
         self.lock = threading.Lock()
         self.grace_timer = None
         self.grace_seconds = 6.0
+        self.screensaver_windows = set()
 
         # Clean up any stale files from previous broken versions
         for path in [
@@ -55,6 +82,80 @@ class MediaIdleInhibitor:
         signal.signal(signal.SIGINT, self.shutdown)
         signal.signal(signal.SIGTERM, self.shutdown)
 
+    # ------------------ Hyprland Socket2 Watcher ------------------
+    def hyprland_socket_thread(self):
+        """Watches Hyprland socket2 to ensure any screensaver window close triggers a system lock."""
+        runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+
+        while self.running:
+            try:
+                sig = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
+                sock_path = os.path.join(runtime_dir, "hypr", sig, ".socket2.sock") if sig else ""
+
+                if not (sock_path and os.path.exists(sock_path)):
+                    hypr_dir = os.path.join(runtime_dir, "hypr")
+                    sock_path = None
+                    if os.path.exists(hypr_dir):
+                        for entry in os.listdir(hypr_dir):
+                            candidate = os.path.join(hypr_dir, entry, ".socket2.sock")
+                            if os.path.exists(candidate):
+                                sock_path = candidate
+                                break
+
+                if not sock_path or not os.path.exists(sock_path):
+                    time.sleep(2)
+                    continue
+
+                # Scan for any already running screensaver windows
+                try:
+                    res = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=2)
+                    if res.returncode == 0:
+                        clients = json.loads(res.stdout)
+                        for c in clients:
+                            if c.get("class") == "org.omarchy.screensaver":
+                                with self.lock:
+                                    self.screensaver_windows.add(c.get("address", ""))
+                except Exception:
+                    pass
+
+                s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                s.connect(sock_path)
+                f = s.makefile("r")
+                for line in f:
+                    if not self.running:
+                        break
+                    line = line.strip()
+                    if line.startswith("openwindow>>"):
+                        # format: address,workspace,class,title
+                        parts = line[12:].split(",", 3)
+                        if len(parts) >= 3 and parts[2] == "org.omarchy.screensaver":
+                            addr = parts[0].strip()
+                            with self.lock:
+                                self.screensaver_windows.add(addr)
+                            log(f"Screensaver window active: {addr}")
+                    elif line.startswith("closewindow>>"):
+                        addr = line[13:].strip()
+                        was_screensaver = False
+                        with self.lock:
+                            if addr in self.screensaver_windows:
+                                self.screensaver_windows.remove(addr)
+                                was_screensaver = True
+                        if was_screensaver:
+                            log(f"Screensaver window closed: {addr}. Ensuring system lock engaged...")
+                            try:
+                                is_locked = subprocess.check_output(
+                                    ["omarchy-shell", "lock", "isLocked"],
+                                    text=True, stderr=subprocess.DEVNULL, timeout=1
+                                ).strip()
+                                if is_locked != "true":
+                                    subprocess.run(["omarchy-system-lock"], timeout=2)
+                            except Exception:
+                                subprocess.run(["omarchy-system-lock"], timeout=2)
+                s.close()
+            except Exception as e:
+                time.sleep(2)
+
+    # ------------------ Media / Video Audio Checks ------------------
     def is_audio_playing(self) -> bool:
         """Checks PipeWire for any active uncorked audio stream from user media apps."""
         try:
@@ -159,8 +260,12 @@ class MediaIdleInhibitor:
             self.disable_inhibit()
 
     def run(self):
-        log("Omarchy Video & Media Idle Inhibitor running.")
+        log("Omarchy Video & Media Idle Inhibitor and Lock Guard running.")
         self.check_and_update()
+
+        # Start background Hyprland socket thread for screensaver window monitoring
+        hypr_t = threading.Thread(target=self.hyprland_socket_thread, daemon=True)
+        hypr_t.start()
 
         pactl_proc = None
         try:

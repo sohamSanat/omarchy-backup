@@ -17,10 +17,10 @@
           "id": "kenny.nightlight"
         },
         {
-          "id": "io.github.diegopluna.argus"
+          "id": "omarchy.system-update"
         },
         {
-          "id": "omarchy.system-update"
+          "id": "io.github.diegopluna.argus"
         },
         {
           "id": "io.github.weedwhitesandwine.obsiduous"
@@ -31,10 +31,17 @@
           "id": "omarchy.workspaces"
         },
         {
+          "id": "tristonarmstrong.dictionary"
+        },
+        {
           "id": "soham.agents"
         },
         {
-          "id": "krall.switchboard"
+          "id": "bhanu.omavideos",
+          "audioOnly": false,
+          "trim": false,
+          "trimStart": "",
+          "trimEnd": ""
         }
       ],
       "right": [
@@ -122,6 +129,9 @@
     "screensaver": 150
   },
   "plugins": [
+    {
+      "id": "krall.switchboard"
+    },
     {
       "id": "pretty.omagen"
     },

@@ -1,0 +1,224 @@
+#!/bin/bash
+set -euo pipefail
+
+# ==============================================================================
+# Omarchy -> Brave-Origin Dynamic Theme & Polish Sync
+# ------------------------------------------------------------------------------
+# Script: ~/.local/bin/omarchy-sync-brave
+# Purpose: Synchronizes Brave-Origin's New Tab Page and YouTube/GitHub/Reddit
+#          site polish with the active Omarchy system theme.
+#
+# ARCHITECTURE OVERVIEW:
+# 1. Templates (auto-compiled by omarchy-theme-set-templates on theme set):
+#    - ~/.config/omarchy/themed/brave-ntp.css.tpl    -> .../current/theme/brave-ntp.css
+#    - ~/.config/omarchy/themed/brave-polish.css.tpl -> .../current/theme/brave-polish.css
+#    - ~/.config/omarchy/themed/brave-polish.json.tpl-> .../current/theme/brave-polish.json
+#
+# 2. Companion extension (unpacked MV3, loaded once via brave://extensions):
+#    - ~/.config/omarchy/brave-polish/  (manifest, ntp.html/js, loader.js)
+#    - This script copies compiled outputs in as ntp.css / polish.css / theme.json
+#    - loader.js re-fetches polish.css from disk on EVERY navigation, so site
+#      themes hot-apply with no restart. ntp.html re-reads ntp.css per new tab.
+#
+# 3. Toolbar color: handled by stock Omarchy (chromium.theme policy +
+#    omarchy-theme-set-browser --refresh-platform-policy). This script does not
+#    touch /etc policies, Preferences, or Secure Preferences.
+#
+# 4. Automation: ~/.config/omarchy/hooks/theme-set.d/brave-sync.sh runs
+#    `omarchy-sync-brave --sync` after every `omarchy theme set`.
+#
+# 5. Dark Reader is intentionally untouched (user's choice).
+# ==============================================================================
+
+CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+EXT_DIR="$HOME/.config/omarchy/brave-polish"
+USER_THEMED_DIR="$HOME/.config/omarchy/themed"
+FORK_DIR="$HOME/.config/omarchy/brave-darkreader"
+
+show_help() {
+  cat <<'EOF'
+Usage: omarchy-sync-brave [OPTIONS]
+
+Synchronize Brave-Origin NTP + site polish with the active Omarchy theme.
+
+Options:
+  --sync       Copy compiled theme outputs into the companion extension (default)
+  --status     Show theme, extension, and Brave process status
+  -h, --help   Display this help message
+
+One-time setup: open brave://extensions, enable Developer mode,
+  "Load unpacked" -> ~/.config/omarchy/brave-polish
+After that, every `omarchy theme set` hot-applies automatically.
+EOF
+}
+
+# Compile a template with {{ key }} placeholders from colors.toml.
+# Mirrors omarchy-theme-set-templates resolution via omarchy-theme-color --all.
+compile_template_if_needed() {
+  local tpl_path="$1"
+  local out_path="$2"
+
+  if [[ -f "$out_path" && -f "$tpl_path" && "$out_path" -nt "$tpl_path" ]]; then
+    return 0
+  fi
+  if [[ ! -f "$tpl_path" ]]; then
+    echo "[omarchy-sync-brave] Warning: template $tpl_path not found. Skipping." >&2
+    return 0
+  fi
+
+  local colors_file="$CURRENT_THEME_DIR/colors.toml"
+  if [[ ! -f "$colors_file" ]]; then
+    echo "[omarchy-sync-brave] Warning: $colors_file not found. Cannot compile $(basename "$out_path")." >&2
+    return 1
+  fi
+
+  local sed_script
+  sed_script=$(mktemp)
+  omarchy-theme-color --file "$colors_file" --all 2>/dev/null | awk -F'\t' '{print "s|{{ " $1 " }}|" $2 "|g"}' > "$sed_script"
+  # Also support {{ key_rgb }} and {{ key_strip }} like omarchy-theme-set-templates
+  while IFS=$'\t' read -r key value; do
+    if [[ $value =~ ^#[0-9A-Fa-f]{6}$ ]]; then
+      local hex="${value#\#}"
+      local rgb
+      rgb=$(printf "%d,%d,%d" "0x${hex:0:2}" "0x${hex:2:2}" "0x${hex:4:2}")
+      printf 's|{{ %s_rgb }}|%s|g\n' "$key" "$rgb" >> "$sed_script"
+      printf 's|{{ %s_strip }}|%s|g\n' "$key" "$hex" >> "$sed_script"
+    fi
+  done < <(omarchy-theme-color --file "$colors_file" --all 2>/dev/null)
+
+  sed -f "$sed_script" "$tpl_path" > "$out_path"
+  rm -f "$sed_script"
+  echo "[omarchy-sync-brave] Compiled $(basename "$out_path")."
+}
+
+ensure_theme_compiled() {
+  compile_template_if_needed "$USER_THEMED_DIR/brave-ntp.css.tpl" "$CURRENT_THEME_DIR/brave-ntp.css"
+  compile_template_if_needed "$USER_THEMED_DIR/brave-polish.css.tpl" "$CURRENT_THEME_DIR/brave-polish.css"
+  compile_template_if_needed "$USER_THEMED_DIR/brave-polish.json.tpl" "$CURRENT_THEME_DIR/brave-polish.json"
+  compile_template_if_needed "$USER_THEMED_DIR/brave-manifest.json.tpl" "$CURRENT_THEME_DIR/brave-manifest.json"
+  compile_template_if_needed "$USER_THEMED_DIR/brave-global.css.tpl" "$CURRENT_THEME_DIR/brave-global.css"
+}
+
+do_sync() {
+  ensure_theme_compiled || return 1
+  mkdir -p "$EXT_DIR"
+
+  local copied=0
+  declare -A pairs=(
+    ["$CURRENT_THEME_DIR/brave-ntp.css"]="$EXT_DIR/ntp.css"
+    ["$CURRENT_THEME_DIR/brave-polish.css"]="$EXT_DIR/polish.css"
+    ["$CURRENT_THEME_DIR/brave-polish.json"]="$EXT_DIR/theme.json"
+    ["$CURRENT_THEME_DIR/brave-manifest.json"]="$EXT_DIR/manifest.json"
+    ["$CURRENT_THEME_DIR/brave-global.css"]="$EXT_DIR/global.css"
+  )
+  local src dest
+  for src in "${!pairs[@]}"; do
+    dest="${pairs[$src]}"
+    if [[ -f "$src" ]]; then
+      cp "$src" "$dest"
+      ((copied++)) || true
+    else
+      echo "[omarchy-sync-brave] Warning: $src missing, skipped." >&2
+    fi
+  done
+
+  # Fail loudly if a raw {{ placeholder }} survived compilation.
+  if grep -q "{{" "$EXT_DIR/ntp.css" "$EXT_DIR/polish.css" "$EXT_DIR/global.css" "$EXT_DIR/theme.json" "$EXT_DIR/manifest.json" 2>/dev/null; then
+    echo "[omarchy-sync-brave] ERROR: unresolved {{ placeholder }} in extension outputs." >&2
+    grep -H "{{" "$EXT_DIR/ntp.css" "$EXT_DIR/polish.css" "$EXT_DIR/global.css" "$EXT_DIR/theme.json" "$EXT_DIR/manifest.json" 2>/dev/null || true
+    return 1
+  fi
+
+  # Feed the Dark Reader fork (Zen treatment): popup styling + theme tokens.
+  # The fork reads config/omarchy-theme.json from disk on every toggle/refresh
+  # and rebuilds its dynamic theme, so this hot-applies on next navigation.
+  if [[ -d "$FORK_DIR" ]]; then
+    if [[ -f "$CURRENT_THEME_DIR/zen-darkreader.css" ]]; then
+      cp "$CURRENT_THEME_DIR/zen-darkreader.css" "$FORK_DIR/ui/popup/omarchy-theme.css"
+      ((copied++)) || true
+    fi
+    if [[ -f "$CURRENT_THEME_DIR/zen-darkreader-theme.json" ]]; then
+      cp "$CURRENT_THEME_DIR/zen-darkreader-theme.json" "$FORK_DIR/config/omarchy-theme.json"
+      ((copied++)) || true
+    fi
+    if grep -q "{{" "$FORK_DIR/ui/popup/omarchy-theme.css" "$FORK_DIR/config/omarchy-theme.json" 2>/dev/null; then
+      echo "[omarchy-sync-brave] ERROR: unresolved {{ placeholder }} in Dark Reader fork outputs." >&2
+      return 1
+    fi
+  fi
+
+  # Validate generated JSON outputs.
+  python3 -c "import json; json.load(open('$EXT_DIR/theme.json')); json.load(open('$EXT_DIR/manifest.json'))" 2>/dev/null || {
+    echo "[omarchy-sync-brave] ERROR: generated theme.json or manifest.json is invalid JSON." >&2
+    return 1
+  }
+
+  echo "[omarchy-sync-brave] Synced $copied file(s) into $EXT_DIR (hot-applies on next tab/navigation)."
+}
+
+do_status() {
+  echo "=================================================================="
+  echo " Omarchy Brave-Origin Polish Status"
+  echo "=================================================================="
+  local current_theme="unknown"
+  if [[ -f "$HOME/.local/state/omarchy/current/theme.name" ]]; then
+    current_theme=$(cat "$HOME/.local/state/omarchy/current/theme.name")
+  fi
+  echo "Active Omarchy Theme : $current_theme"
+  echo "Current Theme Dir    : $CURRENT_THEME_DIR"
+  for f in brave-ntp.css brave-polish.css brave-global.css brave-polish.json brave-manifest.json; do
+    if [[ -f "$CURRENT_THEME_DIR/$f" ]]; then
+      echo "Compiled $f : Present ($(wc -c < "$CURRENT_THEME_DIR/$f") bytes)"
+    else
+      echo "Compiled $f : Missing"
+    fi
+  done
+  echo ""
+  echo "Extension dir        : $EXT_DIR"
+  for f in manifest.json ntp.html ntp.js loader.js global.js background.js ntp.css polish.css global.css theme.json; do
+    if [[ -f "$EXT_DIR/$f" ]]; then
+      echo "  $f : Present ($(wc -c < "$EXT_DIR/$f") bytes)"
+    else
+      echo "  $f : Missing"
+    fi
+  done
+  echo ""
+  echo "Dark Reader fork       : $FORK_DIR"
+  for f in background/index.js inject/index.js ui/popup/index.js config/omarchy-theme.json ui/popup/omarchy-theme.css manifest.json; do
+    if [[ -f "$FORK_DIR/$f" ]]; then
+      echo "  $f : Present ($(wc -c < "$FORK_DIR/$f") bytes)"
+    else
+      echo "  $f : Missing"
+    fi
+  done
+  if grep -q "OmarchyManager" "$FORK_DIR/background/index.js" 2>/dev/null; then
+    echo "  Omarchy patches      : Present"
+  else
+    echo "  Omarchy patches      : MISSING"
+  fi
+  echo ""
+  local brave_pid
+  brave_pid=$(pgrep -x brave 2>/dev/null || true)
+  if [[ -n "$brave_pid" ]]; then
+    echo "Brave Process        : Running (PID: $brave_pid)"
+    echo "Note: new tabs pick up NTP theme immediately; site polish applies on next navigation/reload."
+  else
+    echo "Brave Process        : Not running (theme applies on next launch)"
+  fi
+  echo "=================================================================="
+}
+
+MODE="sync"
+if [[ $# -gt 0 ]]; then
+  case "$1" in
+    --sync) MODE="sync" ;;
+    --status) MODE="status" ;;
+    -h|--help) show_help; exit 0 ;;
+    *) echo "Unknown argument: $1" >&2; show_help; exit 1 ;;
+  esac
+fi
+
+case "$MODE" in
+  sync) do_sync ;;
+  status) do_status ;;
+esac

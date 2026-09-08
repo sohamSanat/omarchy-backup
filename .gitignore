@@ -33,3 +33,7 @@ keyrings/
 # Ignore authentication cookie secrets
 **/cookie.txt
 
+# Heavy binary packages and browser pak caches
+**/muse-bin*
+**/*.pak
+

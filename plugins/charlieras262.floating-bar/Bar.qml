@@ -1150,7 +1150,8 @@ Item {
       // renders behind a surface that isn't fully opaque. Only applies when
       // the background is actually drawn: `transparent` already means
       // "nothing to see here" and takes priority over it.
-      opacity: root.transparent ? 1 : Style.shellOpacity
+      // Background opacity: 0.0 when transparent, 1.0 when opaque
+      opacity: root.transparent ? 0.0 : 1.0
       Behavior on radius { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
       Behavior on color { ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
       Behavior on opacity { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
@@ -1602,8 +1603,9 @@ Item {
         suppressClick = false
         return
       }
+      // Double-click to toggle transparency disabled to prevent accidental triggers
+      // (Bar transparency can still be configured deliberately via 'omarchy bar transparent <true|false|toggle>')
       if (mouse.button === Qt.LeftButton) {
-        root.toggleTransparency()
         mouse.accepted = true
       }
     }

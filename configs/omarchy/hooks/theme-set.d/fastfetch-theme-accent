@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# theme-set hook: keep fastfetch key colors in sync with the Omarchy theme.
+# $1 = theme slug. Accent is read from the theme's colors.toml (user overlay
+# first, then stock), falling back to OMARCHY_THEME_ACCENT from theme-mode.env.
+# The hex accent is mapped to the nearest xterm-256 color and written into
+# every keyColor of the fastfetch user config (fastfetch accepts "38;5;N").
+set -u
+SLUG="${1:-}"
+SLUG_LOWER="$(printf '%s' "$SLUG" | tr '[:upper:]' '[:lower:]')"
+CONFIG="${FASTFETCH_CONFIG:-$HOME/.config/fastfetch/config.jsonc}"
+[[ -f "$CONFIG" ]] || exit 0
+
+ACCENT=""
+for cand in "$HOME/.config/omarchy/themes/$SLUG/colors.toml" \
+            "$HOME/.config/omarchy/themes/$SLUG_LOWER/colors.toml" \
+            "/usr/share/omarchy/themes/$SLUG/colors.toml" \
+            "/usr/share/omarchy/themes/$SLUG_LOWER/colors.toml"; do
+  if [[ -f "$cand" ]]; then
+    ACCENT="$(grep -m1 -E '^accent\s*=' "$cand" | grep -oE '#[0-9a-fA-F]{6}' || true)"
+    [[ -n "$ACCENT" ]] && break
+  fi
+done
+if [[ -z "$ACCENT" && -f "$HOME/.local/state/omarchy/theme-mode.env" ]]; then
+  # shellcheck disable=SC1090
+  source "$HOME/.local/state/omarchy/theme-mode.env" 2>/dev/null || true
+  ACCENT="${OMARCHY_THEME_ACCENT:-}"
+fi
+[[ "$ACCENT" =~ ^#[0-9a-fA-F]{6}$ ]] || exit 0 # nothing usable; leave config alone
+
+N256="$(python3 - "$ACCENT" <<'EOF'
+import sys
+h = sys.argv[1].lstrip('#')
+r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+levels = [0, 95, 135, 175, 215, 255]
+def near(v):
+    return min(range(6), key=lambda i: abs(levels[i] - v))
+ci = (near(r), near(g), near(b))
+cube = (levels[ci[0]], levels[ci[1]], levels[ci[2]])
+cube_n = 16 + 36 * ci[0] + 6 * ci[1] + ci[2]
+gray_v = round((r + g + b) / 3)
+gi = min(range(24), key=lambda i: abs(8 + 10 * i - gray_v))
+gray = 8 + 10 * gi
+def dist(a, b_):
+    return (a[0] - b_[0]) ** 2 + (a[1] - b_[1]) ** 2 + (a[2] - b_[2]) ** 2
+print(cube_n if dist((r, g, b), cube) <= dist((r, g, b), (gray,) * 3) else 232 + gi)
+EOF
+)"
+[[ "$N256" =~ ^[0-9]+$ ]] || exit 0
+
+python3 - "$CONFIG" "$N256" <<'EOF'
+import sys, re
+path, n = sys.argv[1], sys.argv[2]
+s = open(path).read()
+s2, count = re.subn(r'"keyColor"\s*:\s*"[^"]*"', f'"keyColor": "38;5;{n}"', s)
+if count and s2 != s:
+    open(path, 'w').write(s2)
+print(f'fastfetch-theme-accent: updated {count} keyColors to 38;5;{n}')
+EOF

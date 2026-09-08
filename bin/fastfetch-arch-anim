@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# fastfetch-arch-anim: show fastfetch with a continuously spinning Arch logo.
+# The logo rotates on its vertical axis (spinning-coin effect) beside the
+# system info until you press any key or Ctrl+C, which lands on static fastfetch.
+#
+# How it stays smooth: the info text is painted ONCE and never touched again.
+# Each frame only rewrites the small logo cells in place (cursor addressing),
+# so there is no full-screen clear, no flicker, and no color leakage.
+#
+# Color rule: the LOGO is always pure white. ONLY the info text carries
+# color — key colors come from ~/.config/fastfetch/config.jsonc, which a
+# theme-set hook keeps in sync with the Omarchy theme accent.
+#
+# Env knobs:
+#   FASTFETCH_NO_ANIM=1       skip animation, print plain fastfetch
+#   FASTFETCH_ANIM_DELAY=0.06 seconds per frame (default 0.06)
+#   FASTFETCH_ANIM_FRAMES=N   spin only N frames, then print static (default: forever)
+#   FASTFETCH_LOGO_COLOR=N    fixed 0-255 color for the logo (default: pure
+#                             white, the "white logo" look)
+# Any CLI args are passed through to fastfetch for the info columns, and
+# `fastfetch --logo none`-style / non-tty use skips the animation.
+
+REAL_FF="$(command -v fastfetch)"
+FF_ARGS=("$@")
+
+passthrough() { command "$REAL_FF" "${FF_ARGS[@]}"; }
+
+# Never animate when piped, or for machine-readable / help output.
+if [[ -n "${FASTFETCH_NO_ANIM:-}" || ! -t 1 ]]; then
+  passthrough
+  exit $?
+fi
+for a in "${FF_ARGS[@]}"; do
+  case "$a" in
+    --json*|--format*|--gen-config*|-h|--help|-v|--version*|--list-*|--print-*|-j) passthrough; exit $? ;;
+    --logo*|-l|--file*|--data*|--raw|--sixel|--kitty*|--iterm|--chafa*) passthrough; exit $? ;;
+  esac
+done
+
+# Arch logo, same shape as fastfetch's builtin "arch".
+LOGO=(
+"                    -\`"
+"                   .o+\`"
+"                  \`ooo/"
+"                 \`+oooo:"
+"                \`+oooooo:"
+"                -+oooooo+:"
+"              \`/:-:++oooo+:"
+"             \`/++++/+++++++:"
+"            \`/++++++++++++++:"
+"           \`/+++ooooooooooooo/\`"
+"          ./ooosssso++osssssso+\`"
+"         .oossssso-\`\`\`\`/ossssss+\`"
+"        -osssssso.      :ssssssso."
+"       :osssssss/        osssso+++."
+"      /ossssssss/        +ssssooo/-"
+"    \`/ossssso+/:-        -:/+osssso+-"
+"   \`+sso+:-\`                 \`.-/+oso:"
+"  \`++:.                           \`-/+/"
+"  .\`                                 \`/"
+)
+PAD_TOP=2
+PAD_LEFT=2
+GAP=6
+
+DELAY="${FASTFETCH_ANIM_DELAY:-0.06}"
+LIMIT="${FASTFETCH_ANIM_FRAMES:-}" # empty = spin forever, any key/Ctrl+C lands on static
+if [[ "${FASTFETCH_LOGO_COLOR:-}" =~ ^[0-9]+$ ]]; then
+  LC_ON=$'\e[38;5;'"${FASTFETCH_LOGO_COLOR}"$'m'; LC_OFF=$'\e[0m'
+else
+  LC_ON=$'\e[97m'; LC_OFF=$'\e[0m' # pure white logo
+fi
+
+# --pipe false: keep key colors even though INFO is captured through a pipe.
+mapfile -t INFO < <(command "$REAL_FF" --logo none --pipe false "${FF_ARGS[@]}" 2>/dev/null)
+[[ "${#INFO[@]}" -eq 0 ]] && { passthrough; exit $?; }
+
+# Build padded logo block.
+BLOCK=()
+for ((i = 0; i < PAD_TOP; i++)); do BLOCK+=(""); done
+for line in "${LOGO[@]}"; do BLOCK+=("$(printf '%*s%s' "$PAD_LEFT" "" "$line")"); done
+
+WIDTH=0
+for line in "${BLOCK[@]}"; do ((${#line} > WIDTH)) && WIDTH=${#line}; done
+WIDTH=$((WIDTH + GAP))
+
+ROWS=${#INFO[@]}
+((${#BLOCK[@]} > ROWS)) && ROWS=${#BLOCK[@]}
+
+# Rows that actually contain logo ink (blank rows are never touched).
+LROWS=()
+for ((r = 0; r < ${#BLOCK[@]}; r++)); do
+  [[ -n "${BLOCK[r]}" ]] && LROWS+=("$r")
+done
+
+# One full revolution around the logo's vertical axis, as integer |cos|
+# percentages (bash has no floating point, so the table is precomputed).
+# PCT=100 -> full width, PCT=0 -> edge-on (1-char flash).
+PCT=(100 99 97 92 87 79 71 61 50 38 26 13 0 13 26 38 50 61 71 79 87 92 97 99 100 99 97 92 87 79 71 61 50 38 26 13 0 13 26 38 50 61 71 79 87 92 97 99)
+NFRAMES=${#PCT[@]}
+
+# Precompute every logo cell once (only 13 unique widths): each cell is a
+# fixed-WIDTH string, so frames overwrite the full column and leave nothing.
+declare -A CELL
+for pct in $(printf '%s\n' "${PCT[@]}" | sort -nu); do
+  for r in "${LROWS[@]}"; do
+    logo="${BLOCK[r]}"
+    L=${#logo}
+    w=$(( (L * pct + 50) / 100 ))
+    (( w < 1 )) && w=1
+    if (( w <= 2 )); then # edge-on: show ink, not padding space
+      trimmed="${logo#"${logo%%[![:space:]]*}"}"
+      scaled="${trimmed:0:1}"
+      (( w == 2 )) && scaled+="$scaled"
+    else
+      scaled=""
+      for ((x = 0; x < w; x++)); do
+        src=$(( (x * L) / w ))
+        scaled+=${logo:src:1}
+      done
+    fi
+    lead=$(( (WIDTH - w) / 2 ))
+    trail=$(( WIDTH - w - lead ))
+    CELL["$pct,$r"]="$(printf '%*s%s%*s' "$lead" "" "$scaled" "$trail" "")"
+  done
+done
+BLANK="$(printf '%*s' "$WIDTH" "")"
+
+# Animation runs on the terminal's alternate screen, then we return to the
+# main screen and print the static fastfetch exactly once — so the logo
+# can never appear twice, regardless of terminal width or wrapping.
+tput smcup 2>/dev/null || { passthrough; exit $?; }
+tput civis 2>/dev/null
+tput rmam 2>/dev/null # no linewrap while animating
+restore() { tput smam 2>/dev/null; tput rmcup 2>/dev/null; tput cnorm 2>/dev/null; }
+land() { # back on the main screen, single static print
+  trap - EXIT INT TERM HUP
+  restore
+  command "$REAL_FF" "${FF_ARGS[@]}"
+  exit ${1:-0}
+}
+trap restore EXIT
+trap 'land 130' INT TERM HUP
+
+# Paint everything once, top-aligned like normal fastfetch output.
+printf '\e[H'
+for ((r = 0; r < ROWS; r++)); do
+  if [[ -n "${BLOCK[$r]:-}" ]]; then
+    printf '%s%s%s%s\n' "$LC_ON" "${CELL["100,$r"]}" "$LC_OFF" "${INFO[$r]:-}"
+  else
+    printf '%s%s\n' "$BLANK" "${INFO[$r]:-}"
+  fi
+done
+
+# Spin: only the logo cells move. Info text is never redrawn.
+f=0
+while :; do
+  i=$((f % NFRAMES))
+  pct=${PCT[i]}
+  for r in "${LROWS[@]}"; do
+    printf '\e[%d;1H%s%s%s' "$((r + 1))" "$LC_ON" "${CELL["$pct,$r"]}" "$LC_OFF"
+  done
+  f=$((f + 1))
+  if [[ -n "$LIMIT" ]] && (( f >= LIMIT )); then break; fi
+  if [[ -t 0 ]]; then
+    # Frame delay doubles as quit-on-any-key (Ctrl+C works too via trap).
+    if IFS= read -rsn1 -t "$DELAY" _key 2>/dev/null; then break; fi
+  else
+    sleep "$DELAY"
+  fi
+done
+
+land 0

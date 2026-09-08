@@ -48,6 +48,8 @@ mkdir -p "${USER_HOME}/.config/omarchy/extensions"
 mkdir -p "${USER_HOME}/.config/omarchy/themed"
 mkdir -p "${USER_HOME}/.config/omarchy/defaults"
 mkdir -p "${USER_HOME}/.config/omarchy/branding"
+mkdir -p "${USER_HOME}/.config/omarchy/brave-polish"
+mkdir -p "${USER_HOME}/.config/omarchy/brave-darkreader"
 mkdir -p "${USER_HOME}/.config/hypr"
 mkdir -p "${USER_HOME}/.config/fastfetch"
 mkdir -p "${USER_HOME}/.local/bin"
@@ -70,9 +72,20 @@ cp -a "${SCRIPT_DIR}/configs/omarchy/extensions/." "${USER_HOME}/.config/omarchy
 cp -a "${SCRIPT_DIR}/configs/omarchy/themed/." "${USER_HOME}/.config/omarchy/themed/"
 cp -a "${SCRIPT_DIR}/configs/omarchy/hooks/." "${USER_HOME}/.config/omarchy/hooks/"
 
+if [[ -d "${SCRIPT_DIR}/configs/omarchy/brave-polish" ]]; then
+  echo "  -> Restoring Brave Origin Polish companion extension..."
+  mkdir -p "${USER_HOME}/.config/omarchy/brave-polish"
+  cp -a "${SCRIPT_DIR}/configs/omarchy/brave-polish/." "${USER_HOME}/.config/omarchy/brave-polish/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/omarchy/brave-darkreader" ]]; then
+  echo "  -> Restoring Brave Dark Reader MV3 fork extension..."
+  mkdir -p "${USER_HOME}/.config/omarchy/brave-darkreader"
+  cp -a "${SCRIPT_DIR}/configs/omarchy/brave-darkreader/." "${USER_HOME}/.config/omarchy/brave-darkreader/"
+fi
+
 # Make all installed hooks executable
 find "${USER_HOME}/.config/omarchy/hooks" -type f -exec chmod +x {} +
-echo "  [OK] Omarchy core configs, extensions, templates, and hooks restored."
+echo "  [OK] Omarchy core configs, brave mods, extensions, templates, and hooks restored."
 
 echo ""
 echo "==> Step 3: Restoring Hyprland configuration..."
@@ -147,6 +160,24 @@ if [[ -f "${SCRIPT_DIR}/configs/xdg-terminals.list" ]]; then
 fi
 if [[ -f "${SCRIPT_DIR}/configs/fastfetch/config.jsonc" ]]; then
   cp -a "${SCRIPT_DIR}/configs/fastfetch/config.jsonc" "${USER_HOME}/.config/fastfetch/config.jsonc"
+fi
+if [[ -f "${SCRIPT_DIR}/configs/chromium-flags.conf" ]]; then
+  cp -a "${SCRIPT_DIR}/configs/chromium-flags.conf" "${USER_HOME}/.config/"
+  echo "  [OK] Restored Chromium / Brave Wayland ozone flags: ~/.config/chromium-flags.conf"
+fi
+if [[ -f "${SCRIPT_DIR}/configs/brave/policies/managed/omarchy-ntp.json" ]]; then
+  echo "  -> Restoring Brave Origin managed policies..."
+  if [[ -w "/etc/brave/policies/managed" ]]; then
+    cp -a "${SCRIPT_DIR}/configs/brave/policies/managed/omarchy-ntp.json" "/etc/brave/policies/managed/"
+    echo "  [OK] Installed Brave managed policy: /etc/brave/policies/managed/omarchy-ntp.json"
+  elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+    sudo mkdir -p "/etc/brave/policies/managed"
+    sudo cp -a "${SCRIPT_DIR}/configs/brave/policies/managed/omarchy-ntp.json" "/etc/brave/policies/managed/"
+    echo "  [OK] Installed Brave managed policy via sudo: /etc/brave/policies/managed/omarchy-ntp.json"
+  else
+    echo "  [NOTE] Run the following to enable the Omarchy New Tab Page policy in Brave Origin:"
+    echo "         sudo mkdir -p /etc/brave/policies/managed && sudo cp ${SCRIPT_DIR}/configs/brave/policies/managed/omarchy-ntp.json /etc/brave/policies/managed/"
+  fi
 fi
 if [[ -d "${SCRIPT_DIR}/configs/systemd/user" ]]; then
   mkdir -p "${USER_HOME}/.config/systemd/user"
@@ -317,6 +348,7 @@ if [[ -d "${SCRIPT_DIR}/configs/omagent" ]]; then
   echo "  -> Restoring Omagent AI assistant configurations & mobile web PWA..."
   mkdir -p "${USER_HOME}/.config/omagent/ssl" "${USER_HOME}/.local/state/omagent/sessions"
   cp -a "${SCRIPT_DIR}/configs/omagent/coding_agent_prompt.md" "${USER_HOME}/.config/omagent/" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/omagent/agent_identity.md" "${USER_HOME}/.config/omagent/" 2>/dev/null || true
   if [[ -d "${SCRIPT_DIR}/configs/omagent/mobile-web" ]]; then
     mkdir -p "${USER_HOME}/.config/omagent/mobile-web"
     cp -a "${SCRIPT_DIR}/configs/omagent/mobile-web/." "${USER_HOME}/.config/omagent/mobile-web/"
@@ -447,6 +479,12 @@ if [[ -f "${SCRIPT_DIR}/lib/omarchy-whatsapp/sweep" ]]; then
   chmod +x "${USER_HOME}/.local/lib/omarchy-whatsapp/sweep"
   echo "  [OK] Installed ~/.local/lib/omarchy-whatsapp/sweep"
 fi
+if [[ -f "${SCRIPT_DIR}/lib/omarchy_theme.py" ]]; then
+  PYTHON_USER_SITE="$(python3 -m site --user-site 2>/dev/null || echo "${USER_HOME}/.local/lib/python3.14/site-packages")"
+  mkdir -p "$PYTHON_USER_SITE"
+  cp -a "${SCRIPT_DIR}/lib/omarchy_theme.py" "${PYTHON_USER_SITE}/"
+  echo "  [OK] Installed Python theme library: ${PYTHON_USER_SITE}/omarchy_theme.py"
+fi
 
 echo ""
 echo "==> Step 10: Restoring desktop launchers..."
@@ -491,6 +529,16 @@ if command -v omarchy >/dev/null 2>&1; then
   if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-zen" ]]; then
     echo "  -> Syncing Zen Browser with active Omarchy theme..."
     "${USER_HOME}/.local/bin/omarchy-sync-zen" 2>/dev/null || true
+  fi
+
+  if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-brave" ]]; then
+    echo "  -> Syncing Brave Origin with active Omarchy theme..."
+    "${USER_HOME}/.local/bin/omarchy-sync-brave" --sync 2>/dev/null || true
+  fi
+
+  if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-vlc" ]]; then
+    echo "  -> Syncing VLC with active Omarchy theme..."
+    "${USER_HOME}/.local/bin/omarchy-sync-vlc" --sync 2>/dev/null || true
   fi
 
   echo "  -> Setting font: JetBrainsMono Nerd Font"

@@ -1,10 +1,10 @@
-# Firstmate Coding Agent Instructions (Pi Harness + Herdr + Compound Engineering)
+# Omagent Coding Agent Instructions (Antigravity CLI / Pi Harness + Herdr + Compound Engineering)
 
-You are the lead AI software engineer and Firstmate liaison operating on Omarchy Linux.
-You are running on the **Pi harness** inside a dedicated **Herdr** workspace.
+You are the lead AI software engineer and autonomous agent operating on Omarchy Linux.
+You are running inside a dedicated **Herdr** workspace powered by **Antigravity CLI (`agy`)** or **Firstmate (Pi harness)**.
 
 ## 1. MANDATORY COMPOUND ENGINEERING METHODOLOGY
-For EVERY coding task, you MUST strictly use the relevant skills from the **Compound Engineering** suite located in `~/.pi/agent/skills/`.
+For EVERY coding task, you MUST strictly use the relevant skills from the **Compound Engineering** suite located in `~/.agents/skills/` (or `~/.pi/agent/skills/`).
 Never write code or modify files ad-hoc without following the relevant engineering lifecycle.
 
 ### Core Compound Engineering Skills:

@@ -1,0 +1,179 @@
+#!/bin/bash
+set -euo pipefail
+
+# ==============================================================================
+# Omarchy -> VLC Dynamic Theme Sync
+# ------------------------------------------------------------------------------
+# Script: ~/.local/bin/omarchy-sync-vlc
+# Purpose: Keep VLC's UI colors in sync with the active Omarchy theme.
+#
+# HOW IT WORKS:
+# - Reads the palette from ~/.local/state/omarchy/current/theme/colors.toml
+#   via the `omarchy-theme-color` helper (same source every Omarchy theme
+#   template uses, with luminance fallback for `mode`).
+# - Writes VLC's native color knobs into ~/.config/vlc/vlcrc:
+#     qt-dark-palette  = 1 for dark themes, 0 for light themes
+#     qt-slider-colours = 4-stop gradient derived from the theme accent
+#                         (dim accent; accent; bright accent; theme red
+#                         reserved for the "max/clipping" end of the slider)
+# - The rest of VLC's Qt widgets follow the system GTK dark/light mode,
+#   which Omarchy already syncs (omarchy-theme-set-gnome), so no extra work
+#   is needed there.
+#
+# LIMITATION (VLC 3.x, honest note):
+# VLC's Qt interface only exposes these two color settings. There is no
+# supported per-widget stylesheet API in VLC 3, and skins2 (.vlt) skins are
+# static images that cannot follow a theme dynamically — so this script
+# themes everything VLC actually allows to be themed.
+#
+# AUTOMATION: ~/.config/omarchy/hooks/theme-set.d/vlc-sync.sh invokes this
+# script on every `omarchy theme set <name>`.
+# ==============================================================================
+
+CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+THEME_NAME_FILE="$HOME/.local/state/omarchy/current/theme.name"
+COLORS_FILE="$CURRENT_THEME_DIR/colors.toml"
+VLCRC="$HOME/.config/vlc/vlcrc"
+
+show_help() {
+  cat <<'EOF'
+Usage: omarchy-sync-vlc [OPTIONS]
+
+Sync VLC UI colors with the active Omarchy theme.
+
+Options:
+  --sync             Update ~/.config/vlc/vlcrc from the current theme (default)
+  --status           Show current theme colors and what VLC is configured with
+  --file <path>      Use a different colors.toml (for testing a theme offline)
+  -h, --help         Display this help message
+
+Notes:
+  - VLC overwrites vlcrc on exit, so run this while VLC is closed (or
+    restart VLC afterwards to pick up the new colors).
+  - A timestamped backup (vlcrc.bak.<epoch>) is kept before each change.
+EOF
+}
+
+THEME_COLOR() {
+  omarchy-theme-color --file "$COLORS_FILE" "$@" 2>/dev/null || true
+}
+
+hex_to_rgb() {
+  python3 -c 'import sys; h=sys.argv[1].lstrip("#"); print(f"{int(h[0:2],16)};{int(h[2:4],16)};{int(h[4:6],16)}")' "$1"
+}
+
+# Mix two hex colors: mix <hex-a> <hex-b> <amount-of-b 0..1>
+mix_hex() {
+  python3 - "$1" "$2" "$3" <<'PYEOF'
+import sys
+def parse(h):
+  h = h.lstrip('#')
+  return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+a, b, t = parse(sys.argv[1]), parse(sys.argv[2]), float(sys.argv[3])
+c = tuple(round(x + (y - x) * t) for x, y in zip(a, b))
+print('#%02x%02x%02x' % c)
+PYEOF
+}
+
+do_status() {
+  local theme_name="unknown"
+  [[ -f "$THEME_NAME_FILE" ]] && theme_name=$(cat "$THEME_NAME_FILE")
+  echo "theme:        $theme_name"
+  echo "colors.toml:  $COLORS_FILE"
+  if [[ ! -f "$COLORS_FILE" ]]; then
+    echo "status:       no colors.toml found, nothing to sync"
+    return 0
+  fi
+  echo "mode:         $(THEME_COLOR mode dark)"
+  echo "accent:       $(THEME_COLOR accent)"
+  echo "background:   $(THEME_COLOR background)"
+  echo "foreground:   $(THEME_COLOR foreground)"
+  echo "red:          $(THEME_COLOR red)"
+  if [[ -f "$VLCRC" ]]; then
+    echo "vlcrc qt-dark-palette:   $(grep -E '^#?qt-dark-palette=' "$VLCRC" | tail -1)"
+    echo "vlcrc qt-slider-colours: $(grep -E '^#?qt-slider-colours=' "$VLCRC" | tail -1)"
+  else
+    echo "vlcrc:        (not created yet — VLC hasn't been configured)"
+  fi
+}
+
+do_sync() {
+  [[ -f "$COLORS_FILE" ]] || { echo "[omarchy-sync-vlc] No colors.toml at $COLORS_FILE, skipping." >&2; return 0; }
+
+  local mode accent background foreground red
+  mode=$(THEME_COLOR mode dark)
+  accent=$(THEME_COLOR accent "#7aa2f7")
+  background=$(THEME_COLOR background "#1a1b26")
+  foreground=$(THEME_COLOR foreground "#c0caf5")
+  red=$(THEME_COLOR red "#f7768e")
+
+  local dark_palette=1
+  [[ "$mode" == "light" ]] && dark_palette=0
+
+  # 4-stop slider gradient: dim accent -> accent -> bright accent -> theme red.
+  local c1 c2 c3 slider
+  c1=$(mix_hex "$accent" "$background" 0.45)
+  c2="$accent"
+  c3=$(mix_hex "$accent" "$foreground" 0.35)
+  # Guard: bright_blue fallback already equals accent when missing; keep c3 distinct.
+  if [[ "$c3" == "$c2" ]]; then
+    c3=$(mix_hex "$accent" "#ffffff" 0.35)
+  fi
+  slider="$(hex_to_rgb "$c1");$(hex_to_rgb "$c2");$(hex_to_rgb "$c3");$(hex_to_rgb "$red")"
+
+  mkdir -p "$(dirname "$VLCRC")"
+  if [[ -f "$VLCRC" ]]; then
+    cp "$VLCRC" "$VLCRC.bak.$(date +%s)"
+  fi
+
+  DARK_PALETTE="$dark_palette" SLIDER="$slider" VLCRC_PATH="$VLCRC" python3 - <<'PYEOF'
+import os, re
+path = os.environ["VLCRC_PATH"]
+dark = os.environ["DARK_PALETTE"]
+slider = os.environ["SLIDER"]
+lines = []
+if os.path.exists(path):
+  with open(path) as f:
+    lines = f.read().splitlines()
+out, found_dark, found_slider = [], False, False
+for line in lines:
+  if re.match(r'^#?qt-dark-palette=', line):
+    if not found_dark:
+      out.append(f'qt-dark-palette={dark}')
+      found_dark = True
+    continue
+  if re.match(r'^#?qt-slider-colours=', line):
+    if not found_slider:
+      out.append(f'qt-slider-colours={slider}')
+      found_slider = True
+    continue
+  out.append(line)
+if not found_dark:
+  out.append(f'qt-dark-palette={dark}')
+if not found_slider:
+  out.append(f'qt-slider-colours={slider}')
+with open(path, 'w') as f:
+  f.write('\n'.join(out) + '\n')
+PYEOF
+
+  echo "[omarchy-sync-vlc] theme mode=$mode accent=$accent -> vlcrc (qt-dark-palette=$dark_palette)"
+  if pgrep -x vlc >/dev/null 2>&1; then
+    echo "[omarchy-sync-vlc] NOTE: VLC is running — restart it so the new colors take effect (VLC rewrites vlcrc on exit)." >&2
+  fi
+}
+
+MODE="sync"
+while (( $# > 0 )); do
+  case "$1" in
+    --status) MODE="status"; shift ;;
+    --sync) MODE="sync"; shift ;;
+    --file) COLORS_FILE="$2"; shift 2 ;;
+    -h|--help) show_help; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; show_help >&2; exit 1 ;;
+  esac
+done
+
+case "$MODE" in
+  status) do_status ;;
+  sync) do_sync ;;
+esac

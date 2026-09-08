@@ -1,9 +1,17 @@
 {
+  "bhanu.omavideos": {
+    "remote": "https://github.com/Bhanu4417/OmaVideos.git",
+    "commit": "2193bb8bab364475075e60511093cdc2424617b7",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
   "charlieras262.floating-bar": {
     "remote": "https://github.com/Charlieras262/omarchy-floating-bar.git",
     "commit": "5e7dc23421f1f774e5c329cc2397b5825900b75e",
-    "has_local_changes": false,
-    "dirty_files": []
+    "has_local_changes": true,
+    "dirty_files": [
+      "M Bar.qml"
+    ]
   },
   "chispes.agent-gemini": {
     "remote": "https://github.com/Chispes/omarchy-agent-gemini.git",
@@ -168,6 +176,14 @@
   "soham.power": {
     "remote": null,
     "custom": true
+  },
+  "tristonarmstrong.dictionary": {
+    "remote": "https://github.com/tristonarmstrong/omarchy-dictionary.git",
+    "commit": "d73cf9a0a4958e03ead01e6a232b43224a2fe529",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M Panel.qml"
+    ]
   },
   "x692137x.powerwave": {
     "remote": "https://github.com/sjgng/omarchy-powerwave-plugin.git",

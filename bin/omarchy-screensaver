@@ -3,7 +3,7 @@
 # omarchy:summary=Run the Omarchy screensaver and lock system when dismissed
 
 screensaver_in_focus() {
-  hyprctl activewindow -j | jq -e '.class == "org.omarchy.screensaver"' >/dev/null 2>&1
+  hyprctl activewindow -j 2>/dev/null | jq -e '.class == "org.omarchy.screensaver"' >/dev/null 2>&1
 }
 
 in_exit=0
@@ -23,20 +23,23 @@ exit_screensaver() {
   # Stop animation process
   pkill -x ttfx 2>/dev/null || true
 
-  # Blank the screen to prevent any desktop flash
+  # Blank the screen immediately to prevent any desktop flash
   clear 2>/dev/null || true
   printf '\033]11;rgb:00/00/00\007\033[2J\033[H' 2>/dev/null || true
 
-  # Trigger system lock immediately
-  omarchy-system-lock >/dev/null 2>&1 &
+  # Request session lock immediately
+  omarchy-shell lock lock >/dev/null 2>&1 || true
 
-  # Wait for lock to engage (up to 1.5 seconds)
-  for ((i = 0; i < 30; i++)); do
+  # Wait for lock to engage (up to 2.5 seconds)
+  for ((i = 0; i < 50; i++)); do
     if [[ $(omarchy-shell lock isLocked 2>/dev/null) == "true" ]]; then
       break
     fi
     sleep 0.05
   done
+
+  # Run full system lock routines (keyboard layout reset, 1password lock, etc.)
+  omarchy-system-lock >/dev/null 2>&1 &
 
   # Terminate screensaver window
   pkill -f '[o]rg.omarchy.screensaver' 2>/dev/null || true
@@ -66,6 +69,7 @@ wait_for_terminal_resize
 
 # Record initial cursor position
 initial_pos=$(hyprctl cursorpos 2>/dev/null)
+has_been_in_focus=0
 
 while true; do
   ttfx -i ~/.config/omarchy/branding/screensaver.txt \
@@ -78,8 +82,10 @@ while true; do
       exit_screensaver
     fi
 
-    # 2. Window focus lost
-    if ! screensaver_in_focus; then
+    # 2. Window focus check (only trigger if window was previously focused and then lost focus)
+    if screensaver_in_focus; then
+      has_been_in_focus=1
+    elif (( has_been_in_focus )); then
       exit_screensaver
     fi
 

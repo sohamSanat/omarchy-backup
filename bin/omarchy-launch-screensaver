@@ -1,33 +1,101 @@
 #!/bin/bash
 
-# Force start if requested
-if [[ ${1:-} == "force" ]]; then
-  exec /usr/share/omarchy/bin/omarchy-launch-screensaver "$@"
+# omarchy:summary=Launch the Omarchy screensaver with automatic lock on dismissal
+
+if omarchy-cmd-missing ttfx; then
+  exit 1
 fi
 
-# Check screensaver-off toggle
-if [[ -f "$HOME/.local/state/omarchy/toggles/screensaver-off" ]]; then
+# Exit early if screensaver is already running
+pgrep -f '[o]rg.omarchy.screensaver' && exit 0
+
+# Exit early if system is already locked
+if [[ $(omarchy-shell lock isLocked 2>/dev/null) == "true" ]]; then
   exit 0
 fi
 
-# Check stay-awake flag (manual user toggle)
-if [[ -f "$HOME/.local/state/omarchy/indicators/stay-awake" ]]; then
-  exit 0
-fi
-
-# Safety check: do not launch if any browser or media player has an active uncorked audio stream
-has_active_audio=$(pactl -f json list sink-inputs 2>/dev/null | jq 'any(.[]?; (.corked == false) and (.properties["application.name"] // "" | test("^(PipeWire ALSA \\[voxtype|system-sounds)"; "i") | not))' 2>/dev/null)
-if [[ "$has_active_audio" == "true" ]]; then
-  exit 0
-fi
-
-# Safety check: do not launch if any MPRIS player is currently playing
-for p in $(busctl --user list 2>/dev/null | awk '/org.mpris.MediaPlayer2/{print $1}'); do
-  status=$(busctl --user get-property "$p" /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null)
-  if [[ $status == *"Playing"* ]]; then
+# Allow screensaver to be turned off but also force started
+if [[ ${1:-} != "force" ]]; then
+  if omarchy-toggle-enabled screensaver-off 2>/dev/null; then
     exit 0
   fi
+  if [[ -f "$HOME/.local/state/omarchy/indicators/stay-awake" ]]; then
+    exit 0
+  fi
+
+  # Safety check: do not launch if any browser or media player has an active uncorked audio stream
+  has_active_audio=$(pactl -f json list sink-inputs 2>/dev/null | jq 'any(.[]?; (.corked == false) and (.properties["application.name"] // "" | test("^(PipeWire ALSA \\[voxtype|system-sounds)"; "i") | not))' 2>/dev/null)
+  if [[ "$has_active_audio" == "true" ]]; then
+    exit 0
+  fi
+
+  # Safety check: do not launch if any MPRIS player is currently playing
+  for p in $(busctl --user list 2>/dev/null | awk '/org.mpris.MediaPlayer2/{print $1}'); do
+    status=$(busctl --user get-property "$p" /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null)
+    if [[ $status == *"Playing"* ]]; then
+      exit 0
+    fi
+  done
+fi
+
+focused=$(omarchy-hyprland-monitor-focused)
+terminal=$(xdg-terminal-exec --print-id)
+
+case $terminal in
+*Alacritty* | *ghostty* | *foot* | *kitty*) ;;
+*)
+  omarchy-notification-send -g ✋ "Screensaver only runs in Alacritty, Foot, Ghostty, or Kitty"
+  exit 1
+  ;;
+esac
+
+SCREENSAVER_BIN="$HOME/.local/bin/omarchy-screensaver"
+if [[ ! -x "$SCREENSAVER_BIN" ]]; then
+  SCREENSAVER_BIN="/usr/share/omarchy/bin/omarchy-screensaver"
+fi
+
+hypr_focus_monitor() {
+  hyprctl dispatch "hl.dsp.focus({ monitor = \"$1\" })" >/dev/null 2>&1 || hyprctl dispatch focusmonitor "$1" >/dev/null
+}
+
+hypr_exec() {
+  local command
+  printf -v command '%q ' "$@"
+
+  hyprctl dispatch "hl.dsp.exec_cmd([[$command]])" >/dev/null 2>&1 || hyprctl dispatch exec -- bash -lc "$command" >/dev/null
+}
+
+SOCKET="$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock"
+
+# Open Hyprland's event stream before spawning anything
+exec {events}< <(socat -U - "UNIX-CONNECT:$SOCKET")
+
+wait_for_screensaver_window() {
+  local line deadline=$((SECONDS + 5))
+  while ((SECONDS < deadline)) && IFS= read -r -t $((deadline - SECONDS)) -u "$events" line; do
+    [[ $line == openwindow\>\>*,org.omarchy.screensaver,* ]] && return 0
+  done
+}
+
+for m in $(hyprctl monitors -j | jq -r '.[] | .name'); do
+  hypr_focus_monitor "$m"
+
+  case $terminal in
+  *Alacritty*)
+    hypr_exec alacritty --class=org.omarchy.screensaver --config-file "$OMARCHY_PATH/default/alacritty/screensaver.toml" -e "$SCREENSAVER_BIN"
+    ;;
+  *ghostty*)
+    hypr_exec ghostty --class=org.omarchy.screensaver --config-file="$OMARCHY_PATH/default/ghostty/screensaver" --font-size=18 -e "$SCREENSAVER_BIN"
+    ;;
+  *foot*)
+    hypr_exec foot --app-id=org.omarchy.screensaver --config="$OMARCHY_PATH/default/foot/screensaver.ini" -e "$SCREENSAVER_BIN"
+    ;;
+  *kitty*)
+    hypr_exec kitty --class=org.omarchy.screensaver --override font_size=18 --override window_padding_width=0 -e "$SCREENSAVER_BIN"
+    ;;
+  esac
+
+  wait_for_screensaver_window
 done
 
-# Otherwise, run the default screensaver
-exec /usr/share/omarchy/bin/omarchy-launch-screensaver "$@"
+hypr_focus_monitor "$focused"

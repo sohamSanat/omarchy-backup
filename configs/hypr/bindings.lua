@@ -43,8 +43,10 @@ o.bind("SUPER + M", "YouTube Music", { tui = "ytkew", focus = true })
 
 -- Omagent (omaagent)
 o.bind("ALT + SPACE", "Omagent", "omarchy-shell shell toggle io.github.ellion369.omagent")
-o.bind("SUPER + V", "Omagent Voice Intercom", "omagent-voice")
 hl.layer_rule({ match = { namespace = "omarchy-omagent" }, blur = true, ignore_alpha = 0.6 })
+
+-- Dictionary
+o.bind("SUPER + D", "Look up selection in dictionary", "omarchy-dictionary-lookup")
 
 
 -- Workspace Switcher: begin

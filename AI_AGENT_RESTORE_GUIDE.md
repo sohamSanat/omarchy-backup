@@ -225,6 +225,49 @@ This repository contains the full snapshot of user customizations:
      - `~/.config/omagent/config.json` is configured with `"coding_harness": "antigravity"`, `"fast_model": "gemini-3.8-flash"`.
      - API keys are protected (`YOUR_GEMINI_API_KEY` placeholder in backup).
      - Local self-signed TLS certificates (`cert.pem`, `key.pem`) are generated in `~/.config/omagent/ssl/` automatically by `restore.sh`.
+   - **Identity & Coding Instructions**:
+     - `agent_identity.md`: Jarvis-like persona architecture, tri-lane tech stack, and tool specification.
+     - `coding_agent_prompt.md`: Instructions for autonomous software engineering via Antigravity CLI (`agy`) and Pi Harness with Herdr workspaces.
+
+18. **Brave Origin Browser Customization & Theming Suite**:
+   - **Companion Unpacked MV3 Extension (`configs/omarchy/brave-polish/`)**:
+     - Replaces default NTP with a transparent Omarchy canvas (`ntp.html`, `ntp.js`, `ntp.css`) displaying the active theme colors and wallpaper directly over Hyprland.
+     - Injects site polish for major platforms (`loader.js`, `global.js`, `polish.css`, `global.css`) such as YouTube, GitHub, and Reddit with zero-restart hot-reloading.
+   - **Brave Dark Reader Fork (`configs/omarchy/brave-darkreader/`)**:
+     - Full Chromium MV3 port of the Zen Dark Reader mod.
+     - Integrates ITU-R BT.601 perceptual luminance checking and dual-mode color mathematics (`modifyOmarchyDarkSchemeColor`, `modifyOmarchyLightBgColor`, `modifyOmarchyLightFgColor`) to prevent washed-out text on light themes.
+   - **Theme Templates (`configs/omarchy/themed/`)**:
+     - `brave-ntp.css.tpl`, `brave-polish.css.tpl`, `brave-polish.json.tpl`, `brave-manifest.json.tpl`, `brave-global.css.tpl`.
+   - **Synchronization Engine & Hooks**:
+     - `bin/omarchy-sync-brave`: CLI tool supporting `--sync` and `--status`.
+     - `configs/omarchy/hooks/theme-set.d/brave-sync.sh`: Hot-applies theme tokens to Brave on every `omarchy theme set`.
+   - **Managed NTP Policy & Flags**:
+     - `configs/brave/policies/managed/omarchy-ntp.json`: Sets `NewTabPageLocation` to the extension's `ntp.html`.
+     - `configs/chromium-flags.conf`: Sets Wayland ozone flags and default system extensions.
+
+19. **Dictionary Lookup & OmaVideos Plugins**:
+   - **`plugins/tristonarmstrong.dictionary`**:
+     - Floating bar dictionary widget with pronunciation, part-of-speech tabs, audio playback, word search, and history.
+     - Includes `bin/omarchy-dictionary-lookup`, bound globally to `SUPER + D` in `configs/hypr/bindings.lua` to look up selected text instantly.
+   - **`plugins/bhanu.omavideos`**:
+     - Video and media management plugin for the floating bar.
+   - **`plugins/charlieras262.floating-bar`**:
+     - Fixed background opacity logic (`0.0` when transparent, `1.0` when opaque) and disabled accidental double-click transparency toggling.
+
+20. **VLC Dynamic Theming & Terminal Art**:
+   - **`bin/omarchy-sync-vlc` & `configs/omarchy/hooks/theme-set.d/vlc-sync.sh`**:
+     - Derives a 4-stop slider gradient and dark/light palette mode from the active Omarchy theme and writes them directly into `~/.config/vlc/vlcrc`.
+   - **`bin/fastfetch-arch-anim`**:
+     - Smooth animated ASCII spinning Arch Linux banner for terminal sessions.
+   - **`bin/fastfetch-theme-accent`**:
+     - Dynamically maps the active theme's hex accent color to the nearest xterm-256 color for fastfetch and CLI banners.
+
+21. **Universal Omarchy Theming Library & Environment**:
+   - **`lib/omarchy_theme.py`**:
+     - Python library installed into user site-packages providing `is_light()`, `is_dark()`, and `get_palette()`.
+     - Enforces strict contrast rules for light themes (dark text `\033[38;5;235m`, never washed-out DIM or pale neon colors).
+   - **`bin/omarchy-theme-env`**:
+     - CLI tool exporting `OMARCHY_THEME_MODE` and `COLORFGBG` across all shell and terminal environments.
 
 ## 3. Fast Restoration (Automated)
 
