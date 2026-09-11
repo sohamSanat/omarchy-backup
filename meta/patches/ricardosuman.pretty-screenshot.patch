@@ -1,0 +1,13 @@
+diff --git i/omarchy-pretty-screenshot w/omarchy-pretty-screenshot
+index 8905e30..94e06c6 100755
+--- i/omarchy-pretty-screenshot
++++ w/omarchy-pretty-screenshot
+@@ -122,7 +122,7 @@ lua_block() {
+   cat <<'LUA'
+ -- ricardosuman.pretty-screenshot (begin)
+ hl.unbind("PRINT")
+-o.bind("PRINT", "Screenshot", "[ -x ~/.config/omarchy/plugins/ricardosuman.pretty-screenshot/omarchy-pretty-screenshot ] && exec ~/.config/omarchy/plugins/ricardosuman.pretty-screenshot/omarchy-pretty-screenshot || exec omarchy-capture-screenshot")
++o.bind("PRINT", "Screenshot", "test -x ~/.config/omarchy/plugins/ricardosuman.pretty-screenshot/omarchy-pretty-screenshot && exec ~/.config/omarchy/plugins/ricardosuman.pretty-screenshot/omarchy-pretty-screenshot || exec omarchy-capture-screenshot")
+ -- ricardosuman.pretty-screenshot (end)
+ LUA
+ }

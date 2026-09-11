@@ -25,7 +25,8 @@
 
 -- Logitech MX Keys examples:
 -- o.bind("SUPER + SHIFT + S", nil, "omarchy-capture-screenshot")
-o.bind("SUPER + H", "Toggle dictation", "voxtype record toggle")
+o.bind("SUPER + H", "Toggle dictation", "voxtype-dictate-toggle")
+o.bind("CTRL + H", "Toggle dictation", "voxtype-dictate-toggle")
 -- o.bind("SUPER + PERIOD", nil, "omarchy-shell shell toggle omarchy.emojis")
 
 -- Use Strata instead of Nautilus for Omarchy's file-manager shortcuts.
@@ -40,10 +41,6 @@ o.bind("SUPER + Y", "HomeLab launcher", "omarchy-shell shell toggle io.github.el
 
 -- YouTube Music (ytkew)
 o.bind("SUPER + M", "YouTube Music", { tui = "ytkew", focus = true })
-
--- Omagent (omaagent)
-o.bind("ALT + SPACE", "Omagent", "omarchy-shell shell toggle io.github.ellion369.omagent")
-hl.layer_rule({ match = { namespace = "omarchy-omagent" }, blur = true, ignore_alpha = 0.6 })
 
 -- Dictionary
 o.bind("SUPER + D", "Look up selection in dictionary", "omarchy-dictionary-lookup")
@@ -60,3 +57,14 @@ do
   end
 end
 -- Workspace Switcher: end
+
+-- ricardosuman.pretty-screenshot (begin)
+hl.unbind("PRINT")
+o.bind("PRINT", "Screenshot", "omarchy-pretty-screenshot")
+-- ricardosuman.pretty-screenshot (end)
+
+-- io.github.ellion369.omagent: begin
+o.bind("ALT + SPACE", "Omagent overlay", "omarchy-shell shell toggle io.github.ellion369.omagent")
+o.bind("SUPER + A", "Omagent overlay", "omarchy-shell shell toggle io.github.ellion369.omagent")
+hl.layer_rule({ match = { namespace = "omarchy-omagent" }, blur = true, ignore_alpha = 0.6 })
+-- io.github.ellion369.omagent: end

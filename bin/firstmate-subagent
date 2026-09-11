@@ -1,0 +1,580 @@
+#!/usr/bin/env python3
+"""
+firstmate-subagent: Command-line orchestration tool for spawning, directing,
+and supervising Firstmate crewmates and subagents across Herdr panes.
+Fully integrated with the 33 Compound Engineering skills.
+"""
+
+import sys
+import os
+import re
+import json
+import argparse
+import subprocess
+import time
+import shutil
+from pathlib import Path
+
+FM_DIR = Path.home() / "firstmate"
+FM_STATE_DIR = FM_DIR / "state"
+
+SKILL_DIRS = [
+    Path.home() / ".agents/skills",
+    Path.home() / "compound-engineering-plugin/skills",
+    Path.home() / ".pi/agent/skills",
+    Path("/usr/share/omarchy/default/agents/skills"),
+]
+
+def get_herdr_workspaces():
+    try:
+        p = subprocess.run(["herdr", "workspace", "list"], capture_output=True, text=True, timeout=5)
+        if p.returncode == 0:
+            data = json.loads(p.stdout)
+            return data.get("result", {}).get("workspaces", [])
+    except Exception:
+        pass
+    return []
+
+def get_herdr_panes():
+    try:
+        p = subprocess.run(["herdr", "pane", "list"], capture_output=True, text=True, timeout=5)
+        if p.returncode == 0:
+            data = json.loads(p.stdout)
+            return data.get("result", {}).get("panes", [])
+    except Exception:
+        pass
+    return []
+
+def get_herdr_agents():
+    try:
+        p = subprocess.run(["herdr", "agent", "list"], capture_output=True, text=True, timeout=5)
+        if p.returncode == 0:
+            data = json.loads(p.stdout)
+            return data.get("result", {}).get("agents", [])
+    except Exception:
+        pass
+    return []
+
+def ensure_herdr_server() -> bool:
+    """Ensures herdr server is running, auto-starting it in the background if down."""
+    try:
+        p = subprocess.run(["herdr", "status"], capture_output=True, text=True, timeout=3)
+        if "status: running" in p.stdout:
+            return True
+        if not shutil.which("herdr"):
+            return False
+        subprocess.Popen(
+            ["herdr", "server"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL, start_new_session=True,
+        )
+        for _ in range(15):
+            time.sleep(0.3)
+            p = subprocess.run(["herdr", "status"], capture_output=True, text=True, timeout=2)
+            if "status: running" in p.stdout:
+                return True
+    except Exception:
+        pass
+    return False
+
+def find_active_workspace_and_panes(cwd=None):
+    ensure_herdr_server()
+    ws_list = get_herdr_workspaces()
+    if not ws_list:
+        try:
+            target_cwd = str(cwd or Path.cwd())
+            p_ws = subprocess.run(["herdr", "workspace", "create", "--label", "Firstmate Fleet", "--cwd", target_cwd], capture_output=True, text=True, timeout=5)
+            if p_ws.returncode == 0:
+                ws_list = get_herdr_workspaces()
+        except Exception:
+            pass
+
+    focused_ws = next((w for w in ws_list if w.get("focused")), None)
+    if not focused_ws and ws_list:
+        focused_ws = ws_list[-1]
+    
+    if not focused_ws:
+        return None, []
+
+    ws_id = focused_ws.get("workspace_id")
+    panes = get_herdr_panes()
+    ws_panes = [p for p in panes if p.get("workspace_id") == ws_id]
+    return ws_id, ws_panes
+
+UI_SKILL_ROOTS = [
+    Path("/home/soham/Ui-skills/Set1"),
+    Path("/home/soham/Ui-skills/Set2"),
+    Path("/home/soham/Ui-skills/set3"),
+]
+
+def list_available_skills() -> dict[str, dict]:
+    """Scans skill directories and extracts skill metadata."""
+    skills = {}
+    for base in SKILL_DIRS:
+        if not base.is_dir():
+            continue
+        for child in base.iterdir():
+            skill_md = child / "SKILL.md" if child.is_dir() else None
+            if skill_md and skill_md.is_file():
+                name = child.name
+                if name not in skills:
+                    desc = ""
+                    try:
+                        c = skill_md.read_text("utf-8", errors="ignore")[:1000]
+                        m = re.search(r"^description:\s*(.+)$", c, re.MULTILINE)
+                        if m:
+                            desc = m.group(1).strip().strip('"\'')
+                    except Exception:
+                        pass
+                    skills[name] = {"path": skill_md.resolve(), "desc": desc}
+
+    for root in UI_SKILL_ROOTS:
+        if not root.is_dir():
+            continue
+        for skill_md in root.rglob("SKILL.md"):
+            name = skill_md.parent.name
+            if name not in skills:
+                desc = ""
+                try:
+                    c = skill_md.read_text("utf-8", errors="ignore")[:1000]
+                    m = re.search(r"^description:\s*(.+)$", c, re.MULTILINE)
+                    if m:
+                        desc = m.group(1).strip().strip('"\'')
+                except Exception:
+                    pass
+                skills[name] = {"path": skill_md.resolve(), "desc": desc}
+
+    return skills
+
+def resolve_compound_skill(skill_query: str | None, role: str | None, task: str | None) -> tuple[str, Path | None, str]:
+    """Resolves the best Compound Engineering skill for a subagent."""
+    available = list_available_skills()
+
+    # 1. Direct query match
+    if skill_query:
+        clean = skill_query.strip().lower()
+        if clean in available:
+            return clean, available[clean]["path"], available[clean]["desc"]
+        if f"ce-{clean}" in available:
+            k = f"ce-{clean}"
+            return k, available[k]["path"], available[k]["desc"]
+        for k, v in available.items():
+            if clean in k:
+                return k, v["path"], v["desc"]
+
+    # 2. Heuristic resolution based on role & task
+    context = f"{role or ''} {task or ''}".lower()
+    mapping = [
+        (("ui-optimize", "smooth", "butter", "responsive", "phone", "mobile-ui", "optimize-ui", "ui-polish", "animation", "transitions", "60fps"), "ce-ui-optimize"),
+        (("review", "code-review", "adversarial", "audit", "critique"), "ce-code-review"),
+        (("browser", "playwright", "e2e", "ui-test", "visual-test"), "ce-test-browser"),
+        (("debug", "bug", "crash", "error", "traceback", "investigate", "fix"), "ce-debug"),
+        (("plan", "architect", "spec", "breakdown", "roadmap"), "ce-plan"),
+        (("prototype", "mock", "sketch", "wireframe"), "ce-prototype"),
+        (("simplify", "refactor", "clean", "dedup"), "ce-simplify-code"),
+        (("polish", "craft", "typography", "spacing"), "ce-polish"),
+        (("dogfood", "manual-test", "exploratory"), "ce-dogfood"),
+        (("optimize", "perf", "benchmark", "speed", "metric"), "ce-optimize"),
+        (("explain", "teach", "diagram", "visualize"), "ce-explain"),
+        (("brainstorm", "ideate", "explore"), "ce-brainstorm"),
+        (("compound", "learning", "knowledge"), "ce-compound"),
+        (("worktree", "branch-isolate"), "ce-worktree"),
+        (("commit", "pr", "ship"), "ce-commit-push-pr"),
+    ]
+
+    for keywords, target_skill in mapping:
+        if any(kw in context for kw in keywords):
+            if target_skill in available:
+                return target_skill, available[target_skill]["path"], available[target_skill]["desc"]
+
+    # Default to ce-work (general implementation)
+    default_skill = "ce-work" if "ce-work" in available else (list(available.keys())[0] if available else "ce-work")
+    path = available[default_skill]["path"] if default_skill in available else None
+    desc = available[default_skill]["desc"] if default_skill in available else "End-to-end task implementation"
+    return default_skill, path, desc
+
+def format_subagent_task_prompt(name: str, role: str, skill_name: str, skill_path: Path | None, skill_desc: str, task: str, cwd: Path) -> str:
+    """Wraps a task prompt with rich Compound Engineering context."""
+    skill_info = f"Methodology Guide: {skill_path}\n" if skill_path else ""
+    desc_info = f"Methodology Scope: {skill_desc}\n" if skill_desc else ""
+    return (
+        f"[Firstmate Fleet Crewmate: {name}]\n"
+        f"Assigned Role: {role}\n"
+        f"Active Compound Engineering Skill: {skill_name}\n"
+        f"{desc_info}"
+        f"{skill_info}"
+        f"Working Directory: {cwd}\n\n"
+        f"COMPOUND ENGINEERING, AXI & FLEET DIRECTIVES:\n"
+        f"1. ADHERE TO `{skill_name}`: You are a specialized Firstmate crewmate operating under the Compound Engineering methodology of `{skill_name}`. "
+        f"If you need specific guidance on its checklist or protocols, inspect `{skill_path}` using your read tool.\n"
+        f"2. ACTION OVER PREAMBLE: Take direct, concrete action immediately in `{cwd}`. Do not output meta-essays or delay execution.\n"
+        f"3. RIGOROUS VERIFICATION (ANTI-ONE-SHOT):\n"
+        f"   - For UI / Web: capture screenshots with `omagent-screenshot <url_or_path> preview.png` and view the image. Eliminate overlaps, text jargon, and broken margins.\n"
+        f"   - For Code / Tests: run real syntax and test execution (`python3 -m py_compile`, `node --check`, pytest, etc.).\n"
+        f"4. AXI TOKEN EFFICIENCY WITHOUT QUALITY COMPROMISE:\n"
+        f"   - Always prefer AXI CLIs over verbose tools: `gh-axi` (GitHub), `chrome-devtools-axi` (browser), `tasks-axi` (backlog), `quota-axi` (limits), `no-mistakes` (safe git merges).\n"
+        f"   - ZERO COMPROMISE ON CRAFT: AXI saves 40-60% tokens by stripping redundant JSON syntax punctuation and boilerplate, NOT by cutting corners or omitting needed details.\n"
+        f"   - ESCAPE HATCHES: When inspecting details, ALWAYS use `--full` or detail views (e.g. `tasks-axi show <id> --full`, `gh-axi pr view <id> --full`) so you never act on partial information.\n"
+        f"   - Reinvest saved token headroom into deeper reasoning, edge-case coverage, and flawless implementation.\n"
+        f"5. PRUDENT SUB-DELEGATION: You have full authority to spawn peer subagents in Herdr if needed (`firstmate subagent spawn <name> --skill <skill> --task '<task>'`). "
+        f"Only spawn subagents when specialized parallel assistance is genuinely required—do not spawn subagents for trivial single steps.\n"
+        f"6. STRUCTURED REPORTING: Deliver clear, concise findings and deliverables back to your supervisor and peer crewmates.\n\n"
+        f"[Assigned Task]\n"
+        f"{task}"
+    )
+
+def register_firstmate(task_id: str, pane_id: str, ws_id: str, cwd: Path, harness: str, role: str, skill: str = "ce-work"):
+    try:
+        FM_STATE_DIR.mkdir(parents=True, exist_ok=True)
+        meta_path = FM_STATE_DIR / f"{task_id}.meta"
+        content = (
+            f"backend=herdr\n"
+            f"endpoint_task_id={task_id}\n"
+            f"herdr_session=default\n"
+            f"herdr_workspace_id={ws_id}\n"
+            f"herdr_tab_id={ws_id}:t1\n"
+            f"herdr_pane_id={pane_id}\n"
+            f"window=default:{pane_id}\n"
+            f"project={cwd}\n"
+            f"worktree={cwd}\n"
+            f"harness={harness}\n"
+            f"role={role}\n"
+            f"skill={skill}\n"
+            f"kind=crewmate\n"
+            f"mode=local-only\n"
+            f"yolo=on\n"
+        )
+        meta_path.write_text(content, "utf-8")
+        return True
+    except Exception as e:
+        print(f"[firstmate-subagent] Warning: could not register with Firstmate: {e}", file=sys.stderr)
+        return False
+
+def get_registered_meta() -> dict[str, dict]:
+    """Loads all registered Firstmate .meta entries keyed by pane_id, pruning dead entries."""
+    entries = {}
+    if not FM_STATE_DIR.is_dir():
+        return entries
+
+    live_panes = set()
+    try:
+        p_res = subprocess.run(["herdr", "pane", "list"], capture_output=True, text=True, timeout=2)
+        if p_res.returncode == 0:
+            panes = json.loads(p_res.stdout).get("result", {}).get("panes", [])
+            live_panes = {p.get("pane_id") for p in panes if p.get("pane_id")}
+    except Exception:
+        pass
+
+    for p in list(FM_STATE_DIR.glob("*.meta")):
+        try:
+            lines = p.read_text("utf-8").splitlines()
+            d = {}
+            for line in lines:
+                if "=" in line:
+                    k, v = line.split("=", 1)
+                    d[k.strip()] = v.strip()
+            pane = d.get("herdr_pane_id")
+            if pane:
+                if live_panes and pane not in live_panes:
+                    p.unlink(missing_ok=True)
+                    inbox = p.with_suffix(".inbox")
+                    if inbox.is_dir():
+                        shutil.rmtree(inbox, ignore_errors=True)
+                    continue
+                entries[pane] = d
+        except Exception:
+            pass
+    return entries
+
+def cmd_spawn(args):
+    name = args.name
+    role = args.role or "crewmate"
+    kind = args.kind or "agy"
+    cwd = Path(args.cwd).resolve() if args.cwd else Path.cwd()
+
+    ws_id, ws_panes = find_active_workspace_and_panes(cwd=cwd)
+    if not ws_id:
+        print("Error: No active Herdr workspace found.", file=sys.stderr)
+        sys.exit(1)
+
+    # Resolve Compound Engineering Skill
+    skill_name, skill_path, skill_desc = resolve_compound_skill(args.skill, role, args.task)
+
+    # Determine base pane and split direction
+    base_pane = args.pane
+    if not base_pane:
+        if args.direction == "auto":
+            # Intelligent multi-agent tiling grid
+            pane_count = len(ws_panes)
+            if pane_count <= 1:
+                base_pane = ws_panes[0]["pane_id"] if ws_panes else "root"
+                direction = "right"
+            elif pane_count == 2:
+                # Split the right pane downwards
+                base_pane = ws_panes[1]["pane_id"]
+                direction = "down"
+            elif pane_count == 3:
+                # Split the left pane downwards to complete 2x2 grid
+                base_pane = ws_panes[0]["pane_id"]
+                direction = "down"
+            else:
+                # Split the currently active or last pane
+                active = next((p["pane_id"] for p in ws_panes if p.get("focused")), ws_panes[-1]["pane_id"])
+                base_pane = active
+                direction = "right"
+        else:
+            base_pane = next((p["pane_id"] for p in ws_panes if p.get("focused")), ws_panes[0]["pane_id"] if ws_panes else "root")
+            direction = args.direction
+    else:
+        direction = "right" if args.direction == "auto" else args.direction
+
+    # 1. Split pane
+    split_cmd = ["herdr", "pane", "split", base_pane, "--direction", direction, "--no-focus"]
+    if args.cwd:
+        split_cmd.extend(["--cwd", str(cwd)])
+    
+    p = subprocess.run(split_cmd, capture_output=True, text=True)
+    if p.returncode != 0:
+        print(f"Error splitting Herdr pane: {p.stderr}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        res = json.loads(p.stdout).get("result", {}).get("pane", {})
+        new_pane_id = res.get("pane_id")
+    except Exception:
+        print(f"Error parsing pane split response: {p.stdout}", file=sys.stderr)
+        sys.exit(1)
+
+    if not new_pane_id:
+        print("Error: Herdr split did not return a valid pane_id.", file=sys.stderr)
+        sys.exit(1)
+
+    # 2. Start agent in new pane
+    start_cmd = ["herdr", "agent", "start", name, "--kind", kind, "--pane", new_pane_id]
+    p_start = subprocess.run(start_cmd, capture_output=True, text=True, timeout=25)
+    if p_start.returncode != 0:
+        print(f"Error starting agent '{name}' in pane {new_pane_id}: {p_start.stderr}", file=sys.stderr)
+        subprocess.run(["herdr", "pane", "close", new_pane_id], capture_output=True)
+        sys.exit(1)
+
+    # 3. Register in Firstmate
+    fm_task_id = f"fm_{name}_{int(time.time())}"
+    register_firstmate(fm_task_id, new_pane_id, ws_id, cwd, kind, role, skill_name)
+
+    print(f"[firstmate-subagent] Successfully spawned '{name}' in Herdr pane {new_pane_id}")
+    print(f"  • Role: {role}")
+    print(f"  • Compound Engineering Skill: {skill_name} ({skill_desc})")
+    print(f"  • Harness: {kind}")
+    print(f"  • Firstmate Task ID: {fm_task_id}")
+
+    # 4. If task prompt provided, dispatch it with skill wrap
+    if args.task:
+        full_prompt = format_subagent_task_prompt(name, role, skill_name, skill_path, skill_desc, args.task, cwd)
+        cmd_prompt_inner(name, full_prompt, wait=args.wait, timeout_ms=args.timeout)
+
+def cmd_prompt_inner(name: str, prompt: str, wait: bool = False, timeout_ms: int = 180000):
+    cmd = ["herdr", "agent", "prompt", name, prompt]
+    if wait:
+        cmd.extend(["--wait", "--timeout", str(timeout_ms)])
+    
+    print(f"[firstmate-subagent] Dispatching task to '{name}' (wait={wait})...")
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    if p.returncode != 0:
+        err_msg = (p.stderr or p.stdout or "").strip()
+        if wait and ("agent_prompt_stalled" in err_msg or "timeout" in err_msg):
+            print(f"[firstmate-subagent] Notice: prompt queued, waiting for agent '{name}' to settle...")
+            subprocess.run(["herdr", "agent", "wait", name, "--timeout", str(timeout_ms), "idle", "done"], capture_output=True)
+        else:
+            print(f"Error dispatching prompt: {err_msg}", file=sys.stderr)
+            sys.exit(1)
+
+    if wait:
+        time.sleep(0.5)
+        # Read the resulting output
+        cmd_read_inner(name, lines=60)
+
+def cmd_prompt(args):
+    # Check if we should wrap with skill directives
+    meta_map = get_registered_meta()
+    agents = get_herdr_agents()
+    target_ag = next((a for a in agents if a.get("name") == args.name or a.get("pane_id") == args.name), None)
+    
+    target_role = "crewmate"
+    target_skill = args.skill or "ce-work"
+    if target_ag and target_ag.get("pane_id") in meta_map:
+        m = meta_map[target_ag["pane_id"]]
+        target_role = m.get("role", target_role)
+        if not args.skill:
+            target_skill = m.get("skill", target_skill)
+
+    skill_name, skill_path, skill_desc = resolve_compound_skill(target_skill, target_role, args.instruction)
+    
+    # If not already formatted as a directive, format it
+    if not args.instruction.startswith("[Firstmate Fleet"):
+        formatted = format_subagent_task_prompt(args.name, target_role, skill_name, skill_path, skill_desc, args.instruction, Path.cwd())
+    else:
+        formatted = args.instruction
+
+    cmd_prompt_inner(args.name, formatted, wait=args.wait, timeout_ms=args.timeout)
+
+def cmd_read_inner(name: str, lines: int = 60):
+    cmd = ["herdr", "agent", "read", name, "--source", "recent-unwrapped", "--lines", str(lines)]
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    if p.returncode == 0 and p.stdout.strip():
+        print(f"--- Output from '{name}' ---")
+        print(p.stdout.strip())
+        print(f"----------------------------")
+    else:
+        # Fallback to plain pane read
+        agents = get_herdr_agents()
+        target = next((a for a in agents if a.get("name") == name or a.get("pane_id") == name), None)
+        if target and target.get("pane_id"):
+            p2 = subprocess.run(["herdr", "pane", "read", target["pane_id"], "--lines", str(lines)], capture_output=True, text=True)
+            if p2.returncode == 0:
+                print(f"--- Output from '{name}' ({target['pane_id']}) ---")
+                print(p2.stdout.strip())
+                print(f"----------------------------")
+
+def cmd_read(args):
+    cmd_read_inner(args.name, lines=args.lines)
+
+def cmd_list(args):
+    agents = get_herdr_agents()
+    if not agents:
+        print("No active agents found in Herdr.")
+        return
+
+    meta_map = get_registered_meta()
+
+    # Workspace-scoped filtering by default so projects never see crewmates from older/other workspaces
+    show_all = getattr(args, "all", False)
+    target_ws = getattr(args, "workspace", None)
+    if not target_ws and not show_all:
+        target_ws = os.environ.get("HERDR_WORKSPACE_ID")
+        if not target_ws:
+            ws_id, _ = find_active_workspace_and_panes()
+            target_ws = ws_id
+
+    if target_ws and not show_all:
+        agents = [a for a in agents if a.get("workspace_id") == target_ws]
+        if not agents:
+            print(f"No active agents found in Herdr workspace '{target_ws}'. (Use --all to view entire fleet)")
+            return
+
+    header_suffix = f" in workspace '{target_ws}'" if (target_ws and not show_all) else ""
+    print(f"Active Herdr Fleet Crewmates ({len(agents)}){header_suffix}:")
+    print(f"{'NAME':<18} {'ROLE':<16} {'SKILL':<18} {'STATUS':<10} {'PANE':<8} {'WORKSPACE':<8}")
+    print("-" * 84)
+    for a in agents:
+        name = a.get("name") or a.get("agent") or "unnamed"
+        status = a.get("agent_status") or "unknown"
+        pane = a.get("pane_id") or "none"
+        ws = a.get("workspace_id") or "none"
+        
+        meta = meta_map.get(pane, {})
+        role = meta.get("role", "crewmate")
+        skill = meta.get("skill", "ce-work")
+        print(f"{name:<18} {role:<16} {skill:<18} {status:<10} {pane:<8} {ws:<8}")
+
+def cmd_skills(args):
+    skills = list_available_skills()
+    print(f"Available Compound Engineering Skills ({len(skills)}):")
+    print(f"{'SKILL':<26} {'PURPOSE & DESCRIPTION'}")
+    print("-" * 80)
+    for name in sorted(skills.keys()):
+        desc = skills[name]["desc"] or "Methodology & workflow"
+        print(f"{name:<26} {desc[:52]}")
+
+def cmd_wait(args):
+    print(f"[firstmate-subagent] Waiting for '{args.name}' to reach idle/done (timeout: {args.timeout}ms)...")
+    cmd = ["herdr", "agent", "wait", args.name, "--timeout", str(args.timeout), "idle", "done"]
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    if p.returncode == 0:
+        print(f"[firstmate-subagent] '{args.name}' has finished execution.")
+        cmd_read_inner(args.name, lines=60)
+    else:
+        print(f"Warning: Agent did not settle within timeout: {p.stderr}", file=sys.stderr)
+
+def cmd_close(args):
+    agents = get_herdr_agents()
+    target = next((a for a in agents if a.get("name") == args.name or a.get("pane_id") == args.name), None)
+    if not target or not target.get("pane_id"):
+        print(f"Error: Agent '{args.name}' not found.", file=sys.stderr)
+        sys.exit(1)
+
+    pane_id = target["pane_id"]
+    p = subprocess.run(["herdr", "pane", "close", pane_id], capture_output=True, text=True)
+    if p.returncode == 0:
+        # Clean up meta
+        for meta in FM_STATE_DIR.glob("*.meta"):
+            try:
+                if f"herdr_pane_id={pane_id}" in meta.read_text("utf-8"):
+                    meta.unlink()
+            except Exception:
+                pass
+        print(f"[firstmate-subagent] Closed subagent '{args.name}' and Herdr pane {pane_id}.")
+    else:
+        print(f"Error closing pane: {p.stderr}", file=sys.stderr)
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="firstmate-subagent",
+        description="Firstmate Crewmate & Subagent Fleet Orchestrator for Herdr & Compound Engineering"
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # spawn
+    p_spawn = subparsers.add_parser("spawn", help="Spawn a new subagent in a sibling Herdr pane")
+    p_spawn.add_argument("name", help="Identifier name for the subagent (e.g. reviewer, tester, auth-worker, refactor)")
+    p_spawn.add_argument("--role", default="crewmate", help="Firstmate role (e.g. reviewer, tester, coder, architect)")
+    p_spawn.add_argument("--skill", help="Compound Engineering skill to bind (e.g. ce-code-review, ce-test-browser, ce-debug, ce-work)")
+    p_spawn.add_argument("--kind", default="agy", choices=["agy", "pi", "claude", "codex", "opencode", "gemini"], help="Agent harness kind")
+    p_spawn.add_argument("--direction", default="auto", choices=["auto", "right", "down"], help="Split direction (auto computes tiling grid)")
+    p_spawn.add_argument("--pane", help="Specific pane ID to split from")
+    p_spawn.add_argument("--cwd", help="Working directory for the subagent pane")
+    p_spawn.add_argument("--task", help="Initial task prompt to dispatch immediately upon launch")
+    p_spawn.add_argument("--wait", action="store_true", help="Wait for initial task completion")
+    p_spawn.add_argument("--timeout", type=int, default=180000, help="Wait timeout in milliseconds")
+    p_spawn.set_defaults(func=cmd_spawn)
+
+    # prompt
+    p_prompt = subparsers.add_parser("prompt", help="Send an instruction to a subagent")
+    p_prompt.add_argument("name", help="Name of the subagent")
+    p_prompt.add_argument("instruction", help="Instruction or prompt to send")
+    p_prompt.add_argument("--skill", help="Compound Engineering skill to bind to this turn")
+    p_prompt.add_argument("--wait", action="store_true", help="Wait for task to complete")
+    p_prompt.add_argument("--timeout", type=int, default=180000, help="Timeout in milliseconds")
+    p_prompt.set_defaults(func=cmd_prompt)
+
+    # read
+    p_read = subparsers.add_parser("read", help="Read output from a subagent terminal")
+    p_read.add_argument("name", help="Name of the subagent")
+    p_read.add_argument("--lines", type=int, default=60, help="Number of lines to read")
+    p_read.set_defaults(func=cmd_read)
+
+    # wait
+    p_wait = subparsers.add_parser("wait", help="Wait for a subagent to become idle or done")
+    p_wait.add_argument("name", help="Name of the subagent")
+    p_wait.add_argument("--timeout", type=int, default=180000, help="Timeout in milliseconds")
+    p_wait.set_defaults(func=cmd_wait)
+
+    # list
+    p_list = subparsers.add_parser("list", help="List active fleet subagents in Herdr")
+    p_list.add_argument("--all", "-a", action="store_true", help="List all crewmates across all workspaces (default is active workspace only)")
+    p_list.add_argument("--workspace", "-w", help="Filter crewmates to a specific Herdr workspace ID")
+    p_list.set_defaults(func=cmd_list)
+
+    # skills
+    p_skills = subparsers.add_parser("skills", help="List available Compound Engineering skills")
+    p_skills.set_defaults(func=cmd_skills)
+
+    # close
+    p_close = subparsers.add_parser("close", help="Close a subagent's Herdr pane")
+    p_close.add_argument("name", help="Name of the subagent to close")
+    p_close.set_defaults(func=cmd_close)
+
+    args = parser.parse_args()
+    args.func(args)
+
+if __name__ == "__main__":
+    main()

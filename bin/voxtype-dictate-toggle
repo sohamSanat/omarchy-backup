@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# voxtype-dictate-toggle: Dynamically activates CMF Buds headset mode during Voxtype dictation, then restores Hi-Fi A2DP music mode.
+
+set -euo pipefail
+
+# Ensure voxtype daemon is active
+if ! systemctl --user is-active --quiet voxtype.service; then
+    systemctl --user start voxtype.service
+    sleep 0.3
+fi
+
+STATUS=$(voxtype status 2>/dev/null || echo "idle")
+
+if [[ "$STATUS" == "recording" ]]; then
+    # Stop recording
+    voxtype record stop 2>/dev/null || true
+    
+    # Immediately switch CMF Buds back to Hi-Fi Music Mode
+    /home/soham/.local/bin/cmf-buds-mode music >/dev/null 2>&1 || true
+else
+    # If still transcribing previous input, wait briefly for it to finish
+    if [[ "$STATUS" == "transcribing" ]]; then
+        for _ in {1..30}; do
+            sleep 0.1
+            STATUS=$(voxtype status 2>/dev/null || echo "idle")
+            if [[ "$STATUS" == "idle" ]]; then
+                break
+            fi
+        done
+    fi
+
+    # Switch CMF Buds to headset mode so microphone is active
+    CARD=$(pactl list cards short | grep -m1 "bluez_card" | awk '{print $2}' || true)
+    if [[ -n "$CARD" ]]; then
+        /home/soham/.local/bin/cmf-buds-mode headset >/dev/null 2>&1 || true
+    fi
+
+    # Start Voxtype recording
+    voxtype record start 2>/dev/null || true
+fi

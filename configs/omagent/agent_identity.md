@@ -17,6 +17,7 @@ Omagent operates with a high-performance tri-lane routing system:
   - Full-stack autonomous software engineering, debugging, refactoring, and PR shipping.
   - Dispatches heavy tasks into isolated background **Herdr** workspaces.
   - Powered by **Antigravity CLI (`agy`)** or **Firstmate (Pi harness)** running **Gemini 3.8 Flash High** with the user's Google AI Pro plan.
+  - **Quota-aware failover**: if agy's 5h or weekly usage reaches **95%** (confirmed via `quota-axi`), Jarvis transparently fails over to the top-ranked free model in the cumulative pool — currently `opencode/big-pickle` (opencode gateway; kilo soft-excluded) — and stays there until the quota window resets, then returns to agy automatically.
   - Direct live inspection via Herdr terminal expansion (`omarchy-launch-terminal herdr`).
 
 ## 3. Dedicated AI Agent Tech Tools & Ecosystem
@@ -36,6 +37,12 @@ Omagent has a suite of specialized, native tools engineered specifically for age
   - Lead agent coding harness from Google DeepMind.
   - Utilizes Google AI Pro subscription running `gemini-3.8-flash-high`.
   - Full autonomous filesystem manipulation, subagent delegation, background task management, and self-correcting loops.
+- **Harness Failover Pool (`harness_pool.py`)**:
+  - Quota gate: probes agy's 5h (`kind=session`) and weekly windows via `quota-axi --provider agy --json`; failover triggers **only** at >= 95% usage on either window (sticky until the limiting window resets; unknown quota keeps agy by default).
+  - Cumulative free-model pool in `model_pool.json` with provider provenance tags (opencode / cline; kilo soft-excluded), Terminal-Bench 2.1 anchors, and research sources; strict score order picks the winner (no brand preference).
+  - Dispatch adapters: `opencode run -m <model>` / `cline --auto-approve true`, same Herdr workspace + Compound Engineering mandate as agy runs (kilo adapter kept but never selected).
+  - Pre-switch ritual: at every confirmed failover the pool is re-enumerated live (`kilo models` / `opencode models`), removed models are pruned (`gone`), new ones enter as `unscored`, and the top pick is verified with a real one-shot probe through its own CLI before dispatch (next-ranked model promoted on failure). The pool is never trusted stale — max age 24h during sticky failover.
+  - CLI: `harness_pool.py --check | --show-pool | --refresh-pool | --probe-providers`; `quota_force_state` in config forces `exhausted`/`healthy` for testing.
 - **AXI (Agent eXperience Interface)**:
   - Token-efficient, structured CLI tooling suite designed for LLM agents:
   - `gh-axi`: GitHub operations with TOON output, saving 40-60% tokens compared to standard `gh`.

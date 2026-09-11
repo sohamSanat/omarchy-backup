@@ -46,32 +46,6 @@
       ],
       "right": [
         {
-          "id": "mahmoodkhalil57.qrgen",
-          "advancedOpen": true,
-          "assetBackdrop": true,
-          "assetClear": true,
-          "assetPadding": 0.6,
-          "assetPath": "",
-          "assetScale": 0.22,
-          "background": "",
-          "body": "dot",
-          "compress": false,
-          "compressAuto": false,
-          "compressEmoji": false,
-          "compressTarget": "hamr",
-          "correctionAuto": true,
-          "customizeOpen": true,
-          "eyeBall": "rounded",
-          "eyeBallColour": "",
-          "eyeFrame": "leaf",
-          "eyeFrameColour": "",
-          "foreground": "",
-          "level": "M",
-          "margin": 4,
-          "marginAuto": true,
-          "transparentBackground": false
-        },
-        {
           "id": "omaconnect"
         },
         {
@@ -94,7 +68,7 @@
         },
         {
           "id": "jrmmhm.pocket",
-          "members": "omarchy.tray, mahmoodkhalil57.qrgen, omaconnect, jkoestinger.vpn, io.github.nilszeilon.omarchy-sensei, omamail, io.github.ricky.whatsapp, io.github.r-witz.nothing-ear, io.github.elevate08.qs-bitwarden-cli"
+          "members": "omarchy.tray, omaconnect, jkoestinger.vpn, io.github.nilszeilon.omarchy-sensei, omamail, io.github.ricky.whatsapp, io.github.r-witz.nothing-ear, mahmoodkhalil57.qrgen, io.github.elevate08.qs-bitwarden-cli"
         },
         {
           "id": "omarchy.bluetooth"
@@ -148,10 +122,13 @@
       "id": "x692137x.powerwave"
     },
     {
-      "id": "io.github.adamcbrewer.voxtype-aura"
+      "id": "reomarchy.workspace-switcher"
     },
     {
-      "id": "reomarchy.workspace-switcher"
+      "id": "ricardosuman.pretty-screenshot"
+    },
+    {
+      "id": "io.github.adamcbrewer.voxtype-aura"
     },
     {
       "id": "io.github.ellion369.omagent"

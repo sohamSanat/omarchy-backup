@@ -269,6 +269,39 @@ This repository contains the full snapshot of user customizations:
    - **`bin/omarchy-theme-env`**:
      - CLI tool exporting `OMARCHY_THEME_MODE` and `COLORFGBG` across all shell and terminal environments.
 
+22. **Omagent Quota-Aware Failover Engine & Fleet Conductor**:
+   - **`plugins/io.github.ellion369.omagent/harness_pool.py` & `model_pool.json`**:
+     - Automatically checks Antigravity 5h and weekly quota usage with `quota-axi`.
+     - Triggers transparent failover to the highest scoring model in `model_pool.json` (such as `opencode/big-pickle`) upon reaching 95% quota, and auto-returns when the window resets.
+     - Live probe verification ensures models work before dispatch, accompanied by a runtime pane watchdog that issues resume nudges on rate limits or switches models mid-flight.
+     - Test suite located in `tests/test_harness_pool.py`.
+   - **`bin/firstmate-subagent`**:
+     - Subagent fleet conductor allowing parallel crewmates to be spawned into clean 2x2 Herdr tiling grids (`firstmate subagent spawn/prompt/list/skills/close`).
+   - **`bin/omagent-screenshot`**:
+     - Headless browser/UI verification utility supporting `--mobile` (375px) and `--tablet` (1024px) for automated visual QA.
+   - **`agents/rules/omagent.md` & `agents/rules/ui-sets.md`**:
+     - Durable system rules governing Omagent's anti-one-shot 5-phase lifecycle, multi-agent fleet permissions, and UI sets precedence.
+
+23. **The 3 UI Design Skill Sets & 79 Agent Skills (`agents/skills/`)**:
+   - Complete standalone backup of all 32 UI and animation skills (5.8MB total):
+     - **Set 1 (Full Aesthetic)**: `web-design-engineer`, `animate`, `apple-design`, `ask-sonner`, `review-animations`, `find-animation-opportunities`, `improve-animations`, `prototype-ui`, `pick-ui-library`, `animation-vocabulary`.
+     - **Set 2 (SaaS / Product App)**: `ui-design`, `design-systems`, `interaction-design`, `form-design`, `loading-states`, `state-machine-ux`, `color-system`, `layout-grid`, `accessibility-audit`, `visual-critique`.
+     - **Set 3 (Jaw-Dropping / 3D Showcase)**: `build-awwwards-quality-sites`, `build-threejs-scroll-worlds`, `cinematic-gsap-lenis-motion-system`, `threejs-landscape`, `gsap-animation`, `cobejs`, `dither-background`, `add-shader-cursor-trail`, `ambient-section-particles`, `no-ai-design-slop`, `audit-ai-design-slop`.
+     - **UI Optimization**: `ce-ui-optimize` (60/120fps GPU transitions, organic easing, tactile press compression, safe-area insets).
+   - All skills are restored to `~/.agents/skills/` and symlinked into `~/.pi/agent/skills/`.
+
+24. **Pretty Screenshot Plugin & System Tools**:
+   - **`plugins/ricardosuman.pretty-screenshot/` & `bin/omarchy-pretty-screenshot`**:
+     - Beautiful wallpaper-framed screenshots bound to `Print` in `configs/hypr/bindings.lua`.
+   - **`bin/cmf-buds-mode`**:
+     - ANC mode switcher for Nothing CMF Buds.
+   - **`bin/voxtype-dictate-toggle`**:
+     - Dictation toggle script bound to `Super + H` and `Ctrl + H`.
+   - **`bin/hermes` & `bin/cursor-agent`**:
+     - Hermes agent and Cursor agent CLI wrappers via `mise`.
+   - **`configs/goose/` & `configs/kilo/`**:
+     - Configurations for Goose and Kilo agent runtimes.
+
 ## 3. Fast Restoration (Automated)
 
 To apply everything at once, simply clone this repository onto the target Omarchy machine and execute:

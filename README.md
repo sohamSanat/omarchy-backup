@@ -9,13 +9,26 @@ Branch: `main`
 
 ## 🌟 Key Ecosystem Components
 
-### 1. 🤖 Omagent Personal AI Assistant
-- **Quickshell HUD (`Alt + Space`)**: Native blurred glass assistant interface built on Quickshell (`io.github.ellion369.omagent`).
+### 1. 🤖 Omagent Personal AI Assistant & Autonomous Fleet
+- **Quickshell HUD (`Alt + Space`, `Super + A`)**: Native blurred glass assistant interface built on Quickshell (`io.github.ellion369.omagent`).
 - **Voice Intercom (`Super + V`)**: Push-to-talk microphone integration via Voxtype.
 - **3-Lane High-Performance Router (`omagent-route`)**:
   - **Lane 1 (General Knowledge)**: Direct streaming SSE synthesis via Google Gemini 3.8 Flash.
   - **Lane 2 (Web & Research)**: DuckDuckGo live internet retrieval + grounded Gemini synthesis.
-  - **Lane 3 (Autonomous Coding)**: Automatically provisions isolated Herdr workspaces, generates isolated Treehouse git worktrees, selects Compound Engineering skills (`ce-work`, `ce-debug`, `ce-optimize`), invokes Google Antigravity (`agy`) or Pi Harness, and performs dual-agent code reviews.
+  - **Lane 3 (Autonomous Coding Harness)**: Automatically provisions isolated Herdr workspaces, generates isolated Treehouse git worktrees, selects Compound Engineering skills (`ce-work`, `ce-debug`, `ce-optimize`), invokes Google Antigravity (`agy`), and performs dual-agent code reviews.
+- **Quota-Aware Failover Harness Pool (`harness_pool.py` & `model_pool.json`)**:
+  - Probes Antigravity's 5h session and weekly windows via `quota-axi`.
+  - Transparently fails over to the top-ranked free model in `model_pool.json` (e.g. `opencode/big-pickle` gateway) upon reaching 95% quota, and returns automatically once the window resets.
+  - Features real one-shot probe verification, pool auto-pruning, and a runtime pane watchdog that sends resume signals on rate limits or triggers mid-run model switches.
+- **Mandatory Anti-One-Shot 5-Phase Lifecycle & Visual QA**:
+  - Requires implementation, visual verification (`omagent-screenshot <target> preview.png`), sibling peer review in Herdr, UI butter optimization (`ce-ui-optimize`), and clean delivery.
+- **Uncapped Multi-Agent Fleet Orchestration (`firstmate-subagent`)**:
+  - Directs parallel specialist crewmates across 2x2 Herdr tiling panes (`firstmate subagent spawn/prompt/list/close`) bound to Compound Engineering skill workflows.
+- **3 Exclusive UI Design Skill Sets (79 Total Skills in `agents/skills/`)**:
+  - **Set 1: Full Aesthetic** (Linear, Stripe Press, Braun minimalism, Swiss typography, Emil Kowalski spring animations).
+  - **Set 2: SaaS / Product App** (111 production skills: high-density tables, sticky headers, state machines, WCAG AA contrast).
+  - **Set 3: Jaw-Dropping / 3D Showcase** (Three.js WebGL worlds, GLSL shaders, Lenis virtual smooth scroll, GSAP choreography, anti-slop review).
+  - Supreme Precedence Protocol: UI Set skills override generic styling for all visual work, followed by a mandatory post-UI animation polish pass.
 - **Nothing Phone PWA & Voice Bridge (`omagent-mobile-bridge`)**:
   - Python aiohttp HTTPS + WSS daemon listening on port `7890` serving `~/.config/omagent/mobile-web`.
   - Bidirectional mobile audio streaming, Whisper/Voxtype transcription, and Lavish review surfaces.
@@ -24,16 +37,16 @@ Branch: `main`
   - Immediately dispatches interactive notifications with 1-click automated debugging via `diagnose-crash` and `ce-debug`.
 
 ### 2. ⚡ Autonomous AI Coding & Agent Fleet
-- **Agent Runtimes**: Google Antigravity CLI (`agy`), Antigravity IDE, Cursor IDE, and Pi Harness.
+- **Agent Runtimes**: Google Antigravity CLI (`agy`), Antigravity IDE, Cursor IDE, Pi Harness, Hermes Agent (`hermes`), and Cursor Agent (`cursor-agent`).
 - **Firstmate & Herdr**: Agent fleet multiplexing with multi-pane isolation and socket control.
 - **Treehouse**: Reusable, isolated git worktree pooling.
-- **Compound Engineering Skills (`~/.agents/skills`)**: `ce-work`, `ce-debug`, `ce-optimize`, `ce-plan`, `ce-ideate`, `ce-pov`, `ce-code-review`, `ce-compound`, `lfg`, `diagnose-crash`, `omarchy`.
+- **Compound Engineering Skills (`~/.agents/skills`)**: 33 specialized methodologies (`ce-work`, `ce-ui-optimize`, `ce-debug`, `ce-optimize`, `ce-plan`, `ce-ideate`, `ce-pov`, `ce-code-review`, `ce-compound`, `lfg`, `diagnose-crash`, `omarchy`, etc.).
 - **AXI Ergonomic Tooling**: `gh-axi`, `quota-axi`, `tasks-axi`, `lavish-axi`, `no-mistakes`.
-- **Repo Learnings**: Preserved in `~/.agents/learnings/` (`omarchy_theming.md`, `cli_threshold_falsiness_and_bash_subshells.md`).
+- **Repo Learnings**: Preserved in `~/.agents/learnings/` (`omarchy_theming.md`, `cli_threshold_falsiness_and_bash_subshells.md`, `argparse_percent_escaping_and_sysfs_negative_current.md`).
 
 ### 3. 🎨 Visual Experience, Bar & Theming Pipeline
 - **Theme Collection**: 16 curated themes (`moodpeak` [Active], `nous` [Light research], `sakura-mochi`, `aetheria`, `akaito`, `amekoji`, `artzen`, `city-783`, `harbor`, `harbordark`, `omagen1`, `omarchy_signature`, `quattrocento-light`, `synthetica`).
-- **Floating Bar**: 26 modular plugins in `plugins/` (`io.github.ellion369.omagent`, `reomarchy.workspace-switcher`, `tristonarmstrong.dictionary`, `bhanu.omavideos`, `soham.power`, `mryll.printbar`, `mahmoodkhalil57.qrgen`, `io.github.ricky.whatsapp`, etc.).
+- **Floating Bar**: 27 modular plugins in `plugins/` (`io.github.ellion369.omagent`, `reomarchy.workspace-switcher`, `ricardosuman.pretty-screenshot`, `tristonarmstrong.dictionary`, `bhanu.omavideos`, `soham.power`, `mryll.printbar`, `mahmoodkhalil57.qrgen`, `io.github.ricky.whatsapp`, etc.).
 - **Visual Workspace Switcher v2**: Hold-Super HUD with screencopy previews, active window titles, corner marks, bottom keymap HUD (`← →`, `↑ ↓`, `1-9`, `↵`, `esc`), and live search filter.
 - **Dynamic Theming Engine**: `omarchy theme set` instantly propagates colors across KDE/Qt (`kdeglobals`), GTK 4, terminal emulators (Ghostty, Alacritty, Kitty, Foot), Zen Browser (userChrome, Dark Reader), Brave Origin Browser, VLC Media Player, Obsidian, Foliate, and ytkew.
 - **Universal Theming Library & Environment**: `omarchy_theme.py` (high-contrast palette math ensuring dark text on light themes) and `omarchy-theme-env` CLI for terminal environment variable sync (`OMARCHY_THEME_MODE`, `COLORFGBG`).
@@ -47,6 +60,11 @@ Branch: `main`
 - **Chromium Wayland Flags (`configs/chromium-flags.conf`)**: Ozone Wayland flags, password store integration, and smooth touchpad history navigation.
 
 ### 5. 🛠️ Utilities & System Services
+- **`firstmate-subagent`**: Multi-agent fleet conductor managing parallel crewmates across Herdr panes (`spawn`, `prompt`, `list`, `skills`, `close`).
+- **`omagent-screenshot`**: Headless browser screenshot tool (`--mobile`, `--tablet`) for automated visual layout validation.
+- **`omarchy-pretty-screenshot` (`Print`)**: Beautiful window/desktop screenshot tool with wallpaper and gradient frames (`plugins/ricardosuman.pretty-screenshot`).
+- **`voxtype-dictate-toggle` (`Super + H`, `Ctrl + H`)**: Toggle microphone recording and transcription for Voxtype.
+- **`cmf-buds-mode`**: CLI utility controlling Active Noise Cancellation modes for Nothing CMF Buds.
 - **`omarchy-dictionary-lookup` (`Super + D`)**: Fast dictionary popup for active text selections with automatic clipboard and primary selection extraction.
 - **`omarchy-sync-vlc`**: Dynamically writes 4-stop slider gradient and dark/light palette into `~/.config/vlc/vlcrc`.
 - **Fastfetch Enhancements**: `fastfetch-arch-anim` (smooth spinning Arch ASCII animation) and `fastfetch-theme-accent` (theme accent mapper).

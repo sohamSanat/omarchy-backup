@@ -243,6 +243,14 @@ if [[ -d "${SCRIPT_DIR}/configs/copilot" ]]; then
   mkdir -p "${USER_HOME}/.copilot"
   cp -a "${SCRIPT_DIR}/configs/copilot/." "${USER_HOME}/.copilot/"
 fi
+if [[ -d "${SCRIPT_DIR}/configs/goose" ]]; then
+  mkdir -p "${USER_HOME}/.config/goose"
+  cp -a "${SCRIPT_DIR}/configs/goose/." "${USER_HOME}/.config/goose/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/kilo" ]]; then
+  mkdir -p "${USER_HOME}/.config/kilo"
+  cp -a "${SCRIPT_DIR}/configs/kilo/." "${USER_HOME}/.config/kilo/"
+fi
 if [[ -d "${SCRIPT_DIR}/configs/pi" ]]; then
   mkdir -p "${USER_HOME}/.pi/agent/themes"
   cp -a "${SCRIPT_DIR}/configs/pi/agent/." "${USER_HOME}/.pi/agent/"
@@ -458,6 +466,9 @@ if [[ -f "${USER_HOME}/.local/bin/omaagent" ]]; then
 fi
 if [[ -f "${USER_HOME}/.local/bin/firstmate" ]]; then
   ln -nsf "${USER_HOME}/.local/bin/firstmate" "${USER_HOME}/.local/bin/fm"
+fi
+if [[ -f "${USER_HOME}/.local/bin/battery-monitor" ]]; then
+  ln -nsf "${USER_HOME}/.local/bin/battery-monitor" "${USER_HOME}/.local/bin/battery" 2>/dev/null || true
 fi
 if [[ -f "${USER_HOME}/.config/omarchy/plugins/soham.power/scripts/battery-limiter.sh" ]]; then
   ln -nsf "${USER_HOME}/.config/omarchy/plugins/soham.power/scripts/battery-limiter.sh" "${USER_HOME}/.local/bin/omarchy-battery-limit"

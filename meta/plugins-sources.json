@@ -55,9 +55,13 @@
     "commit": "2979e9728b11ada6a29c9b315a2ac8e0a48380c4",
     "has_local_changes": true,
     "dirty_files": [
-      " M Omagent.qml",
-      " M omagent-route",
-      "?? docs/"
+      "M Omagent.qml",
+      "M README.md",
+      "M omagent-route",
+      "?? docs/",
+      "?? harness_pool.py",
+      "?? model_pool.json",
+      "?? tests/"
     ]
   },
   "io.github.nilszeilon.omarchy-sensei": {
@@ -190,5 +194,13 @@
     "commit": "7d50efe23230e07603792d83827585cb8f918908",
     "has_local_changes": false,
     "dirty_files": []
+  },
+  "ricardosuman.pretty-screenshot": {
+    "remote": "https://github.com/ricardosuman/omarchy-pretty-screenshot.git",
+    "commit": "5fc021c11173cc37796def3fd6d74b4abc395aed",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M omarchy-pretty-screenshot"
+    ]
   }
 }

@@ -15,7 +15,145 @@ Item {
   property string dictationState: "idle"
 
   property string runState: "idle"
+  property string activeMode: "regular" // "regular" | "internet" | "agentic"
+  property string activeHarness: "agy" // "agy" | "opencode" | "cline"
+  property string activeModel: "claude-opus-4-6-thinking"
+  property bool showingModelMenu: false
   property bool autoMode: false
+
+  readonly property var harnessCatalog: ({
+    "agy": {
+      "name": "AGY",
+      "fullName": "Antigravity CLI (Base Default)",
+      "icon": "󰲋",
+      "defaultModel": "claude-opus-4-6-thinking",
+      "models": [
+        { "id": "claude-opus-4-6-thinking", "name": "Claude Opus 4.6", "badge": "Highest Reasoning", "isFree": false },
+        { "id": "gemini-3.1-pro-high", "name": "Gemini 3.1 Pro (High)", "badge": "Deep Thinking", "isFree": false },
+        { "id": "gemini-3.8-flash-high", "name": "Gemini 3.8 Flash (High)", "badge": "Fast Reasoning", "isFree": false },
+        { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "badge": "Thinking", "isFree": false }
+      ]
+    },
+    "opencode": {
+      "name": "OpenCode",
+      "fullName": "OpenCode Engine",
+      "icon": "󰘳",
+      "defaultModel": "opencode/nemotron-3.5-lightning-free",
+      "models": [
+        { "id": "opencode/nemotron-3.5-lightning-free", "name": "Nemotron 3.5 Lightning", "badge": "Free", "isFree": true },
+        { "id": "opencode/nemotron-3-ultra-free", "name": "Nemotron 3 Ultra", "badge": "Free", "isFree": true },
+        { "id": "opencode/big-pickle", "name": "Big Pickle", "badge": "Free", "isFree": true },
+        { "id": "opencode/mimo-v2.5-free", "name": "MiMo v2.5", "badge": "Free", "isFree": true },
+        { "id": "opencode/ling-3.0-flash-fin-free", "name": "Ling 3.0 Flash Fin", "badge": "Free", "isFree": true },
+        { "id": "opencode/muse-spark-1.3-contributor-free", "name": "Muse Spark 1.3", "badge": "Free", "isFree": true },
+        { "id": "opencode/muse-spark-1.2-contributor-free", "name": "Muse Spark 1.2", "badge": "Free", "isFree": true }
+      ]
+    },
+    "cline": {
+      "name": "Cline",
+      "fullName": "Cline Autonomous Agent",
+      "icon": "󰚩",
+      "defaultModel": "z-ai/glm-5.3-flash",
+      "models": [
+        { "id": "z-ai/glm-5.3-flash", "name": "GLM 5.3 Flash", "badge": "Free", "isFree": true },
+        { "id": "deepseek/deepseek-v4-flash", "name": "DeepSeek V4 Flash", "badge": "Free", "isFree": true },
+        { "id": "cline-free/muse-spark-1.3-contributor", "name": "Muse Spark 1.3", "badge": "Free", "isFree": true }
+      ]
+    }
+  })
+
+  function setMode(mode) {
+    if (mode === "regular" || mode === "internet" || mode === "agentic") {
+      root.activeMode = mode
+      if (mode !== "agentic") {
+        root.showingModelMenu = false
+      }
+      root.save()
+    }
+  }
+
+  function cycleMode(forward) {
+    var modes = ["regular", "internet", "agentic"]
+    var idx = modes.indexOf(root.activeMode)
+    if (idx < 0) idx = 0
+    if (forward === false) {
+      idx = (idx - 1 + modes.length) % modes.length
+    } else {
+      idx = (idx + 1) % modes.length
+    }
+    root.setMode(modes[idx])
+  }
+
+  function setHarness(harness) {
+    if (root.activeHarness === harness) return
+    root.activeHarness = harness
+    var hData = root.harnessCatalog[harness]
+    if (hData) {
+      root.activeModel = hData.defaultModel
+    }
+    root.showingModelMenu = false
+    root.save()
+  }
+
+  function setModel(modelId) {
+    root.activeModel = modelId
+    root.showingModelMenu = false
+    root.save()
+  }
+
+  function cycleHarness(forward) {
+    var harnesses = ["agy", "opencode", "cline"]
+    var idx = harnesses.indexOf(root.activeHarness)
+    if (idx < 0) idx = 0
+    if (forward === false) {
+      idx = (idx - 1 + harnesses.length) % harnesses.length
+    } else {
+      idx = (idx + 1) % harnesses.length
+    }
+    root.setHarness(harnesses[idx])
+  }
+
+  function cycleModel(forward) {
+    var hData = root.harnessCatalog[root.activeHarness]
+    if (!hData || !hData.models || hData.models.length === 0) return
+    var models = hData.models
+    var curIdx = 0
+    for (var i = 0; i < models.length; i++) {
+      if (models[i].id === root.activeModel) {
+        curIdx = i
+        break
+      }
+    }
+    if (forward === false) {
+      curIdx = (curIdx - 1 + models.length) % models.length
+    } else {
+      curIdx = (curIdx + 1) % models.length
+    }
+    root.setModel(models[curIdx].id)
+  }
+
+  function getActiveModelDisplayName() {
+    var hData = root.harnessCatalog[root.activeHarness]
+    if (!hData) return root.activeModel
+    for (var i = 0; i < hData.models.length; i++) {
+      if (hData.models[i].id === root.activeModel) {
+        return hData.models[i].name
+      }
+    }
+    return String(root.activeModel).split("/").pop()
+  }
+
+  function getActiveModelBadge() {
+    var hData = root.harnessCatalog[root.activeHarness]
+    if (!hData) return ""
+    for (var i = 0; i < hData.models.length; i++) {
+      if (hData.models[i].id === root.activeModel) {
+        return hData.models[i].badge
+      }
+    }
+    return ""
+  }
+
   property bool sawAgent: false
   property bool sawError: false
   property bool expectedStop: false
@@ -53,8 +191,8 @@ Item {
   readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/omagent"
   readonly property string statePath: root.stateDir + "/last.json"
 
-  readonly property bool busy: runner.running || root.runState === "running" || root.runState === "detached"
-  readonly property bool stoppable: root.busy
+  readonly property bool busy: runner.running || root.runState === "running"
+  readonly property bool stoppable: runner.running || root.runState === "running" || root.runState === "detached"
 
   readonly property bool hasSession: root.agentName !== "" && root.sessionId !== ""
   readonly property bool canResume: root.resumeArgv && root.resumeArgv.length > 0
@@ -100,7 +238,8 @@ Item {
       if (i >= Math.max(0, entries.count - 120)) {
         rows.push({ "rowKind": row.rowKind, "rowText": row.rowText,
                     "rowCount": row.rowCount, "rowLines": row.rowLines,
-                    "rowAuto": row.rowAuto })
+                    "rowAuto": row.rowAuto, "rowMode": row.rowMode,
+                    "rowHarness": row.rowHarness, "rowModel": row.rowModel })
       }
     }
     return {
@@ -121,7 +260,10 @@ Item {
       "priorTokens": root.priorTokens + root.runTokens,
       "priorCost": root.priorCost + root.runCost,
       "sawCost": root.sawCost,
-      "elapsedMs": root.elapsedMs
+      "elapsedMs": root.elapsedMs,
+      "activeMode": root.activeMode,
+      "activeHarness": root.activeHarness,
+      "activeModel": root.activeModel
     }
   }
 
@@ -156,7 +298,10 @@ Item {
         "rowCount": Number(data.entries[i].rowCount || 1),
         "rowLines": String(data.entries[i].rowLines || ""),
         "rowExpanded": false,
-        "rowAuto": !!data.entries[i].rowAuto
+        "rowAuto": !!data.entries[i].rowAuto,
+        "rowMode": String(data.entries[i].rowMode || ""),
+        "rowHarness": String(data.entries[i].rowHarness || ""),
+        "rowModel": String(data.entries[i].rowModel || "")
       })
     }
     root.agentName = String(data.agentName || "")
@@ -172,6 +317,9 @@ Item {
     root.runPid = Number(data.runPid) || 0
     root.sawAgent = root.agentName !== ""
     root.followTail = true
+    if (data.activeMode) root.activeMode = String(data.activeMode)
+    if (data.activeHarness) root.activeHarness = String(data.activeHarness)
+    if (data.activeModel) root.activeModel = String(data.activeModel)
 
     if ((String(data.runState) === "running" || String(data.runState) === "detached") && root.runPid > 0) {
       root.runState = "interrupted"
@@ -187,7 +335,7 @@ Item {
 
   function emphasizeKeys(text) {
     var safe = String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    return safe.replace(/(Shift\+Tab|Ctrl\+[A-Z])/g, "<b>$1</b>")
+    return safe.replace(/(Shift\+Tab|Ctrl\+[A-Z0-9])/g, "<b>$1</b>")
   }
 
   function copyText(text) {
@@ -221,6 +369,7 @@ Item {
       payload = null
     }
     if (payload && payload.auto === true) root.autoMode = true
+    if (payload && payload.mode) root.setMode(payload.mode)
     root.opened = true
     if (payload && payload.history === true) {
       root.openHistory()
@@ -233,11 +382,13 @@ Item {
   }
 
   function close() {
+    root.showingModelMenu = false
     root.showingHistory = false
     root.opened = false
   }
 
   function dismiss() {
+    root.showingModelMenu = false
     if (root.shell && typeof root.shell.hide === "function")
       root.shell.hide((root.manifest && root.manifest.id) || "io.github.ellion369.omagent")
     else root.close()
@@ -248,7 +399,7 @@ Item {
     else root.open("{}")
   }
 
-  function pushRow(kind, text, auto) {
+  function pushRow(kind, text, auto, mode, harness, model) {
     if (!text) return
     var last = entries.count > 0 ? entries.get(entries.count - 1) : null
     if (kind === "text" && last && last.rowKind === "text") {
@@ -272,7 +423,10 @@ Item {
         "rowCount": 1,
         "rowLines": String(text),
         "rowExpanded": false,
-        "rowAuto": auto === true
+        "rowAuto": auto === true,
+        "rowMode": mode ? String(mode) : (kind === "you" ? root.activeMode : ""),
+        "rowHarness": harness ? String(harness) : (kind === "you" && root.activeMode === "agentic" ? root.activeHarness : ""),
+        "rowModel": model ? String(model) : (kind === "you" && root.activeMode === "agentic" ? root.activeModel : "")
       })
     }
     while (entries.count > 300) entries.remove(0)
@@ -292,7 +446,7 @@ Item {
       return
     }
     if (!root.hasSession) entries.clear()
-    root.pushRow("you", request, root.autoMode)
+    root.pushRow("you", request, root.autoMode, root.activeMode, root.activeHarness, root.activeModel)
 
     root.sawAgent = false
     root.sawError = false
@@ -306,6 +460,11 @@ Item {
     root.runState = "running"
 
     var argv = [root.routerPath]
+    if (root.activeMode) argv.push("--mode", root.activeMode)
+    if (root.activeMode === "agentic") {
+      if (root.activeHarness) argv.push("--harness", root.activeHarness)
+      if (root.activeModel) argv.push("--model", root.activeModel)
+    }
     if (root.autoMode) argv.push("--auto")
     if (root.hasSession) argv = argv.concat(["--agent", root.agentName, "--session", root.sessionId])
     argv.push("--", request)
@@ -414,6 +573,15 @@ Item {
     if (root.runState !== "running") return
     root.expectedStop = true
     runner.running = false
+  }
+
+  function detachToBackground() {
+    if (root.runState !== "running" && !runner.running) return
+    root.expectedStop = true
+    runner.running = false
+    root.runState = "detached"
+    root.pushRow("status", "• Crewmate running in background in Herdr · Firstmate is active on the bridge (Ctrl+E to view terminal)")
+    root.save()
   }
 
   function launchResume() {
@@ -750,12 +918,12 @@ Item {
     readonly property int gap: Style.space(12)
     readonly property int surfaceWidth: Math.min(Style.space(520), panel.width - Style.space(32))
     readonly property int pillTop: (entries.count > 0 || root.showingHistory)
-      ? Math.round(panel.height * 0.13)
-      : Math.round(panel.height * 0.28)
+      ? Math.round(panel.height * 0.06)
+      : Math.round(panel.height * 0.14)
     readonly property int cardTop: pillTop + pill.height + gap
     readonly property int cardMax: Math.max(
       Style.space(80),
-      Math.min(Math.round(panel.height * 0.68),
+      Math.min(Math.round(panel.height * 0.78),
                panel.height - cardTop - panel.clampY(root.dragY) - Style.space(24)))
 
     function clampX(value) {
@@ -795,10 +963,10 @@ Item {
       id: pill
 
       width: panel.surfaceWidth
-      height: Style.space(76)
+      height: (root.activeMode === "agentic") ? Style.space(166) : Style.space(114)
       x: Math.round((panel.width - width) / 2) + panel.clampX(root.dragX)
       y: panel.pillTop + panel.clampY(root.dragY)
-      radius: height / 2
+      radius: Style.space(22)
       color: Qt.rgba(Color.menu.background.r,
                      Color.menu.background.g,
                      Color.menu.background.b, 0.86)
@@ -821,6 +989,10 @@ Item {
       padding: Style.space(4)
       scale: root.opened ? 1 : 0.96
       opacity: root.opened ? 1 : 0
+
+      Behavior on height {
+        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+      }
 
       Behavior on y {
         enabled: !mover.active
@@ -865,291 +1037,1018 @@ Item {
         }
       }
 
-      Row {
+      Column {
         anchors.fill: parent
-        anchors.leftMargin: Style.space(20)
-        anchors.rightMargin: Style.space(10)
-        spacing: Style.space(14)
+        anchors.topMargin: Style.space(10)
+        anchors.bottomMargin: Style.space(10)
+        anchors.leftMargin: Style.space(18)
+        anchors.rightMargin: Style.space(18)
+        spacing: Style.space(8)
 
+        // Top Row: Logo + Text Prompt + Action Buttons (History & Dictation)
         Item {
-          width: Style.space(54)
-          height: parent.height
+          width: parent.width
+          height: Style.space(50)
 
-          Image {
-            id: logoMask
-            anchors.centerIn: parent
-            width: Style.space(42)
-            height: width
-            source: "omarchy-logo.svg"
-            fillMode: Image.PreserveAspectFit
-            smooth: false
-            visible: false
-            layer.enabled: true
-          }
+          Item {
+            id: logoItem
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            width: Style.space(38)
+            height: parent.height
 
-          MultiEffect {
-            anchors.fill: logoMask
-            source: logoMask
-            colorization: 1.0
-            colorizationColor: Color.menu.text
-            opacity: 0.78
-          }
-        }
-
-        Item {
-          width: parent.width - Style.space(54) - Style.space(42) * 2 - parent.spacing * 3
-            - (autoBadge.visible ? autoBadge.width + parent.spacing : 0)
-          height: parent.height
-
-          TextInput {
-            id: prompt
-            anchors.fill: parent
-            color: Color.menu.text
-            selectionColor: Color.menu.selectedBackground
-            selectedTextColor: Color.menu.selectedText
-            font.family: Style.font.menuFamily
-            font.pixelSize: Style.font.heading
-            verticalAlignment: TextInput.AlignVCenter
-            selectByMouse: true
-            clip: true
-            maximumLength: 2000
-
-            cursorDelegate: Rectangle {
-              width: Math.max(1, Style.space(1))
-              color: Color.accent
+            Image {
+              id: logoMask
+              anchors.centerIn: parent
+              width: Style.space(32)
+              height: width
+              source: "omarchy-logo.svg"
+              fillMode: Image.PreserveAspectFit
+              smooth: false
+              visible: false
+              layer.enabled: true
             }
 
-            onTextChanged: {
-              if (root.showingHistory) {
-                root.applyHistoryFilter()
+            MultiEffect {
+              anchors.fill: logoMask
+              source: logoMask
+              colorization: 1.0
+              colorizationColor: Color.menu.text
+              opacity: 0.78
+            }
+          }
+
+          Row {
+            id: actionButtons
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(4)
+
+            Item {
+              width: Style.space(34)
+              height: Style.space(34)
+
+              Rectangle {
+                anchors.centerIn: parent
+                width: Style.space(32)
+                height: width
+                radius: width / 2
+                color: root.showingHistory
+                  ? Color.menu.selectedBackground
+                  : (historyBtnArea.containsMouse ? Color.menu.selectedBackground : "transparent")
+
+                Text {
+                  anchors.centerIn: parent
+                  text: "󰋚"
+                  color: root.showingHistory ? Color.accent : Color.menu.text
+                  opacity: root.showingHistory ? 1.0 : 0.62
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.iconLarge
+                }
+
+                MouseArea {
+                  id: historyBtnArea
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.toggleHistory()
+                }
               }
             }
 
-            Keys.priority: Keys.BeforeItem
+            Item {
+              width: Style.space(34)
+              height: Style.space(34)
 
-            Keys.onPressed: function(event) {
-              if (event.modifiers & Qt.ControlModifier) {
-                if (event.key === Qt.Key_H) {
-                  root.toggleHistory()
-                  event.accepted = true
-                  return
-                } else if (event.key === Qt.Key_E) {
-                  root.expand()
-                  event.accepted = true
-                  return
-                } else if (event.key === Qt.Key_C && prompt.selectedText.length === 0) {
-                  root.stopRun()
-                  event.accepted = true
-                  return
-                } else if (event.key === Qt.Key_N) {
-                  root.newSession()
-                  event.accepted = true
-                  return
-                } else if (event.key === Qt.Key_Y) {
-                  root.copyLast()
-                  event.accepted = true
-                  return
+              Rectangle {
+                anchors.centerIn: parent
+                width: Style.space(32)
+                height: width
+                radius: width / 2
+                color: micArea.containsMouse
+                  ? Color.menu.selectedBackground
+                  : "transparent"
+
+                Text {
+                  anchors.centerIn: parent
+                  text: root.dictationState === "transcribing" ? "󰔟" : "󰍬"
+                  color: root.dictationState === "idle" ? Color.menu.text : Color.bar.active
+                  opacity: root.dictationState === "idle" ? 0.62 : 1
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.iconLarge
+                }
+
+                MouseArea {
+                  id: micArea
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.toggleDictation()
+                }
+              }
+            }
+          }
+
+          Item {
+            id: promptContainer
+            anchors.left: logoItem.right
+            anchors.leftMargin: Style.space(12)
+            anchors.right: actionButtons.left
+            anchors.rightMargin: Style.space(10)
+            anchors.verticalCenter: parent.verticalCenter
+            height: parent.height
+
+            TextInput {
+              id: prompt
+              anchors.fill: parent
+              color: Color.menu.text
+              selectionColor: Color.menu.selectedBackground
+              selectedTextColor: Color.menu.selectedText
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.heading
+              verticalAlignment: TextInput.AlignVCenter
+              selectByMouse: true
+              clip: true
+              maximumLength: 2000
+
+              cursorDelegate: Rectangle {
+                width: Math.max(1, Style.space(1))
+                color: Color.accent
+              }
+
+              onTextChanged: {
+                if (root.showingHistory) {
+                  root.applyHistoryFilter()
                 }
               }
 
-              if (root.showingHistory) {
-                if (event.key === Qt.Key_Down) {
-                  root.historySelectedIndex = Math.min(filteredHistoryModel.count - 1, root.historySelectedIndex + 1)
-                  event.accepted = true
-                  return
-                } else if (event.key === Qt.Key_Up) {
-                  root.historySelectedIndex = Math.max(0, root.historySelectedIndex - 1)
-                  event.accepted = true
-                  return
-                } else if (event.key === Qt.Key_Delete) {
-                  if (root.historySelectedIndex >= 0 && root.historySelectedIndex < filteredHistoryModel.count) {
-                    root.deleteSession(filteredHistoryModel.get(root.historySelectedIndex).id)
+              Keys.priority: Keys.BeforeItem
+
+              Keys.onPressed: function(event) {
+                if (event.modifiers & Qt.ControlModifier) {
+                  if (event.key === Qt.Key_1) {
+                    root.setMode("regular")
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_2) {
+                    root.setMode("internet")
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_3) {
+                    root.setMode("agentic")
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_H) {
+                    root.toggleHistory()
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_E) {
+                    root.expand()
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_C && prompt.selectedText.length === 0) {
+                    root.stopRun()
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_D) {
+                    root.detachToBackground()
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_N) {
+                    root.newSession()
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_Y) {
+                    root.copyLast()
+                    event.accepted = true
+                    return
                   }
+                }
+
+                if (event.modifiers & Qt.AltModifier) {
+                  if (event.key === Qt.Key_1) {
+                    root.setHarness("agy")
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_2) {
+                    root.setHarness("opencode")
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_3) {
+                    root.setHarness("cline")
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_M) {
+                    if (root.activeMode === "agentic") {
+                      root.showingModelMenu = !root.showingModelMenu
+                    }
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_H) {
+                    if (root.activeMode === "agentic") {
+                      root.cycleHarness(true)
+                    }
+                    event.accepted = true
+                    return
+                  }
+                }
+
+                if (root.showingModelMenu) {
+                  if (event.key === Qt.Key_Down) {
+                    root.cycleModel(true)
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_Up) {
+                    root.cycleModel(false)
+                    event.accepted = true
+                    return
+                  }
+                }
+
+                if (event.key === Qt.Key_Tab && !(event.modifiers & Qt.ShiftModifier)) {
+                  root.cycleMode(true)
                   event.accepted = true
                   return
                 }
-              }
-
-              if (event.key === Qt.Key_Backtab
-                  || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))) {
-                root.toggleAuto()
-                event.accepted = true
-                return
-              }
-              if (event.key === Qt.Key_PageUp) {
-                root.followTail = false
-                list.contentY = Math.max(0, list.contentY - list.height * 0.8)
-                event.accepted = true
-              } else if (event.key === Qt.Key_PageDown) {
-                list.contentY = Math.min(
-                  Math.max(0, list.contentHeight - list.height),
-                  list.contentY + list.height * 0.8)
-                root.followTail = list.atYEnd
-                event.accepted = true
-              }
-            }
-
-            Keys.onEscapePressed: function(event) {
-              if (root.showingHistory) {
-                root.showingHistory = false
-                prompt.text = ""
-                event.accepted = true
-                return
-              }
-              root.dismiss()
-              event.accepted = true
-            }
-
-            Keys.onReturnPressed: function(event) {
-              if (root.showingHistory) {
-                if (filteredHistoryModel.count > 0 && root.historySelectedIndex >= 0 && root.historySelectedIndex < filteredHistoryModel.count) {
-                  root.loadSession(filteredHistoryModel.get(root.historySelectedIndex).id)
+                if (event.key === Qt.Key_Backtab || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))) {
+                  root.cycleMode(false)
                   event.accepted = true
                   return
-                } else if (prompt.text.trim().length > 0) {
+                }
+
+                if (root.showingHistory) {
+                  if (event.key === Qt.Key_Down) {
+                    root.historySelectedIndex = Math.min(filteredHistoryModel.count - 1, root.historySelectedIndex + 1)
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_Up) {
+                    root.historySelectedIndex = Math.max(0, root.historySelectedIndex - 1)
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_Delete) {
+                    if (root.historySelectedIndex >= 0 && root.historySelectedIndex < filteredHistoryModel.count) {
+                      root.deleteSession(filteredHistoryModel.get(root.historySelectedIndex).id)
+                    }
+                    event.accepted = true
+                    return
+                  }
+                }
+
+                if (event.key === Qt.Key_PageUp) {
+                  root.followTail = false
+                  list.contentY = Math.max(0, list.contentY - list.height * 0.8)
+                  event.accepted = true
+                } else if (event.key === Qt.Key_PageDown) {
+                  list.contentY = Math.min(
+                    Math.max(0, list.contentHeight - list.height),
+                    list.contentY + list.height * 0.8)
+                  root.followTail = list.atYEnd
+                  event.accepted = true
+                }
+              }
+
+              Keys.onEscapePressed: function(event) {
+                if (root.showingModelMenu) {
+                  root.showingModelMenu = false
+                  event.accepted = true
+                  return
+                }
+                if (root.showingHistory) {
                   root.showingHistory = false
-                  root.submit()
+                  prompt.text = ""
                   event.accepted = true
                   return
                 }
+                root.dismiss()
+                event.accepted = true
               }
-              root.submit()
-              event.accepted = true
-            }
 
-            Keys.onEnterPressed: function(event) {
-              if (root.showingHistory) {
-                if (filteredHistoryModel.count > 0 && root.historySelectedIndex >= 0 && root.historySelectedIndex < filteredHistoryModel.count) {
-                  root.loadSession(filteredHistoryModel.get(root.historySelectedIndex).id)
-                  event.accepted = true
-                  return
-                } else if (prompt.text.trim().length > 0) {
-                  root.showingHistory = false
-                  root.submit()
+              Keys.onReturnPressed: function(event) {
+                if (root.showingModelMenu) {
+                  root.showingModelMenu = false
                   event.accepted = true
                   return
                 }
+                if (root.showingHistory) {
+                  if (filteredHistoryModel.count > 0 && root.historySelectedIndex >= 0 && root.historySelectedIndex < filteredHistoryModel.count) {
+                    root.loadSession(filteredHistoryModel.get(root.historySelectedIndex).id)
+                    event.accepted = true
+                    return
+                  } else if (prompt.text.trim().length > 0) {
+                    root.showingHistory = false
+                    root.submit()
+                    event.accepted = true
+                    return
+                  }
+                }
+                root.submit()
+                event.accepted = true
               }
-              root.submit()
-              event.accepted = true
+
+              Keys.onEnterPressed: function(event) {
+                if (root.showingModelMenu) {
+                  root.showingModelMenu = false
+                  event.accepted = true
+                  return
+                }
+                if (root.showingHistory) {
+                  if (filteredHistoryModel.count > 0 && root.historySelectedIndex >= 0 && root.historySelectedIndex < filteredHistoryModel.count) {
+                    root.loadSession(filteredHistoryModel.get(root.historySelectedIndex).id)
+                    event.accepted = true
+                    return
+                  } else if (prompt.text.trim().length > 0) {
+                    root.showingHistory = false
+                    root.submit()
+                    event.accepted = true
+                    return
+                  }
+                }
+                root.submit()
+                event.accepted = true
+              }
             }
-          }
-
-          Text {
-            anchors.fill: parent
-            visible: prompt.text.length === 0
-            text: root.dictationState === "recording"
-              ? "Listening…"
-              : (root.dictationState === "transcribing"
-                ? "Transcribing…"
-                : (root.showingHistory
-                  ? "Search past chats…"
-                  : (root.hasSession ? "Follow up…" : "Personal Assistance Active")))
-            color: Color.menu.text
-            opacity: root.dictationState === "idle" ? 0.44 : 0.72
-            font.family: Style.font.menuFamily
-            font.pixelSize: Style.font.heading
-            verticalAlignment: Text.AlignVCenter
-          }
-        }
-
-        Item {
-          id: autoBadge
-
-          visible: root.autoMode
-          width: autoLabel.implicitWidth + Style.space(16)
-          height: parent.height
-
-          Rectangle {
-            anchors.centerIn: parent
-            width: parent.width
-            height: autoLabel.implicitHeight + Style.space(8)
-            radius: height / 2
-            color: Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b,
-                           badgeArea.containsMouse ? 0.3 : 0.18)
 
             Text {
-              id: autoLabel
+              anchors.fill: parent
+              visible: prompt.text.length === 0
+              text: root.dictationState === "recording"
+                ? "Listening…"
+                : (root.dictationState === "transcribing"
+                  ? "Transcribing…"
+                  : (root.showingHistory
+                    ? "Search past chats…"
+                    : (root.runState === "detached"
+                      ? "Ask Firstmate or queue steering task… (Ctrl+E to view)"
+                      : (root.hasSession
+                        ? "Follow up…"
+                        : (root.activeMode === "internet"
+                          ? "Search web with Jarvis… (Internet)"
+                          : (root.activeMode === "agentic"
+                            ? "Describe project or task… (Agentic)"
+                            : "Ask Jarvis anything… (Regular)"))))))
+              color: Color.menu.text
+              opacity: root.dictationState === "idle" ? 0.44 : 0.72
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.heading
+              verticalAlignment: Text.AlignVCenter
+              elide: Text.ElideRight
+              clip: true
+            }
+          }
+        }
 
+        // Divider
+        Rectangle {
+          width: parent.width
+          height: 1
+          color: Color.menu.border
+          opacity: 0.16
+        }
+
+        // Bottom Row: Mode Selector Segments & Status Description
+        Item {
+          width: parent.width
+          height: Style.space(28)
+
+          // Segmented Control Pill
+          Rectangle {
+            id: modePillContainer
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            height: Style.space(26)
+            width: modeSegmentRow.implicitWidth + Style.space(8)
+            radius: height / 2
+            color: Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.05)
+            border.color: Qt.rgba(Color.menu.border.r, Color.menu.border.g, Color.menu.border.b, 0.22)
+            border.width: 1
+
+            Row {
+              id: modeSegmentRow
               anchors.centerIn: parent
-              text: "AUTO"
-              color: Color.urgent
+              spacing: Style.space(2)
+
+              // 1. Regular Segment
+              Rectangle {
+                id: segRegular
+                width: segRegularContent.implicitWidth + Style.space(16)
+                height: Style.space(22)
+                radius: height / 2
+                color: root.activeMode === "regular"
+                  ? Color.menu.selectedBackground
+                  : (segRegularMouse.containsMouse ? Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.08) : "transparent")
+
+                Behavior on color { ColorAnimation { duration: 120 } }
+
+                Row {
+                  id: segRegularContent
+                  anchors.centerIn: parent
+                  spacing: Style.space(5)
+
+                  Text {
+                    text: "󰘥"
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                    color: root.activeMode === "regular" ? Color.menu.selectedText : Color.menu.text
+                    opacity: root.activeMode === "regular" ? 1.0 : 0.7
+                  }
+
+                  Text {
+                    text: "Regular"
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption
+                    font.weight: root.activeMode === "regular" ? Font.DemiBold : Font.Normal
+                    color: root.activeMode === "regular" ? Color.menu.selectedText : Color.menu.text
+                    opacity: root.activeMode === "regular" ? 1.0 : 0.75
+                  }
+                }
+
+                MouseArea {
+                  id: segRegularMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.setMode("regular")
+                }
+              }
+
+              // 2. Internet Segment
+              Rectangle {
+                id: segInternet
+                width: segInternetContent.implicitWidth + Style.space(16)
+                height: Style.space(22)
+                radius: height / 2
+                color: root.activeMode === "internet"
+                  ? Color.menu.selectedBackground
+                  : (segInternetMouse.containsMouse ? Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.08) : "transparent")
+
+                Behavior on color { ColorAnimation { duration: 120 } }
+
+                Row {
+                  id: segInternetContent
+                  anchors.centerIn: parent
+                  spacing: Style.space(5)
+
+                  Text {
+                    text: "󰖟"
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                    color: root.activeMode === "internet" ? Color.accent : Color.menu.text
+                    opacity: root.activeMode === "internet" ? 1.0 : 0.7
+                  }
+
+                  Text {
+                    text: "Internet"
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption
+                    font.weight: root.activeMode === "internet" ? Font.DemiBold : Font.Normal
+                    color: root.activeMode === "internet" ? Color.accent : Color.menu.text
+                    opacity: root.activeMode === "internet" ? 1.0 : 0.75
+                  }
+                }
+
+                MouseArea {
+                  id: segInternetMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.setMode("internet")
+                }
+              }
+
+              // 3. Agentic Segment
+              Rectangle {
+                id: segAgentic
+                width: segAgenticContent.implicitWidth + Style.space(16)
+                height: Style.space(22)
+                radius: height / 2
+                color: root.activeMode === "agentic"
+                  ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.22)
+                  : (segAgenticMouse.containsMouse ? Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.08) : "transparent")
+
+                Behavior on color { ColorAnimation { duration: 120 } }
+
+                Row {
+                  id: segAgenticContent
+                  anchors.centerIn: parent
+                  spacing: Style.space(5)
+
+                  Text {
+                    text: "󰲋"
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                    color: root.activeMode === "agentic" ? Color.urgent : Color.menu.text
+                    opacity: root.activeMode === "agentic" ? 1.0 : 0.7
+                  }
+
+                  Text {
+                    text: "Agentic"
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption
+                    font.weight: root.activeMode === "agentic" ? Font.DemiBold : Font.Normal
+                    color: root.activeMode === "agentic" ? Color.urgent : Color.menu.text
+                    opacity: root.activeMode === "agentic" ? 1.0 : 0.75
+                  }
+                }
+
+                MouseArea {
+                  id: segAgenticMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.setMode("agentic")
+                }
+              }
+            }
+          }
+
+          // Mode Description & Shortcut Tag
+          Item {
+            id: modeHintContainer
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(4)
+            anchors.left: modePillContainer.right
+            anchors.leftMargin: Style.space(8)
+            anchors.verticalCenter: parent.verticalCenter
+            height: parent.height
+            clip: true
+
+            Row {
+              id: modeHintRow
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(6)
+
+              Text {
+                id: modeHintLabel
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.activeMode === "regular"
+                  ? "Direct Knowledge"
+                  : (root.activeMode === "internet" ? "Live DuckDuckGo" : "Fleet Dispatch")
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.caption
+                color: root.activeMode === "agentic" ? Color.urgent : (root.activeMode === "internet" ? Color.accent : Color.menu.text)
+                opacity: 0.85
+                elide: Text.ElideRight
+                width: Math.min(implicitWidth, Math.max(0, modeHintContainer.width - modeHintTabTag.implicitWidth - Style.space(8)))
+              }
+
+              Text {
+                id: modeHintTabTag
+                anchors.verticalCenter: parent.verticalCenter
+                text: "\u00b7 Tab \u21c4"
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.caption
+                color: Color.menu.text
+                opacity: 0.52
+              }
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.cycleMode(true)
+            }
+          }
+        }
+
+        // Divider for Agentic Controls
+        Rectangle {
+          visible: root.activeMode === "agentic"
+          width: parent.width
+          height: 1
+          color: Color.menu.border
+          opacity: 0.16
+        }
+
+        // Agentic Options Row (Harness Selector + Model Dropdown Trigger)
+        Item {
+          id: agenticOptionsRow
+          visible: root.activeMode === "agentic"
+          width: parent.width
+          height: Style.space(28)
+
+          readonly property int maxModelBtnWidth: Math.max(Style.space(80), parent.width - harnessPillContainer.width - Style.space(16))
+
+          // Left: Harness Selector (AGY, OpenCode, Cline)
+          Rectangle {
+            id: harnessPillContainer
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            height: Style.space(26)
+            width: harnessSegmentRow.implicitWidth + Style.space(8)
+            radius: height / 2
+            color: Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.05)
+            border.color: Qt.rgba(Color.menu.border.r, Color.menu.border.g, Color.menu.border.b, 0.22)
+            border.width: 1
+
+            Row {
+              id: harnessSegmentRow
+              anchors.centerIn: parent
+              spacing: Style.space(2)
+
+              // AGY Button
+              Rectangle {
+                id: segHarnessAgy
+                width: segAgyContent.implicitWidth + Style.space(14)
+                height: Style.space(22)
+                radius: height / 2
+                color: root.activeHarness === "agy"
+                  ? Color.menu.selectedBackground
+                  : (harnessAgyMouse.containsMouse ? Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.08) : "transparent")
+
+                Behavior on color { ColorAnimation { duration: 120 } }
+
+                Row {
+                  id: segAgyContent
+                  anchors.centerIn: parent
+                  spacing: Style.space(4)
+
+                  Text {
+                    text: "󰲋"
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                    color: root.activeHarness === "agy" ? Color.urgent : Color.menu.text
+                    opacity: root.activeHarness === "agy" ? 1.0 : 0.7
+                  }
+
+                  Text {
+                    text: "AGY"
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption
+                    font.weight: root.activeHarness === "agy" ? Font.DemiBold : Font.Normal
+                    color: root.activeHarness === "agy" ? Color.menu.selectedText : Color.menu.text
+                    opacity: root.activeHarness === "agy" ? 1.0 : 0.75
+                  }
+                }
+
+                MouseArea {
+                  id: harnessAgyMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.setHarness("agy")
+                }
+              }
+
+              // OpenCode Button
+              Rectangle {
+                id: segHarnessOpencode
+                width: segOpencodeContent.implicitWidth + Style.space(14)
+                height: Style.space(22)
+                radius: height / 2
+                color: root.activeHarness === "opencode"
+                  ? Color.menu.selectedBackground
+                  : (harnessOpencodeMouse.containsMouse ? Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.08) : "transparent")
+
+                Behavior on color { ColorAnimation { duration: 120 } }
+
+                Row {
+                  id: segOpencodeContent
+                  anchors.centerIn: parent
+                  spacing: Style.space(4)
+
+                  Text {
+                    text: "󰘳"
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                    color: root.activeHarness === "opencode" ? Color.accent : Color.menu.text
+                    opacity: root.activeHarness === "opencode" ? 1.0 : 0.7
+                  }
+
+                  Text {
+                    text: "OpenCode"
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption
+                    font.weight: root.activeHarness === "opencode" ? Font.DemiBold : Font.Normal
+                    color: root.activeHarness === "opencode" ? Color.menu.selectedText : Color.menu.text
+                    opacity: root.activeHarness === "opencode" ? 1.0 : 0.75
+                  }
+                }
+
+                MouseArea {
+                  id: harnessOpencodeMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.setHarness("opencode")
+                }
+              }
+
+              // Cline Button
+              Rectangle {
+                id: segHarnessCline
+                width: segClineContent.implicitWidth + Style.space(14)
+                height: Style.space(22)
+                radius: height / 2
+                color: root.activeHarness === "cline"
+                  ? Color.menu.selectedBackground
+                  : (harnessClineMouse.containsMouse ? Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.08) : "transparent")
+
+                Behavior on color { ColorAnimation { duration: 120 } }
+
+                Row {
+                  id: segClineContent
+                  anchors.centerIn: parent
+                  spacing: Style.space(4)
+
+                  Text {
+                    text: "󰚩"
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                    color: root.activeHarness === "cline" ? Color.bar.active : Color.menu.text
+                    opacity: root.activeHarness === "cline" ? 1.0 : 0.7
+                  }
+
+                  Text {
+                    text: "Cline"
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption
+                    font.weight: root.activeHarness === "cline" ? Font.DemiBold : Font.Normal
+                    color: root.activeHarness === "cline" ? Color.menu.selectedText : Color.menu.text
+                    opacity: root.activeHarness === "cline" ? 1.0 : 0.75
+                  }
+                }
+
+                MouseArea {
+                  id: harnessClineMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.setHarness("cline")
+                }
+              }
+            }
+          }
+
+          // Right: Model Selector Dropdown Trigger Button
+          Rectangle {
+            id: modelSelectorBtn
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            height: Style.space(26)
+            readonly property int maxLabelWidth: Math.max(Style.space(40), agenticOptionsRow.maxModelBtnWidth - Style.space(14) - (badgeContainer.visible ? badgeContainer.width + Style.space(6) : 0) - Style.space(24))
+            width: Math.min(agenticOptionsRow.maxModelBtnWidth, modelBtnRow.implicitWidth + Style.space(14))
+            radius: Style.space(6)
+            clip: true
+            color: root.showingModelMenu
+              ? Color.menu.selectedBackground
+              : (modelBtnMouse.containsMouse ? Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.08) : Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.04))
+            border.color: root.showingModelMenu
+              ? Color.accent
+              : Qt.rgba(Color.menu.border.r, Color.menu.border.g, Color.menu.border.b, 0.22)
+            border.width: 1
+
+            Behavior on color { ColorAnimation { duration: 120 } }
+            Behavior on border.color { ColorAnimation { duration: 120 } }
+
+            Row {
+              id: modelBtnRow
+              anchors.centerIn: parent
+              spacing: Style.space(6)
+
+              Text {
+                id: modelBtnLabel
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.getActiveModelDisplayName()
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.caption
+                font.weight: Font.Medium
+                color: Color.menu.text
+                elide: Text.ElideRight
+                width: Math.min(implicitWidth, modelSelectorBtn.maxLabelWidth)
+              }
+
+              // Model badge (e.g. Highest Reasoning or Free)
+              Rectangle {
+                id: badgeContainer
+                visible: root.getActiveModelBadge() !== ""
+                anchors.verticalCenter: parent.verticalCenter
+                height: Style.space(15)
+                width: badgeText.implicitWidth + Style.space(8)
+                radius: height / 2
+                color: (root.getActiveModelBadge() === "Free")
+                  ? Qt.rgba(Color.bar.active.r, Color.bar.active.g, Color.bar.active.b, 0.22)
+                  : Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.22)
+
+                Text {
+                  id: badgeText
+                  anchors.centerIn: parent
+                  text: root.getActiveModelBadge()
+                  font.family: Style.font.menuFamily
+                  font.pixelSize: Style.font.caption * 0.82
+                  font.weight: Font.Bold
+                  color: (root.getActiveModelBadge() === "Free")
+                    ? Color.bar.active
+                    : Color.urgent
+                }
+              }
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.showingModelMenu ? "󰅃" : "󰅀"
+                font.family: Style.font.family
+                font.pixelSize: Style.font.caption
+                color: Color.menu.text
+                opacity: 0.6
+              }
+            }
+
+            MouseArea {
+              id: modelBtnMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                root.showingModelMenu = !root.showingModelMenu
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // MouseArea dismiss for model dropdown
+    MouseArea {
+      anchors.fill: parent
+      visible: root.opened && root.showingModelMenu && root.activeMode === "agentic"
+      z: 99
+      onClicked: root.showingModelMenu = false
+    }
+
+    // Model Dropdown Card
+    BorderSurface {
+      id: modelMenuPopup
+      z: 100
+
+      visible: opacity > 0
+      opacity: (root.opened && root.showingModelMenu && root.activeMode === "agentic") ? 1 : 0
+      width: Style.space(380)
+      height: Math.min(panel.height - y - Style.space(20), modelMenuContent.implicitHeight + Style.space(20))
+      x: Math.max(Style.space(16), Math.min(panel.width - width - Style.space(16), pill.x + pill.width - width))
+      y: pill.y + pill.height + Style.space(6)
+      radius: Style.space(16)
+      padding: Style.space(8)
+      clip: true
+      color: Qt.rgba(Color.menu.background.r,
+                     Color.menu.background.g,
+                     Color.menu.background.b, 0.98)
+      borderSpec: pill.borderBase
+
+      Behavior on opacity {
+        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+      }
+
+      Column {
+        id: modelMenuContent
+        width: parent.width
+        spacing: Style.space(4)
+
+        // Dropdown Header
+        Item {
+          width: parent.width
+          height: Style.space(26)
+
+          Row {
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(8)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(6)
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: {
+                var h = root.harnessCatalog[root.activeHarness]
+                return h ? (h.icon + " " + h.name + " Models") : "Select Model"
+              }
               font.family: Style.font.menuFamily
               font.pixelSize: Style.font.caption
-              font.letterSpacing: 1
+              font.weight: Font.DemiBold
+              color: Color.menu.text
+              opacity: 0.82
             }
 
-            MouseArea {
-              id: badgeArea
-
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: root.toggleAuto()
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.activeHarness === "agy" ? "· Frontier Reasoning" : "· Current Free Tier"
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.caption * 0.9
+              color: root.activeHarness === "agy" ? Color.urgent : Color.bar.active
+              opacity: 0.9
             }
           }
         }
 
-        Item {
-          width: Style.space(42)
-          height: parent.height
-
-          Rectangle {
-            anchors.centerIn: parent
-            width: Style.space(38)
-            height: width
-            radius: width / 2
-            color: root.showingHistory
-              ? Color.menu.selectedBackground
-              : (historyBtnArea.containsMouse ? Color.menu.selectedBackground : "transparent")
-
-            Text {
-              anchors.centerIn: parent
-              text: "󰋚"
-              color: root.showingHistory ? Color.accent : Color.menu.text
-              opacity: root.showingHistory ? 1.0 : 0.62
-              font.family: Style.font.family
-              font.pixelSize: Style.font.iconLarge
-            }
-
-            MouseArea {
-              id: historyBtnArea
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: root.toggleHistory()
-            }
-          }
+        Rectangle {
+          width: parent.width
+          height: 1
+          color: Color.menu.border
+          opacity: 0.16
         }
 
-        Item {
-          width: Style.space(42)
-          height: parent.height
+        // Model items list
+        Column {
+          width: parent.width
+          spacing: Style.space(2)
 
-          Rectangle {
-            anchors.centerIn: parent
-            width: Style.space(38)
-            height: width
-            radius: width / 2
-            color: micArea.containsMouse
-              ? Color.menu.selectedBackground
-              : "transparent"
+          Repeater {
+            model: (root.harnessCatalog && root.harnessCatalog[root.activeHarness]) ? root.harnessCatalog[root.activeHarness].models : []
 
-            Text {
-              anchors.centerIn: parent
-              text: root.dictationState === "transcribing" ? "󰔟" : "󰍬"
-              color: root.dictationState === "idle" ? Color.menu.text : Color.bar.active
-              opacity: root.dictationState === "idle" ? 0.62 : 1
-              font.family: Style.font.family
-              font.pixelSize: Style.font.iconLarge
-            }
+            delegate: Rectangle {
+              id: modelItemDelegate
+              width: parent.width
+              height: Style.space(38)
+              radius: Style.space(8)
 
-            MouseArea {
-              id: micArea
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: root.toggleDictation()
+              readonly property bool isSelected: root.activeModel === modelData.id
+              color: isSelected
+                ? Color.menu.selectedBackground
+                : (modelItemHover.containsMouse ? Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.07) : "transparent")
+
+              Behavior on color { ColorAnimation { duration: 100 } }
+
+              Item {
+                anchors.fill: parent
+
+                Text {
+                  id: modelCheckIcon
+                  anchors.left: parent.left
+                  anchors.leftMargin: Style.space(10)
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: modelItemDelegate.isSelected ? "󰄵" : "󰄱"
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.bodySmall
+                  color: modelItemDelegate.isSelected ? Color.accent : Color.muted
+                  opacity: modelItemDelegate.isSelected ? 1.0 : 0.4
+                }
+
+                Rectangle {
+                  id: modelBadgeRect
+                  visible: modelData.badge !== ""
+                  anchors.right: parent.right
+                  anchors.rightMargin: Style.space(10)
+                  anchors.verticalCenter: parent.verticalCenter
+                  height: Style.space(17)
+                  width: itemBadgeText.implicitWidth + Style.space(10)
+                  radius: height / 2
+                  color: (modelData.isFree)
+                    ? Qt.rgba(Color.bar.active.r, Color.bar.active.g, Color.bar.active.b, 0.22)
+                    : Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.22)
+                  border.color: (modelData.isFree)
+                    ? Qt.rgba(Color.bar.active.r, Color.bar.active.g, Color.bar.active.b, 0.45)
+                    : Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.45)
+                  border.width: 1
+
+                  Text {
+                    id: itemBadgeText
+                    anchors.centerIn: parent
+                    text: modelData.badge
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption * 0.8
+                    font.weight: Font.Bold
+                    color: (modelData.isFree) ? Color.bar.active : Color.urgent
+                  }
+                }
+
+                Column {
+                  anchors.left: modelCheckIcon.right
+                  anchors.leftMargin: Style.space(8)
+                  anchors.right: modelBadgeRect.visible ? modelBadgeRect.left : parent.right
+                  anchors.rightMargin: Style.space(8)
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: 1
+
+                  Text {
+                    text: modelData.name
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.bodySmall
+                    font.weight: modelItemDelegate.isSelected ? Font.DemiBold : Font.Normal
+                    color: modelItemDelegate.isSelected ? Color.menu.selectedText : Color.menu.text
+                    elide: Text.ElideRight
+                    width: parent.width
+                  }
+
+                  Text {
+                    text: modelData.id
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption * 0.85
+                    color: Color.muted
+                    opacity: 0.72
+                    elide: Text.ElideRight
+                    width: parent.width
+                  }
+                }
+              }
+
+              MouseArea {
+                id: modelItemHover
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  root.setModel(modelData.id)
+                }
+              }
             }
           }
         }
@@ -1180,6 +2079,10 @@ Item {
       opacity: root.opened ? 1 : 0
 
       Behavior on height {
+        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+      }
+
+      Behavior on y {
         NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
       }
 
@@ -1228,7 +2131,7 @@ Item {
               id: stateLabel
 
               text: root.runState === "running" ? "Working…"
-                : (root.runState === "detached" ? "Still running"
+                : (root.runState === "detached" ? "In background (Ctrl+E to view)"
                 : (root.runState === "interrupted" ? "Ended while away"
                 : (root.runState === "failed" ? "Failed"
                 : (root.runState === "stopped" ? "Stopped"
@@ -1285,6 +2188,9 @@ Item {
                 required property string rowLines
                 required property bool rowExpanded
                 required property bool rowAuto
+                required property string rowMode
+                required property string rowHarness
+                required property string rowModel
                 required property int index
 
                 readonly property bool isYou: row.rowKind === "you"
@@ -1297,7 +2203,7 @@ Item {
                 readonly property int padX: row.boxed ? Style.space(10) : 0
                 readonly property int padY: row.boxed ? Style.space(7) : 0
                 readonly property int leadIn: (row.isYou && row.index > 0) ? Style.space(14) : 0
-                readonly property int tagSpace: (row.isYou && row.rowAuto)
+                readonly property int tagSpace: (row.isYou && (row.rowAuto || (row.rowMode && row.rowMode !== "")))
                   ? autoTag.implicitWidth + Style.space(8) : 0
                 readonly property int opticalShift: row.isYou
                   ? Math.round((metrics.descent - (metrics.ascent - metrics.capHeight)) / 2)
@@ -1389,11 +2295,19 @@ Item {
                 Text {
                   id: autoTag
 
-                  visible: row.isYou && row.rowAuto
+                  visible: row.isYou && (row.rowAuto || (row.rowMode && row.rowMode !== ""))
                   x: row.chipWidth - row.padX - width
                   y: row.leadIn + row.padY + Math.round((metrics.height - height) / 2)
-                  text: "auto"
-                  color: Color.urgent
+                  text: {
+                    if (row.rowMode === "agentic") {
+                      var hName = row.rowHarness ? (row.rowHarness.toUpperCase()) : "AGY"
+                      return "󰲋 " + hName
+                    }
+                    if (row.rowMode === "internet") return "󰖟 web"
+                    if (row.rowMode === "regular") return "󰘥 regular"
+                    return row.rowAuto ? "auto" : ""
+                  }
+                  color: row.rowMode === "agentic" ? Color.urgent : (row.rowMode === "internet" ? Color.accent : Color.muted)
                   font.family: Style.font.menuFamily
                   font.pixelSize: Style.font.caption
                 }
@@ -1546,6 +2460,17 @@ Item {
             }
 
             Button {
+              text: "Background ^D"
+              tooltipText: "Ctrl+D \u2014 keep crewmate running in Herdr and free the bridge for conversation"
+              visible: root.runState === "running"
+              fontSize: Style.font.caption
+              foreground: Color.muted
+              horizontalPadding: Style.space(7)
+              verticalPadding: Style.space(3)
+              onClicked: root.detachToBackground()
+            }
+
+            Button {
               text: "Copy ^Y"
               tooltipText: "Ctrl+Y \u2014 copy the last answer, or click any row"
               visible: entries.count > 0
@@ -1575,6 +2500,16 @@ Item {
               horizontalPadding: Style.space(7)
               verticalPadding: Style.space(3)
               onClicked: root.toggleHistory()
+            }
+
+            Button {
+              text: (root.activeMode === "internet" ? "󰖟 Internet" : (root.activeMode === "agentic" ? "󰲋 Agentic" : "󰘥 Regular"))
+              tooltipText: "Active mode: " + root.activeMode + " \u2014 click or press Tab to switch mode"
+              fontSize: Style.font.caption
+              foreground: root.activeMode === "agentic" ? Color.urgent : (root.activeMode === "internet" ? Color.accent : Color.muted)
+              horizontalPadding: Style.space(7)
+              verticalPadding: Style.space(3)
+              onClicked: root.cycleMode(true)
             }
           }
 

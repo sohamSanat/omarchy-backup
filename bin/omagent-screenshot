@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""
+omagent-screenshot: Fast, zero-config headless screenshot tool for Omagent & AI coding agents.
+Captures screenshots of local HTML files or remote URLs using the fastest available engine:
+Playwright Chromium Headless Shell -> Zen Browser Headless -> System Chromium/Chrome.
+"""
+
+import sys
+import os
+import glob
+import shutil
+import argparse
+import subprocess
+import tempfile
+from pathlib import Path
+
+def find_browser():
+    # 1. Check Playwright Chromium Headless Shell (Fastest, ~1s, no profile needed)
+    shells = sorted(glob.glob(os.path.expanduser("~/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell")))
+    if shells and os.path.isfile(shells[-1]) and os.access(shells[-1], os.X_OK):
+        return ("chrome-headless-shell", shells[-1])
+
+    # 2. Check Playwright Chromium
+    chromes = sorted(glob.glob(os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome")))
+    if chromes and os.path.isfile(chromes[-1]) and os.access(chromes[-1], os.X_OK):
+        return ("chrome", chromes[-1])
+
+    # 3. Check Zen Browser
+    zen = shutil.which("zen") or os.path.expanduser("~/.local/bin/zen")
+    if os.path.isfile(zen) and os.access(zen, os.X_OK):
+        return ("zen", zen)
+
+    # 4. Check system chromium / google-chrome / firefox
+    for bin_name in ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "firefox"]:
+        p = shutil.which(bin_name)
+        if p:
+            engine = "firefox" if "firefox" in bin_name else "chrome"
+            return (engine, p)
+
+    return (None, None)
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Fast headless screenshot tool for visual verification of web pages and UIs.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("target", help="URL or path to local HTML file (e.g. index.html or file:///path)")
+    parser.add_argument("output", nargs="?", default="preview.png", help="Path to save output screenshot PNG")
+    parser.add_argument("--width", type=int, default=1440, help="Viewport width in pixels")
+    parser.add_argument("--height", type=int, default=900, help="Viewport height in pixels")
+    parser.add_argument("--mobile", action="store_true", help="Set viewport to mobile (375x812)")
+    parser.add_argument("--tablet", action="store_true", help="Set viewport to tablet (1024x768)")
+    parser.add_argument("--full", action="store_true", help="Capture extended vertical page (height=3200)")
+
+    args = parser.parse_args()
+
+    width = args.width
+    height = args.height
+
+    if args.mobile:
+        width, height = 375, 812
+    elif args.tablet:
+        width, height = 1024, 768
+    elif args.full:
+        height = 3200
+
+    target = args.target
+    if not (target.startswith("http://") or target.startswith("https://") or target.startswith("file://")):
+        path = Path(target).resolve()
+        if not path.exists():
+            print(f"Error: Target file does not exist: {path}", file=sys.stderr)
+            sys.exit(1)
+        target = f"file://{path}"
+
+    out_path = Path(args.output).resolve()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    engine, browser_bin = find_browser()
+    if not browser_bin:
+        print("Error: No headless browser found (checked Playwright Chromium, Zen, System Chromium/Firefox).", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        if engine in ("chrome-headless-shell", "chrome"):
+            cmd = [
+                browser_bin,
+                "--headless",
+                "--hide-scrollbars",
+                f"--window-size={width},{height}",
+                f"--screenshot={out_path}",
+                target
+            ]
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20)
+            if res.returncode != 0 and not out_path.exists():
+                print(f"Warning: Chrome returned code {res.returncode}: {res.stderr[:200]}", file=sys.stderr)
+        elif engine in ("zen", "firefox"):
+            with tempfile.TemporaryDirectory(prefix="zen_shot_") as tmp_prof:
+                cmd = [
+                    browser_bin,
+                    "--headless",
+                    "--no-remote",
+                    "--profile", tmp_prof,
+                    "--screenshot", str(out_path),
+                    "--window-size", f"{width},{height}",
+                    target
+                ]
+                res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=25)
+                if res.returncode != 0 and not out_path.exists():
+                    print(f"Warning: Browser returned code {res.returncode}: {res.stderr[:200]}", file=sys.stderr)
+
+        if out_path.is_file() and out_path.stat().st_size > 0:
+            size_kb = round(out_path.stat().st_size / 1024, 1)
+            print(f"[omagent-screenshot] Successfully captured {width}x{height} screenshot ({size_kb} KB) -> {out_path}")
+            sys.exit(0)
+        else:
+            print(f"Error: Failed to generate screenshot at {out_path}", file=sys.stderr)
+            sys.exit(1)
+    except subprocess.TimeoutExpired:
+        print(f"Error: Browser timed out while rendering {target}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error executing browser screenshot: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

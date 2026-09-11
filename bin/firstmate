@@ -17,6 +17,9 @@ case "${1:-}" in
   snapshot)
     "$FM_HOME/bin/fm-fleet-snapshot.sh" "${@:2}"
     ;;
+  subagent|crew)
+    exec firstmate-subagent "${@:2}"
+    ;;
   sync)
     "$FM_HOME/bin/fm-fleet-sync.sh" "${@:2}"
     ;;

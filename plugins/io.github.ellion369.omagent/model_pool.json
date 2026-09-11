@@ -1,0 +1,406 @@
+{
+  "version": 1,
+  "anchor": "Terminal-Bench 2.1 pass@1 (vendor/leaderboard max, benchmarks as of 21 Jul 2026)",
+  "rubric": {
+    "agentic_score": "0-10 composite: TB2.1-anchored agentic coding ability + tool-calling + context window + code-specialist lineage",
+    "sources_note": "https://poolside.ai/models (TB2.1 chart), https://opencode.ai/docs/zen/ (free-tier list/privacy), live CLI probes 2026-09-09"
+  },
+  "models": [
+    {
+      "id": "kilo/poolside/laguna-s-2.1:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 9.2,
+      "tb21": 70.2,
+      "context": "1M (native), 131K (local serve)",
+      "status": "scored",
+      "notes": "Top free agentic model: 118B MoE/8B active, RL-trained inside an agent harness; 33 pts clear of next free model on TB2.1.",
+      "sources": [
+        "https://poolside.ai/models",
+        "kilo models (free gateway)"
+      ],
+      "last_probe_failed_at": 1788947417.3864243,
+      "last_probe_detail": "kilo/poolside/laguna-s-2.1:free: skipped (failed 8m ago: chat OK but model failed the agentic tool-use test); kilo/thinkingmachines/inkling:free: skipped (failed 7m ago: chat probe timed out); kilo/nvidia/nemotron-3-ultra-550b-a55b:free: chat probe timed out; kilo/nvidia/nemotron-3.5-lightning:free: chat OK but model failed the agentic tool-use test; kilo/thinkingmachines/inkling-small:free: chat probe timed out"
+    },
+    {
+      "id": "kilo/nvidia/nemotron-3.5-lightning:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 7.6,
+      "tb21": null,
+      "context": "~1M (family)",
+      "status": "scored",
+      "notes": "NVIDIA Nemotron 3.5 Lightning; live probe passed (PROBE_OK). Fast agentic MoE, TB2.1 anchor not published; scored by family lineage (Nemotron 3 Ultra 56.4) + long context.",
+      "sources": [
+        "https://poolside.ai/models",
+        "live kilo probe 2026-09-09"
+      ]
+    },
+    {
+      "id": "kilo/nvidia/nemotron-3-ultra:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 7.4,
+      "tb21": 56.4,
+      "context": "1M",
+      "status": "gone",
+      "notes": "Removed from provider's free listing; excluded from selection.",
+      "sources": [
+        "https://build.nvidia.com/nvidia/nemotron-3-ultra-550b-a55b",
+        "https://poolside.ai/models"
+      ],
+      "gone_since": "2026-09-09T07:13:24Z"
+    },
+    {
+      "id": "opencode/inkling-free",
+      "provider": "opencode",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 7.2,
+      "tb21": 63.8,
+      "context": "large (975B-class model)",
+      "status": "gone",
+      "notes": "Removed from provider's free listing; excluded from selection.",
+      "sources": [
+        "https://poolside.ai/models",
+        "https://opencode.ai/docs/zen/"
+      ],
+      "gone_since": "2026-09-09T07:13:24Z"
+    },
+    {
+      "id": "opencode/big-pickle",
+      "provider": "opencode",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 6.8,
+      "tb21": null,
+      "context": "unknown",
+      "status": "scored",
+      "notes": "Zen free period (data used for improvement during free period). Live probe passed. Stealth/benchmark-unpublished; scored conservatively below inkling.",
+      "sources": [
+        "https://opencode.ai/docs/zen/",
+        "live opencode probe 2026-09-09"
+      ],
+      "last_verified_at": 1788947417.3432815,
+      "last_verification": "chat + agentic tool-use verified"
+    },
+    {
+      "id": "opencode/mimo-v2.5-free",
+      "provider": "opencode",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 6.2,
+      "tb21": null,
+      "context": "unknown",
+      "status": "scored",
+      "notes": "MiMo-V2.5 free period. Live probe passed. Benchmarks unpublished; mid-tier provisional score.",
+      "sources": [
+        "https://opencode.ai/docs/zen/",
+        "live opencode probe 2026-09-09"
+      ]
+    },
+    {
+      "id": "opencode/ling-3.0-flash-fin-free",
+      "provider": "opencode",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 5.8,
+      "tb21": null,
+      "context": "unknown",
+      "status": "scored",
+      "notes": "Ling 3.0 Flash Fin free period. Benchmarks unpublished; provisional score below mimo/big-pickle pending research.",
+      "sources": [
+        "https://opencode.ai/docs/zen/"
+      ]
+    },
+    {
+      "id": "kilo/muse-spark-1.3:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 5.0,
+      "tb21": null,
+      "context": "unknown",
+      "status": "gone",
+      "notes": "Removed from provider's free listing; excluded from selection.",
+      "sources": [
+        "https://opencode.ai/docs/zen/"
+      ],
+      "gone_since": "2026-09-09T07:13:24Z"
+    },
+    {
+      "id": "opencode/muse-spark-1.3-contributor-free",
+      "provider": "opencode",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 5.0,
+      "tb21": null,
+      "context": "unknown",
+      "status": "scored",
+      "notes": "Same model as kilo's muse-spark-1.3:free on a different gateway; tie broken by tiebreak_order.",
+      "sources": [
+        "https://opencode.ai/docs/zen/"
+      ]
+    },
+    {
+      "id": "kilo/~z-ai/glm-flash-latest",
+      "provider": "kilo",
+      "free": true,
+      "auth": "account",
+      "agentic_score": 6.5,
+      "tb21": null,
+      "context": "unknown",
+      "status": "gone",
+      "notes": "Removed from provider's free listing; excluded from selection.",
+      "sources": [
+        "live kilo probe 2026-09-09"
+      ],
+      "gone_since": "2026-09-09T07:13:24Z"
+    },
+    {
+      "id": "kilo/~deepseek/deepseek-v4-flash-latest",
+      "provider": "kilo",
+      "free": true,
+      "auth": "account",
+      "agentic_score": 6.9,
+      "tb21": 61.8,
+      "context": "unknown",
+      "status": "gone",
+      "notes": "Removed from provider's free listing; excluded from selection.",
+      "sources": [
+        "https://poolside.ai/models",
+        "https://api-docs.deepseek.com/",
+        "live kilo probe 2026-09-09"
+      ],
+      "gone_since": "2026-09-09T07:13:24Z"
+    },
+    {
+      "id": "cline/cline-default",
+      "provider": "cline",
+      "free": false,
+      "auth": "account",
+      "agentic_score": null,
+      "tb21": null,
+      "context": "unknown",
+      "status": "unscored",
+      "notes": "Cline's own gateway (authenticated via WorkOS). Preflight probe showed $0.00 balance \u2014 excluded until credited; free 'kilo gateway'-style models were not found in cline CLI.",
+      "sources": [
+        "live cline probe 2026-09-09",
+        "~/.cline/data/settings/providers.json"
+      ]
+    },
+    {
+      "id": "kilo/cohere/north-mini-code:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `kilo models`; not yet researched.",
+      "sources": []
+    },
+    {
+      "id": "kilo/dots-studio/dots-3-note-preview:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `kilo models`; not yet researched.",
+      "sources": []
+    },
+    {
+      "id": "kilo/inclusionai/ling-3.0-flash-fin:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `kilo models`; not yet researched.",
+      "sources": []
+    },
+    {
+      "id": "kilo/inclusionai/ling-3.0-flash-sante:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `kilo models`; not yet researched.",
+      "sources": []
+    },
+    {
+      "id": "kilo/liquid/lfm-2.5-2.6b:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `kilo models`; not yet researched.",
+      "sources": []
+    },
+    {
+      "id": "kilo/nex-agi/nex-n2.5-mini:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `kilo models`; not yet researched.",
+      "sources": []
+    },
+    {
+      "id": "kilo/nex-agi/nex-n2.5-pro:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `kilo models`; not yet researched.",
+      "sources": []
+    },
+    {
+      "id": "kilo/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `kilo models`; not yet researched.",
+      "sources": []
+    },
+    {
+      "id": "kilo/nvidia/nemotron-3-super-120b-a12b:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 6.2,
+      "tb21": 38.6,
+      "status": "scored",
+      "notes": "Scored from TB2.1 vendor-anchored comparison chart.",
+      "sources": [
+        "https://poolside.ai/models (Terminal-Bench 2.1 comparison chart, as of 21 Jul 2026)"
+      ]
+    },
+    {
+      "id": "kilo/nvidia/nemotron-3-ultra-550b-a55b:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 7.8,
+      "tb21": 56.4,
+      "status": "scored",
+      "notes": "Scored from TB2.1 vendor-anchored comparison chart.",
+      "sources": [
+        "https://poolside.ai/models (Terminal-Bench 2.1 comparison chart, as of 21 Jul 2026)"
+      ]
+    },
+    {
+      "id": "kilo/poolside/laguna-xs-2.1:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 5.8,
+      "tb21": 33.4,
+      "status": "scored",
+      "notes": "Scored from TB2.1 vendor-anchored comparison chart.",
+      "sources": [
+        "https://poolside.ai/models (Terminal-Bench 2.1 comparison chart, as of 21 Jul 2026)"
+      ]
+    },
+    {
+      "id": "kilo/stepfun/step-3.7-flash:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `kilo models`; not yet researched.",
+      "sources": []
+    },
+    {
+      "id": "kilo/thinkingmachines/inkling-small:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 7.4,
+      "tb21": 52.7,
+      "status": "scored",
+      "notes": "Scored from TB2.1 vendor-anchored comparison chart.",
+      "sources": [
+        "https://poolside.ai/models (Terminal-Bench 2.1 comparison chart, as of 21 Jul 2026)"
+      ]
+    },
+    {
+      "id": "kilo/thinkingmachines/inkling:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": 8.4,
+      "tb21": 63.8,
+      "status": "scored",
+      "notes": "Scored from TB2.1 vendor-anchored comparison chart.",
+      "sources": [
+        "https://poolside.ai/models (Terminal-Bench 2.1 comparison chart, as of 21 Jul 2026)"
+      ]
+    },
+    {
+      "id": "opencode/muse-spark-1.2-contributor-free",
+      "provider": "opencode",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `opencode models`; not yet researched.",
+      "sources": []
+    },
+    {
+      "id": "opencode/nemotron-3-ultra-free",
+      "provider": "opencode",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `opencode models`; not yet researched.",
+      "sources": []
+    },
+    {
+      "id": "opencode/nemotron-3.5-lightning-free",
+      "provider": "opencode",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `opencode models`; not yet researched.",
+      "sources": []
+    },
+    {
+      "id": "kilo/inclusionai/ling-3.0-flash-vl:free",
+      "provider": "kilo",
+      "free": true,
+      "auth": "none",
+      "agentic_score": null,
+      "tb21": null,
+      "status": "unscored",
+      "notes": "Auto-enumerated from `kilo models`; not yet researched.",
+      "sources": []
+    }
+  ],
+  "refreshed_at": "2026-09-10T19:23:31Z",
+  "scored_at": "2026-09-09"
+}

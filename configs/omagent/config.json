@@ -1,10 +1,39 @@
 {
   "gemini_api_key": "YOUR_GEMINI_API_KEY",
-  "fast_model": "gemini-3.8-flash",
-  "web_model": "gemini-3.8-flash",
-  "coding_harness": "antigravity",
-  "coding_model": "gemini-3.8-flash-high",
+  "fast_model": "gemini-3.5-flash",
+  "web_model": "gemini-3.5-flash",
+  "default_mode": "regular",
+  "coding_harness": "agy",
+  "coding_model": "claude-opus-4-6-thinking",
   "thinking_level": "high",
   "use_herdr": true,
-  "use_treehouse": true
+  "use_firstmate": true,
+  "use_treehouse": true,
+  "fallback_harness": "agy-only",
+  "quota_check": {
+    "enabled": true,
+    "trigger_usage_pct": 95,
+    "cache_ttl_s": 60,
+    "unknown_policy": "fallback"
+  },
+  "quota_force_state": null,
+  "excluded_providers": [
+    "kilo"
+  ],
+  "tiebreak_order": [
+    "opencode",
+    "cline"
+  ],
+  "pool_refresh": {
+    "enabled": true,
+    "on_failover": true,
+    "max_age_s": 86400,
+    "probe_timeout_s": 45,
+    "probe_verified_ttl_s": 1800
+  },
+  "runtime_watchdog": {
+    "enabled": true,
+    "max_nudges": 2,
+    "cooldown_s": 20
+  }
 }

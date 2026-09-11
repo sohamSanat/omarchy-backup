@@ -199,6 +199,65 @@ Plugin `console.log` messages may not appear there. Router errors appear in
 the card. `OMAGENT_DRY_RUN=1 ./omagent-route -- "your request"` checks the
 selected command from a repository checkout without running the agent.
 
+## Quota-Aware Harness Failover
+
+Lane 3 no longer burns tokens into an exhausted agy quota. Before every coding
+dispatch, the router gates agy behind its real quota (via `quota-axi`) and
+fails over to the best-ranked **free** model from a cumulative, provenance-tagged
+model pool when needed.
+
+**Gate rule (strict):** agy stays the harness unless its **5h OR weekly usage
+reaches >= 95%** (confirmed reading). An unprobeable quota (e.g. agy closed)
+keeps agy. Once failed over, the choice is sticky until the limiting quota
+window resets, then agy resumes automatically.
+
+**Selection:** strict agentic-score order (Terminal-Bench 2.1 anchored).
+Current winner: `kilo/poolside/laguna-s-2.1:free` (TB2.1: 70.2, score 9.2/10),
+then `kilo/thinkingmachines/inkling:free` (63.8), `kilo/nvidia/nemotron-3-ultra-550b-a55b:free`
+(56.4), etc. Ties break by gateway order (kilo, opencode, cline). Provider
+auth notes: kilo `:free` and opencode zen free models need **no login**; kilo
+`~latest` models need `kilo auth`; cline needs its gateway funded.
+
+**Pre-switch ritual (pool freshness):** free-model catalogs change constantly,
+so the pool is re-scanned *at the moment of switching*, never trusted stale.
+On every confirmed failover transition the router runs: (1) `--refresh-pool`
+— re-enumerates `kilo models` / `opencode models`, adds new free models as
+`unscored` (never auto-picked until researched) and marks vanished ones `gone`
+(excluded from selection); (2) a **live verify probe** — the top-ranked pick
+is sent a real one-shot task through its own CLI (`PROBE_OK`); on failure the
+next ranked model is promoted (top-3 probe budget). During sticky failover the
+pool re-verifies only if older than `pool_refresh.max_age_s` (24h), and a
+verified model is trusted for `probe_verified_ttl_s` (30 min). Budget ~1–2 min
+for a fresh transition; sticky follow-ups skip the ritual (~7s).
+
+**Files & commands:**
+
+- `harness_pool.py` — gate, pool, selection, adapters (same dir as `omagent-route`)
+- `model_pool.json` — ranked pool with provider tags, TB2.1 anchors, sources
+- `~/.local/state/omagent/harness_state.json` — sticky failover state
+- `./harness_pool.py --check` — print the current decision as JSON
+- `./harness_pool.py --show-pool` — ranked pool table
+- `./harness_pool.py --refresh-pool` — re-enumerate free models (new ones land as `unscored`)
+- `./harness_pool.py --probe-providers` — provider availability/auth probe
+
+**Config (`~/.config/omagent/config.json`):**
+
+```json
+"fallback_harness": "auto",
+"quota_check": { "enabled": true, "trigger_usage_pct": 95, "cache_ttl_s": 60,
+                 "unknown_policy": "trust-agy" },
+"quota_force_state": null,
+"pool_refresh": { "enabled": true, "on_failover": true, "max_age_s": 86400,
+                  "probe_timeout_s": 45, "probe_verified_ttl_s": 1800 }
+```
+
+Set `quota_force_state` to `"exhausted"` or `"healthy"` to test the gate
+without waiting for a real quota cliff. Set `unknown_policy` to `"fallback"`
+to fail over on unprobeable quota instead of staying on agy. The fallback
+runs the same Compound Engineering mandate in the same Herdr workspace flow
+via `kilo run` / `opencode run` / `cline`; live transcript tailing remains
+agy/Pi-specific (fallback completion is detected via Herdr process info).
+
 ## Remove
 
 ```sh

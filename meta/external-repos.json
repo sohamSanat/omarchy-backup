@@ -28,5 +28,30 @@
     "path": "/home/soham/treehouse",
     "remote": "https://github.com/kunchenguid/treehouse.git",
     "commit": "db06078c6f5569e539b8cdb7703f38fdefe06382"
+  },
+  "Ui-skills-Set1-Animations-skills": {
+    "path": "/home/soham/Ui-skills/Set1/Animations-skills",
+    "remote": "https://github.com/emilkowalski/skills.git",
+    "commit": "d23d7f88a2e21c9e4b1418c7abe420f5c1052ba7"
+  },
+  "Ui-skills-Set1-garden-skills": {
+    "path": "/home/soham/Ui-skills/Set1/garden-skills",
+    "remote": "https://github.com/ConardLi/garden-skills.git",
+    "commit": "aaf9a82f5efd73e87cc0998edc398e75bfc35901"
+  },
+  "Ui-skills-Set2-designer-skills": {
+    "path": "/home/soham/Ui-skills/Set2/designer-skills",
+    "remote": "https://github.com/Owl-Listener/designer-skills.git",
+    "commit": "9a6930cf84a822eb458624bd11c61aac5bbdf224"
+  },
+  "Ui-skills-set3-Skills": {
+    "path": "/home/soham/Ui-skills/set3/Skills",
+    "remote": "https://github.com/MengTo/Skills.git",
+    "commit": "321c769739b823de5eb94eb3a52aa1974fe783a2"
+  },
+  "battery-monitor": {
+    "path": "/home/soham/Projects/battery-monitor",
+    "remote": "local",
+    "commit": "git-tracked"
   }
 }
