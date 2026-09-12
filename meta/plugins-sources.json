@@ -177,6 +177,10 @@
     "dirty_files": [],
     "note": "User customized fork of omarchy.agents"
   },
+  "soham.lock": {
+    "remote": null,
+    "custom": true
+  },
   "soham.power": {
     "remote": null,
     "custom": true

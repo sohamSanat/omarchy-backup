@@ -271,27 +271,37 @@ This repository contains the full snapshot of user customizations:
      - CLI tool exporting `OMARCHY_THEME_MODE` and `COLORFGBG` across all shell and terminal environments.
 
 22. **Omagent Quota-Aware Failover Engine & Fleet Conductor**:
-   - **`plugins/io.github.ellion369.omagent/harness_pool.py` & `model_pool.json`**:
-     - Automatically checks Antigravity 5h and weekly quota usage with `quota-axi`.
-     - Triggers transparent failover to the highest scoring model in `model_pool.json` (such as `opencode/big-pickle`) upon reaching 95% quota, and auto-returns when the window resets.
-     - Live probe verification ensures models work before dispatch, accompanied by a runtime pane watchdog that issues resume nudges on rate limits or switches models mid-flight.
-     - Test suite located in `tests/test_harness_pool.py`.
-   - **`bin/firstmate-subagent`**:
+   - **`plugins/io.github.ellion369.omagent/`**:
+     - `omagent-route`: High-performance router with Grill-Me Strategic Alignment engine, bifurcated UI routing (Track A reference image vs Track B archetype menu), model switch/handoff, and 2x2 Herdr subagent swarm dispatch.
+     - `Omagent.qml`: Blurred glass HUD with interactive Grill-Me cards, reference image drop-in, model switch controls, and Set 4 badge.
+     - `harness_pool.py` & `model_pool.json`: Quota gating via `quota-axi`, probe verification, failover ladder (`opencode/big-pickle`), and runtime watchdog.
+     - `ARCHITECTURE_UI_UX.md`: Canonical system specification for UI/UX agentic architecture, reference deconstruction, and adversarial review.
+   - **`bin/firstmate-subagent` & `bin/firstmate`**:
      - Subagent fleet conductor allowing parallel crewmates to be spawned into clean 2x2 Herdr tiling grids (`firstmate subagent spawn/prompt/list/skills/close`).
+     - Equips all subagents with on-demand autonomy to invoke any of the 33 Compound Engineering skills (`firstmate skills`, `firstmate skill-read`).
    - **`bin/omagent-screenshot`**:
      - Headless browser/UI verification utility supporting `--mobile` (375px) and `--tablet` (1024px) for automated visual QA.
-   - **`agents/rules/omagent.md` & `agents/rules/ui-sets.md`**:
-     - Durable system rules governing Omagent's anti-one-shot 5-phase lifecycle, multi-agent fleet permissions, and UI sets precedence.
+   - **`bin/omarchy-voxtype-hook`**:
+     - Intercepts voice transcription and directly injects speech into active Omagent HUD via Quickshell IPC.
+   - **`agents/rules/`**:
+     - `omagent.md`: Durable rules governing Omagent's anti-one-shot 5-phase lifecycle and multi-agent fleet permissions.
+     - `ui-sets.md`: The 4 UI Skill Sets and non-negotiable header layout laws (`white-space: nowrap !important;`).
+     - `ui-ux-architecture.md`: Comprehensive UI/UX agentic architecture rules.
+   - **`agents/learnings/ui_ux_agentic_architecture.md`**:
+     - Permanent learning documenting bifurcated UI routing, Grill-Me alignment, and 2x2 subagent swarms.
 
-23. **The 3 UI Design Skill Sets & 79 Agent Skills (`agents/skills/`)**:
-   - Complete standalone backup of all 32 UI and animation skills (5.8MB total):
+23. **The 4 UI Design Skill Sets & 80 Agent Skills (`agents/skills/`)**:
+   - Complete standalone backup of all 33 UI and animation skills (8.0MB total):
      - **Set 1 (Full Aesthetic)**: `web-design-engineer`, `animate`, `apple-design`, `ask-sonner`, `review-animations`, `find-animation-opportunities`, `improve-animations`, `prototype-ui`, `pick-ui-library`, `animation-vocabulary`.
      - **Set 2 (SaaS / Product App)**: `ui-design`, `design-systems`, `interaction-design`, `form-design`, `loading-states`, `state-machine-ux`, `color-system`, `layout-grid`, `accessibility-audit`, `visual-critique`.
      - **Set 3 (Jaw-Dropping / 3D Showcase)**: `build-awwwards-quality-sites`, `build-threejs-scroll-worlds`, `cinematic-gsap-lenis-motion-system`, `threejs-landscape`, `gsap-animation`, `cobejs`, `dither-background`, `add-shader-cursor-trail`, `ambient-section-particles`, `no-ai-design-slop`, `audit-ai-design-slop`.
+     - **Set 4 (Impeccable Visual Reference Alignment)**: `impeccable` (non-invasive reference fidelity, honoring pinned aesthetics, eras, materials, and palettes; zero archetype collision; out-of-distribution craft).
      - **UI Optimization**: `ce-ui-optimize` (60/120fps GPU transitions, organic easing, tactile press compression, safe-area insets).
    - All skills are restored to `~/.agents/skills/` and symlinked into `~/.pi/agent/skills/`.
 
-24. **Pretty Screenshot Plugin & System Tools**:
+24. **System Tools, Plugins & Config Updates**:
+   - **`plugins/soham.lock/`**:
+     - Custom system lock plugin with `LockView.qml` and `Service.qml`.
    - **`plugins/ricardosuman.pretty-screenshot/` & `bin/omarchy-pretty-screenshot`**:
      - Beautiful wallpaper-framed screenshots bound to `Print` in `configs/hypr/bindings.lua`.
    - **`bin/cmf-buds-mode`**:
@@ -302,6 +312,8 @@ This repository contains the full snapshot of user customizations:
      - Hermes agent and Cursor agent CLI wrappers via `mise`.
    - **`configs/goose/` & `configs/kilo/`**:
      - Configurations for Goose and Kilo agent runtimes.
+   - **`configs/opencode/opencode.json`**:
+     - Permission allowances for `~/Ui-skills/**` and `~/.agents/**`.
 
 ## 3. Fast Restoration (Automated)
 

@@ -20,6 +20,8 @@ Item {
   property string activeModel: "claude-opus-4-6-thinking"
   property bool showingModelMenu: false
   property bool autoMode: false
+  property string attachedImagePath: ""
+  property string agenticTrack: "ui" // "ui" | "coding"
 
   readonly property var harnessCatalog: ({
     "agy": {
@@ -101,6 +103,17 @@ Item {
     root.save()
   }
 
+  function setAgenticTrack(track) {
+    if (track !== "ui" && track !== "coding") return
+    if (root.agenticTrack === track) return
+    root.agenticTrack = track
+    root.save()
+  }
+
+  function toggleAgenticTrack() {
+    root.setAgenticTrack(root.agenticTrack === "ui" ? "coding" : "ui")
+  }
+
   function cycleHarness(forward) {
     var harnesses = ["agy", "opencode", "cline"]
     var idx = harnesses.indexOf(root.activeHarness)
@@ -152,6 +165,25 @@ Item {
       }
     }
     return ""
+  }
+
+  function getAttachedImageBasename() {
+    if (!root.attachedImagePath) return ""
+    var parts = root.attachedImagePath.split("/")
+    var name = parts[parts.length - 1]
+    if (name.length > 20) {
+      return name.substring(0, 9) + "…" + name.substring(name.length - 8)
+    }
+    return name
+  }
+
+  function pickReferenceImage() {
+    refImagePickerProcess.command = [
+      "omarchy-file-select",
+      "--title", "Attach Reference Image",
+      "--extensions", "png jpg jpeg webp gif svg bmp"
+    ]
+    refImagePickerProcess.running = true
   }
 
   property bool sawAgent: false
@@ -239,7 +271,8 @@ Item {
         rows.push({ "rowKind": row.rowKind, "rowText": row.rowText,
                     "rowCount": row.rowCount, "rowLines": row.rowLines,
                     "rowAuto": row.rowAuto, "rowMode": row.rowMode,
-                    "rowHarness": row.rowHarness, "rowModel": row.rowModel })
+                    "rowHarness": row.rowHarness, "rowModel": row.rowModel,
+                    "rowImage": row.rowImage, "rowTrack": row.rowTrack })
       }
     }
     return {
@@ -262,6 +295,7 @@ Item {
       "sawCost": root.sawCost,
       "elapsedMs": root.elapsedMs,
       "activeMode": root.activeMode,
+      "agenticTrack": root.agenticTrack,
       "activeHarness": root.activeHarness,
       "activeModel": root.activeModel
     }
@@ -301,7 +335,9 @@ Item {
         "rowAuto": !!data.entries[i].rowAuto,
         "rowMode": String(data.entries[i].rowMode || ""),
         "rowHarness": String(data.entries[i].rowHarness || ""),
-        "rowModel": String(data.entries[i].rowModel || "")
+        "rowModel": String(data.entries[i].rowModel || ""),
+        "rowImage": String(data.entries[i].rowImage || ""),
+        "rowTrack": String(data.entries[i].rowTrack || "")
       })
     }
     root.agentName = String(data.agentName || "")
@@ -318,6 +354,7 @@ Item {
     root.sawAgent = root.agentName !== ""
     root.followTail = true
     if (data.activeMode) root.activeMode = String(data.activeMode)
+    if (data.agenticTrack) root.agenticTrack = String(data.agenticTrack)
     if (data.activeHarness) root.activeHarness = String(data.activeHarness)
     if (data.activeModel) root.activeModel = String(data.activeModel)
 
@@ -399,7 +436,7 @@ Item {
     else root.open("{}")
   }
 
-  function pushRow(kind, text, auto, mode, harness, model) {
+  function pushRow(kind, text, auto, mode, harness, model, imagePath, track) {
     if (!text) return
     var last = entries.count > 0 ? entries.get(entries.count - 1) : null
     if (kind === "text" && last && last.rowKind === "text") {
@@ -426,7 +463,9 @@ Item {
         "rowAuto": auto === true,
         "rowMode": mode ? String(mode) : (kind === "you" ? root.activeMode : ""),
         "rowHarness": harness ? String(harness) : (kind === "you" && root.activeMode === "agentic" ? root.activeHarness : ""),
-        "rowModel": model ? String(model) : (kind === "you" && root.activeMode === "agentic" ? root.activeModel : "")
+        "rowModel": model ? String(model) : (kind === "you" && root.activeMode === "agentic" ? root.activeModel : ""),
+        "rowImage": imagePath ? String(imagePath) : (kind === "you" ? String(root.attachedImagePath || "") : ""),
+        "rowTrack": track ? String(track) : (kind === "you" && root.activeMode === "agentic" ? root.agenticTrack : "")
       })
     }
     while (entries.count > 300) entries.remove(0)
@@ -445,8 +484,9 @@ Item {
       root.pushRow("status", "Still working. Ctrl+C stops it")
       return
     }
+    var attachedImg = (root.activeMode === "agentic" && root.agenticTrack === "ui" && root.attachedImagePath) ? root.attachedImagePath : ""
     if (!root.hasSession) entries.clear()
-    root.pushRow("you", request, root.autoMode, root.activeMode, root.activeHarness, root.activeModel)
+    root.pushRow("you", request, root.autoMode, root.activeMode, root.activeHarness, root.activeModel, attachedImg, root.agenticTrack)
 
     root.sawAgent = false
     root.sawError = false
@@ -464,12 +504,15 @@ Item {
     if (root.activeMode === "agentic") {
       if (root.activeHarness) argv.push("--harness", root.activeHarness)
       if (root.activeModel) argv.push("--model", root.activeModel)
+      if (root.agenticTrack) argv.push("--track", root.agenticTrack)
+      if (attachedImg) argv.push("--image", attachedImg)
     }
     if (root.autoMode) argv.push("--auto")
     if (root.hasSession) argv = argv.concat(["--agent", root.agentName, "--session", root.sessionId])
     argv.push("--", request)
     runner.command = argv
     runner.running = true
+    root.attachedImagePath = ""
     prompt.text = ""
   }
 
@@ -783,13 +826,33 @@ Item {
 
   function toggleDictation() {
     prompt.forceActiveFocus()
-    Quickshell.execDetached(["voxtype", "record", "toggle"])
+    Quickshell.execDetached(["voxtype-dictate-toggle"])
+  }
+
+  function appendDictation(text) {
+    if (!root.opened) return "closed"
+    var str = String(text || "").trim()
+    if (str.length === 0) return "empty"
+    if (prompt.text.length > 0 && !prompt.text.endsWith(" ")) {
+      prompt.text += " " + str
+    } else {
+      prompt.text += str
+    }
+    prompt.cursorPosition = prompt.text.length
+    prompt.forceActiveFocus()
+    return "inserted"
   }
 
   function updateDictation(raw) {
     var text = String(raw || "")
     var match = text.match(/\"(?:alt|class)\"\s*:\s*\"([^\"]+)\"/)
-    root.dictationState = match ? match[1] : "idle"
+    var nextState = match ? match[1] : "idle"
+    if (root.dictationState !== nextState) {
+      root.dictationState = nextState
+      if (nextState === "idle" && root.opened) {
+        prompt.forceActiveFocus()
+      }
+    }
   }
 
   ListModel { id: entries }
@@ -895,6 +958,18 @@ Item {
   }
 
   Process {
+    id: refImagePickerProcess
+    stdout: SplitParser {
+      onRead: function(line) {
+        var p = String(line).trim()
+        if (p.length > 0) {
+          root.attachedImagePath = p
+        }
+      }
+    }
+  }
+
+  Process {
     command: ["omarchy-voxtype-status"]
     running: true
     stdout: SplitParser {
@@ -963,7 +1038,7 @@ Item {
       id: pill
 
       width: panel.surfaceWidth
-      height: (root.activeMode === "agentic") ? Style.space(166) : Style.space(114)
+      height: (root.activeMode === "agentic") ? Style.space(202) : Style.space(114)
       x: Math.round((panel.width - width) / 2) + panel.clampX(root.dragX)
       y: panel.pillTop + panel.clampY(root.dragY)
       radius: Style.space(22)
@@ -1147,6 +1222,43 @@ Item {
                 }
               }
             }
+
+            Item {
+              visible: root.activeMode === "agentic" && root.agenticTrack === "ui"
+              width: visible ? Style.space(34) : 0
+              height: Style.space(34)
+
+              Rectangle {
+                anchors.centerIn: parent
+                width: Style.space(32)
+                height: width
+                radius: width / 2
+                color: root.attachedImagePath !== ""
+                  ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.18)
+                  : (attachImgArea.containsMouse ? Color.menu.selectedBackground : "transparent")
+                border.color: root.attachedImagePath !== ""
+                  ? Color.urgent
+                  : "transparent"
+                border.width: 1
+
+                Text {
+                  anchors.centerIn: parent
+                  text: "󰋩"
+                  color: root.attachedImagePath !== "" ? Color.urgent : Color.menu.text
+                  opacity: root.attachedImagePath !== "" ? 1.0 : (attachImgArea.containsMouse ? 0.95 : 0.62)
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.iconLarge
+                }
+
+                MouseArea {
+                  id: attachImgArea
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.pickReferenceImage()
+                }
+              }
+            }
           }
 
           Item {
@@ -1199,6 +1311,10 @@ Item {
                     event.accepted = true
                     return
                   } else if (event.key === Qt.Key_H) {
+                    root.toggleDictation()
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_R) {
                     root.toggleHistory()
                     event.accepted = true
                     return
@@ -1222,6 +1338,15 @@ Item {
                     root.copyLast()
                     event.accepted = true
                     return
+                  } else if (event.key === Qt.Key_T && root.activeMode === "agentic") {
+                    root.toggleAgenticTrack()
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_I && root.activeMode === "agentic") {
+                    if (root.agenticTrack !== "ui") root.setAgenticTrack("ui")
+                    root.pickReferenceImage()
+                    event.accepted = true
+                    return
                   }
                 }
 
@@ -1236,6 +1361,10 @@ Item {
                     return
                   } else if (event.key === Qt.Key_3) {
                     root.setHarness("cline")
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_T && root.activeMode === "agentic") {
+                    root.toggleAgenticTrack()
                     event.accepted = true
                     return
                   } else if (event.key === Qt.Key_M) {
@@ -1583,7 +1712,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.activeMode === "regular"
                   ? "Direct Knowledge"
-                  : (root.activeMode === "internet" ? "Live DuckDuckGo" : "Fleet Dispatch")
+                  : (root.activeMode === "internet" ? "Live DuckDuckGo" : (root.agenticTrack === "coding" ? "Code Fleet Dispatch" : "UI Fleet Dispatch"))
                 font.family: Style.font.menuFamily
                 font.pixelSize: Style.font.caption
                 color: root.activeMode === "agentic" ? Color.urgent : (root.activeMode === "internet" ? Color.accent : Color.menu.text)
@@ -1619,6 +1748,236 @@ Item {
           height: 1
           color: Color.menu.border
           opacity: 0.16
+        }
+
+        // Agentic Track Selector Row (UI/UX vs Coding Workflow Toggle + Context Pill)
+        Item {
+          id: agenticTrackRow
+          visible: root.activeMode === "agentic"
+          width: parent.width
+          height: Style.space(28)
+
+          // Left: Segmented Toggle [ 󰏘 UI / UX | 󰘐 Coding ]
+          Rectangle {
+            id: trackPillContainer
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            height: Style.space(26)
+            width: trackSegmentRow.implicitWidth + Style.space(8)
+            radius: height / 2
+            color: Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.05)
+            border.color: Qt.rgba(Color.menu.border.r, Color.menu.border.g, Color.menu.border.b, 0.22)
+            border.width: 1
+
+            Row {
+              id: trackSegmentRow
+              anchors.centerIn: parent
+              spacing: Style.space(2)
+
+              // UI / UX Track Button
+              Rectangle {
+                id: segTrackUi
+                width: segUiContent.implicitWidth + Style.space(14)
+                height: Style.space(22)
+                radius: height / 2
+                color: root.agenticTrack === "ui"
+                  ? Color.menu.selectedBackground
+                  : (trackUiMouse.containsMouse ? Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.08) : "transparent")
+
+                Behavior on color { ColorAnimation { duration: 120 } }
+
+                Row {
+                  id: segUiContent
+                  anchors.centerIn: parent
+                  spacing: Style.space(4)
+
+                  Text {
+                    text: "󰏘"
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                    color: root.agenticTrack === "ui" ? Color.urgent : Color.menu.text
+                    opacity: root.agenticTrack === "ui" ? 1.0 : 0.7
+                  }
+
+                  Text {
+                    text: "UI / UX"
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption
+                    font.weight: root.agenticTrack === "ui" ? Font.DemiBold : Font.Normal
+                    color: root.agenticTrack === "ui" ? Color.menu.selectedText : Color.menu.text
+                    opacity: root.agenticTrack === "ui" ? 1.0 : 0.75
+                  }
+                }
+
+                MouseArea {
+                  id: trackUiMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.setAgenticTrack("ui")
+                }
+              }
+
+              // Coding Track Button
+              Rectangle {
+                id: segTrackCoding
+                width: segCodingContent.implicitWidth + Style.space(14)
+                height: Style.space(22)
+                radius: height / 2
+                color: root.agenticTrack === "coding"
+                  ? Color.menu.selectedBackground
+                  : (trackCodingMouse.containsMouse ? Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.08) : "transparent")
+
+                Behavior on color { ColorAnimation { duration: 120 } }
+
+                Row {
+                  id: segCodingContent
+                  anchors.centerIn: parent
+                  spacing: Style.space(4)
+
+                  Text {
+                    text: "󰘐"
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                    color: root.agenticTrack === "coding" ? Color.bar.active : Color.menu.text
+                    opacity: root.agenticTrack === "coding" ? 1.0 : 0.7
+                  }
+
+                  Text {
+                    text: "Coding"
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption
+                    font.weight: root.agenticTrack === "coding" ? Font.DemiBold : Font.Normal
+                    color: root.agenticTrack === "coding" ? Color.menu.selectedText : Color.menu.text
+                    opacity: root.agenticTrack === "coding" ? 1.0 : 0.75
+                  }
+                }
+
+                MouseArea {
+                  id: trackCodingMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.setAgenticTrack("coding")
+                }
+              }
+            }
+          }
+
+          // Right: Track-specific Context Pill
+          // In UI mode: Reference Image Attachment Pill
+          Rectangle {
+            id: refImagePill
+            visible: root.agenticTrack === "ui"
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            height: Style.space(26)
+            width: Math.min(parent.width - trackPillContainer.width - Style.space(16), refImgRow.implicitWidth + Style.space(18))
+            radius: height / 2
+            clip: true
+            color: root.attachedImagePath !== ""
+              ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.15)
+              : (refImgMouse.containsMouse ? Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.08) : Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.04))
+            border.color: root.attachedImagePath !== ""
+              ? Color.urgent
+              : Qt.rgba(Color.menu.border.r, Color.menu.border.g, Color.menu.border.b, 0.22)
+            border.width: 1
+
+            Behavior on color { ColorAnimation { duration: 120 } }
+            Behavior on border.color { ColorAnimation { duration: 120 } }
+
+            Row {
+              id: refImgRow
+              anchors.centerIn: parent
+              spacing: Style.space(4)
+
+              Text {
+                text: "󰋩"
+                font.family: Style.font.family
+                font.pixelSize: Style.font.caption
+                color: root.attachedImagePath !== "" ? Color.urgent : Color.menu.text
+                opacity: root.attachedImagePath !== "" ? 1.0 : 0.7
+              }
+
+              Text {
+                text: root.attachedImagePath !== "" ? root.getAttachedImageBasename() : "Ref Image"
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.caption
+                font.weight: root.attachedImagePath !== "" ? Font.Medium : Font.Normal
+                color: root.attachedImagePath !== "" ? Color.urgent : Color.menu.text
+                opacity: root.attachedImagePath !== "" ? 1.0 : 0.75
+                elide: Text.ElideMiddle
+                width: Math.min(implicitWidth, Math.max(Style.space(20), refImagePill.width - Style.space(24) - (root.attachedImagePath !== "" ? Style.space(16) : 0)))
+              }
+
+              Text {
+                visible: root.attachedImagePath !== ""
+                text: "✕"
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.caption * 0.9
+                font.weight: Font.Bold
+                color: Color.urgent
+                opacity: clearRefImgMouse.containsMouse ? 1.0 : 0.7
+
+                MouseArea {
+                  id: clearRefImgMouse
+                  anchors.fill: parent
+                  anchors.margins: -Style.space(4)
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    root.attachedImagePath = ""
+                  }
+                }
+              }
+            }
+
+            MouseArea {
+              id: refImgMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.pickReferenceImage()
+            }
+          }
+
+          // In Coding mode: Dedicated Worktree Badge
+          Rectangle {
+            id: codingWorktreeBadge
+            visible: root.agenticTrack === "coding"
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            height: Style.space(26)
+            width: Math.min(parent.width - trackPillContainer.width - Style.space(16), codingBadgeRow.implicitWidth + Style.space(16))
+            radius: height / 2
+            clip: true
+            color: Qt.rgba(Color.bar.active.r, Color.bar.active.g, Color.bar.active.b, 0.12)
+            border.color: Qt.rgba(Color.bar.active.r, Color.bar.active.g, Color.bar.active.b, 0.35)
+            border.width: 1
+
+            Row {
+              id: codingBadgeRow
+              anchors.centerIn: parent
+              spacing: Style.space(5)
+
+              Text {
+                text: "󰌠"
+                font.family: Style.font.family
+                font.pixelSize: Style.font.caption
+                color: Color.bar.active
+              }
+
+              Text {
+                text: "Dedicated Worktree · 33 CE Skills"
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.caption
+                font.weight: Font.Medium
+                color: Color.bar.active
+                elide: Text.ElideRight
+                width: Math.min(implicitWidth, Math.max(Style.space(20), codingWorktreeBadge.width - Style.space(26)))
+              }
+            }
+          }
         }
 
         // Agentic Options Row (Harness Selector + Model Dropdown Trigger)
@@ -2191,6 +2550,8 @@ Item {
                 required property string rowMode
                 required property string rowHarness
                 required property string rowModel
+                required property string rowImage
+                required property string rowTrack
                 required property int index
 
                 readonly property bool isYou: row.rowKind === "you"
@@ -2208,6 +2569,7 @@ Item {
                 readonly property int opticalShift: row.isYou
                   ? Math.round((metrics.descent - (metrics.ascent - metrics.capHeight)) / 2)
                   : 0
+                readonly property int imgSpace: (row.isYou && row.rowImage && row.rowImage !== "") ? Style.space(22) : 0
 
                 readonly property bool isProse: !row.isYou && !row.isNote
                 readonly property real leading: 1.35
@@ -2215,10 +2577,13 @@ Item {
                   ? Math.round(metrics.height * (row.leading - 1)) : 0
 
                 width: rows.width
-                height: row.leadIn + label.contentHeight - row.trailing + row.padY * 2
+                height: row.leadIn + label.contentHeight - row.trailing + row.padY * 2 + row.imgSpace
 
                 readonly property int chipWidth:
-                  Math.min(label.contentWidth + row.padX * 2 + row.tagSpace, rows.width)
+                  Math.max(
+                    Math.min(label.contentWidth + row.padX * 2 + row.tagSpace, rows.width),
+                    (row.isYou && row.rowImage && row.rowImage !== "") ? (rowImgBadge.width + row.padX * 2) : 0
+                  )
 
                 FontMetrics {
                   id: metrics
@@ -2258,11 +2623,47 @@ Item {
                   }
                 }
 
+                // Attached Reference Image Badge
+                Rectangle {
+                  id: rowImgBadge
+                  visible: row.isYou && row.rowImage && row.rowImage !== ""
+                  x: row.padX
+                  y: row.leadIn + row.padY
+                  height: Style.space(18)
+                  width: rowImgBadgeRow.implicitWidth + Style.space(10)
+                  radius: Style.space(4)
+                  color: Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.18)
+                  border.color: Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.45)
+                  border.width: 1
+
+                  Row {
+                    id: rowImgBadgeRow
+                    anchors.centerIn: parent
+                    spacing: Style.space(4)
+
+                    Text {
+                      text: "󰋩"
+                      font.family: Style.font.family
+                      font.pixelSize: Style.font.caption * 0.85
+                      color: Color.urgent
+                    }
+
+                    Text {
+                      text: row.rowImage ? row.rowImage.split("/").pop() : ""
+                      font.family: Style.font.menuFamily
+                      font.pixelSize: Style.font.caption * 0.85
+                      color: Color.menu.text
+                      elide: Text.ElideMiddle
+                      width: Math.min(implicitWidth, Style.space(160))
+                    }
+                  }
+                }
+
                 Text {
                   id: label
 
                   x: row.padX
-                  y: row.leadIn + row.padY + row.opticalShift
+                  y: row.leadIn + row.padY + row.opticalShift + row.imgSpace
                   width: rows.width - row.padX * 2 - row.tagSpace
                   wrapMode: (row.isNote && !row.rowExpanded) ? Text.NoWrap : Text.WordWrap
                   elide: (row.isNote && !row.rowExpanded) ? Text.ElideRight : Text.ElideNone
@@ -2301,13 +2702,16 @@ Item {
                   text: {
                     if (row.rowMode === "agentic") {
                       var hName = row.rowHarness ? (row.rowHarness.toUpperCase()) : "AGY"
-                      return "󰲋 " + hName
+                      var trackLabel = (row.rowTrack === "coding") ? "Code" : "UI"
+                      return "󰲋 " + hName + " · " + trackLabel
                     }
                     if (row.rowMode === "internet") return "󰖟 web"
                     if (row.rowMode === "regular") return "󰘥 regular"
                     return row.rowAuto ? "auto" : ""
                   }
-                  color: row.rowMode === "agentic" ? Color.urgent : (row.rowMode === "internet" ? Color.accent : Color.muted)
+                  color: (row.rowMode === "agentic" && row.rowTrack === "coding")
+                    ? Color.bar.active
+                    : (row.rowMode === "agentic" ? Color.urgent : (row.rowMode === "internet" ? Color.accent : Color.muted))
                   font.family: Style.font.menuFamily
                   font.pixelSize: Style.font.caption
                 }
@@ -2503,10 +2907,18 @@ Item {
             }
 
             Button {
-              text: (root.activeMode === "internet" ? "󰖟 Internet" : (root.activeMode === "agentic" ? "󰲋 Agentic" : "󰘥 Regular"))
+              text: {
+                if (root.activeMode === "internet") return "󰖟 Internet"
+                if (root.activeMode === "agentic") {
+                  return (root.agenticTrack === "coding") ? "󰘐 Agentic (Coding)" : "󰏘 Agentic (UI)"
+                }
+                return "󰘥 Regular"
+              }
               tooltipText: "Active mode: " + root.activeMode + " \u2014 click or press Tab to switch mode"
               fontSize: Style.font.caption
-              foreground: root.activeMode === "agentic" ? Color.urgent : (root.activeMode === "internet" ? Color.accent : Color.muted)
+              foreground: (root.activeMode === "agentic" && root.agenticTrack === "coding")
+                ? Color.bar.active
+                : (root.activeMode === "agentic" ? Color.urgent : (root.activeMode === "internet" ? Color.accent : Color.muted))
               horizontalPadding: Style.space(7)
               verticalPadding: Style.space(3)
               onClicked: root.cycleMode(true)

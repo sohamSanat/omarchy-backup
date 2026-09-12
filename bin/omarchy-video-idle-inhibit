@@ -149,6 +149,7 @@ class MediaIdleInhibitor:
                                 ).strip()
                                 if is_locked != "true":
                                     subprocess.run(["omarchy-system-lock"], timeout=2)
+                                subprocess.run(["omarchy-shell", "lock", "wake"], timeout=1)
                             except Exception:
                                 subprocess.run(["omarchy-system-lock"], timeout=2)
                 s.close()

@@ -33,7 +33,7 @@ pause_media = true
 
 [audio.feedback]
 # Enable subtle sound cues when recording starts/stops
-enabled = true
+enabled = false
 theme = "subtle"
 volume = 0.6
 
@@ -50,6 +50,12 @@ mode = "type"
 fallback_to_clipboard = true
 type_delay_ms = 1
 pre_type_delay_ms = 50
+
+[output.post_process]
+command = "/home/soham/.local/bin/omarchy-voxtype-hook"
+timeout_ms = 5000
+trim = true
+fallback_on_empty = false
 
 [output.notification]
 on_recording_start = false

@@ -200,13 +200,28 @@ def format_subagent_task_prompt(name: str, role: str, skill_name: str, skill_pat
     return (
         f"[Firstmate Fleet Crewmate: {name}]\n"
         f"Assigned Role: {role}\n"
-        f"Active Compound Engineering Skill: {skill_name}\n"
+        f"Active Primary Skill: {skill_name}\n"
         f"{desc_info}"
         f"{skill_info}"
         f"Working Directory: {cwd}\n\n"
+        f"★ ON-DEMAND COMPOUND ENGINEERING SKILLS ACCESS:\n"
+        f"You have full, unrestricted access to the complete suite of 33 Compound Engineering skills.\n"
+        f"You are NOT limited to only your primary skill. Whenever your task requires scoping, deep debugging, browser QA, code simplification, or learning compounding, you are empowered and expected to access and adopt any of these skills on demand:\n"
+        f"- Upstream Scoping & Planning: ce-plan (/home/soham/.agents/skills/ce-plan/SKILL.md) / ce-brainstorm / ce-strategy\n"
+        f"- Concrete Implementation: ce-work (/home/soham/.agents/skills/ce-work/SKILL.md) / ce-prototype\n"
+        f"- Root-Cause Diagnosis & Bug Fixing: ce-debug (/home/soham/.agents/skills/ce-debug/SKILL.md) / diagnose-crash\n"
+        f"- Visual & Browser QA: ce-test-browser (/home/soham/.agents/skills/ce-test-browser/SKILL.md) / omagent-screenshot\n"
+        f"- Adversarial Code & Architecture Review: ce-code-review (/home/soham/.agents/skills/ce-code-review/SKILL.md) / no-ai-design-slop\n"
+        f"- UI 60/120fps Smoothness & Animation: ce-ui-optimize (/home/soham/.agents/skills/ce-ui-optimize/SKILL.md) / animate / review-animations\n"
+        f"- Code Simplification & Deduplication: ce-simplify-code (/home/soham/.agents/skills/ce-simplify-code/SKILL.md)\n"
+        f"- Institutional Learning Compounding: ce-compound (/home/soham/.agents/skills/ce-compound/SKILL.md) -> save to solutions/<problem-slug>.md\n"
+        f"- Safe Git Commits & Merges: ce-commit (/home/soham/.agents/skills/ce-commit/SKILL.md) / no-mistakes\n\n"
+        f"HOW TO ACCESS SKILLS ON DEMAND:\n"
+        f"1. Read skill file directly: use your read tool or run `cat /home/soham/.agents/skills/<skill>/SKILL.md`\n"
+        f"2. CLI skill dump: run `firstmate skill-read <skill>` or `firstmate-subagent skill-read <skill>`\n"
+        f"3. List all skills: run `firstmate skills --ce` or `firstmate-subagent skills`\n\n"
         f"COMPOUND ENGINEERING, AXI & FLEET DIRECTIVES:\n"
-        f"1. ADHERE TO `{skill_name}`: You are a specialized Firstmate crewmate operating under the Compound Engineering methodology of `{skill_name}`. "
-        f"If you need specific guidance on its checklist or protocols, inspect `{skill_path}` using your read tool.\n"
+        f"1. ADHERE TO CRAFT: Apply the rigor, checklists, and anti-one-shot discipline of your primary and on-demand skills.\n"
         f"2. ACTION OVER PREAMBLE: Take direct, concrete action immediately in `{cwd}`. Do not output meta-essays or delay execution.\n"
         f"3. RIGOROUS VERIFICATION (ANTI-ONE-SHOT):\n"
         f"   - For UI / Web: capture screenshots with `omagent-screenshot <url_or_path> preview.png` and view the image. Eliminate overlaps, text jargon, and broken margins.\n"
@@ -478,12 +493,59 @@ def cmd_list(args):
 
 def cmd_skills(args):
     skills = list_available_skills()
-    print(f"Available Compound Engineering Skills ({len(skills)}):")
-    print(f"{'SKILL':<26} {'PURPOSE & DESCRIPTION'}")
-    print("-" * 80)
+    filter_term = getattr(args, "filter", None) or ""
+    only_ce = getattr(args, "ce", False)
+
+    matched_keys = []
     for name in sorted(skills.keys()):
+        if only_ce and not name.startswith("ce-"):
+            continue
+        if filter_term and filter_term.lower() not in name.lower() and filter_term.lower() not in (skills[name]["desc"] or "").lower():
+            continue
+        matched_keys.append(name)
+
+    header = "Available Compound Engineering Skills" if only_ce else f"Available Skills ({len(matched_keys)})"
+    print(f"{header}:")
+    print(f"{'SKILL':<26} {'PATH':<44} {'PURPOSE & DESCRIPTION'}")
+    print("-" * 110)
+    for name in matched_keys:
         desc = skills[name]["desc"] or "Methodology & workflow"
-        print(f"{name:<26} {desc[:52]}")
+        path_str = str(skills[name]["path"]) if skills[name]["path"] else ""
+        if len(path_str) > 42:
+            path_str = "..." + path_str[-39:]
+        print(f"{name:<26} {path_str:<44} {desc[:40]}")
+
+
+def cmd_skill_read(args):
+    skill_query = args.skill.strip()
+    skills = list_available_skills()
+
+    target_key = None
+    if skill_query in skills:
+        target_key = skill_query
+    else:
+        # Match case-insensitive or with ce- prefix
+        target_key = next((k for k in skills if k.lower() == skill_query.lower() or k.lower() == f"ce-{skill_query.lower()}"), None)
+
+    if not target_key:
+        print(f"Error: Skill '{skill_query}' not found. Run 'firstmate-subagent skills' to see available skills.", file=sys.stderr)
+        sys.exit(1)
+
+    skill_path = skills[target_key]["path"]
+    if not skill_path or not skill_path.is_file():
+        print(f"Error: Skill file not found for '{target_key}'.", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        content = skill_path.read_text("utf-8")
+        print(f"==================================================================")
+        print(f"★ COMPOUND ENGINEERING SKILL: {target_key}")
+        print(f"Location: {skill_path}")
+        print(f"==================================================================\n")
+        print(content)
+    except Exception as e:
+        print(f"Error reading skill file {skill_path}: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def cmd_wait(args):
     print(f"[firstmate-subagent] Waiting for '{args.name}' to reach idle/done (timeout: {args.timeout}ms)...")
@@ -566,7 +628,14 @@ def main():
 
     # skills
     p_skills = subparsers.add_parser("skills", help="List available Compound Engineering skills")
+    p_skills.add_argument("filter", nargs="?", help="Optional keyword or substring to filter skills")
+    p_skills.add_argument("--ce", action="store_true", help="Show only Compound Engineering (ce-*) skills")
     p_skills.set_defaults(func=cmd_skills)
+
+    # skill-read
+    p_skill_read = subparsers.add_parser("skill-read", help="Print the complete documentation and instructions for a skill")
+    p_skill_read.add_argument("skill", help="Name of the skill (e.g. ce-debug, ce-work, ce-test-browser, ce-ui-optimize)")
+    p_skill_read.set_defaults(func=cmd_skill_read)
 
     # close
     p_close = subparsers.add_parser("close", help="Close a subagent's Herdr pane")

@@ -49,6 +49,11 @@
     "remote": "https://github.com/MengTo/Skills.git",
     "commit": "321c769739b823de5eb94eb3a52aa1974fe783a2"
   },
+  "Ui-skills-impeccable": {
+    "path": "/home/soham/Ui-skills/impeccable",
+    "remote": "https://github.com/pbakaus/impeccable.git",
+    "commit": "cb56ed6c19a07329a9fa0cd4e657bee040156593"
+  },
   "battery-monitor": {
     "path": "/home/soham/Projects/battery-monitor",
     "remote": "local",

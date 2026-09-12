@@ -20,6 +20,12 @@ case "${1:-}" in
   subagent|crew)
     exec firstmate-subagent "${@:2}"
     ;;
+  skills)
+    exec firstmate-subagent skills "${@:2}"
+    ;;
+  skill|skill-read|skill-show)
+    exec firstmate-subagent skill-read "${@:2}"
+    ;;
   sync)
     "$FM_HOME/bin/fm-fleet-sync.sh" "${@:2}"
     ;;

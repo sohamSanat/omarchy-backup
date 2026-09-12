@@ -38,6 +38,10 @@ exit_screensaver() {
     sleep 0.05
   done
 
+  # Ensure lockscreen is awake and ready for fingerprint
+  omarchy-shell lock wake >/dev/null 2>&1 || true
+  omarchy-system-wake >/dev/null 2>&1 &
+
   # Run full system lock routines (keyboard layout reset, 1password lock, etc.)
   omarchy-system-lock >/dev/null 2>&1 &
 

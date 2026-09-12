@@ -955,13 +955,17 @@ def build_launch_cmd(provider: str, model: str, prompt: str) -> str:
     if provider == "agy":
         return f"agy --model {q(model)} --dangerously-skip-permissions -i {q(prompt)}\n"
     if provider == "opencode":
-        return f"opencode run -m {q(model)} {q(prompt)}\n"
+        return f"opencode run --auto -m {q(model)} {q(prompt)}\n"
     if provider == "kilo":
         return f"kilo run -m {q(model)} {q(prompt)}\n"
     if provider == "cline":
         thinking_flag = "--thinking medium " if "muse-spark" in (model or "") else ""
         model_flag = f"-m {q(model)} " if model else ""
-        return f"cline --auto-approve true {thinking_flag}{model_flag}{q(prompt)}\n"
+        # --timeout 0: disable the tool-call timeout (free-tier models are slower and large
+        #   file writes can exceed the default cline timeout causing session abandonment)
+        # --retries 15: more tolerance for transient errors before giving up (default is 6)
+        # --compaction basic: keep context lean without slow recursive LLM summarization on flash models
+        return f"cline --auto-approve true --timeout 0 --retries 15 --compaction basic {thinking_flag}{model_flag}{q(prompt)}\n"
     raise ValueError(f"unknown provider: {provider}")
 
 
@@ -976,19 +980,31 @@ def build_launch_cmd(provider: str, model: str, prompt: str) -> str:
 
 RL_PATTERNS = [
     "rate limit", "rate-limit", "ratelimit", "too many requests", "429",
-    "quota exceeded", "exceeded your quota", "resource_exhausted",
-    "resource has been exhausted", "usage limit", "billing",
-    "service unavailable", "503", "overloaded", "capacity",
-    "temporarily unavailable", "try again later", "high demand",
+    "quota exceeded", "resource_exhausted", "resource has been exhausted",
+    "usage limit", "billing limit reached", "service unavailable (503)",
+    "internal server error (500)", "model overloaded", "temporarily unavailable",
+    "try again later", "stream reading error", "econnreset", "socket hang up",
+    "fetch failed", "context deadline exceeded", "api error: 429", "provider error: 429",
+    "process crashed", "terminated unexpectedly", "killed by signal",
+    # Cline-specific transient errors
+    "tool call timed out", "response was interrupted", "generation stopped unexpectedly",
 ]
 # Phrases that mean the account's daily/hard quota is gone → immediate switch.
 DAILY_EXHAUST_PATTERNS = [
-    "daily limit", "per-day", "per day limit", "daily quota",
-    "free tier limit", "free models limit", "monthly limit", "weekly limit",
-    "exceeded your current quota", "quota exceeded for model",
-    "limit reached for", "no longer available", "has been exhausted",
-    "run out of", "used up", "balance is $0.00", "insufficient balance",
-    "insufficient credits", "credit balance",
+    "you have used up your daily limit", "used up your daily limit", "daily limit",
+    "per-day limit", "per day limit", "daily quota", "free tier limit",
+    "free models limit", "monthly limit", "weekly limit", "exceeded your daily",
+    "exceeded your current quota", "insufficient credits", "credit balance",
+    "balance is $0.00", "run out of credits", "quota exhausted for model"
+]
+# Cline tool-level abort patterns: when cline exits the entire session (not just
+# a rate limit that can be continued) → treat as persistent error → prompt_switch.
+CLINE_ABORT_PATTERNS = [
+    "cline has exited",
+    "max retries exceeded",
+    "too many consecutive mistakes",
+    "operation abandoned",
+    "task was abandoned",
 ]
 
 # --- watchdog: reader, classifier, tick, nudge, switch (below) ---
@@ -1008,13 +1024,22 @@ def _pane_read_tail(pane_id: str, lines: int = 40) -> str:
 
 
 def _classify_pane_error(text: str) -> str | None:
-    """Returns 'daily' (hard quota exhaustion), 'rate' (transient), or None."""
+    """Returns:
+      'daily'  – hard quota exhaustion → prompt_switch immediately
+      'abort'  – cline session-abort (timeout, max-retries, abandoned) → prompt_switch immediately
+      'rate'   – transient error (rate-limit, network) → nudge with 'continue' first
+      None     – no error found
+    """
     t = (text or "").lower()
     if not t:
         return None
     for pat in DAILY_EXHAUST_PATTERNS:
         if pat in t:
             return "daily"
+    # Cline session-abort errors cannot be recovered with 'continue'; switch immediately
+    for pat in CLINE_ABORT_PATTERNS:
+        if pat in t:
+            return "abort"
     for pat in RL_PATTERNS:
         if pat in t:
             return "rate"
@@ -1022,26 +1047,25 @@ def _classify_pane_error(text: str) -> str | None:
 
 
 def runtime_watchdog_tick(provider: str, pane_id: str, cfg: dict, state: dict) -> dict:
-    """One watchdog iteration for a failover pane.
+    """One watchdog iteration across agy, opencode, cline.
 
-    state (persisted by the caller across ticks): {
-      nudges, last_nudge_at, last_output_sample, switched_model }
-    Returns: {"action": "none"|"nudged"|"switch", "detail": str,
-              "new_model": str|None}
+    state (persisted by caller): {
+        nudges, last_nudge_at, last_output_sample, model, provider
+    }
+    Returns: {"action": "none"|"nudged"|"prompt_switch", "detail": str, "error": str, ...}
     """
     wc = cfg.get("runtime_watchdog") or {}
     max_nudges = int(wc.get("max_nudges", 2))
-    cooldown = int(wc.get("cooldown_s", 20))
+    cooldown = int(wc.get("cooldown_s", 15))
     enabled = bool(wc.get("enabled", True))
-    if not enabled or state.get("switched_model"):
-        return {"action": "none", "detail": "disabled or already switched"}
+    if not enabled:
+        return {"action": "none", "detail": "disabled"}
 
     tail = _pane_read_tail(pane_id)
     if not tail.strip():
         return {"action": "none", "detail": "no output"}
-    # Only react once per new error burst: skip if output unchanged since the
-    # last tick (no fresh error text arrived).
-    sample = tail.strip()[-200:]
+
+    sample = tail.strip()[-250:]
     if sample == state.get("last_output_sample"):
         return {"action": "none", "detail": "output unchanged"}
     state["last_output_sample"] = sample
@@ -1052,40 +1076,65 @@ def runtime_watchdog_tick(provider: str, pane_id: str, cfg: dict, state: dict) -
 
     now = time.time()
     last_nudge = float(state.get("last_nudge_at") or 0)
-    if err == "rate" and last_nudge and (now - last_nudge) < cooldown:
-        return {"action": "none", "detail": "cooldown"}
+    current_model = state.get("model") or "active-model"
 
-    current_model = state.get("model")
-
-    # Hard daily quota exhaustion → permanent harness/model switch, no nudging.
+    # 1. Hard daily quota exhaustion → prompt user immediately to switch
     if err == "daily":
         _record_model_failure(provider, current_model, "daily quota exhausted (pane watchdog)")
-        new_model = switch_provider_model(provider, cfg, exclude_model=current_model)
-        if new_model:
-            state["switched_model"] = new_model
-            return {"action": "switch",
-                    "detail": f"daily quota exhausted → switched to {new_model}",
-                    "new_model": new_model}
-        return {"action": "none", "detail": "daily quota exhausted; no alternative model available"}
+        return {
+            "action": "prompt_switch",
+            "reason": "daily_limit",
+            "error": tail[-300:].strip(),
+            "detail": f"daily quota exhausted on {current_model}",
+            "model": current_model,
+            "provider": provider,
+        }
 
-    # Transient rate limit → nudge with 'continue' up to max_nudges times.
+    # 1b. Cline session-abort (tool timeout, max-retries, abandoned) → no point nudging;
+    #     cline exited the session entirely. Record failure and prompt user to switch.
+    if err == "abort":
+        _record_model_failure(provider, current_model,
+                              f"cline session aborted (timeout/max-retries/abandonment)")
+        return {
+            "action": "prompt_switch",
+            "reason": "session_aborted",
+            "error": tail[-300:].strip(),
+            "detail": (
+                f"Cline (`{current_model}`) aborted the session mid-task. "
+                f"This is a known limitation of free-tier models that are slower than the default "
+                f"tool timeout. Switching to a different model will resume with full context."
+            ),
+            "model": current_model,
+            "provider": provider,
+        }
+
+    # 2. Transient error (rate limit, network, API error, etc.) -> auto-nudge with 'continue'
     nudges = int(state.get("nudges") or 0)
     if nudges >= max_nudges:
-        _record_model_failure(provider, current_model,
-                              f"error persisted after {nudges} 'continue' nudges (pane watchdog)")
-        new_model = switch_provider_model(provider, cfg, exclude_model=current_model)
-        if new_model:
-            state["switched_model"] = new_model
-            return {"action": "switch",
-                    "detail": f"error persistent after {nudges} nudges → switched to {new_model}",
-                    "new_model": new_model}
-        return {"action": "none", "detail": "error persistent; no alternative model available"}
+        _record_model_failure(provider, current_model, f"error persisted after {nudges} 'continue' nudges")
+        return {
+            "action": "prompt_switch",
+            "reason": "error_persisted",
+            "error": tail[-300:].strip(),
+            "detail": f"error persisted after {nudges} 'continue' attempts on {current_model}",
+            "model": current_model,
+            "provider": provider,
+        }
+
+    if last_nudge and (now - last_nudge) < cooldown:
+        return {"action": "none", "detail": "cooldown"}
 
     if not _send_pane_nudge(provider, pane_id):
         return {"action": "none", "detail": "nudge delivery failed; will retry next tick"}
+
     state["nudges"] = nudges + 1
     state["last_nudge_at"] = now
-    return {"action": "nudged", "detail": f"rate-limit nudge #{state['nudges']}: resume signal sent ('continue')"}
+    return {
+        "action": "nudged",
+        "detail": f"auto-recovery nudge #{state['nudges']}: sent 'continue' to pane",
+        "nudge_num": state["nudges"],
+        "error": tail[-200:].strip(),
+    }
 
 
 def _record_model_failure(provider: str, mid: str | None, detail: str) -> None:
@@ -1099,17 +1148,30 @@ def _record_model_failure(provider: str, mid: str | None, detail: str) -> None:
 
 
 def _send_pane_nudge(provider: str, pane_id: str) -> bool:
-    """Sends the resume signal ('continue') into the pane.
+    """Sends the resume signal ('continue') into the pane for any harness."""
+    is_shell_prompt = False
+    try:
+        p_proc = subprocess.run(
+            ["herdr", "pane", "process-info", "--pane", pane_id],
+            capture_output=True, text=True, timeout=2
+        )
+        if p_proc.returncode == 0:
+            p_info = json.loads(p_proc.stdout).get("result", {}).get("process_info", {})
+            fg_procs = [p.get("name", "") for p in p_info.get("foreground_processes", [])]
+            if fg_procs and all(sh in ("bash", "zsh", "sh") for sh in fg_procs):
+                is_shell_prompt = True
+    except Exception:
+        pass
 
-    kilo/opencode exit to the shell prompt on a mid-run error, so the resume
-    is a fresh `run -c 'continue'` (their -c/--continue flag resumes the last
-    session). cline runs an interactive TUI, where typing 'continue' as a new
-    message is the resume. Returns True when the text was delivered.
-    """
     if provider in ("kilo", "opencode"):
-        nudge_cmd = f"{provider} run -c 'continue'\n"
+        nudge_cmd = f"{provider} run --auto -c 'continue'\n" if is_shell_prompt else "continue\n"
+    elif provider == "agy":
+        nudge_cmd = "agy --continue\n" if is_shell_prompt else "continue\n"
+    elif provider == "cline":
+        nudge_cmd = "cline --auto-approve true --timeout 0 --retries 15 --compaction basic 'continue'\n" if is_shell_prompt else "continue\n"
     else:
         nudge_cmd = "continue\n"
+
     try:
         res = subprocess.run(
             ["herdr", "pane", "send-text", pane_id, nudge_cmd],

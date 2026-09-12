@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# omarchy-voxtype-hook: Intercepts Voxtype transcription output.
+# Directs speech text into Omagent when Omagent is open, or outputs to stdout for wtype in normal apps.
+
+set -euo pipefail
+
+# Read transcript from stdin
+TRANSCRIPT=$(cat)
+
+# Strip trailing newline if any, but preserve internal spacing
+CLEAN_TRANSCRIPT=$(echo "$TRANSCRIPT" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+if [[ -z "$CLEAN_TRANSCRIPT" ]]; then
+    exit 0
+fi
+
+# Always persist last transcript for logging / debugging / CLI retrieval
+STATE_DIR="${XDG_RUNTIME_DIR:-/run/user/$UID}/voxtype"
+mkdir -p "$STATE_DIR"
+printf "%s\n" "$CLEAN_TRANSCRIPT" > "$STATE_DIR/last_transcription"
+
+# Check if Omagent plugin is loaded and currently open
+# We query omarchy-shell IPC to insert dictation directly into prompt.text
+IPC_RESULT=$(omarchy-shell shell call io.github.ellion369.omagent appendDictation "$CLEAN_TRANSCRIPT" 2>/dev/null || echo "failed")
+
+if [[ "$IPC_RESULT" == "inserted" ]]; then
+    # Omagent ingested the transcript directly into its input field!
+    # Suppress wtype typing to eliminate duplicate keystrokes, dropped chars, and focus racing.
+    exit 0
+fi
+
+# If Omagent is not open or did not ingest, output text verbatim to stdout for normal wtype injection
+printf "%s" "$TRANSCRIPT"

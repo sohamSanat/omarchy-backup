@@ -24,11 +24,21 @@ Branch: `main`
   - Requires implementation, visual verification (`omagent-screenshot <target> preview.png`), sibling peer review in Herdr, UI butter optimization (`ce-ui-optimize`), and clean delivery.
 - **Uncapped Multi-Agent Fleet Orchestration (`firstmate-subagent`)**:
   - Directs parallel specialist crewmates across 2x2 Herdr tiling panes (`firstmate subagent spawn/prompt/list/close`) bound to Compound Engineering skill workflows.
-- **3 Exclusive UI Design Skill Sets (79 Total Skills in `agents/skills/`)**:
+  - Grants every subagent on-demand autonomy to invoke any of the 33 Compound Engineering skills (`firstmate skills`, `firstmate skill-read`).
+- **Interactive Grill-Me Strategic Alignment Protocol (`omagent-route`)**:
+  - Multi-round design alignment before code generation: Clarifies reference essence, kinetic physics, header layout laws, atmospheric depth, typography, and contrast rhythms.
+  - Interactive QML cards with inline selection or one-click `proceed` to launch autonomous swarms.
+- **Bifurcated UI Routing & Visual Reference Image Deconstruction**:
+  - **Track A (Reference Image Provided)**: Automatically locks to **Set 4 (Impeccable)**, completely bypassing archetype choices to prevent style collision; runs geometric and chromatic deconstruction and persists analysis to `solutions/reference_design_language.md`.
+  - **Track B (No Reference Image)**: Interactive UI Archetype Menu (Sets 1, 2, or 3).
+- **4 Exclusive UI Design Skill Sets (80 Total Skills in `agents/skills/`)**:
   - **Set 1: Full Aesthetic** (Linear, Stripe Press, Braun minimalism, Swiss typography, Emil Kowalski spring animations).
-  - **Set 2: SaaS / Product App** (111 production skills: high-density tables, sticky headers, state machines, WCAG AA contrast).
+  - **Set 2: SaaS / Product App** (High-density tables, sticky headers, state machines, WCAG AA contrast).
   - **Set 3: Jaw-Dropping / 3D Showcase** (Three.js WebGL worlds, GLSL shaders, Lenis virtual smooth scroll, GSAP choreography, anti-slop review).
-  - Supreme Precedence Protocol: UI Set skills override generic styling for all visual work, followed by a mandatory post-UI animation polish pass.
+  - **Set 4: Impeccable Visual Reference Alignment** (`impeccable`: non-invasive reference fidelity, honors pinned aesthetics, zero archetype collision, out-of-distribution craft).
+  - **Supreme Precedence & Header Laws**: Rigid single-line navigation (`white-space: nowrap !important;`), centered vertical baselines, and mandatory post-UI animation pass.
+- **Voice Intercom & Voxtype IPC Hook (`omarchy-voxtype-hook`)**:
+  - Intercepts voice transcription; directly injects speech into active Omagent HUD via Quickshell IPC, eliminating keystroke racing.
 - **Nothing Phone PWA & Voice Bridge (`omagent-mobile-bridge`)**:
   - Python aiohttp HTTPS + WSS daemon listening on port `7890` serving `~/.config/omagent/mobile-web`.
   - Bidirectional mobile audio streaming, Whisper/Voxtype transcription, and Lavish review surfaces.
@@ -42,7 +52,8 @@ Branch: `main`
 - **Treehouse**: Reusable, isolated git worktree pooling.
 - **Compound Engineering Skills (`~/.agents/skills`)**: 33 specialized methodologies (`ce-work`, `ce-ui-optimize`, `ce-debug`, `ce-optimize`, `ce-plan`, `ce-ideate`, `ce-pov`, `ce-code-review`, `ce-compound`, `lfg`, `diagnose-crash`, `omarchy`, etc.).
 - **AXI Ergonomic Tooling**: `gh-axi`, `quota-axi`, `tasks-axi`, `lavish-axi`, `no-mistakes`.
-- **Repo Learnings**: Preserved in `~/.agents/learnings/` (`omarchy_theming.md`, `cli_threshold_falsiness_and_bash_subshells.md`, `argparse_percent_escaping_and_sysfs_negative_current.md`).
+- **System Rules**: `omagent.md`, `ui-sets.md`, `ui-ux-architecture.md`, `axi.md`, `theming.md`.
+- **Repo Learnings**: Preserved in `~/.agents/learnings/` (`ui_ux_agentic_architecture.md`, `omarchy_theming.md`, `cli_threshold_falsiness_and_bash_subshells.md`, `argparse_percent_escaping_and_sysfs_negative_current.md`).
 
 ### 3. 🎨 Visual Experience, Bar & Theming Pipeline
 - **Theme Collection**: 16 curated themes (`moodpeak` [Active], `nous` [Light research], `sakura-mochi`, `aetheria`, `akaito`, `amekoji`, `artzen`, `city-783`, `harbor`, `harbordark`, `omagen1`, `omarchy_signature`, `quattrocento-light`, `synthetica`).
