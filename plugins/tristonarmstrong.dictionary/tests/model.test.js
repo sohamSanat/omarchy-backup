@@ -35,7 +35,9 @@ var PUBLIC_SYMBOLS = [
   "apiBase","lookupArgs","parseResponse","normalizeEntry","normalizeMeaning","normalizeDefinition","stringList",
   "parseSections","stripInlineHeaders","WIKT_POS_KEYS","WIKT_SKIP_DROP",
   "wiktCanonicalPos","wiktExtractIpa","wiktIsInflectionLine","wiktExtractDefs",
-  "parseWiktionaryWikitext","summaryLabel","sourceLabel","levenshtein","fuzzyMatch","setWordlist"
+  "parseWiktionaryWikitext","summaryLabel","sourceLabel","levenshtein","fuzzyMatch","setWordlist",
+  "GEMINI_MODEL","GEMINI_FALLBACK_MODEL","GEMINI_ENDPOINT","AI_SUGGESTIONS_COUNT","geminiEndpoint",
+  "geminiSuggestPrompt","geminiSuggestArgs","parseGeminiSuggestions"
 ];
 var exportLines = PUBLIC_SYMBOLS.map(function (s) { return "exports." + s + " = " + s + ";"; }).join("\n");
 
@@ -964,6 +966,91 @@ group("apiBase — edge cases", function () {
     ["en", "th", "ja", "ko", "fr", "de"].forEach(function (c) {
       assert(M.apiBase(c).endsWith("titles="), "should end with titles= for " + c);
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 22 — AI (Gemini) suggestions: prompt / argv / response parsing
+// ═══════════════════════════════════════════════════════════════════════════
+group("geminiSuggest", function () {
+  function geminiEnvelope(words) {
+    return JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(words) }] } }] });
+  }
+
+  test("GEMINI_MODEL is gemini-3.5-flash-lite", function () {
+    eq(M.GEMINI_MODEL, "gemini-3.5-flash-lite");
+  });
+  test("GEMINI_FALLBACK_MODEL is gemini-3.5-flash", function () {
+    eq(M.GEMINI_FALLBACK_MODEL, "gemini-3.5-flash");
+  });
+  test("endpoint targets gemini-3.5-flash-lite generateContent", function () {
+    assert(M.geminiEndpoint().indexOf("gemini-3.5-flash-lite:generateContent") > -1);
+  });
+  test("AI_SUGGESTIONS_COUNT is 5", function () { eq(M.AI_SUGGESTIONS_COUNT, 5); });
+  test("prompt mentions the misspelling and demands JSON-only array", function () {
+    var p = M.geminiSuggestPrompt("helllo");
+    assert(p.indexOf("helllo") > -1);
+    assert(p.toLowerCase().indexOf("json array") > -1);
+  });
+  test("prompt defaults language to English", function () {
+    assert(M.geminiSuggestPrompt("helllo").indexOf("English") > -1);
+  });
+  test("prompt carries the requested language label", function () {
+    assert(M.geminiSuggestPrompt("bonjur", "French").indexOf("French") > -1);
+  });
+  test("argv uses POST + JSON header, key via x-goog-api-key header", function () {
+    var a = M.geminiSuggestArgs("helllo", "KEY123");
+    assert(a[0] === "curl");
+    assert(a.indexOf("-X") > -1 && a.indexOf("POST") > -1);
+    var keyHdr = a.filter(function (x) { return String(x).indexOf("x-goog-api-key") > -1; });
+    eq(keyHdr.length, 1);
+    assert(keyHdr[0].indexOf("KEY123") > -1);
+    // Key must NOT leak into the URL element.
+    a.forEach(function (x) {
+      if (String(x).indexOf("generativelanguage") > -1) assert(x.indexOf("KEY123") === -1);
+    });
+  });
+  test("argv body embeds the prompt text", function () {
+    var a = M.geminiSuggestArgs("helllo", "KEY123");
+    var body = a[a.indexOf("-d") + 1];
+    assert(body.indexOf("helllo") > -1);
+  });
+  test("parses a clean 5-word envelope", function () {
+    deepEq(M.parseGeminiSuggestions(geminiEnvelope(["hello", "hell", "hallo", "hollow", "hilly"])),
+      ["hello", "hell", "hallo", "hollow", "hilly"]);
+  });
+  test("strips markdown fences", function () {
+    var env = JSON.stringify({ candidates: [{ content: { parts: [{ text: "```json\n[\"hello\", \"hell\"]\n```" }] } }] });
+    deepEq(M.parseGeminiSuggestions(env), ["hello", "hell"]);
+  });
+  test("lowercases, dedupes, caps at 5", function () {
+    deepEq(M.parseGeminiSuggestions(geminiEnvelope(["Hello", "hello", "HELL", "hell", "hallo", "hollow", "hilly", "hollo"])),
+      ["hello", "hell", "hallo", "hollow", "hilly"]);
+  });
+  test("drops junk entries (numbers, empty, symbols)", function () {
+    deepEq(M.parseGeminiSuggestions(geminiEnvelope(["hello", "123", "", "!!!", "world"])), ["hello", "world"]);
+  });
+  test("handles trailing commas in JSON array", function () {
+    var env = JSON.stringify({ candidates: [{ content: { parts: [{ text: "[\"apple\", \"apply\", \"ample\",]" }] } }] });
+    deepEq(M.parseGeminiSuggestions(env), ["apple", "apply", "ample"]);
+  });
+  test("extracts JSON array from conversational text preamble and footer", function () {
+    var env = JSON.stringify({ candidates: [{ content: { parts: [{ text: "Here are the closest words:\n[\"receive\", \"recipe\", \"receipt\"]\nHope this helps!" }] } }] });
+    deepEq(M.parseGeminiSuggestions(env), ["receive", "recipe", "receipt"]);
+  });
+  test("supports international and accented words", function () {
+    var env = JSON.stringify({ candidates: [{ content: { parts: [{ text: "[\"café\", \"déjà\", \"fête\", \"crème\", \"naïve\"]" }] } }] });
+    deepEq(M.parseGeminiSuggestions(env), ["café", "déjà", "fête", "crème", "naïve"]);
+  });
+  test("supports custom fast model in geminiSuggestArgs", function () {
+    var a = M.geminiSuggestArgs("test", "KEY", "English", "gemini-3.8-flash");
+    assert(a.some(function(x) { return String(x).indexOf("gemini-3.8-flash") > -1; }));
+  });
+  test("garbage / error shapes return []", function () {
+    deepEq(M.parseGeminiSuggestions("not json"), []);
+    deepEq(M.parseGeminiSuggestions(JSON.stringify({ error: { message: "bad key" } })), []);
+    deepEq(M.parseGeminiSuggestions(JSON.stringify({ candidates: [] })), []);
+    deepEq(M.parseGeminiSuggestions(JSON.stringify({ candidates: [{ content: { parts: [{ text: "just prose" }] } }] })), []);
   });
 });
 

@@ -88,14 +88,74 @@ Panel {
   // data layer stay in sync.
   property string language: Model.defaultLanguage ? Model.defaultLanguage() : "en"
 
-  // ---- Fuzzy state. Populated only when the user's exact query was a 404
-  //      and the local wordlist surfaced closer candidates. suggestions is
-  //      the chip list shown for the user to choose from; originalQuery is
-  //      what the user typed before auto-match rewrote query to a better
-  //      word (kept so we can render a "showing 'X' for 'Y'" hint).
+  // ---- Spelling suggestions state (AI-supercharged + local fallback).
+  //      When a query is misspelled (Wiktionary 404), AI suggests the 5 closest
+  //      words, ordered closest first.
   property var suggestions: []
   property string originalQuery: ""
   property bool isAutoMatched: false
+
+  property var aiSuggestions: []
+  property string aiStatus: "idle"        // "idle" | "loading" | "ok" | "error" | "missing-key"
+  property string aiError: ""
+  property string configGeminiKey: ""
+  property string configFastModel: ""
+  property string configDictModel: ""
+  property bool aiTriedFallback: false
+  property var aiCache: ({})
+
+  readonly property string homeDir: Quickshell.env("HOME") || "/home/soham"
+  readonly property string effectiveGeminiKey: {
+    var envKey = Quickshell.env("GEMINI_API_KEY") || ""
+    if (envKey.trim() !== "") return envKey.trim()
+    if (root.configGeminiKey.trim() !== "") return root.configGeminiKey.trim()
+    return ""
+  }
+  readonly property string geminiKey: effectiveGeminiKey
+  readonly property string effectiveModel: {
+    var envModel = Quickshell.env("GEMINI_DICT_MODEL") || ""
+    if (envModel.trim() !== "") return envModel.trim()
+    if (root.configDictModel.trim() !== "") return root.configDictModel.trim()
+    return Model.GEMINI_MODEL
+  }
+  readonly property string fallbackModel: {
+    var envModel = Quickshell.env("GEMINI_MODEL") || ""
+    if (envModel.trim() !== "") return envModel.trim()
+    if (root.configFastModel.trim() !== "") return root.configFastModel.trim()
+    return Model.GEMINI_FALLBACK_MODEL
+  }
+  readonly property string closestWord: {
+    if (root.aiSuggestions && root.aiSuggestions.length > 0) return String(root.aiSuggestions[0] || "")
+    if (root.suggestions && root.suggestions.length > 0) return String(root.suggestions[0] || "")
+    return ""
+  }
+
+  // Load configuration from ~/.config/omagent/config.json for GEMINI_API_KEY and fast_model
+  FileView {
+    id: omagentConfigFile
+    path: root.homeDir + "/.config/omagent/config.json"
+    watchChanges: true
+    printErrors: false
+    onLoaded: {
+      try {
+        var parsed = JSON.parse(text())
+        if (parsed && typeof parsed === "object") {
+          if (parsed.gemini_api_key) root.configGeminiKey = String(parsed.gemini_api_key).trim()
+          if (parsed.fast_model) root.configFastModel = String(parsed.fast_model).trim()
+          if (parsed.dict_model) root.configDictModel = String(parsed.dict_model).trim()
+          if (parsed.gemini_dict_model) root.configDictModel = String(parsed.gemini_dict_model).trim()
+        }
+      } catch (e) {
+        // ignore bad config
+      }
+    }
+    onFileChanged: reload()
+    onLoadFailed: {
+      root.configGeminiKey = ""
+      root.configFastModel = ""
+      root.configDictModel = ""
+    }
+  }
 
   // Suppress the user-edit reset in applyEdited when the *plugin itself*
   // rewrites the search field (auto-match path: we set searchField.text to
@@ -111,16 +171,21 @@ Panel {
   readonly property int panelMaxHeight: Style.space(620)
   readonly property int searchDelayMs: 250
 
-  // ---- Reset all result-related state back to idle. Called from search(),
-  //      runLookup(), applyEdited(), and the language-change handler.
-  function resetResults() {
+  // ---- Reset all result-related state back to idle.
+  function resetResults(preserveCorrection) {
     root.entry = null
     root.variants = 0
     root.status = "idle"
     root.statusMessage = ""
     root.suggestions = []
-    root.originalQuery = ""
-    root.isAutoMatched = false
+    if (!preserveCorrection) {
+      root.originalQuery = ""
+      root.isAutoMatched = false
+    }
+    root.aiSuggestions = []
+    root.aiStatus = "idle"
+    root.aiError = ""
+    aiProc.running = false
   }
 
   // Inject the bundled wordlist into Model.js so fuzzyMatch() can use it.
@@ -159,12 +224,34 @@ Panel {
   //      while a request is in flight we kill the running process so a
   //      stale response can't overwrite the newer one. Curl writes JSON to
   //      stdout; we parse it once on completion.
-  function runLookup() {
+  function searchSuggestion(word) {
+    var chosen = String(word || "").trim()
+    if (chosen === "") return
+    var prev = root.originalQuery || root.query
+    root.originalQuery = prev
+    root.isAutoMatched = true
+    root.programmaticEdit = true
+    searchField.text = chosen
+    root.query = chosen
+    root.programmaticEdit = false
+    runLookup(true)
+  }
+
+  // ---- Lookup. The active query is the one in the field; if it changes
+  //      while a request is in flight we kill the running process so a
+  //      stale response can't overwrite the newer one. Curl writes JSON to
+  //      stdout; we parse it once on completion.
+  function runLookup(preserveCorrection) {
     var q = String(searchField.text || "").trim()
     root.query = q
+    lookupProc.running = false
+    aiProc.running = false
+    root.aiSuggestions = []
+    root.aiStatus = "idle"
+    root.aiError = ""
     if (q === "") {
       lookupProc.running = false
-      root.resetResults()
+      root.resetResults(false)
       return
     }
     var args = Model.lookupArgs(q, root.language)
@@ -172,7 +259,7 @@ Panel {
 
     root.status = "loading"
     root.statusMessage = ""
-    root.resetResults()
+    root.resetResults(preserveCorrection === true)
     root.status = "loading"
     if (lookupProc.running) lookupProc.running = false
     lookupProc.command = args
@@ -182,24 +269,128 @@ Panel {
   // The grammar of "search" — Enter fires immediately; typing clears any
   // pending debounce and resets state so a stale response can't surprise
   // the user. Esc routes to the panel close (the keyCatcher handles it).
-  // When programmaticEdit is true (auto-match recovery just rewrote the
-  // field to a candidate word) we skip the user-reset clauses so the
-  // isAutoMatched flag survives into the second lookup.
+  // When programmaticEdit is true we skip the user-reset clauses so the
+  // isAutoMatched flag survives.
   function applyEdited() {
     if (root.programmaticEdit) return
     var q = String(searchField.text || "").trim()
     root.query = q
     if (q === "") {
       lookupProc.running = false
-      root.resetResults()
+      root.resetResults(false)
       return
     }
     if (searchDebounce.running) searchDebounce.stop()
-    // Don't auto-fire on every keystroke — the API is rate-limited and
-    // half-typed words make noise — but clear any in-flight result so the
-    // panel doesn't show stale data next to fresh text.
     if (root.status === "ok" || root.status === "notfound" || root.status === "error" || root.status === "suggestions") {
-      root.resetResults()
+      root.resetResults(false)
+    }
+  }
+
+  // Fallback to local dictionary wordlist when AI is offline or without an API key
+  function fallbackToLocalFuzzy() {
+    var fuzzy = Model.fuzzyMatch(root.originalQuery || root.query)
+    var alts = []
+    if (fuzzy) {
+      if (fuzzy.autoMatch) alts.push(fuzzy.autoMatch)
+      if (fuzzy.alternatives && fuzzy.alternatives.length > 0) {
+        for (var i = 0; i < fuzzy.alternatives.length; i++) {
+          if (alts.indexOf(fuzzy.alternatives[i]) === -1) {
+            alts.push(fuzzy.alternatives[i])
+          }
+        }
+      }
+    }
+    root.suggestions = alts.slice(0, 5)
+  }
+
+  // ---- AI word suggestions (Gemini fast model with fallback).
+  //      When Wiktionary doesn't find a word, ask Gemini (gemini-3.5-flash-lite)
+  //      to suggest the 5 closest words. Ordered with closest word first.
+  function runAiSuggest(useFallback) {
+    var target = String(root.originalQuery || root.query || "").trim()
+    if (target === "") return
+
+    var cacheKey = (root.language || "en") + ":" + target.toLowerCase()
+    if (!useFallback && root.aiCache && root.aiCache[cacheKey] && root.aiCache[cacheKey].length > 0) {
+      var cached = root.aiCache[cacheKey]
+      root.aiSuggestions = cached
+      root.suggestions = cached
+      root.aiStatus = "ok"
+      root.aiError = ""
+      return
+    }
+
+    var key = root.effectiveGeminiKey
+    if (key === "") {
+      root.aiStatus = "missing-key"
+      fallbackToLocalFuzzy()
+      return
+    }
+
+    var chosenModel = useFallback ? root.fallbackModel : root.effectiveModel
+    var args = Model.geminiSuggestArgs(target, key, Model.langLabel(root.language), chosenModel)
+    if (args.length === 0) {
+      root.aiStatus = "error"
+      root.aiError = "could not build the AI request"
+      fallbackToLocalFuzzy()
+      return
+    }
+
+    if (!useFallback) {
+      root.aiSuggestions = []
+      root.aiTriedFallback = false
+    }
+    root.aiError = ""
+    root.aiStatus = "loading"
+    // Keep local fallback visible while AI is loading
+    fallbackToLocalFuzzy()
+    if (aiProc.running) aiProc.running = false
+    aiProc.command = args
+    aiProc.running = true
+  }
+
+  Process {
+    id: aiProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        if (root.aiStatus !== "loading") return
+        var words = Model.parseGeminiSuggestions(text)
+        if (words.length > 0) {
+          var target = String(root.originalQuery || root.query || "").trim()
+          var cacheKey = (root.language || "en") + ":" + target.toLowerCase()
+          if (!root.aiCache) root.aiCache = ({})
+          root.aiCache[cacheKey] = words
+          root.aiSuggestions = words
+          root.suggestions = words
+          root.aiStatus = "ok"
+          root.aiError = ""
+        } else {
+          // If primary model failed (e.g. rate limit / empty parse), try fallback model once
+          if (!root.aiTriedFallback && root.fallbackModel !== root.effectiveModel) {
+            root.aiTriedFallback = true
+            root.runAiSuggest(true)
+          } else {
+            fallbackToLocalFuzzy()
+            root.aiStatus = "error"
+            root.aiError = "AI suggestions unavailable"
+          }
+        }
+      }
+    }
+    stderr: StdioCollector {
+      waitForEnd: true
+    }
+    onExited: function(exitCode) {
+      if (root.aiStatus !== "loading") return
+      if (!root.aiTriedFallback && root.fallbackModel !== root.effectiveModel) {
+        root.aiTriedFallback = true
+        root.runAiSuggest(true)
+      } else {
+        fallbackToLocalFuzzy()
+        root.aiStatus = "error"
+        root.aiError = exitCode === 28 ? "AI request timed out" : "AI suggestions unavailable"
+      }
     }
   }
 
@@ -218,49 +409,18 @@ Panel {
           root.variants = result.variants || 0
           root.status = "ok"
           root.statusMessage = ""
-          // originalQuery stays put when isAutoMatched is true so the
-          // result body can render "showing 'X' for 'Y'".
         } else if (result && (result.kind === "notfound" || result.kind === "invalid" || result.kind === "empty")) {
-          // Fuzzy recovery covers more than the explicit notfound body —
-          // the Free Dictionary API has been observed returning HTTP 502
-          // (Cloudflare error page) for typos instead of 404, which the
-          // parser surfaces as `invalid`/`empty`. Trying fuzzy in those
-          // cases saves a user round-trip. Genuine network failures fall
-          // through to the error branch below.
           root.entry = null
           if (root.isAutoMatched) {
-            // Recovery round tripped without finding a working word —
-            // don't loop, just show the notfound state.
-            root.originalQuery = ""
             root.isAutoMatched = false
             root.status = "notfound"
-            root.statusMessage = "no definition found"
+            root.statusMessage = "no definition found for \"" + (root.originalQuery || root.query) + "\""
             return
           }
           root.originalQuery = root.query
-          var fuzzy = Model.fuzzyMatch(root.query)
-          if (fuzzy && fuzzy.autoMatch) {
-            // Rewrite the field to the candidate so the user can see what
-            // we fetched, keep it marked "auto", and fetch it. The next
-            // round will see isAutoMatched === true on any further 404.
-            // programmaticEdit suppresses applyEdited's user-reset clauses
-            // while the field is being updated by us, not the user.
-            root.isAutoMatched = true
-            root.programmaticEdit = true
-            searchField.text = fuzzy.autoMatch
-            root.query = fuzzy.autoMatch
-            root.programmaticEdit = false
-            root.runLookup()
-            return
-          }
-          if (fuzzy && fuzzy.alternatives && fuzzy.alternatives.length > 0) {
-            root.suggestions = fuzzy.alternatives
-            root.status = "suggestions"
-            root.statusMessage = "no definition found for \"" + root.originalQuery + "\""
-          } else {
-            root.status = "notfound"
-            root.statusMessage = "no definition found for \"" + root.originalQuery + "\""
-          }
+          root.status = "suggestions"
+          root.statusMessage = "no definition found for \"" + root.originalQuery + "\""
+          root.runAiSuggest(false)
         } else {
           root.entry = null
           root.status = "error"
@@ -274,11 +434,6 @@ Panel {
     }
     onExited: function(exitCode) {
       if (root.status !== "loading") return
-      // The not-found branch usually comes back via stdout (the API
-      // returns a JSON error body on 404), and we already handled it.
-      // This is the catch-all for the times we never get that body —
-      // DNS, TLS, refused connection. Curl's HTTP 404 exit (22) lands
-      // here with no parsed body, so surface it as a fetch error.
       root.entry = null
       root.status = "error"
       root.statusMessage = "could not reach the dictionary service"
@@ -370,6 +525,11 @@ Column {
                   return (parts === "" ? "found" : parts) + suffix
                 }
                 if (root.status === "loading") return "looking up…"
+                if (root.status === "suggestions") {
+                  if (root.aiStatus === "loading") return "AI finding closest words…"
+                  if (root.aiStatus === "ok") return "AI spelling suggestions"
+                  return "did you mean"
+                }
                 if (root.status === "notfound") return "no definition"
                 if (root.status === "error") return "couldn't reach the API"
                 return "look up a word"
@@ -504,7 +664,12 @@ Column {
                   enabled: String(searchField.text || "").trim() !== "" && root.status !== "loading"
                   onClicked: {
                     searchDebounce.stop()
-                    root.runLookup()
+                    if (root.status === "suggestions" && root.closestWord !== "" &&
+                        String(searchField.text || "").trim() === (root.originalQuery || root.query)) {
+                      root.searchSuggestion(root.closestWord)
+                    } else {
+                      root.runLookup(false)
+                    }
                   }
                   foreground: root.contentForeground
                 }
@@ -525,16 +690,30 @@ Column {
         }
 
         Keys.onReturnPressed: function(event) {
+          if (root.status === "suggestions" && root.closestWord !== "" &&
+              String(searchField.text || "").trim() === (root.originalQuery || root.query)) {
+            searchDebounce.stop()
+            root.searchSuggestion(root.closestWord)
+            event.accepted = true
+            return
+          }
           if (String(searchField.text || "").trim() !== "") {
             searchDebounce.stop()
-            root.runLookup()
+            root.runLookup(false)
             event.accepted = true
           }
         }
         Keys.onEnterPressed: function(event) {
+          if (root.status === "suggestions" && root.closestWord !== "" &&
+              String(searchField.text || "").trim() === (root.originalQuery || root.query)) {
+            searchDebounce.stop()
+            root.searchSuggestion(root.closestWord)
+            event.accepted = true
+            return
+          }
           if (String(searchField.text || "").trim() !== "") {
             searchDebounce.stop()
-            root.runLookup()
+            root.runLookup(false)
             event.accepted = true
           }
         }
@@ -626,55 +805,214 @@ Column {
               }
             }
 
-            // Suggestions from the local fuzzy match.
+            // Suggestions (AI-powered 5 closest words + robust local fallback)
             Column {
+              id: suggestionsSection
               width: parent.width
               visible: root.status === "suggestions"
-              spacing: Style.space(8)
+              spacing: Style.space(10)
 
-              Text {
+              // Query status message
+              Column {
                 width: parent.width
-                text: "No definition for \"" + (root.originalQuery || root.query) + "\"."
-                textFormat: Text.PlainText
-                color: Qt.darker(root.contentForeground, 1.0)
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.body
-                wrapMode: Text.WordWrap
+                spacing: Style.space(2)
+
+                Text {
+                  width: parent.width
+                  text: "No definition for \"" + (root.originalQuery || root.query) + "\"."
+                  textFormat: Text.PlainText
+                  color: root.contentForeground
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.body
+                  font.bold: true
+                  wrapMode: Text.WordWrap
+                }
+
+                Text {
+                  width: parent.width
+                  text: {
+                    if (root.aiStatus === "loading") return "✨ Finding closest words with AI…"
+                    if (root.aiStatus === "ok" && root.aiSuggestions.length > 0) return "AI found the 5 closest words for your query:"
+                    if (root.suggestions.length > 0) return "Did you mean:"
+                    return "No close matches found. Check your spelling or language."
+                  }
+                  textFormat: Text.PlainText
+                  color: Qt.darker(root.contentForeground, 1.4)
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.caption
+                  wrapMode: Text.WordWrap
+                }
               }
 
-              Text {
+              // AI loading spinner / shimmer indicator
+              Row {
                 width: parent.width
-                text: "Did you mean:"
-                color: Qt.darker(root.contentForeground, 1.4)
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                font.letterSpacing: 1.0
+                visible: root.aiStatus === "loading"
+                spacing: Style.space(8)
+
+                Item {
+                  width: Style.space(18)
+                  height: Style.space(18)
+                  anchors.verticalCenter: parent.verticalCenter
+
+                  Text {
+                    anchors.centerIn: parent
+                    text: "✨"
+                    color: Color.accent
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.body
+                    transformOrigin: Item.Center
+
+                    NumberAnimation on rotation {
+                      from: 0
+                      to: 360
+                      duration: 1200
+                      loops: Animation.Infinite
+                      running: root.aiStatus === "loading"
+                    }
+                  }
+                }
+
+                Text {
+                  text: "Asking AI for closest words…"
+                  textFormat: Text.PlainText
+                  color: Color.accent
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.caption
+                  font.italic: true
+                  anchors.verticalCenter: parent.verticalCenter
+                }
               }
 
-              // Chip row — one clickable Button per candidate.
-              Flow {
+              // Featured Closest Match Card (shown once closest word is determined)
+              Rectangle {
+                id: closestCard
                 width: parent.width
-                spacing: Style.space(6)
+                implicitHeight: Style.space(52)
+                radius: Style.cornerRadius
+                visible: root.closestWord !== ""
+                color: Style.selectedFillFor(root.contentForeground, Color.accent)
+                border.width: Style.spacing.hairline
+                border.color: Color.accent
 
-                Repeater {
-                  model: root.suggestions
+                MouseArea {
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.searchSuggestion(root.closestWord)
 
-                  Button {
-                    required property string modelData
-                    text: modelData
-                    foreground: root.contentForeground
-                    onClicked: root.search(modelData)
+                  Row {
+                    anchors.fill: parent
+                    anchors.leftMargin: Style.space(12)
+                    anchors.rightMargin: Style.space(10)
+                    spacing: Style.space(10)
+
+                    Text {
+                      text: "✨"
+                      color: Color.accent
+                      font.family: root.contentFontFamily
+                      font.pixelSize: Style.font.title
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Column {
+                      anchors.verticalCenter: parent.verticalCenter
+                      spacing: Style.space(1)
+                      width: parent.width - Style.space(120)
+
+                      Text {
+                        text: root.aiStatus === "ok" ? "✨ AI RECOMMENDED CLOSEST MATCH" : "CLOSEST MATCH"
+                        color: Color.accent
+                        font.family: root.contentFontFamily
+                        font.pixelSize: Style.font.caption
+                        font.bold: true
+                        font.letterSpacing: 1.2
+                      }
+
+                      Text {
+                        text: root.closestWord
+                        textFormat: Text.PlainText
+                        color: root.contentForeground
+                        font.family: root.contentFontFamily
+                        font.pixelSize: Style.font.body
+                        font.bold: true
+                        elide: Text.ElideRight
+                        width: parent.width
+                      }
+                    }
+
+                    Item {
+                      width: Style.space(4)
+                      height: 1
+                    }
+
+                    Button {
+                      text: "Look up →"
+                      foreground: Color.accent
+                      anchors.verticalCenter: parent.verticalCenter
+                      onClicked: root.searchSuggestion(root.closestWord)
+                    }
                   }
                 }
               }
+
+              // Suggested words row (5 closest words as interactive chips)
+              Column {
+                width: parent.width
+                visible: (root.aiSuggestions.length > 0 || root.suggestions.length > 0)
+                spacing: Style.space(6)
+
+                Text {
+                  width: parent.width
+                  text: root.aiStatus === "ok" ? "✨ AI Top 5 closest words:" : "Suggestions:"
+                  color: Qt.darker(root.contentForeground, 1.4)
+                  font.family: root.contentFontFamily
+                  font.pixelSize: Style.font.caption
+                  font.bold: true
+                  font.letterSpacing: 1.0
+                }
+
+                Flow {
+                  width: parent.width
+                  spacing: Style.space(6)
+
+                  Repeater {
+                    model: root.aiSuggestions.length > 0 ? root.aiSuggestions : root.suggestions
+
+                    Button {
+                      required property string modelData
+                      required property int index
+                      text: (index + 1) + ". " + modelData
+                      foreground: index === 0 ? Color.accent : root.contentForeground
+                      onClicked: root.searchSuggestion(modelData)
+                    }
+                  }
+                }
+              }
+
+              // Footnote for status
+              Text {
+                width: parent.width
+                visible: root.aiStatus === "ok" || root.aiStatus === "missing-key" || root.aiStatus === "error"
+                text: {
+                  if (root.aiStatus === "ok") return "✨ AI spelling assistance powered by Gemini"
+                  if (root.aiStatus === "missing-key") return "💡 Tip: Configure GEMINI_API_KEY in ~/.config/omagent/config.json for AI-powered suggestions."
+                  return "💡 AI suggestions offline · showing local dictionary suggestions."
+                }
+                textFormat: Text.PlainText
+                color: root.aiStatus === "ok" ? Color.accent : Qt.darker(root.contentForeground, 1.6)
+                font.family: root.contentFontFamily
+                font.pixelSize: Style.font.caption
+                font.italic: true
+                wrapMode: Text.WordWrap
+              }
             }
 
-            // Not found (no fuzzy candidates).
+            // Not found (only visible when no suggestions exist at all)
             Column {
               width: parent.width
               visible: root.status === "notfound"
-              spacing: Style.space(4)
+              spacing: Style.space(8)
 
               Text {
                 width: parent.width

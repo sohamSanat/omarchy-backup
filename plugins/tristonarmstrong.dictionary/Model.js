@@ -610,6 +610,126 @@ function levenshtein(a, b) {
 }
 
 
+// ---- AI (Gemini) suggestions ----
+//
+// AI-powered spelling help: when Wiktionary returns no definition for a word,
+// the panel asks Gemini (gemini-3.5-flash-lite — lightweight, ultra-fast, cheap)
+// to find the 5 closest real words the user meant (ordered closest first).
+// Pure helpers only: prompt building + response parsing. The QML side owns the
+// network call (curl via Process) and rendering.
+//
+// Endpoint (v1beta, API key via x-goog-api-key header):
+//   POST https://generativelanguage.googleapis.com/v1beta/models/
+//        gemini-3.5-flash-lite:generateContent
+// Body:
+//   {"contents":[{"parts":[{"text": <prompt> }]}],
+//    "generationConfig":{"temperature":0.1,"maxOutputTokens":80}}
+var GEMINI_MODEL = "gemini-3.5-flash-lite"
+var GEMINI_FALLBACK_MODEL = "gemini-3.5-flash"
+var GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/" +
+                      GEMINI_MODEL + ":generateContent"
+var AI_SUGGESTIONS_COUNT = 5
+
+function geminiEndpoint(modelName) {
+  var model = String(modelName || GEMINI_MODEL).trim() || GEMINI_MODEL
+  return "https://generativelanguage.googleapis.com/v1beta/models/" +
+         encodeURIComponent(model) + ":generateContent"
+}
+
+// Build the prompt sent to Gemini for a misspelled query.
+// Explicitly asks for the closest real dictionary words accounting for typos
+// and phonetic misspellings, ordered with closest word first.
+function geminiSuggestPrompt(rawQuery, langName) {
+  var q = String(rawQuery || "").trim().toLowerCase().slice(0, 50)
+  var lang = String(langName || "English").trim() || "English"
+  return "The user mistyped or misspelled a word in " + lang + " as \"" + q + "\". " +
+    "Analyze keyboard slips, common orthographic errors (such as swapped letters like 'ie'/'ei', single vs double consonants), phonetic approximations, and missing or extra letters. " +
+    "Identify the single exact " + lang + " dictionary word the user most likely intended to type, followed by other plausible alternatives. " +
+    "Suggest exactly " + AI_SUGGESTIONS_COUNT + " real, valid " + lang + " dictionary words, strictly ranked with the single most likely intended word first. " +
+    "Respond with ONLY a JSON array of " + AI_SUGGESTIONS_COUNT + " lowercase strings (for example: [\"word1\",\"word2\",\"word3\",\"word4\",\"word5\"]), no other text, no markdown fences."
+}
+
+// Build the curl argv for the Gemini suggestion call. Key is passed as an
+// HTTP header (never in the URL, so it stays out of process-list URLs and
+// shell history). Uses maxOutputTokens: 1024 so thinking/reasoning models
+// do not truncate output mid-stream.
+function geminiSuggestArgs(rawQuery, apiKey, langName, modelName) {
+  var endpoint = geminiEndpoint(modelName)
+  var body = JSON.stringify({
+    contents: [{ parts: [{ text: geminiSuggestPrompt(rawQuery, langName) }] }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 1024 }
+  })
+  return ["curl", "-sS", "--max-time", "8", "-X", "POST",
+    endpoint,
+    "-H", "Content-Type: application/json",
+    "-H", "x-goog-api-key: " + String(apiKey || "").trim(),
+    "-d", body]
+}
+
+// Parse the Gemini generateContent JSON envelope into a clean string list.
+// Robust against markdown code blocks, conversational prefixes, trailing commas,
+// and international script characters. Returns [] on unrecoverable errors.
+function parseGeminiSuggestions(jsonText) {
+  var text = String(jsonText || "").trim()
+  if (text === "") return []
+  var data
+  try {
+    data = JSON.parse(text)
+  } catch (e) {
+    return []
+  }
+  if (!data || typeof data !== "object") return []
+  if (data.error) return []
+  if (!data.candidates || !data.candidates.length) return []
+  var parts = data.candidates[0] && data.candidates[0].content &&
+              data.candidates[0].content.parts
+  if (!parts || !parts.length || typeof parts[0].text !== "string") return []
+  var rawText = parts[0].text.trim()
+  // Strip markdown fences
+  rawText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim()
+
+  var match = rawText.match(/\[[\s\S]*\]/)
+  var arr = null
+  if (match) {
+    var cleaned = match[0].replace(/,\s*\]/g, "]")
+    try {
+      arr = JSON.parse(cleaned)
+    } catch (e1) {
+      var quoted = []
+      var qMatch
+      var qRe = /"([^"\\]*(?:\\.[^"\\]*)*)"/g
+      while ((qMatch = qRe.exec(match[0])) !== null) {
+        quoted.push(qMatch[1])
+      }
+      if (quoted.length > 0) arr = quoted
+    }
+  } else {
+    try {
+      arr = JSON.parse(rawText)
+    } catch (e2) {
+      var quoted2 = []
+      var qMatch2
+      var qRe2 = /"([^"\\]*(?:\\.[^"\\]*)*)"/g
+      while ((qMatch2 = qRe2.exec(rawText)) !== null) {
+        quoted2.push(qMatch2[1])
+      }
+      if (quoted2.length > 0) arr = quoted2
+    }
+  }
+  if (!Array.isArray(arr)) return []
+  var out = []
+  var seen = {}
+  for (var i = 0; i < arr.length && out.length < AI_SUGGESTIONS_COUNT; i++) {
+    var w = String(arr[i] || "").toLowerCase().trim()
+    if (w.length < 1 || w.length > 40) continue
+    if (/[0-9_=+*&^%$#@!~`<>?:;|\/\\]/.test(w)) continue
+    if (seen[w]) continue
+    seen[w] = true
+    out.push(w)
+  }
+  return out
+}
+
 // English wordlist for fuzzy matching. Loaded from the standalone wordlist.js
 // file and injected via setWordlist() at panel init time. The list is not
 // inlined here to keep this file focused on logic.
@@ -619,11 +739,52 @@ function setWordlist(list) {
   if (Array.isArray(list)) _WORDLIST = list
 }
 
+// Damerau-Levenshtein distance (insert, delete, substitute, transpose adjacent).
+// Accurately scores letter swaps ('recieved' -> 'received' = 1 edit).
+function damerauLevenshtein(a, b) {
+  var s1 = String(a || "")
+  var s2 = String(b || "")
+  var m = s1.length
+  var n = s2.length
+  if (m === 0) return n
+  if (n === 0) return m
+
+  var d = []
+  for (var i = 0; i <= m; i++) {
+    d[i] = []
+    d[i][0] = i
+  }
+  for (var j = 0; j <= n; j++) {
+    d[0][j] = j
+  }
+
+  for (var i = 1; i <= m; i++) {
+    var ch1 = s1.charAt(i - 1)
+    for (var j = 1; j <= n; j++) {
+      var ch2 = s2.charAt(j - 1)
+      var cost = (ch1 === ch2) ? 0 : 1
+      d[i][j] = Math.min(
+        d[i - 1][j] + 1,       // deletion
+        d[i][j - 1] + 1,       // insertion
+        d[i - 1][j - 1] + cost // substitution
+      )
+      if (i > 1 && j > 1 && ch1 === s2.charAt(j - 2) && s1.charAt(i - 2) === ch2) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1) // transposition
+      }
+    }
+  }
+  return d[m][n]
+}
+
+function levenshtein(a, b) {
+  return damerauLevenshtein(a, b)
+}
+
 var AUTO_MATCH_MAX_NORMALIZED = 0.22    // ("helllo" -> "hello" = 0.14, well under)
 var ALTERNATIVES_MAX_NORMALIZED = 0.40   // distance / max length
 var ALTERNATIVES_DISTANCE_LIMIT = 3     // hard cap on raw edits
 var AUTO_MATCH_GAP = 0.08                // next candidate must trail by at least this much in score
-var ALTERNATIVES_TO_SHOW = 3
+var ALTERNATIVES_TO_SHOW = 5
 
 function fuzzyMatch(rawQuery) {
   var query = String(rawQuery || "").toLowerCase().trim()
@@ -650,23 +811,21 @@ function fuzzyMatch(rawQuery) {
     // the score below penalizes large gaps all the same.
     if (w.charAt(0) !== q.charAt(0)) continue
     if (Math.abs(wlen - qlen) > ALTERNATIVES_DISTANCE_LIMIT) continue
-    var d = levenshtein(q, w)
+    var d = damerauLevenshtein(q, w)
     if (d > ALTERNATIVES_DISTANCE_LIMIT) continue
-    // Normalized score: 0 = identical, larger = worse. The longest-side
-    // length is the denom so a 1-edit typo on a 12-letter word scores
-    // better than the same typo on a 3-letter word.
     var score = d / Math.max(qlen, wlen)
-    results.push({ word: w, distance: d, score: score })
+    results.push({ word: w, distance: d, score: score, index: k })
   }
 
-  // Sort by score (best = smallest), then by absolute distance, then by
-  // closer-length match, then alphabetical as a stable final tiebreak.
+  // Sort by edit distance first (1 edit beats 2 edits!),
+  // then length difference, then score, then frequency order in wordlist.
   results.sort(function (a, b) {
-    if (a.score !== b.score) return a.score - b.score
     if (a.distance !== b.distance) return a.distance - b.distance
     var ad = Math.abs(a.word.length - qlen)
     var bd = Math.abs(b.word.length - qlen)
     if (ad !== bd) return ad - bd
+    if (a.score !== b.score) return a.score - b.score
+    if (a.index !== b.index) return a.index - b.index
     if (a.word < b.word) return -1
     if (a.word > b.word) return 1
     return 0

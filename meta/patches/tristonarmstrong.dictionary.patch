@@ -1,8 +1,882 @@
-diff --git i/Panel.qml w/Panel.qml
-index 84d7e3b..8afab1b 100644
---- i/Panel.qml
+diff --git c/Model.js w/Model.js
+index f9e96c4..bf541f0 100644
+--- c/Model.js
++++ w/Model.js
+@@ -610,6 +610,126 @@ function levenshtein(a, b) {
+ }
+ 
+ 
++// ---- AI (Gemini) suggestions ----
++//
++// AI-powered spelling help: when Wiktionary returns no definition for a word,
++// the panel asks Gemini (gemini-3.5-flash-lite — lightweight, ultra-fast, cheap)
++// to find the 5 closest real words the user meant (ordered closest first).
++// Pure helpers only: prompt building + response parsing. The QML side owns the
++// network call (curl via Process) and rendering.
++//
++// Endpoint (v1beta, API key via x-goog-api-key header):
++//   POST https://generativelanguage.googleapis.com/v1beta/models/
++//        gemini-3.5-flash-lite:generateContent
++// Body:
++//   {"contents":[{"parts":[{"text": <prompt> }]}],
++//    "generationConfig":{"temperature":0.1,"maxOutputTokens":80}}
++var GEMINI_MODEL = "gemini-3.5-flash-lite"
++var GEMINI_FALLBACK_MODEL = "gemini-3.5-flash"
++var GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/" +
++                      GEMINI_MODEL + ":generateContent"
++var AI_SUGGESTIONS_COUNT = 5
++
++function geminiEndpoint(modelName) {
++  var model = String(modelName || GEMINI_MODEL).trim() || GEMINI_MODEL
++  return "https://generativelanguage.googleapis.com/v1beta/models/" +
++         encodeURIComponent(model) + ":generateContent"
++}
++
++// Build the prompt sent to Gemini for a misspelled query.
++// Explicitly asks for the closest real dictionary words accounting for typos
++// and phonetic misspellings, ordered with closest word first.
++function geminiSuggestPrompt(rawQuery, langName) {
++  var q = String(rawQuery || "").trim().toLowerCase().slice(0, 50)
++  var lang = String(langName || "English").trim() || "English"
++  return "The user mistyped or misspelled a word in " + lang + " as \"" + q + "\". " +
++    "Analyze keyboard slips, common orthographic errors (such as swapped letters like 'ie'/'ei', single vs double consonants), phonetic approximations, and missing or extra letters. " +
++    "Identify the single exact " + lang + " dictionary word the user most likely intended to type, followed by other plausible alternatives. " +
++    "Suggest exactly " + AI_SUGGESTIONS_COUNT + " real, valid " + lang + " dictionary words, strictly ranked with the single most likely intended word first. " +
++    "Respond with ONLY a JSON array of " + AI_SUGGESTIONS_COUNT + " lowercase strings (for example: [\"word1\",\"word2\",\"word3\",\"word4\",\"word5\"]), no other text, no markdown fences."
++}
++
++// Build the curl argv for the Gemini suggestion call. Key is passed as an
++// HTTP header (never in the URL, so it stays out of process-list URLs and
++// shell history). Uses maxOutputTokens: 1024 so thinking/reasoning models
++// do not truncate output mid-stream.
++function geminiSuggestArgs(rawQuery, apiKey, langName, modelName) {
++  var endpoint = geminiEndpoint(modelName)
++  var body = JSON.stringify({
++    contents: [{ parts: [{ text: geminiSuggestPrompt(rawQuery, langName) }] }],
++    generationConfig: { temperature: 0.1, maxOutputTokens: 1024 }
++  })
++  return ["curl", "-sS", "--max-time", "8", "-X", "POST",
++    endpoint,
++    "-H", "Content-Type: application/json",
++    "-H", "x-goog-api-key: " + String(apiKey || "").trim(),
++    "-d", body]
++}
++
++// Parse the Gemini generateContent JSON envelope into a clean string list.
++// Robust against markdown code blocks, conversational prefixes, trailing commas,
++// and international script characters. Returns [] on unrecoverable errors.
++function parseGeminiSuggestions(jsonText) {
++  var text = String(jsonText || "").trim()
++  if (text === "") return []
++  var data
++  try {
++    data = JSON.parse(text)
++  } catch (e) {
++    return []
++  }
++  if (!data || typeof data !== "object") return []
++  if (data.error) return []
++  if (!data.candidates || !data.candidates.length) return []
++  var parts = data.candidates[0] && data.candidates[0].content &&
++              data.candidates[0].content.parts
++  if (!parts || !parts.length || typeof parts[0].text !== "string") return []
++  var rawText = parts[0].text.trim()
++  // Strip markdown fences
++  rawText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim()
++
++  var match = rawText.match(/\[[\s\S]*\]/)
++  var arr = null
++  if (match) {
++    var cleaned = match[0].replace(/,\s*\]/g, "]")
++    try {
++      arr = JSON.parse(cleaned)
++    } catch (e1) {
++      var quoted = []
++      var qMatch
++      var qRe = /"([^"\\]*(?:\\.[^"\\]*)*)"/g
++      while ((qMatch = qRe.exec(match[0])) !== null) {
++        quoted.push(qMatch[1])
++      }
++      if (quoted.length > 0) arr = quoted
++    }
++  } else {
++    try {
++      arr = JSON.parse(rawText)
++    } catch (e2) {
++      var quoted2 = []
++      var qMatch2
++      var qRe2 = /"([^"\\]*(?:\\.[^"\\]*)*)"/g
++      while ((qMatch2 = qRe2.exec(rawText)) !== null) {
++        quoted2.push(qMatch2[1])
++      }
++      if (quoted2.length > 0) arr = quoted2
++    }
++  }
++  if (!Array.isArray(arr)) return []
++  var out = []
++  var seen = {}
++  for (var i = 0; i < arr.length && out.length < AI_SUGGESTIONS_COUNT; i++) {
++    var w = String(arr[i] || "").toLowerCase().trim()
++    if (w.length < 1 || w.length > 40) continue
++    if (/[0-9_=+*&^%$#@!~`<>?:;|\/\\]/.test(w)) continue
++    if (seen[w]) continue
++    seen[w] = true
++    out.push(w)
++  }
++  return out
++}
++
+ // English wordlist for fuzzy matching. Loaded from the standalone wordlist.js
+ // file and injected via setWordlist() at panel init time. The list is not
+ // inlined here to keep this file focused on logic.
+@@ -619,11 +739,52 @@ function setWordlist(list) {
+   if (Array.isArray(list)) _WORDLIST = list
+ }
+ 
++// Damerau-Levenshtein distance (insert, delete, substitute, transpose adjacent).
++// Accurately scores letter swaps ('recieved' -> 'received' = 1 edit).
++function damerauLevenshtein(a, b) {
++  var s1 = String(a || "")
++  var s2 = String(b || "")
++  var m = s1.length
++  var n = s2.length
++  if (m === 0) return n
++  if (n === 0) return m
++
++  var d = []
++  for (var i = 0; i <= m; i++) {
++    d[i] = []
++    d[i][0] = i
++  }
++  for (var j = 0; j <= n; j++) {
++    d[0][j] = j
++  }
++
++  for (var i = 1; i <= m; i++) {
++    var ch1 = s1.charAt(i - 1)
++    for (var j = 1; j <= n; j++) {
++      var ch2 = s2.charAt(j - 1)
++      var cost = (ch1 === ch2) ? 0 : 1
++      d[i][j] = Math.min(
++        d[i - 1][j] + 1,       // deletion
++        d[i][j - 1] + 1,       // insertion
++        d[i - 1][j - 1] + cost // substitution
++      )
++      if (i > 1 && j > 1 && ch1 === s2.charAt(j - 2) && s1.charAt(i - 2) === ch2) {
++        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1) // transposition
++      }
++    }
++  }
++  return d[m][n]
++}
++
++function levenshtein(a, b) {
++  return damerauLevenshtein(a, b)
++}
++
+ var AUTO_MATCH_MAX_NORMALIZED = 0.22    // ("helllo" -> "hello" = 0.14, well under)
+ var ALTERNATIVES_MAX_NORMALIZED = 0.40   // distance / max length
+ var ALTERNATIVES_DISTANCE_LIMIT = 3     // hard cap on raw edits
+ var AUTO_MATCH_GAP = 0.08                // next candidate must trail by at least this much in score
+-var ALTERNATIVES_TO_SHOW = 3
++var ALTERNATIVES_TO_SHOW = 5
+ 
+ function fuzzyMatch(rawQuery) {
+   var query = String(rawQuery || "").toLowerCase().trim()
+@@ -650,23 +811,21 @@ function fuzzyMatch(rawQuery) {
+     // the score below penalizes large gaps all the same.
+     if (w.charAt(0) !== q.charAt(0)) continue
+     if (Math.abs(wlen - qlen) > ALTERNATIVES_DISTANCE_LIMIT) continue
+-    var d = levenshtein(q, w)
++    var d = damerauLevenshtein(q, w)
+     if (d > ALTERNATIVES_DISTANCE_LIMIT) continue
+-    // Normalized score: 0 = identical, larger = worse. The longest-side
+-    // length is the denom so a 1-edit typo on a 12-letter word scores
+-    // better than the same typo on a 3-letter word.
+     var score = d / Math.max(qlen, wlen)
+-    results.push({ word: w, distance: d, score: score })
++    results.push({ word: w, distance: d, score: score, index: k })
+   }
+ 
+-  // Sort by score (best = smallest), then by absolute distance, then by
+-  // closer-length match, then alphabetical as a stable final tiebreak.
++  // Sort by edit distance first (1 edit beats 2 edits!),
++  // then length difference, then score, then frequency order in wordlist.
+   results.sort(function (a, b) {
+-    if (a.score !== b.score) return a.score - b.score
+     if (a.distance !== b.distance) return a.distance - b.distance
+     var ad = Math.abs(a.word.length - qlen)
+     var bd = Math.abs(b.word.length - qlen)
+     if (ad !== bd) return ad - bd
++    if (a.score !== b.score) return a.score - b.score
++    if (a.index !== b.index) return a.index - b.index
+     if (a.word < b.word) return -1
+     if (a.word > b.word) return 1
+     return 0
+diff --git c/Panel.qml w/Panel.qml
+index 84d7e3b..74be375 100644
+--- c/Panel.qml
 +++ w/Panel.qml
-@@ -929,70 +929,6 @@ Column {
+@@ -88,15 +88,75 @@ Panel {
+   // data layer stay in sync.
+   property string language: Model.defaultLanguage ? Model.defaultLanguage() : "en"
+ 
+-  // ---- Fuzzy state. Populated only when the user's exact query was a 404
+-  //      and the local wordlist surfaced closer candidates. suggestions is
+-  //      the chip list shown for the user to choose from; originalQuery is
+-  //      what the user typed before auto-match rewrote query to a better
+-  //      word (kept so we can render a "showing 'X' for 'Y'" hint).
++  // ---- Spelling suggestions state (AI-supercharged + local fallback).
++  //      When a query is misspelled (Wiktionary 404), AI suggests the 5 closest
++  //      words, ordered closest first.
+   property var suggestions: []
+   property string originalQuery: ""
+   property bool isAutoMatched: false
+ 
++  property var aiSuggestions: []
++  property string aiStatus: "idle"        // "idle" | "loading" | "ok" | "error" | "missing-key"
++  property string aiError: ""
++  property string configGeminiKey: ""
++  property string configFastModel: ""
++  property string configDictModel: ""
++  property bool aiTriedFallback: false
++  property var aiCache: ({})
++
++  readonly property string homeDir: Quickshell.env("HOME") || "/home/soham"
++  readonly property string effectiveGeminiKey: {
++    var envKey = Quickshell.env("GEMINI_API_KEY") || ""
++    if (envKey.trim() !== "") return envKey.trim()
++    if (root.configGeminiKey.trim() !== "") return root.configGeminiKey.trim()
++    return ""
++  }
++  readonly property string geminiKey: effectiveGeminiKey
++  readonly property string effectiveModel: {
++    var envModel = Quickshell.env("GEMINI_DICT_MODEL") || ""
++    if (envModel.trim() !== "") return envModel.trim()
++    if (root.configDictModel.trim() !== "") return root.configDictModel.trim()
++    return Model.GEMINI_MODEL
++  }
++  readonly property string fallbackModel: {
++    var envModel = Quickshell.env("GEMINI_MODEL") || ""
++    if (envModel.trim() !== "") return envModel.trim()
++    if (root.configFastModel.trim() !== "") return root.configFastModel.trim()
++    return Model.GEMINI_FALLBACK_MODEL
++  }
++  readonly property string closestWord: {
++    if (root.aiSuggestions && root.aiSuggestions.length > 0) return String(root.aiSuggestions[0] || "")
++    if (root.suggestions && root.suggestions.length > 0) return String(root.suggestions[0] || "")
++    return ""
++  }
++
++  // Load configuration from ~/.config/omagent/config.json for GEMINI_API_KEY and fast_model
++  FileView {
++    id: omagentConfigFile
++    path: root.homeDir + "/.config/omagent/config.json"
++    watchChanges: true
++    printErrors: false
++    onLoaded: {
++      try {
++        var parsed = JSON.parse(text())
++        if (parsed && typeof parsed === "object") {
++          if (parsed.gemini_api_key) root.configGeminiKey = String(parsed.gemini_api_key).trim()
++          if (parsed.fast_model) root.configFastModel = String(parsed.fast_model).trim()
++          if (parsed.dict_model) root.configDictModel = String(parsed.dict_model).trim()
++          if (parsed.gemini_dict_model) root.configDictModel = String(parsed.gemini_dict_model).trim()
++        }
++      } catch (e) {
++        // ignore bad config
++      }
++    }
++    onFileChanged: reload()
++    onLoadFailed: {
++      root.configGeminiKey = ""
++      root.configFastModel = ""
++      root.configDictModel = ""
++    }
++  }
++
+   // Suppress the user-edit reset in applyEdited when the *plugin itself*
+   // rewrites the search field (auto-match path: we set searchField.text to
+   // the chosen candidate, and the resulting onTextChanged would otherwise
+@@ -111,16 +171,21 @@ Panel {
+   readonly property int panelMaxHeight: Style.space(620)
+   readonly property int searchDelayMs: 250
+ 
+-  // ---- Reset all result-related state back to idle. Called from search(),
+-  //      runLookup(), applyEdited(), and the language-change handler.
+-  function resetResults() {
++  // ---- Reset all result-related state back to idle.
++  function resetResults(preserveCorrection) {
+     root.entry = null
+     root.variants = 0
+     root.status = "idle"
+     root.statusMessage = ""
+     root.suggestions = []
+-    root.originalQuery = ""
+-    root.isAutoMatched = false
++    if (!preserveCorrection) {
++      root.originalQuery = ""
++      root.isAutoMatched = false
++    }
++    root.aiSuggestions = []
++    root.aiStatus = "idle"
++    root.aiError = ""
++    aiProc.running = false
+   }
+ 
+   // Inject the bundled wordlist into Model.js so fuzzyMatch() can use it.
+@@ -159,12 +224,34 @@ Panel {
+   //      while a request is in flight we kill the running process so a
+   //      stale response can't overwrite the newer one. Curl writes JSON to
+   //      stdout; we parse it once on completion.
+-  function runLookup() {
++  function searchSuggestion(word) {
++    var chosen = String(word || "").trim()
++    if (chosen === "") return
++    var prev = root.originalQuery || root.query
++    root.originalQuery = prev
++    root.isAutoMatched = true
++    root.programmaticEdit = true
++    searchField.text = chosen
++    root.query = chosen
++    root.programmaticEdit = false
++    runLookup(true)
++  }
++
++  // ---- Lookup. The active query is the one in the field; if it changes
++  //      while a request is in flight we kill the running process so a
++  //      stale response can't overwrite the newer one. Curl writes JSON to
++  //      stdout; we parse it once on completion.
++  function runLookup(preserveCorrection) {
+     var q = String(searchField.text || "").trim()
+     root.query = q
++    lookupProc.running = false
++    aiProc.running = false
++    root.aiSuggestions = []
++    root.aiStatus = "idle"
++    root.aiError = ""
+     if (q === "") {
+       lookupProc.running = false
+-      root.resetResults()
++      root.resetResults(false)
+       return
+     }
+     var args = Model.lookupArgs(q, root.language)
+@@ -172,7 +259,7 @@ Panel {
+ 
+     root.status = "loading"
+     root.statusMessage = ""
+-    root.resetResults()
++    root.resetResults(preserveCorrection === true)
+     root.status = "loading"
+     if (lookupProc.running) lookupProc.running = false
+     lookupProc.command = args
+@@ -182,24 +269,128 @@ Panel {
+   // The grammar of "search" — Enter fires immediately; typing clears any
+   // pending debounce and resets state so a stale response can't surprise
+   // the user. Esc routes to the panel close (the keyCatcher handles it).
+-  // When programmaticEdit is true (auto-match recovery just rewrote the
+-  // field to a candidate word) we skip the user-reset clauses so the
+-  // isAutoMatched flag survives into the second lookup.
++  // When programmaticEdit is true we skip the user-reset clauses so the
++  // isAutoMatched flag survives.
+   function applyEdited() {
+     if (root.programmaticEdit) return
+     var q = String(searchField.text || "").trim()
+     root.query = q
+     if (q === "") {
+       lookupProc.running = false
+-      root.resetResults()
++      root.resetResults(false)
+       return
+     }
+     if (searchDebounce.running) searchDebounce.stop()
+-    // Don't auto-fire on every keystroke — the API is rate-limited and
+-    // half-typed words make noise — but clear any in-flight result so the
+-    // panel doesn't show stale data next to fresh text.
+     if (root.status === "ok" || root.status === "notfound" || root.status === "error" || root.status === "suggestions") {
+-      root.resetResults()
++      root.resetResults(false)
++    }
++  }
++
++  // Fallback to local dictionary wordlist when AI is offline or without an API key
++  function fallbackToLocalFuzzy() {
++    var fuzzy = Model.fuzzyMatch(root.originalQuery || root.query)
++    var alts = []
++    if (fuzzy) {
++      if (fuzzy.autoMatch) alts.push(fuzzy.autoMatch)
++      if (fuzzy.alternatives && fuzzy.alternatives.length > 0) {
++        for (var i = 0; i < fuzzy.alternatives.length; i++) {
++          if (alts.indexOf(fuzzy.alternatives[i]) === -1) {
++            alts.push(fuzzy.alternatives[i])
++          }
++        }
++      }
++    }
++    root.suggestions = alts.slice(0, 5)
++  }
++
++  // ---- AI word suggestions (Gemini fast model with fallback).
++  //      When Wiktionary doesn't find a word, ask Gemini (gemini-3.5-flash-lite)
++  //      to suggest the 5 closest words. Ordered with closest word first.
++  function runAiSuggest(useFallback) {
++    var target = String(root.originalQuery || root.query || "").trim()
++    if (target === "") return
++
++    var cacheKey = (root.language || "en") + ":" + target.toLowerCase()
++    if (!useFallback && root.aiCache && root.aiCache[cacheKey] && root.aiCache[cacheKey].length > 0) {
++      var cached = root.aiCache[cacheKey]
++      root.aiSuggestions = cached
++      root.suggestions = cached
++      root.aiStatus = "ok"
++      root.aiError = ""
++      return
++    }
++
++    var key = root.effectiveGeminiKey
++    if (key === "") {
++      root.aiStatus = "missing-key"
++      fallbackToLocalFuzzy()
++      return
++    }
++
++    var chosenModel = useFallback ? root.fallbackModel : root.effectiveModel
++    var args = Model.geminiSuggestArgs(target, key, Model.langLabel(root.language), chosenModel)
++    if (args.length === 0) {
++      root.aiStatus = "error"
++      root.aiError = "could not build the AI request"
++      fallbackToLocalFuzzy()
++      return
++    }
++
++    if (!useFallback) {
++      root.aiSuggestions = []
++      root.aiTriedFallback = false
++    }
++    root.aiError = ""
++    root.aiStatus = "loading"
++    // Keep local fallback visible while AI is loading
++    fallbackToLocalFuzzy()
++    if (aiProc.running) aiProc.running = false
++    aiProc.command = args
++    aiProc.running = true
++  }
++
++  Process {
++    id: aiProc
++    stdout: StdioCollector {
++      waitForEnd: true
++      onStreamFinished: {
++        if (root.aiStatus !== "loading") return
++        var words = Model.parseGeminiSuggestions(text)
++        if (words.length > 0) {
++          var target = String(root.originalQuery || root.query || "").trim()
++          var cacheKey = (root.language || "en") + ":" + target.toLowerCase()
++          if (!root.aiCache) root.aiCache = ({})
++          root.aiCache[cacheKey] = words
++          root.aiSuggestions = words
++          root.suggestions = words
++          root.aiStatus = "ok"
++          root.aiError = ""
++        } else {
++          // If primary model failed (e.g. rate limit / empty parse), try fallback model once
++          if (!root.aiTriedFallback && root.fallbackModel !== root.effectiveModel) {
++            root.aiTriedFallback = true
++            root.runAiSuggest(true)
++          } else {
++            fallbackToLocalFuzzy()
++            root.aiStatus = "error"
++            root.aiError = "AI suggestions unavailable"
++          }
++        }
++      }
++    }
++    stderr: StdioCollector {
++      waitForEnd: true
++    }
++    onExited: function(exitCode) {
++      if (root.aiStatus !== "loading") return
++      if (!root.aiTriedFallback && root.fallbackModel !== root.effectiveModel) {
++        root.aiTriedFallback = true
++        root.runAiSuggest(true)
++      } else {
++        fallbackToLocalFuzzy()
++        root.aiStatus = "error"
++        root.aiError = exitCode === 28 ? "AI request timed out" : "AI suggestions unavailable"
++      }
+     }
+   }
+ 
+@@ -218,49 +409,18 @@ Panel {
+           root.variants = result.variants || 0
+           root.status = "ok"
+           root.statusMessage = ""
+-          // originalQuery stays put when isAutoMatched is true so the
+-          // result body can render "showing 'X' for 'Y'".
+         } else if (result && (result.kind === "notfound" || result.kind === "invalid" || result.kind === "empty")) {
+-          // Fuzzy recovery covers more than the explicit notfound body —
+-          // the Free Dictionary API has been observed returning HTTP 502
+-          // (Cloudflare error page) for typos instead of 404, which the
+-          // parser surfaces as `invalid`/`empty`. Trying fuzzy in those
+-          // cases saves a user round-trip. Genuine network failures fall
+-          // through to the error branch below.
+           root.entry = null
+           if (root.isAutoMatched) {
+-            // Recovery round tripped without finding a working word —
+-            // don't loop, just show the notfound state.
+-            root.originalQuery = ""
+             root.isAutoMatched = false
+             root.status = "notfound"
+-            root.statusMessage = "no definition found"
++            root.statusMessage = "no definition found for \"" + (root.originalQuery || root.query) + "\""
+             return
+           }
+           root.originalQuery = root.query
+-          var fuzzy = Model.fuzzyMatch(root.query)
+-          if (fuzzy && fuzzy.autoMatch) {
+-            // Rewrite the field to the candidate so the user can see what
+-            // we fetched, keep it marked "auto", and fetch it. The next
+-            // round will see isAutoMatched === true on any further 404.
+-            // programmaticEdit suppresses applyEdited's user-reset clauses
+-            // while the field is being updated by us, not the user.
+-            root.isAutoMatched = true
+-            root.programmaticEdit = true
+-            searchField.text = fuzzy.autoMatch
+-            root.query = fuzzy.autoMatch
+-            root.programmaticEdit = false
+-            root.runLookup()
+-            return
+-          }
+-          if (fuzzy && fuzzy.alternatives && fuzzy.alternatives.length > 0) {
+-            root.suggestions = fuzzy.alternatives
+-            root.status = "suggestions"
+-            root.statusMessage = "no definition found for \"" + root.originalQuery + "\""
+-          } else {
+-            root.status = "notfound"
+-            root.statusMessage = "no definition found for \"" + root.originalQuery + "\""
+-          }
++          root.status = "suggestions"
++          root.statusMessage = "no definition found for \"" + root.originalQuery + "\""
++          root.runAiSuggest(false)
+         } else {
+           root.entry = null
+           root.status = "error"
+@@ -274,11 +434,6 @@ Panel {
+     }
+     onExited: function(exitCode) {
+       if (root.status !== "loading") return
+-      // The not-found branch usually comes back via stdout (the API
+-      // returns a JSON error body on 404), and we already handled it.
+-      // This is the catch-all for the times we never get that body —
+-      // DNS, TLS, refused connection. Curl's HTTP 404 exit (22) lands
+-      // here with no parsed body, so surface it as a fetch error.
+       root.entry = null
+       root.status = "error"
+       root.statusMessage = "could not reach the dictionary service"
+@@ -370,6 +525,11 @@ Column {
+                   return (parts === "" ? "found" : parts) + suffix
+                 }
+                 if (root.status === "loading") return "looking up…"
++                if (root.status === "suggestions") {
++                  if (root.aiStatus === "loading") return "AI finding closest words…"
++                  if (root.aiStatus === "ok") return "AI spelling suggestions"
++                  return "did you mean"
++                }
+                 if (root.status === "notfound") return "no definition"
+                 if (root.status === "error") return "couldn't reach the API"
+                 return "look up a word"
+@@ -504,7 +664,12 @@ Column {
+                   enabled: String(searchField.text || "").trim() !== "" && root.status !== "loading"
+                   onClicked: {
+                     searchDebounce.stop()
+-                    root.runLookup()
++                    if (root.status === "suggestions" && root.closestWord !== "" &&
++                        String(searchField.text || "").trim() === (root.originalQuery || root.query)) {
++                      root.searchSuggestion(root.closestWord)
++                    } else {
++                      root.runLookup(false)
++                    }
+                   }
+                   foreground: root.contentForeground
+                 }
+@@ -525,16 +690,30 @@ Column {
+         }
+ 
+         Keys.onReturnPressed: function(event) {
++          if (root.status === "suggestions" && root.closestWord !== "" &&
++              String(searchField.text || "").trim() === (root.originalQuery || root.query)) {
++            searchDebounce.stop()
++            root.searchSuggestion(root.closestWord)
++            event.accepted = true
++            return
++          }
+           if (String(searchField.text || "").trim() !== "") {
+             searchDebounce.stop()
+-            root.runLookup()
++            root.runLookup(false)
+             event.accepted = true
+           }
+         }
+         Keys.onEnterPressed: function(event) {
++          if (root.status === "suggestions" && root.closestWord !== "" &&
++              String(searchField.text || "").trim() === (root.originalQuery || root.query)) {
++            searchDebounce.stop()
++            root.searchSuggestion(root.closestWord)
++            event.accepted = true
++            return
++          }
+           if (String(searchField.text || "").trim() !== "") {
+             searchDebounce.stop()
+-            root.runLookup()
++            root.runLookup(false)
+             event.accepted = true
+           }
+         }
+@@ -626,55 +805,214 @@ Column {
+               }
+             }
+ 
+-            // Suggestions from the local fuzzy match.
++            // Suggestions (AI-powered 5 closest words + robust local fallback)
+             Column {
++              id: suggestionsSection
+               width: parent.width
+               visible: root.status === "suggestions"
+-              spacing: Style.space(8)
++              spacing: Style.space(10)
+ 
+-              Text {
++              // Query status message
++              Column {
+                 width: parent.width
+-                text: "No definition for \"" + (root.originalQuery || root.query) + "\"."
+-                textFormat: Text.PlainText
+-                color: Qt.darker(root.contentForeground, 1.0)
+-                font.family: root.contentFontFamily
+-                font.pixelSize: Style.font.body
+-                wrapMode: Text.WordWrap
++                spacing: Style.space(2)
++
++                Text {
++                  width: parent.width
++                  text: "No definition for \"" + (root.originalQuery || root.query) + "\"."
++                  textFormat: Text.PlainText
++                  color: root.contentForeground
++                  font.family: root.contentFontFamily
++                  font.pixelSize: Style.font.body
++                  font.bold: true
++                  wrapMode: Text.WordWrap
++                }
++
++                Text {
++                  width: parent.width
++                  text: {
++                    if (root.aiStatus === "loading") return "✨ Finding closest words with AI…"
++                    if (root.aiStatus === "ok" && root.aiSuggestions.length > 0) return "AI found the 5 closest words for your query:"
++                    if (root.suggestions.length > 0) return "Did you mean:"
++                    return "No close matches found. Check your spelling or language."
++                  }
++                  textFormat: Text.PlainText
++                  color: Qt.darker(root.contentForeground, 1.4)
++                  font.family: root.contentFontFamily
++                  font.pixelSize: Style.font.caption
++                  wrapMode: Text.WordWrap
++                }
+               }
+ 
+-              Text {
++              // AI loading spinner / shimmer indicator
++              Row {
+                 width: parent.width
+-                text: "Did you mean:"
+-                color: Qt.darker(root.contentForeground, 1.4)
+-                font.family: root.contentFontFamily
+-                font.pixelSize: Style.font.caption
+-                font.bold: true
+-                font.letterSpacing: 1.0
++                visible: root.aiStatus === "loading"
++                spacing: Style.space(8)
++
++                Item {
++                  width: Style.space(18)
++                  height: Style.space(18)
++                  anchors.verticalCenter: parent.verticalCenter
++
++                  Text {
++                    anchors.centerIn: parent
++                    text: "✨"
++                    color: Color.accent
++                    font.family: root.contentFontFamily
++                    font.pixelSize: Style.font.body
++                    transformOrigin: Item.Center
++
++                    NumberAnimation on rotation {
++                      from: 0
++                      to: 360
++                      duration: 1200
++                      loops: Animation.Infinite
++                      running: root.aiStatus === "loading"
++                    }
++                  }
++                }
++
++                Text {
++                  text: "Asking AI for closest words…"
++                  textFormat: Text.PlainText
++                  color: Color.accent
++                  font.family: root.contentFontFamily
++                  font.pixelSize: Style.font.caption
++                  font.italic: true
++                  anchors.verticalCenter: parent.verticalCenter
++                }
+               }
+ 
+-              // Chip row — one clickable Button per candidate.
+-              Flow {
++              // Featured Closest Match Card (shown once closest word is determined)
++              Rectangle {
++                id: closestCard
+                 width: parent.width
+-                spacing: Style.space(6)
++                implicitHeight: Style.space(52)
++                radius: Style.cornerRadius
++                visible: root.closestWord !== ""
++                color: Style.selectedFillFor(root.contentForeground, Color.accent)
++                border.width: Style.spacing.hairline
++                border.color: Color.accent
+ 
+-                Repeater {
+-                  model: root.suggestions
++                MouseArea {
++                  anchors.fill: parent
++                  hoverEnabled: true
++                  cursorShape: Qt.PointingHandCursor
++                  onClicked: root.searchSuggestion(root.closestWord)
+ 
+-                  Button {
+-                    required property string modelData
+-                    text: modelData
+-                    foreground: root.contentForeground
+-                    onClicked: root.search(modelData)
++                  Row {
++                    anchors.fill: parent
++                    anchors.leftMargin: Style.space(12)
++                    anchors.rightMargin: Style.space(10)
++                    spacing: Style.space(10)
++
++                    Text {
++                      text: "✨"
++                      color: Color.accent
++                      font.family: root.contentFontFamily
++                      font.pixelSize: Style.font.title
++                      anchors.verticalCenter: parent.verticalCenter
++                    }
++
++                    Column {
++                      anchors.verticalCenter: parent.verticalCenter
++                      spacing: Style.space(1)
++                      width: parent.width - Style.space(120)
++
++                      Text {
++                        text: root.aiStatus === "ok" ? "✨ AI RECOMMENDED CLOSEST MATCH" : "CLOSEST MATCH"
++                        color: Color.accent
++                        font.family: root.contentFontFamily
++                        font.pixelSize: Style.font.caption
++                        font.bold: true
++                        font.letterSpacing: 1.2
++                      }
++
++                      Text {
++                        text: root.closestWord
++                        textFormat: Text.PlainText
++                        color: root.contentForeground
++                        font.family: root.contentFontFamily
++                        font.pixelSize: Style.font.body
++                        font.bold: true
++                        elide: Text.ElideRight
++                        width: parent.width
++                      }
++                    }
++
++                    Item {
++                      width: Style.space(4)
++                      height: 1
++                    }
++
++                    Button {
++                      text: "Look up →"
++                      foreground: Color.accent
++                      anchors.verticalCenter: parent.verticalCenter
++                      onClicked: root.searchSuggestion(root.closestWord)
++                    }
+                   }
+                 }
+               }
++
++              // Suggested words row (5 closest words as interactive chips)
++              Column {
++                width: parent.width
++                visible: (root.aiSuggestions.length > 0 || root.suggestions.length > 0)
++                spacing: Style.space(6)
++
++                Text {
++                  width: parent.width
++                  text: root.aiStatus === "ok" ? "✨ AI Top 5 closest words:" : "Suggestions:"
++                  color: Qt.darker(root.contentForeground, 1.4)
++                  font.family: root.contentFontFamily
++                  font.pixelSize: Style.font.caption
++                  font.bold: true
++                  font.letterSpacing: 1.0
++                }
++
++                Flow {
++                  width: parent.width
++                  spacing: Style.space(6)
++
++                  Repeater {
++                    model: root.aiSuggestions.length > 0 ? root.aiSuggestions : root.suggestions
++
++                    Button {
++                      required property string modelData
++                      required property int index
++                      text: (index + 1) + ". " + modelData
++                      foreground: index === 0 ? Color.accent : root.contentForeground
++                      onClicked: root.searchSuggestion(modelData)
++                    }
++                  }
++                }
++              }
++
++              // Footnote for status
++              Text {
++                width: parent.width
++                visible: root.aiStatus === "ok" || root.aiStatus === "missing-key" || root.aiStatus === "error"
++                text: {
++                  if (root.aiStatus === "ok") return "✨ AI spelling assistance powered by Gemini"
++                  if (root.aiStatus === "missing-key") return "💡 Tip: Configure GEMINI_API_KEY in ~/.config/omagent/config.json for AI-powered suggestions."
++                  return "💡 AI suggestions offline · showing local dictionary suggestions."
++                }
++                textFormat: Text.PlainText
++                color: root.aiStatus === "ok" ? Color.accent : Qt.darker(root.contentForeground, 1.6)
++                font.family: root.contentFontFamily
++                font.pixelSize: Style.font.caption
++                font.italic: true
++                wrapMode: Text.WordWrap
++              }
+             }
+ 
+-            // Not found (no fuzzy candidates).
++            // Not found (only visible when no suggestions exist at all)
+             Column {
+               width: parent.width
+               visible: root.status === "notfound"
+-              spacing: Style.space(4)
++              spacing: Style.space(8)
+ 
+               Text {
+                 width: parent.width
+@@ -929,70 +1267,6 @@ Column {
              }
            }
          }
@@ -73,3 +947,161 @@ index 84d7e3b..8afab1b 100644
        }
      }
    }
+diff --git c/README.md w/README.md
+index bed87a8..53bd598 100644
+--- c/README.md
++++ w/README.md
+@@ -7,8 +7,12 @@ on your system.
+ 
+ Click the bar icon to open a search field. Type a word and press Enter to
+ look it up. Use the language dropdown in the panel header to switch editions
+-between [supported languages](#supported-languages). When no match exists,
+-up to three similar words are suggested as clickable chips.
++between [supported languages](#supported-languages). When a word is misspelled
++or not found in the dictionary, the plugin supercharges spelling correction with
++AI (Gemini `gemini-3.5-flash-lite`, fast ~0.8s):
++- The **closest matching word** is prominently highlighted in a spotlight card with one-click lookup (or press Enter)
++- The **5 closest words** suggested by AI are displayed as clickable numbered chips
++- If offline or unconfigured, it gracefully falls back to local dictionary suggestions
+ 
+ ![Dictionary preview](preview.png)
+ 
+@@ -37,10 +41,18 @@ omarchy bar move tristonarmstrong.dictionary --section center --after omarchy.cl
+ - Click the bar icon to open the search panel
+ - Type a word and press Enter to look it up
+ - Use the language dropdown in the panel header to switch editions
+-- When no match exists, up to three similar words appear as chips you can
+-  click to retry
++- If you misspell a word, AI immediately finds the **5 closest words**:
++  - The top closest match is featured in a card — click "Look up →" or press Enter to search it instantly
++  - 5 closest candidate words are displayed as numbered interactive chips
++- If AI is unavailable or offline, local dictionary fuzzy matching seamlessly takes over as fallback
+ - Press Esc to close the panel
+ 
++> **AI setup:** The plugin automatically discovers your API key from either:
++> 1. `GEMINI_API_KEY` exported in your environment
++> 2. `~/.config/omagent/config.json` (`gemini_api_key`)
++>
++> If no key is set, the plugin gracefully falls back to local offline fuzzy matching without interruption.
++
+ ### Global selection hotkey
+ 
+ Bind `SUPER + D` in `~/.config/hypr/bindings.lua` to look up the highlighted
+@@ -91,8 +103,8 @@ qmllint -I "$OMARCHY_PATH/shell" \
+ bash tests/run.sh
+ ```
+ 
+-Runs three suites — QML lint checks (2), Model.js unit tests (240), and
+-the lookup-script tests (22) — 264 tests total. Model.js is parsed
++Runs four suites — QML lint checks (2), Model.js unit tests (257),
++lookup-script tests (22), and staged install tests (14) — 295 tests total. Model.js is parsed
+ in-process; the lookup script's pure functions are exercised in a
+ subprocess with stubbed `wl-paste` and `omarchy-shell` so the suite
+ needs no Wayland session or running shell.
+diff --git c/tests/model.test.js w/tests/model.test.js
+index 96f341b..b7e8463 100644
+--- c/tests/model.test.js
++++ w/tests/model.test.js
+@@ -35,7 +35,9 @@ var PUBLIC_SYMBOLS = [
+   "apiBase","lookupArgs","parseResponse","normalizeEntry","normalizeMeaning","normalizeDefinition","stringList",
+   "parseSections","stripInlineHeaders","WIKT_POS_KEYS","WIKT_SKIP_DROP",
+   "wiktCanonicalPos","wiktExtractIpa","wiktIsInflectionLine","wiktExtractDefs",
+-  "parseWiktionaryWikitext","summaryLabel","sourceLabel","levenshtein","fuzzyMatch","setWordlist"
++  "parseWiktionaryWikitext","summaryLabel","sourceLabel","levenshtein","fuzzyMatch","setWordlist",
++  "GEMINI_MODEL","GEMINI_FALLBACK_MODEL","GEMINI_ENDPOINT","AI_SUGGESTIONS_COUNT","geminiEndpoint",
++  "geminiSuggestPrompt","geminiSuggestArgs","parseGeminiSuggestions"
+ ];
+ var exportLines = PUBLIC_SYMBOLS.map(function (s) { return "exports." + s + " = " + s + ";"; }).join("\n");
+ 
+@@ -967,6 +969,91 @@ group("apiBase — edge cases", function () {
+   });
+ });
+ 
++// ═══════════════════════════════════════════════════════════════════════════
++// 22 — AI (Gemini) suggestions: prompt / argv / response parsing
++// ═══════════════════════════════════════════════════════════════════════════
++group("geminiSuggest", function () {
++  function geminiEnvelope(words) {
++    return JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(words) }] } }] });
++  }
++
++  test("GEMINI_MODEL is gemini-3.5-flash-lite", function () {
++    eq(M.GEMINI_MODEL, "gemini-3.5-flash-lite");
++  });
++  test("GEMINI_FALLBACK_MODEL is gemini-3.5-flash", function () {
++    eq(M.GEMINI_FALLBACK_MODEL, "gemini-3.5-flash");
++  });
++  test("endpoint targets gemini-3.5-flash-lite generateContent", function () {
++    assert(M.geminiEndpoint().indexOf("gemini-3.5-flash-lite:generateContent") > -1);
++  });
++  test("AI_SUGGESTIONS_COUNT is 5", function () { eq(M.AI_SUGGESTIONS_COUNT, 5); });
++  test("prompt mentions the misspelling and demands JSON-only array", function () {
++    var p = M.geminiSuggestPrompt("helllo");
++    assert(p.indexOf("helllo") > -1);
++    assert(p.toLowerCase().indexOf("json array") > -1);
++  });
++  test("prompt defaults language to English", function () {
++    assert(M.geminiSuggestPrompt("helllo").indexOf("English") > -1);
++  });
++  test("prompt carries the requested language label", function () {
++    assert(M.geminiSuggestPrompt("bonjur", "French").indexOf("French") > -1);
++  });
++  test("argv uses POST + JSON header, key via x-goog-api-key header", function () {
++    var a = M.geminiSuggestArgs("helllo", "KEY123");
++    assert(a[0] === "curl");
++    assert(a.indexOf("-X") > -1 && a.indexOf("POST") > -1);
++    var keyHdr = a.filter(function (x) { return String(x).indexOf("x-goog-api-key") > -1; });
++    eq(keyHdr.length, 1);
++    assert(keyHdr[0].indexOf("KEY123") > -1);
++    // Key must NOT leak into the URL element.
++    a.forEach(function (x) {
++      if (String(x).indexOf("generativelanguage") > -1) assert(x.indexOf("KEY123") === -1);
++    });
++  });
++  test("argv body embeds the prompt text", function () {
++    var a = M.geminiSuggestArgs("helllo", "KEY123");
++    var body = a[a.indexOf("-d") + 1];
++    assert(body.indexOf("helllo") > -1);
++  });
++  test("parses a clean 5-word envelope", function () {
++    deepEq(M.parseGeminiSuggestions(geminiEnvelope(["hello", "hell", "hallo", "hollow", "hilly"])),
++      ["hello", "hell", "hallo", "hollow", "hilly"]);
++  });
++  test("strips markdown fences", function () {
++    var env = JSON.stringify({ candidates: [{ content: { parts: [{ text: "```json\n[\"hello\", \"hell\"]\n```" }] } }] });
++    deepEq(M.parseGeminiSuggestions(env), ["hello", "hell"]);
++  });
++  test("lowercases, dedupes, caps at 5", function () {
++    deepEq(M.parseGeminiSuggestions(geminiEnvelope(["Hello", "hello", "HELL", "hell", "hallo", "hollow", "hilly", "hollo"])),
++      ["hello", "hell", "hallo", "hollow", "hilly"]);
++  });
++  test("drops junk entries (numbers, empty, symbols)", function () {
++    deepEq(M.parseGeminiSuggestions(geminiEnvelope(["hello", "123", "", "!!!", "world"])), ["hello", "world"]);
++  });
++  test("handles trailing commas in JSON array", function () {
++    var env = JSON.stringify({ candidates: [{ content: { parts: [{ text: "[\"apple\", \"apply\", \"ample\",]" }] } }] });
++    deepEq(M.parseGeminiSuggestions(env), ["apple", "apply", "ample"]);
++  });
++  test("extracts JSON array from conversational text preamble and footer", function () {
++    var env = JSON.stringify({ candidates: [{ content: { parts: [{ text: "Here are the closest words:\n[\"receive\", \"recipe\", \"receipt\"]\nHope this helps!" }] } }] });
++    deepEq(M.parseGeminiSuggestions(env), ["receive", "recipe", "receipt"]);
++  });
++  test("supports international and accented words", function () {
++    var env = JSON.stringify({ candidates: [{ content: { parts: [{ text: "[\"café\", \"déjà\", \"fête\", \"crème\", \"naïve\"]" }] } }] });
++    deepEq(M.parseGeminiSuggestions(env), ["café", "déjà", "fête", "crème", "naïve"]);
++  });
++  test("supports custom fast model in geminiSuggestArgs", function () {
++    var a = M.geminiSuggestArgs("test", "KEY", "English", "gemini-3.8-flash");
++    assert(a.some(function(x) { return String(x).indexOf("gemini-3.8-flash") > -1; }));
++  });
++  test("garbage / error shapes return []", function () {
++    deepEq(M.parseGeminiSuggestions("not json"), []);
++    deepEq(M.parseGeminiSuggestions(JSON.stringify({ error: { message: "bad key" } })), []);
++    deepEq(M.parseGeminiSuggestions(JSON.stringify({ candidates: [] })), []);
++    deepEq(M.parseGeminiSuggestions(JSON.stringify({ candidates: [{ content: { parts: [{ text: "just prose" }] } }] })), []);
++  });
++});
++
+ // ═══════════════════════════════════════════════════════════════════════════
+ // Run
+ // ═══════════════════════════════════════════════════════════════════════════

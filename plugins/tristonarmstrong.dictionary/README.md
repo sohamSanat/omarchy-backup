@@ -7,8 +7,12 @@ on your system.
 
 Click the bar icon to open a search field. Type a word and press Enter to
 look it up. Use the language dropdown in the panel header to switch editions
-between [supported languages](#supported-languages). When no match exists,
-up to three similar words are suggested as clickable chips.
+between [supported languages](#supported-languages). When a word is misspelled
+or not found in the dictionary, the plugin supercharges spelling correction with
+AI (Gemini `gemini-3.5-flash-lite`, fast ~0.8s):
+- The **closest matching word** is prominently highlighted in a spotlight card with one-click lookup (or press Enter)
+- The **5 closest words** suggested by AI are displayed as clickable numbered chips
+- If offline or unconfigured, it gracefully falls back to local dictionary suggestions
 
 ![Dictionary preview](preview.png)
 
@@ -37,9 +41,17 @@ omarchy bar move tristonarmstrong.dictionary --section center --after omarchy.cl
 - Click the bar icon to open the search panel
 - Type a word and press Enter to look it up
 - Use the language dropdown in the panel header to switch editions
-- When no match exists, up to three similar words appear as chips you can
-  click to retry
+- If you misspell a word, AI immediately finds the **5 closest words**:
+  - The top closest match is featured in a card — click "Look up →" or press Enter to search it instantly
+  - 5 closest candidate words are displayed as numbered interactive chips
+- If AI is unavailable or offline, local dictionary fuzzy matching seamlessly takes over as fallback
 - Press Esc to close the panel
+
+> **AI setup:** The plugin automatically discovers your API key from either:
+> 1. `GEMINI_API_KEY` exported in your environment
+> 2. `~/.config/omagent/config.json` (`gemini_api_key`)
+>
+> If no key is set, the plugin gracefully falls back to local offline fuzzy matching without interruption.
 
 ### Global selection hotkey
 
@@ -91,8 +103,8 @@ qmllint -I "$OMARCHY_PATH/shell" \
 bash tests/run.sh
 ```
 
-Runs three suites — QML lint checks (2), Model.js unit tests (240), and
-the lookup-script tests (22) — 264 tests total. Model.js is parsed
+Runs four suites — QML lint checks (2), Model.js unit tests (257),
+lookup-script tests (22), and staged install tests (14) — 295 tests total. Model.js is parsed
 in-process; the lookup script's pure functions are exercised in a
 subprocess with stubbed `wl-paste` and `omarchy-shell` so the suite
 needs no Wayland session or running shell.

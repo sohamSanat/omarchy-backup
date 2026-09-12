@@ -249,6 +249,7 @@ This repository contains the full snapshot of user customizations:
    - **`plugins/tristonarmstrong.dictionary`**:
      - Floating bar dictionary widget with pronunciation, part-of-speech tabs, audio playback, word search, and history.
      - Includes `bin/omarchy-dictionary-lookup`, bound globally to `SUPER + D` in `configs/hypr/bindings.lua` to look up selected text instantly.
+     - Supercharged with Gemini AI spelling suggestions: automatically discovers API key from `GEMINI_API_KEY` or `~/.config/omagent/config.json`, suggests the 5 closest real dictionary words for misspellings, features the top closest match card with one-click lookup, and falls back to Damerau-Levenshtein local fuzzy matching if offline.
    - **`plugins/bhanu.omavideos`**:
      - Video and media management plugin for the floating bar.
    - **`plugins/charlieras262.floating-bar`**:
