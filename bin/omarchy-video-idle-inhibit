@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Omarchy Video & Media Idle Inhibitor and Lock-on-Screensaver Guard.
-1. Prevents screensaver and idle lock while watching videos or listening to media,
-   using Wayland idle-inhibit protocol without modifying persistent Omarchy settings.
+Omarchy Idle Inhibitor & Lock-on-Screensaver Guard.
+1. Prevents screensaver and idle lock while watching videos, listening to media,
+   or whenever Herdr is on the currently active workspace, using the Wayland
+   idle-inhibit protocol without modifying persistent Omarchy settings.
 2. Ensures that whenever the animated screensaver is dismissed or closed by any means,
    the system immediately locks and prompts for password / fingerprint authentication.
 """
@@ -61,6 +62,9 @@ class MediaIdleInhibitor:
         self.grace_seconds = 6.0
         self.screensaver_windows = set()
 
+        self._last_herdr_check = 0.0
+        self._cached_herdr_state = False
+
         # Clean up any stale files from previous broken versions
         for path in [
             os.path.join(HOME, ".local/state/omarchy/indicators/stay-awake"),
@@ -84,7 +88,7 @@ class MediaIdleInhibitor:
 
     # ------------------ Hyprland Socket2 Watcher ------------------
     def hyprland_socket_thread(self):
-        """Watches Hyprland socket2 to ensure any screensaver window close triggers a system lock."""
+        """Watches Hyprland socket2 for screensaver windows, workspace changes, and window lifecycle."""
         runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
 
         while self.running:
@@ -125,6 +129,9 @@ class MediaIdleInhibitor:
                     if not self.running:
                         break
                     line = line.strip()
+                    if not line:
+                        continue
+
                     if line.startswith("openwindow>>"):
                         # format: address,workspace,class,title
                         parts = line[12:].split(",", 3)
@@ -133,6 +140,7 @@ class MediaIdleInhibitor:
                             with self.lock:
                                 self.screensaver_windows.add(addr)
                             log(f"Screensaver window active: {addr}")
+                        self.check_and_update()
                     elif line.startswith("closewindow>>"):
                         addr = line[13:].strip()
                         was_screensaver = False
@@ -152,8 +160,21 @@ class MediaIdleInhibitor:
                                 subprocess.run(["omarchy-shell", "lock", "wake"], timeout=1)
                             except Exception:
                                 subprocess.run(["omarchy-system-lock"], timeout=2)
+                        self.check_and_update()
+                    elif (
+                        line.startswith("workspace>>")
+                        or line.startswith("workspacev2>>")
+                        or line.startswith("focusedmon>>")
+                        or line.startswith("movewindow>>")
+                        or line.startswith("movewindowv2>>")
+                        or line.startswith("activewindow>>")
+                        or line.startswith("activewindowv2>>")
+                        or line.startswith("windowtitle>>")
+                        or line.startswith("windowtitlev2>>")
+                    ):
+                        self.check_and_update()
                 s.close()
-            except Exception as e:
+            except Exception:
                 time.sleep(2)
 
     # ------------------ Media / Video Audio Checks ------------------
@@ -209,7 +230,115 @@ class MediaIdleInhibitor:
     def is_media_active(self) -> bool:
         return self.is_audio_playing() or self.is_mpris_playing()
 
-    def enable_inhibit(self):
+    # ------------------ Herdr Workspace Check ------------------
+    def is_herdr_on_active_workspace(self) -> bool:
+        """Returns True if any window running Herdr is on the currently active workspace of any monitor."""
+        now = time.time()
+        with self.lock:
+            if now - self._last_herdr_check < 0.25:
+                return self._cached_herdr_state
+
+        state = self._check_herdr_active_workspace_uncached()
+        with self.lock:
+            self._last_herdr_check = now
+            self._cached_herdr_state = state
+        return state
+
+    def _check_herdr_active_workspace_uncached(self) -> bool:
+        try:
+            # 1. Active workspaces across all monitors
+            res_mon = subprocess.run(["hyprctl", "monitors", "-j"], capture_output=True, text=True, timeout=1.5)
+            if res_mon.returncode != 0:
+                return False
+            monitors = json.loads(res_mon.stdout)
+            active_ws_ids = set()
+            active_ws_names = set()
+            for m in monitors:
+                ws = m.get("activeWorkspace", {})
+                if ws.get("id") is not None:
+                    active_ws_ids.add(ws["id"])
+                if ws.get("name"):
+                    active_ws_names.add(ws["name"])
+                sp = m.get("specialWorkspace", {})
+                if sp.get("id") and sp["id"] != 0:
+                    active_ws_ids.add(sp["id"])
+                if sp.get("name"):
+                    active_ws_names.add(sp["name"])
+
+            if not active_ws_ids and not active_ws_names:
+                return False
+
+            # 2. Collect running herdr client PIDs (excluding the server daemon)
+            herdr_client_pids = set()
+            try:
+                pg = subprocess.run(["pgrep", "-x", "herdr"], capture_output=True, text=True, timeout=1.0)
+                if pg.returncode == 0:
+                    for line in pg.stdout.splitlines():
+                        line = line.strip()
+                        if line:
+                            pid = int(line)
+                            try:
+                                with open(f"/proc/{pid}/cmdline", "rb") as cf:
+                                    cmd = cf.read().decode("utf-8", errors="ignore")
+                                    if "server" not in cmd:
+                                        herdr_client_pids.add(pid)
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+
+            # 3. Inspect Hyprland clients
+            res_cli = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=1.5)
+            if res_cli.returncode != 0:
+                return False
+            clients = json.loads(res_cli.stdout)
+
+            hostname = socket.gethostname().lower()
+
+            for c in clients:
+                ws = c.get("workspace", {})
+                ws_id = ws.get("id")
+                ws_name = ws.get("name")
+                if ws_id not in active_ws_ids and ws_name not in active_ws_names:
+                    continue
+
+                title = (c.get("title") or "").lower()
+                initial_title = (c.get("initialTitle") or "").lower()
+                cls = (c.get("class") or "").lower()
+                initial_cls = (c.get("initialClass") or "").lower()
+
+                # Check 1: Title or class matches herdr
+                if "herdr" in title or "herdr" in initial_title or "herdr" in cls or "herdr" in initial_cls:
+                    return True
+
+                # Check 2: Title format from herdr config "{hostname}: {workspace}"
+                if title.startswith(f"{hostname}:") or initial_title.startswith(f"{hostname}:"):
+                    return True
+
+                # Check 3: Process ancestry - is a running herdr client inside this window?
+                win_pid = c.get("pid")
+                if win_pid and herdr_client_pids:
+                    for h_pid in herdr_client_pids:
+                        if h_pid == win_pid:
+                            return True
+                        curr = h_pid
+                        while curr > 1:
+                            try:
+                                with open(f"/proc/{curr}/stat", "r") as sf:
+                                    ppid = int(sf.read().split()[3])
+                                    if ppid == win_pid:
+                                        return True
+                                    if ppid <= 1 or ppid == curr:
+                                        break
+                                    curr = ppid
+                            except Exception:
+                                break
+        except Exception:
+            pass
+        return False
+
+    # ------------------ Inhibit Management ------------------
+    def enable_inhibit(self, reason: str = "Active"):
         with self.lock:
             if self.grace_timer:
                 self.grace_timer.cancel()
@@ -225,7 +354,7 @@ class MediaIdleInhibitor:
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL
                     )
-                    log(">>> INHIBIT ACTIVE: Media playback detected (Wayland idle inhibited)")
+                    log(f">>> INHIBIT ACTIVE: {reason} (Wayland idle inhibited)")
                 except Exception as e:
                     log(f"Failed to spawn {INHIBIT_BIN}: {e}")
 
@@ -242,7 +371,7 @@ class MediaIdleInhibitor:
     def _apply_release(self):
         with self.lock:
             self.grace_timer = None
-            if self.is_media_active():
+            if self.is_media_active() or self.is_herdr_on_active_workspace():
                 return
 
             if self.inhibit_proc and self.inhibit_proc.poll() is None:
@@ -252,16 +381,24 @@ class MediaIdleInhibitor:
                 except subprocess.TimeoutExpired:
                     self.inhibit_proc.kill()
                 self.inhibit_proc = None
-                log("<<< INHIBIT RELEASED: Media playback stopped (normal idle timers restored)")
+                log("<<< INHIBIT RELEASED: Neither media nor Herdr active on current workspace (normal idle timers restored)")
 
     def check_and_update(self):
-        if self.is_media_active():
-            self.enable_inhibit()
+        media_active = self.is_media_active()
+        herdr_active = self.is_herdr_on_active_workspace()
+
+        if media_active or herdr_active:
+            reasons = []
+            if herdr_active:
+                reasons.append("Herdr pane on current workspace")
+            if media_active:
+                reasons.append("Media playback active")
+            self.enable_inhibit(", ".join(reasons))
         else:
             self.disable_inhibit()
 
     def run(self):
-        log("Omarchy Video & Media Idle Inhibitor and Lock Guard running.")
+        log("Omarchy Idle Inhibitor and Lock Guard running.")
         self.check_and_update()
 
         # Start background Hyprland socket thread for screensaver window monitoring

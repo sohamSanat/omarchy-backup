@@ -272,13 +272,15 @@ This repository contains the full snapshot of user customizations:
 
 22. **Omagent Quota-Aware Failover Engine & Fleet Conductor**:
    - **`plugins/io.github.ellion369.omagent/`**:
-     - `omagent-route`: High-performance router with Grill-Me Strategic Alignment engine, bifurcated UI routing (Track A reference image vs Track B archetype menu), model switch/handoff, and 2x2 Herdr subagent swarm dispatch.
+     - `omagent-route`: High-performance router with **Supreme Prompt Primacy Law** (zero "Reference Image Hijacking" — user prompt is 100% sacred truth for domain, features, and copy), **Dynamic LLM & Algorithmic Grill-Me Strategic Alignment engine**, bifurcated UI routing (Track A reference image -> Set 4 Impeccable vs Track B archetype menu), model switch/handoff, and 2x2 Herdr subagent swarm dispatch.
      - `Omagent.qml`: Blurred glass HUD with interactive Grill-Me cards, reference image drop-in, model switch controls, and Set 4 badge.
      - `harness_pool.py` & `model_pool.json`: Quota gating via `quota-axi`, probe verification, failover ladder (`opencode/big-pickle`), and runtime watchdog.
-     - `ARCHITECTURE_UI_UX.md`: Canonical system specification for UI/UX agentic architecture, reference deconstruction, and adversarial review.
+     - `ARCHITECTURE_UI_UX.md`: Canonical system specification for UI/UX agentic architecture, prompt primacy, reference deconstruction, and adversarial review.
    - **`bin/firstmate-subagent` & `bin/firstmate`**:
      - Subagent fleet conductor allowing parallel crewmates to be spawned into clean 2x2 Herdr tiling grids (`firstmate subagent spawn/prompt/list/skills/close`).
-     - Equips all subagents with on-demand autonomy to invoke any of the 33 Compound Engineering skills (`firstmate skills`, `firstmate skill-read`).
+     - Equips all subagents with on-demand autonomy to invoke any of the 33 Compound Engineering skills (`firstmate skills`, `firstmate skill-read`) and automatically provisions workspace trust in `~/.gemini/antigravity-cli/settings.json`.
+   - **`bin/agy`**:
+     - Antigravity CLI Autonomous Folder-Trust Wrapper that intercepts `agy` calls, automatically pre-authorizes current directory and project workspaces with `always-proceed` tool permissions in `~/.gemini/antigravity-cli/settings.json`, and delegates to `agy-real`.
    - **`bin/omagent-screenshot`**:
      - Headless browser/UI verification utility supporting `--mobile` (375px) and `--tablet` (1024px) for automated visual QA.
    - **`bin/omarchy-voxtype-hook`**:
@@ -286,7 +288,7 @@ This repository contains the full snapshot of user customizations:
    - **`agents/rules/`**:
      - `omagent.md`: Durable rules governing Omagent's anti-one-shot 5-phase lifecycle and multi-agent fleet permissions.
      - `ui-sets.md`: The 4 UI Skill Sets and non-negotiable header layout laws (`white-space: nowrap !important;`).
-     - `ui-ux-architecture.md`: Comprehensive UI/UX agentic architecture rules.
+     - `ui-ux-architecture.md`: Comprehensive UI/UX agentic architecture rules with Supreme Prompt Primacy Law and dynamic Grill-Me session specs.
    - **`agents/learnings/ui_ux_agentic_architecture.md`**:
      - Permanent learning documenting bifurcated UI routing, Grill-Me alignment, and 2x2 subagent swarms.
 
@@ -304,6 +306,8 @@ This repository contains the full snapshot of user customizations:
      - Custom system lock plugin with `LockView.qml` and `Service.qml`.
    - **`plugins/ricardosuman.pretty-screenshot/` & `bin/omarchy-pretty-screenshot`**:
      - Beautiful wallpaper-framed screenshots bound to `Print` in `configs/hypr/bindings.lua`.
+   - **`bin/omarchy-video-idle-inhibit`**:
+     - Daemon preventing idle/screensaver lock during media playback and whenever an active Herdr agent swarm workspace is in focus, with screensaver lock-guard.
    - **`bin/cmf-buds-mode`**:
      - ANC mode switcher for Nothing CMF Buds.
    - **`bin/voxtype-dictate-toggle`**:

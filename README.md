@@ -25,11 +25,14 @@ Branch: `main`
 - **Uncapped Multi-Agent Fleet Orchestration (`firstmate-subagent`)**:
   - Directs parallel specialist crewmates across 2x2 Herdr tiling panes (`firstmate subagent spawn/prompt/list/close`) bound to Compound Engineering skill workflows.
   - Grants every subagent on-demand autonomy to invoke any of the 33 Compound Engineering skills (`firstmate skills`, `firstmate skill-read`).
-- **Interactive Grill-Me Strategic Alignment Protocol (`omagent-route`)**:
-  - Multi-round design alignment before code generation: Clarifies reference essence, kinetic physics, header layout laws, atmospheric depth, typography, and contrast rhythms.
-  - Interactive QML cards with inline selection or one-click `proceed` to launch autonomous swarms.
+- **Supreme Prompt Primacy Law & Anti-Hijacking Protection**:
+  - Eliminates "Reference Image Hijacking": the user's master prompt defines 100% of product domain, entity name, hero copy, navigation items, and features.
+  - Reference images act strictly as aesthetic style donors (chromatic chords, lighting, squircle radii, frosted glass, typography tension). Literal cloning of depicted companies or industries is strictly forbidden.
+- **Dynamic LLM & Algorithmic Grill-Me Strategic Alignment Protocol (`omagent-route`)**:
+  - Contextual 6-question design alignment before code generation: Clarifies reference essence, kinetic physics, header layout laws, atmospheric depth, typography, and contrast rhythms.
+  - Features dynamic LLM question generation (`call_llm_dynamic_grill_questions`) with deterministic algorithmic fallback, plus interactive QML cards with inline selection and one-click `proceed` support.
 - **Bifurcated UI Routing & Visual Reference Image Deconstruction**:
-  - **Track A (Reference Image Provided)**: Automatically locks to **Set 4 (Impeccable)**, completely bypassing archetype choices to prevent style collision; runs geometric and chromatic deconstruction and persists analysis to `solutions/reference_design_language.md`.
+  - **Track A (Reference Image Provided)**: Automatically locks to **Set 4 (Impeccable)**, completely bypassing archetype choices to prevent style collision; runs geometric and chromatic deconstruction and persists analysis to `solutions/reference_design_language.md` with prompt-primacy headers.
   - **Track B (No Reference Image)**: Interactive UI Archetype Menu (Sets 1, 2, or 3).
 - **4 Exclusive UI Design Skill Sets (80 Total Skills in `agents/skills/`)**:
   - **Set 1: Full Aesthetic** (Linear, Stripe Press, Braun minimalism, Swiss typography, Emil Kowalski spring animations).
@@ -71,8 +74,10 @@ Branch: `main`
 - **Chromium Wayland Flags (`configs/chromium-flags.conf`)**: Ozone Wayland flags, password store integration, and smooth touchpad history navigation.
 
 ### 5. 🛠️ Utilities & System Services
-- **`firstmate-subagent`**: Multi-agent fleet conductor managing parallel crewmates across Herdr panes (`spawn`, `prompt`, `list`, `skills`, `close`).
+- **`agy`**: Antigravity CLI Autonomous Folder-Trust Wrapper (`bin/agy`) that pre-registers workspaces and ensures `always-proceed` permissions in `~/.gemini/antigravity-cli/settings.json` to prevent interactive permission prompts during autonomous coding runs.
+- **`firstmate-subagent`**: Multi-agent fleet conductor managing parallel crewmates across Herdr panes (`spawn`, `prompt`, `list`, `skills`, `close`) with automatic workspace trust provisioning.
 - **`omagent-screenshot`**: Headless browser screenshot tool (`--mobile`, `--tablet`) for automated visual layout validation.
+- **`omarchy-video-idle-inhibit`**: Daemon preventing idle/screensaver lock during media playback and whenever an active Herdr agent swarm workspace is in focus, with screensaver lock-guard.
 - **`omarchy-pretty-screenshot` (`Print`)**: Beautiful window/desktop screenshot tool with wallpaper and gradient frames (`plugins/ricardosuman.pretty-screenshot`).
 - **`voxtype-dictate-toggle` (`Super + H`, `Ctrl + H`)**: Toggle microphone recording and transcription for Voxtype.
 - **`cmf-buds-mode`**: CLI utility controlling Active Noise Cancellation modes for Nothing CMF Buds.

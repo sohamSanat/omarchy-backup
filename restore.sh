@@ -451,6 +451,14 @@ fi
 
 echo ""
 echo "==> Step 8: Restoring custom scripts and binaries to ~/.local/bin..."
+# Preserve existing Antigravity ELF binary as agy-real if agy wrapper is being installed
+if [[ -f "${USER_HOME}/.local/bin/agy" && ! -f "${USER_HOME}/.local/bin/agy-real" ]]; then
+  if file "${USER_HOME}/.local/bin/agy" 2>/dev/null | grep -q "ELF"; then
+    mv "${USER_HOME}/.local/bin/agy" "${USER_HOME}/.local/bin/agy-real"
+    echo "  [OK] Preserved Antigravity ELF binary as ~/.local/bin/agy-real"
+  fi
+fi
+
 for script_path in "${SCRIPT_DIR}/bin"/*; do
   if [[ -f "$script_path" ]]; then
     script_name="$(basename "$script_path")"

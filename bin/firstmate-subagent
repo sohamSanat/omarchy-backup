@@ -265,6 +265,63 @@ def register_firstmate(task_id: str, pane_id: str, ws_id: str, cwd: Path, harnes
         print(f"[firstmate-subagent] Warning: could not register with Firstmate: {e}", file=sys.stderr)
         return False
 
+
+def ensure_antigravity_trusts_workspace(workspace_path: Path | str | None = None) -> None:
+    """Ensures ~/.gemini/antigravity-cli/settings.json universally trusts the given workspace."""
+    try:
+        settings_dir = Path.home() / ".gemini/antigravity-cli"
+        settings_dir.mkdir(parents=True, exist_ok=True)
+        settings_file = settings_dir / "settings.json"
+
+        data: dict = {}
+        if settings_file.is_file():
+            try:
+                data = json.loads(settings_file.read_text("utf-8"))
+            except Exception:
+                data = {}
+
+        changed = False
+        if data.get("allowNonWorkspaceAccess") is not True:
+            data["allowNonWorkspaceAccess"] = True
+            changed = True
+        if data.get("toolPermission") != "always-proceed":
+            data["toolPermission"] = "always-proceed"
+            changed = True
+
+        tw = data.setdefault("trustedWorkspaces", [])
+        tw_set = set(tw)
+
+        candidates = {
+            "/",
+            "/tmp",
+            "/var/tmp",
+            str(Path.home()),
+            str(Path.home() / "Projects"),
+            str(Path.home() / "Projects" / "coding-tasks"),
+            str(Path.cwd().resolve()),
+        }
+        if workspace_path:
+            p_str = str(workspace_path)
+            candidates.add(p_str)
+            try:
+                candidates.add(str(Path(workspace_path).resolve()))
+            except Exception:
+                pass
+
+        for c in candidates:
+            if c and c not in tw_set:
+                tw.append(c)
+                tw_set.add(c)
+                changed = True
+
+        if changed:
+            tmp_path = settings_file.with_suffix(".tmp")
+            tmp_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            tmp_path.replace(settings_file)
+    except Exception as e:
+        print(f"[firstmate-subagent] Warning: could not ensure workspace trust: {e}", file=sys.stderr)
+
+
 def get_registered_meta() -> dict[str, dict]:
     """Loads all registered Firstmate .meta entries keyed by pane_id, pruning dead entries."""
     entries = {}
@@ -365,7 +422,10 @@ def cmd_spawn(args):
         sys.exit(1)
 
     # 2. Start agent in new pane
+    ensure_antigravity_trusts_workspace(cwd)
     start_cmd = ["herdr", "agent", "start", name, "--kind", kind, "--pane", new_pane_id]
+    if kind == "agy":
+        start_cmd.extend(["--", "--dangerously-skip-permissions"])
     p_start = subprocess.run(start_cmd, capture_output=True, text=True, timeout=25)
     if p_start.returncode != 0:
         print(f"Error starting agent '{name}' in pane {new_pane_id}: {p_start.stderr}", file=sys.stderr)

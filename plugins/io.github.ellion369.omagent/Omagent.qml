@@ -1423,6 +1423,22 @@ Item {
                   }
                 }
 
+                if ((event.modifiers & Qt.ShiftModifier) || (event.modifiers & Qt.ControlModifier)) {
+                  if (event.key === Qt.Key_Up) {
+                    root.followTail = false
+                    list.contentY = Math.max(0, list.contentY - 150)
+                    event.accepted = true
+                    return
+                  } else if (event.key === Qt.Key_Down) {
+                    var maxScrollY = Math.max(0, list.contentHeight - list.height)
+                    var targetScrollY = Math.min(maxScrollY, list.contentY + 150)
+                    list.contentY = targetScrollY
+                    root.followTail = (targetScrollY >= maxScrollY - 10)
+                    event.accepted = true
+                    return
+                  }
+                }
+
                 if (event.key === Qt.Key_PageUp) {
                   root.followTail = false
                   list.contentY = Math.max(0, list.contentY - list.height * 0.8)
@@ -2524,10 +2540,46 @@ Item {
           contentWidth: width
           contentHeight: rows.height
           boundsBehavior: Flickable.StopAtBounds
+          flickDeceleration: 3500
+          maximumFlickVelocity: 8000
 
           onMovementEnded: root.followTail = list.atYEnd
+          onFlickEnded: root.followTail = list.atYEnd
           onContentHeightChanged: if (root.followTail) root.scrollToEnd()
           onHeightChanged: if (root.followTail) root.scrollToEnd()
+
+          Timer {
+            id: wheelActiveTimer
+            interval: 650
+            repeat: false
+          }
+
+          WheelHandler {
+            id: listWheel
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: function(event) {
+              list.cancelFlick()
+              wheelActiveTimer.restart()
+              var delta = 0
+              if (event.pixelDelta.y !== 0) {
+                // High-precision touchpad: 2.8x accelerated glide
+                delta = event.pixelDelta.y * 2.8
+              } else if (event.angleDelta.y !== 0) {
+                // Discrete mouse wheel tick: 1.25x multiplier gives 150px per notch (~6-7 lines)
+                delta = event.angleDelta.y * 1.25
+              }
+
+              if (delta === 0) return
+
+              var maxY = Math.max(0, list.contentHeight - list.height)
+              var newY = Math.max(0, Math.min(maxY, list.contentY - delta))
+              list.contentY = newY
+
+              // Unlock followTail when scrolled up; re-lock when scrolled back to bottom
+              root.followTail = (newY >= maxY - 10)
+              event.accepted = true
+            }
+          }
 
           Column {
             id: rows
@@ -2810,21 +2862,52 @@ Item {
           }
         }
 
-        Rectangle {
-          readonly property real scrollable: list.contentHeight - list.height
-
+        Item {
+          id: scrollTrack
+          anchors.top: list.top
+          anchors.bottom: list.bottom
           anchors.right: list.right
-          visible: scrollable > 1
-          width: Math.max(2, Style.space(2))
-          radius: width / 2
-          height: Math.max(Style.space(18), list.height * (list.height / list.contentHeight))
-          y: list.y + (list.height - height)
-            * Math.min(1, Math.max(0, list.contentY / Math.max(1, scrollable)))
-          color: Color.menu.text
-          opacity: list.moving ? 0.4 : 0.16
+          width: Style.space(14)
+          visible: list.contentHeight > list.height
 
-          Behavior on opacity {
-            NumberAnimation { duration: 200 }
+          MouseArea {
+            id: scrollTrackArea
+            anchors.fill: parent
+            hoverEnabled: true
+
+            onPositionChanged: function(mouse) {
+              if (pressed) {
+                var ratio = Math.max(0, Math.min(1, (mouse.y - scrollThumb.height / 2) / Math.max(1, height - scrollThumb.height)))
+                var maxY = Math.max(0, list.contentHeight - list.height)
+                var newY = ratio * maxY
+                list.contentY = newY
+                root.followTail = (newY >= maxY - 10)
+              }
+            }
+            onPressed: function(mouse) {
+              var ratio = Math.max(0, Math.min(1, (mouse.y - scrollThumb.height / 2) / Math.max(1, height - scrollThumb.height)))
+              var maxY = Math.max(0, list.contentHeight - list.height)
+              var newY = ratio * maxY
+              list.contentY = newY
+              root.followTail = (newY >= maxY - 10)
+            }
+          }
+
+          Rectangle {
+            id: scrollThumb
+            readonly property real scrollable: list.contentHeight - list.height
+
+            anchors.right: parent.right
+            width: (scrollTrackArea.containsMouse || scrollTrackArea.pressed) ? Math.max(4, Style.space(4)) : Math.max(2.5, Style.space(2.5))
+            radius: width / 2
+            height: Math.max(Style.space(24), list.height * (list.height / list.contentHeight))
+            y: (list.height - height) * Math.min(1, Math.max(0, list.contentY / Math.max(1, scrollable)))
+            color: (scrollTrackArea.containsMouse || scrollTrackArea.pressed) ? Color.accent : Color.menu.text
+            opacity: scrollTrackArea.pressed ? 0.9 : (scrollTrackArea.containsMouse ? 0.75 : (list.moving || wheelActiveTimer.running ? 0.65 : 0.22))
+
+            Behavior on width { NumberAnimation { duration: 100 } }
+            Behavior on opacity { NumberAnimation { duration: 150 } }
+            Behavior on color { ColorAnimation { duration: 100 } }
           }
         }
 
@@ -2997,6 +3080,25 @@ Item {
           model: filteredHistoryModel
           spacing: Style.space(6)
           boundsBehavior: Flickable.StopAtBounds
+          flickDeceleration: 3500
+          maximumFlickVelocity: 8000
+
+          WheelHandler {
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: function(event) {
+              historyList.cancelFlick()
+              var delta = 0
+              if (event.pixelDelta.y !== 0) {
+                delta = event.pixelDelta.y * 2.8
+              } else if (event.angleDelta.y !== 0) {
+                delta = event.angleDelta.y * 1.25
+              }
+              if (delta === 0) return
+              var maxY = Math.max(0, historyList.contentHeight - historyList.height)
+              historyList.contentY = Math.max(0, Math.min(maxY, historyList.contentY - delta))
+              event.accepted = true
+            }
+          }
 
           currentIndex: root.historySelectedIndex
           onCurrentIndexChanged: {
