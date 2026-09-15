@@ -14,7 +14,7 @@
           "id": "mryll.meteobar"
         },
         {
-          "id": "kenny.nightlight"
+          "id": "omarchy.nightlight"
         },
         {
           "id": "omarchy.system-update"
@@ -92,11 +92,13 @@
   },
   "cloneSourceRestores": [
     "krall.switchboard",
-    "kenny.nightlight"
+    "soham.lock",
+    "nguyenn.clipboard"
   ],
   "disabledPlugins": [
     "omarchy.menu",
-    "omarchy.nightlight"
+    "omarchy.lock",
+    "omarchy.clipboard"
   ],
   "idle": {
     "lock": 750,
@@ -132,6 +134,15 @@
     },
     {
       "id": "io.github.ellion369.omagent"
+    },
+    {
+      "id": "soham.lock"
+    },
+    {
+      "id": "nguyenn.clipboard"
+    },
+    {
+      "id": "reidenxerx.tile-blueprints"
     }
   ],
   "version": 1

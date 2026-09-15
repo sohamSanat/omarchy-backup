@@ -1,0 +1,129 @@
+:root {
+  /* Default Windows 11 Dark Theme (matches reference screenshot) */
+  --bg-app: #1f1f1f;
+  --bg-canvas: #181818;
+  --bg-sidebar: #202020;
+  --bg-titlebar: #202020;
+  --bg-card: #272727;
+  --bg-card-hover: #333333;
+  --bg-card-selected: rgba(0, 120, 212, 0.2);
+  
+  --bg-subtle: rgba(255, 255, 255, 0.05);
+  --bg-subtle-hover: rgba(255, 255, 255, 0.08);
+  --bg-subtle-active: rgba(255, 255, 255, 0.12);
+  --bg-control: rgba(255, 255, 255, 0.07);
+  --bg-control-hover: rgba(255, 255, 255, 0.11);
+  --bg-control-active: rgba(255, 255, 255, 0.16);
+  --bg-acrylic: rgba(32, 32, 32, 0.85);
+  --bg-frosted: rgba(28, 28, 28, 0.82);
+
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-control: rgba(255, 255, 255, 0.12);
+  --border-control-hover: rgba(255, 255, 255, 0.2);
+
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --text-muted: #8e8e8e;
+  --text-disabled: #555555;
+
+  /* Fluent Accent */
+  --accent: #0078D4;
+  --accent-hover: #1084D9;
+  --accent-pressed: #006CBE;
+  --accent-text: #ffffff;
+  --accent-pill: #60CDFF;
+  --accent-glow: rgba(96, 205, 255, 0.35);
+
+  --danger: #E81123;
+  --danger-hover: #F1707A;
+
+  --shadow-flyout: 0 8px 24px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-card-hover: 0 8px 20px rgba(0, 0, 0, 0.45);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 9999px;
+
+  --font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
+  --transition-speed: 0.15s;
+  --transition-curve: cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  --bg-app: #f3f3f3;
+  --bg-canvas: #f9f9f9;
+  --bg-sidebar: #f3f3f3;
+  --bg-titlebar: #f3f3f3;
+  --bg-card: #ffffff;
+  --bg-card-hover: #ececec;
+  --bg-card-selected: rgba(0, 120, 212, 0.15);
+
+  --bg-subtle: rgba(0, 0, 0, 0.04);
+  --bg-subtle-hover: rgba(0, 0, 0, 0.07);
+  --bg-subtle-active: rgba(0, 0, 0, 0.1);
+  --bg-control: rgba(0, 0, 0, 0.05);
+  --bg-control-hover: rgba(0, 0, 0, 0.08);
+  --bg-control-active: rgba(0, 0, 0, 0.12);
+  --bg-acrylic: rgba(243, 243, 243, 0.88);
+  --bg-frosted: rgba(250, 250, 250, 0.88);
+
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-control: rgba(0, 0, 0, 0.14);
+  --border-control-hover: rgba(0, 0, 0, 0.25);
+
+  /* High contrast for light mode as required by theming rules */
+  --text-primary: #1e1e1e;
+  --text-secondary: #424242;
+  --text-muted: #5c5c5c;
+  --text-disabled: #8a8a8a;
+
+  --accent: #005FB8;
+  --accent-hover: #0066CC;
+  --accent-pressed: #004C99;
+  --accent-text: #ffffff;
+  --accent-pill: #005FB8;
+  --accent-glow: rgba(0, 95, 184, 0.25);
+
+  --danger: #C42B1C;
+  --danger-hover: #B02719;
+
+  --shadow-flyout: 0 8px 24px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover: 0 6px 16px rgba(0, 0, 0, 0.14);
+}
+
+/* Omarchy Custom Theme Adapter */
+[data-theme="omarchy"] {
+  --bg-app: var(--omarchy-bg, #0e091d);
+  --bg-canvas: color-mix(in srgb, var(--omarchy-bg, #0e091d) 90%, black);
+  --bg-sidebar: var(--omarchy-bg, #0e091d);
+  --bg-titlebar: var(--omarchy-bg, #0e091d);
+  --bg-card: color-mix(in srgb, var(--omarchy-bg, #0e091d) 80%, white 10%);
+  --bg-card-hover: color-mix(in srgb, var(--omarchy-bg, #0e091d) 70%, white 15%);
+  --bg-card-selected: color-mix(in srgb, var(--omarchy-accent, #BE3F50) 25%, transparent);
+
+  --bg-subtle: rgba(255, 255, 255, 0.06);
+  --bg-subtle-hover: rgba(255, 255, 255, 0.1);
+  --bg-subtle-active: rgba(255, 255, 255, 0.16);
+  --bg-control: rgba(255, 255, 255, 0.08);
+  --bg-control-hover: rgba(255, 255, 255, 0.14);
+  --bg-acrylic: color-mix(in srgb, var(--omarchy-bg, #0e091d) 85%, transparent);
+  --bg-frosted: color-mix(in srgb, var(--omarchy-bg, #0e091d) 90%, transparent);
+
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --border-control: rgba(255, 255, 255, 0.15);
+
+  --text-primary: var(--omarchy-fg, #ffffff);
+  --text-secondary: color-mix(in srgb, var(--omarchy-fg, #ffffff) 80%, transparent);
+  --text-muted: color-mix(in srgb, var(--omarchy-fg, #ffffff) 60%, transparent);
+
+  --accent: var(--omarchy-accent, #BE3F50);
+  --accent-hover: color-mix(in srgb, var(--omarchy-accent, #BE3F50) 85%, white);
+  --accent-pressed: color-mix(in srgb, var(--omarchy-accent, #BE3F50) 85%, black);
+  --accent-text: #ffffff;
+  --accent-pill: var(--omarchy-accent, #BE3F50);
+  --accent-glow: color-mix(in srgb, var(--omarchy-accent, #BE3F50) 40%, transparent);
+}

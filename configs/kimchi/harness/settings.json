@@ -1,0 +1,19 @@
+{
+  "quietStartup": true,
+  "theme": "kimchi-minimal",
+  "retry": {
+    "enabled": true,
+    "maxRetries": 3,
+    "baseDelayMs": 2000,
+    "provider": {
+      "timeoutMs": 600000,
+      "maxRetries": 0,
+      "maxRetryDelayMs": 60000
+    }
+  },
+  "hideThinkingBlock": true,
+  "lastChangelogVersion": "1.1.13",
+  "defaultProvider": "kimchi-dev",
+  "defaultModel": "deepseek-v4-flash-0731",
+  "defaultThinkingLevel": "medium"
+}

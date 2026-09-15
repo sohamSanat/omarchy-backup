@@ -43,6 +43,14 @@ o.window("(io\\.github\\.lgse\\.Strata|strata|org\\.gnome\\.Nautilus|nautilus)",
   opacity = "0.82 0.75",
 })
 
+-- Brave-Origin stays fully opaque: window-level transparency washes out
+-- loaded websites. New-tab styling is handled inside the page (solid
+-- theme background + glass cards), like Zen's solid-chrome approach.
+o.window("(brave-origin-nightly|brave-origin|brave)", {
+  tag = "-default-opacity",
+  opacity = "1.0 1.0",
+})
+
 -- Float file chooser and desktop portal dialogs
 o.window("(GTK Application|xdg-desktop-portal-.*)", {
   tag = "+floating-window",
@@ -80,4 +88,7 @@ o.window(".*", { idle_inhibit = "fullscreen" })
 
 -- Inhibit idle for Picture-in-Picture windows
 o.window({ tag = "pip" }, { idle_inhibit = "always" })
+
+-- Inhibit idle when Herdr is focused
+o.window({ title = ".*herdr.*" }, { idle_inhibit = "focus" })
 

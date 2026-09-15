@@ -38,8 +38,42 @@ backup_if_exists() {
   fi
 }
 
+INSTALL_PACKAGES=false
+for arg in "$@"; do
+  case "$arg" in
+    --install-apps|--install-pkgs|--all)
+      INSTALL_PACKAGES=true
+      ;;
+  esac
+done
+
+if [[ "$INSTALL_PACKAGES" == "true" ]]; then
+  echo ""
+  echo "==> Step 0: Installing packages from backup metadata..."
+  if command -v pacman >/dev/null 2>&1 && [[ -f "${SCRIPT_DIR}/meta/installed-packages.txt" ]]; then
+    echo "  -> Installing official packages via pacman..."
+    sudo pacman -S --needed --noconfirm - < "${SCRIPT_DIR}/meta/installed-packages.txt" 2>/dev/null || true
+  fi
+
+  if command -v yay >/dev/null 2>&1 && [[ -f "${SCRIPT_DIR}/meta/aur-packages.txt" ]]; then
+    echo "  -> Installing AUR packages via yay..."
+    cut -d' ' -f1 "${SCRIPT_DIR}/meta/aur-packages.txt" | yay -S --needed --noconfirm - 2>/dev/null || true
+  elif command -v paru >/dev/null 2>&1 && [[ -f "${SCRIPT_DIR}/meta/aur-packages.txt" ]]; then
+    echo "  -> Installing AUR packages via paru..."
+    cut -d' ' -f1 "${SCRIPT_DIR}/meta/aur-packages.txt" | paru -S --needed --noconfirm - 2>/dev/null || true
+  fi
+
+  if command -v npm >/dev/null 2>&1 && [[ -f "${SCRIPT_DIR}/meta/npm-global-packages.txt" ]]; then
+    echo "  -> Installing global NPM packages..."
+    grep -oP '(?<=├── |└── )[^@]+' "${SCRIPT_DIR}/meta/npm-global-packages.txt" | grep -v '^npm$' | while read -r pkg; do
+      npm install -g "$pkg" 2>/dev/null || true
+    done
+  fi
+fi
+
 echo ""
 echo "==> Step 1: Ensuring directories exist..."
+mkdir -p "${USER_HOME}/Projects"
 mkdir -p "${USER_HOME}/.config/omarchy"
 mkdir -p "${USER_HOME}/.config/omarchy/themes"
 mkdir -p "${USER_HOME}/.config/omarchy/plugins"
@@ -148,6 +182,16 @@ fi
 if [[ -d "${SCRIPT_DIR}/configs/omniroute" ]]; then
   mkdir -p "${USER_HOME}/.config/omniroute"
   cp -a "${SCRIPT_DIR}/configs/omniroute/." "${USER_HOME}/.config/omniroute/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/wireplumber" ]]; then
+  echo "  -> Restoring WirePlumber audio autoconnect configuration..."
+  mkdir -p "${USER_HOME}/.config/wireplumber/wireplumber.conf.d"
+  cp -a "${SCRIPT_DIR}/configs/wireplumber/." "${USER_HOME}/.config/wireplumber/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/kimchi" ]]; then
+  echo "  -> Restoring Kimchi AI agent configuration..."
+  mkdir -p "${USER_HOME}/.config/kimchi"
+  cp -a "${SCRIPT_DIR}/configs/kimchi/." "${USER_HOME}/.config/kimchi/"
 fi
 if [[ -f "${SCRIPT_DIR}/configs/kdeglobals" ]]; then
   cp -a "${SCRIPT_DIR}/configs/kdeglobals" "${USER_HOME}/.config/"
@@ -486,6 +530,21 @@ for wa_bin in omarchy-whatsapp omarchy-whatsapp-ctl omarchy-whatsapp-daemon omar
     ln -nsf "${USER_HOME}/.config/omarchy/plugins/io.github.ricky.whatsapp/bin/${wa_bin}" "${USER_HOME}/.local/bin/${wa_bin}"
   fi
 done
+if [[ -f "${USER_HOME}/.config/omarchy/plugins/reidenxerx.tile-blueprints/bin/tile-blueprints" ]]; then
+  ln -nsf "${USER_HOME}/.config/omarchy/plugins/reidenxerx.tile-blueprints/bin/tile-blueprints" "${USER_HOME}/.local/bin/tile-blueprints"
+fi
+if [[ -f "${USER_HOME}/.local/bin/photos" ]]; then
+  ln -nsf "${USER_HOME}/.local/bin/photos" "${USER_HOME}/.local/bin/photo-gallery"
+fi
+if [[ -f "${USER_HOME}/.local/share/zen/zen" ]]; then
+  ln -nsf "${USER_HOME}/.local/share/zen/zen" "${USER_HOME}/.local/bin/zen"
+fi
+if [[ -f "${USER_HOME}/.local/share/flatpak/exports/bin/com.stremio.Stremio" ]]; then
+  ln -nsf "${USER_HOME}/.local/share/flatpak/exports/bin/com.stremio.Stremio" "${USER_HOME}/.local/bin/stremio"
+fi
+if [[ -f "${USER_HOME}/.no-mistakes/bin/no-mistakes" ]]; then
+  ln -nsf "${USER_HOME}/.no-mistakes/bin/no-mistakes" "${USER_HOME}/.local/bin/no-mistakes"
+fi
 
 echo ""
 echo "==> Step 9: Restoring custom libraries..."
@@ -531,6 +590,24 @@ if command -v flatpak >/dev/null 2>&1; then
   if [[ -f "${SCRIPT_DIR}/meta/flatpak-packages.txt" ]]; then
     flatpak install --user -y flathub com.stremio.Stremio 2>/dev/null || true
   fi
+fi
+
+if [[ -d "${SCRIPT_DIR}/apps" ]]; then
+  echo "  -> Restoring standalone GUI applications to ~/Projects..."
+  mkdir -p "${USER_HOME}/Projects"
+  for app_dir in "${SCRIPT_DIR}/apps"/*; do
+    if [[ -d "$app_dir" ]]; then
+      app_name="$(basename "$app_dir")"
+      mkdir -p "${USER_HOME}/Projects/${app_name}"
+      cp -a "${app_dir}/." "${USER_HOME}/Projects/${app_name}/"
+      echo "  [OK] Restored application: ~/Projects/${app_name}"
+    fi
+  done
+fi
+
+if command -v mise >/dev/null 2>&1; then
+  echo "  -> Installing configured mise tools and runtimes..."
+  mise install --yes 2>/dev/null || true
 fi
 
 echo ""
@@ -584,4 +661,9 @@ echo "  - Current theme: Moodpeak"
 echo "  - Current font: JetBrainsMono Nerd Font"
 echo "  - Bar Layout: Custom floating bar with 14 plugins"
 echo "  - Window Manager: Hyprland with blur, scale 2, and custom bindings"
+if [[ "$INSTALL_PACKAGES" != "true" ]]; then
+  echo ""
+  echo "  [TIP] To automatically reinstall missing official and AUR packages:"
+  echo "        ./restore.sh --install-apps"
+fi
 echo "========================================================"

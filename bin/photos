@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# P-gallery (formerly Photos) - Windows 11 Fluent Photo Gallery with Biometric & Password Protection
+exec /home/soham/.local/bin/p-gallery "$@"

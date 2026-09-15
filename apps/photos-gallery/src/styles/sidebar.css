@@ -1,0 +1,453 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  min-width: 180px;
+  max-width: 450px;
+  background-color: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  flex-shrink: 0;
+  transition: width 0.15s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 10px;
+  margin-bottom: 4px;
+}
+
+.hamburger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  transition: background-color var(--transition-speed);
+}
+
+.hamburger-btn:hover {
+  background-color: var(--bg-subtle-hover);
+}
+
+/* Nav sections and items */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 8px 16px 8px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  position: relative;
+  cursor: pointer;
+  gap: 12px;
+  text-decoration: none;
+  transition: background-color var(--transition-speed);
+}
+
+.nav-item:hover {
+  background-color: var(--bg-subtle-hover);
+}
+
+.nav-item.active {
+  background-color: var(--bg-subtle-active);
+  font-weight: 500;
+}
+
+/* The signature Windows 11 blue vertical pill indicator on active item */
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 2px;
+  background-color: var(--accent-pill);
+}
+
+.nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.nav-item.active .nav-icon {
+  color: var(--accent-pill);
+}
+
+.nav-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  opacity: 0.8;
+  transition: all var(--transition-speed);
+}
+
+.nav-action-btn:hover {
+  background-color: var(--bg-control-hover);
+  color: var(--text-primary);
+  opacity: 1;
+}
+
+.badge-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background-color: var(--bg-control);
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+}
+
+/* Sidebar Section Headers */
+.sidebar-section {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 10px 0 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  gap: 10px;
+  transition: background-color var(--transition-speed);
+}
+
+.section-header:hover {
+  background-color: var(--bg-subtle-hover);
+}
+
+.section-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.section-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.section-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Tree View */
+.tree-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.tree-container.collapsed {
+  display: none;
+}
+
+.tree-node {
+  display: flex;
+  flex-direction: column;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding-right: 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  position: relative;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: background-color var(--transition-speed);
+}
+
+.tree-row:hover {
+  background-color: var(--bg-subtle-hover);
+}
+
+.tree-row.active {
+  background-color: var(--bg-subtle-active);
+  font-weight: 500;
+}
+
+.tree-row.active::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 2px;
+  background-color: var(--accent-pill);
+}
+
+.tree-indent {
+  flex-shrink: 0;
+}
+
+.tree-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.tree-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.tree-chevron:hover {
+  color: var(--text-primary);
+}
+
+.tree-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-children {
+  display: flex;
+  flex-direction: column;
+}
+
+.tree-children.collapsed {
+  display: none;
+}
+
+/* Sidebar Resizer Splitter */
+.sidebar-resizer {
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  position: absolute;
+  right: -2.5px;
+  top: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-speed);
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer.dragging {
+  background-color: var(--accent-pill);
+}
+
+/* =========================================================
+   Windows 11 Collapsed Navigation Rail
+   ========================================================= */
+.sidebar.collapsed {
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  scrollbar-width: none !important;
+}
+
+.sidebar.collapsed::-webkit-scrollbar {
+  display: none !important;
+}
+
+.sidebar.collapsed .sidebar-header {
+  padding: 0 !important;
+  justify-content: center !important;
+  height: 44px !important;
+}
+
+.sidebar.collapsed .hamburger-btn {
+  width: 36px !important;
+  height: 36px !important;
+  margin: 0 auto !important;
+}
+
+.sidebar.collapsed .sidebar-nav {
+  padding: 0 4px 16px 4px !important;
+  gap: 3px !important;
+  align-items: center !important;
+}
+
+.sidebar.collapsed .nav-item {
+  width: 40px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 0 !important;
+  border-radius: var(--radius-sm) !important;
+  position: relative !important;
+}
+
+.sidebar.collapsed .nav-item.active {
+  background-color: var(--bg-subtle-active) !important;
+}
+
+.sidebar.collapsed .nav-item.active::before {
+  left: -2px !important;
+  top: 7px !important;
+  bottom: 7px !important;
+  width: 3px !important;
+  border-radius: 0 2px 2px 0 !important;
+  background-color: var(--accent-pill) !important;
+}
+
+.sidebar.collapsed .nav-icon {
+  margin: 0 !important;
+  width: 20px !important;
+  height: 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* Hide all text labels, badges, action buttons, chevrons, and tree indentations in rail mode */
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .section-label,
+.sidebar.collapsed .section-chevron,
+.sidebar.collapsed .badge-count,
+.sidebar.collapsed .nav-actions,
+.sidebar.collapsed .tree-name,
+.sidebar.collapsed .tree-chevron,
+.sidebar.collapsed .tree-indent {
+  display: none !important;
+}
+
+/* Hide This PC subfolder tree when collapsed to prevent clipped text */
+.sidebar.collapsed #thispc-tree-container,
+.sidebar.collapsed .tree-node,
+.sidebar.collapsed .tree-row,
+.sidebar.collapsed .tree-children {
+  display: none !important;
+}
+
+/* Ensure personal-tree-container items (Memories, Pictures) display cleanly as icons */
+.sidebar.collapsed #personal-tree-container {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  width: 100% !important;
+  align-items: center !important;
+}
+
+/* Hide redundant grouping header 'Soham - Personal' in rail mode so only destination icons appear */
+.sidebar.collapsed #section-personal-header {
+  display: none !important;
+}
+
+/* Section dividers in collapsed mode */
+.sidebar.collapsed .sidebar-section {
+  margin-top: 6px !important;
+  padding-top: 6px !important;
+  border-top: 1px solid var(--border-subtle) !important;
+  width: 100% !important;
+  align-items: center !important;
+}
+
+.sidebar.collapsed .section-header {
+  width: 40px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  margin: 0 auto !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 0 !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.sidebar.collapsed .section-icon {
+  margin: 0 !important;
+  width: 20px !important;
+  height: 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* Disable drag resizer when collapsed */
+.sidebar.collapsed .sidebar-resizer {
+  display: none !important;
+  pointer-events: none !important;
+}
+

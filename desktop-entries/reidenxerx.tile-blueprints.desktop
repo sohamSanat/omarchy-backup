@@ -1,0 +1,16 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Tile Blueprints
+GenericName=Tiling Layout Editor
+Comment=Design and configure per-workspace tiling layouts and app assignments
+Exec=omarchy-shell shell toggle reidenxerx.tile-blueprints '{}'
+TryExec=omarchy-shell
+Icon=tile-blueprints
+Terminal=false
+StartupNotify=false
+Categories=Settings;DesktopSettings;Utility;
+Keywords=tile;tiling;blueprint;blueprints;layout;workspace;arrange;hyprland;omarchy;window;
+# No StartupWMClass: Quickshell surfaces all report org.quickshell.
+# StartupNotify=false: this Exec talks to the already-running shell. gtk-launch
+# and the Apps "Launching…" OSD otherwise wait ~15s for a new toplevel.

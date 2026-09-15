@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# omarchy:summary=Restore displays and wake lock screen when laptop lid is opened
+
+# 1. Reconcile clamshell display configuration
+omarchy-hyprland-monitor-clamshell >/dev/null 2>&1 || true
+
+# 2. Re-enable DPMS on all active displays
+hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })' >/dev/null 2>&1 || true
+
+# 3. Restore display brightness
+omarchy-brightness-display on >/dev/null 2>&1 || true
+
+# 4. Wake the lock screen and start authentication
+omarchy-shell lock wake >/dev/null 2>&1 || true
+
+# 5. Recovery: if internal monitor came up modeless (0x0), reload Hyprland to restore video mode
+if omarchy-hyprland-monitor-modeless 2>/dev/null; then
+  hyprctl reload >/dev/null 2>&1 || true
+fi

@@ -1,0 +1,381 @@
+/* Windows 11 Fluent App Lock Screen (Biometrics & Sudo Password) */
+
+.app-lock-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 18, 18, 0.76);
+  backdrop-filter: blur(48px) saturate(180%);
+  -webkit-backdrop-filter: blur(48px) saturate(180%);
+  transition: opacity 0.35s cubic-bezier(0.1, 0.9, 0.2, 1), transform 0.35s cubic-bezier(0.1, 0.9, 0.2, 1);
+  user-select: none;
+}
+
+[data-theme="light"] .app-lock-screen {
+  background: rgba(245, 245, 247, 0.82);
+}
+
+.app-lock-screen.unlocked {
+  opacity: 0;
+  transform: scale(1.04);
+  pointer-events: none;
+}
+
+.lock-card {
+  width: 390px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-control);
+  border-radius: 18px;
+  padding: 32px 28px 28px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--border-subtle);
+  animation: lockCardIn 0.3s cubic-bezier(0.1, 0.9, 0.2, 1);
+  text-align: center;
+  -webkit-app-region: no-drag;
+}
+
+@keyframes lockCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.lock-card.shake {
+  animation: lockShake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes lockShake {
+  10%, 90% { transform: translate3d(-3px, 0, 0); }
+  20%, 80% { transform: translate3d(5px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+  40%, 60% { transform: translate3d(5px, 0, 0); }
+}
+
+.lock-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.lock-app-icon {
+  width: 52px;
+  height: 52px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 4px 12px rgba(0, 120, 212, 0.35));
+}
+
+.lock-app-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.lock-security-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-glow);
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(0, 120, 212, 0.2);
+}
+
+.lock-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  background: var(--bg-control);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+}
+
+.lock-user-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lock-username {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Fingerprint Biometric Pulse Box */
+.lock-fingerprint-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 22px;
+  width: 100%;
+}
+
+.lock-fp-icon-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.lock-fp-pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--accent-glow);
+  border: 1px solid var(--accent);
+  animation: fpPulse 2s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+
+@keyframes fpPulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.25;
+  }
+  100% {
+    transform: scale(0.85);
+    opacity: 0.8;
+  }
+}
+
+.lock-fp-icon {
+  position: relative;
+  z-index: 2;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.lock-fp-icon.verified {
+  color: #107C10;
+  transform: scale(1.15);
+}
+
+.lock-fp-status {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  max-width: 280px;
+  transition: color 0.2s ease;
+}
+
+.lock-fp-status.success {
+  color: #107C10;
+  font-weight: 600;
+}
+
+.lock-fp-status.error {
+  color: var(--danger);
+}
+
+/* Password Form */
+.lock-password-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lock-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: var(--bg-control);
+  border: 1.5px solid var(--border-control);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-speed);
+  overflow: hidden;
+}
+
+.lock-input-wrap:focus-within {
+  border-color: var(--accent);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.lock-input-wrap.error {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 2px rgba(232, 17, 35, 0.25) !important;
+}
+
+.lock-input-prefix {
+  padding: 0 8px 0 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.lock-password-input {
+  flex: 1;
+  height: 38px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  outline: none;
+  font-family: inherit;
+}
+
+.lock-password-input::placeholder {
+  color: var(--text-muted);
+}
+
+.lock-toggle-pwd-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0 8px;
+  height: 100%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-speed);
+}
+
+.lock-toggle-pwd-btn:hover {
+  color: var(--text-primary);
+}
+
+.lock-submit-btn {
+  background: var(--accent);
+  border: none;
+  color: #ffffff;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-speed);
+}
+
+.lock-submit-btn:hover {
+  background: var(--accent-hover);
+}
+
+.lock-submit-btn:active {
+  background: var(--accent-pressed);
+}
+
+.lock-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.lock-error-msg {
+  font-size: 12px;
+  color: var(--danger);
+  min-height: 18px;
+  display: none;
+  font-weight: 500;
+}
+
+.lock-error-msg.show {
+  display: block;
+}
+
+/* Titlebar Lock Button */
+.btn-lock-app {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-speed);
+}
+
+.btn-lock-app:hover {
+  background: var(--bg-control-hover);
+  color: var(--text-primary);
+}
+
+/* Lock Screen Top Window Bar */
+.lock-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0;
+  -webkit-app-region: drag;
+  z-index: 100000;
+}
+
+.lock-window-controls {
+  display: flex;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.lock-win-btn {
+  width: 46px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-speed);
+}
+
+.lock-win-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .lock-win-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.lock-win-btn.close:hover {
+  background: #c42b1c !important;
+  color: #ffffff !important;
+}
+

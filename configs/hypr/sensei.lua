@@ -26,6 +26,7 @@ if hl and not _G.omarchy_sensei_original_hl_bind then
     ["Toggle window gaps"] = { action = "toggle-window-gaps", title = "Toggle window gaps" },
     ["Toggle workspace layout"] = { action = "toggle-workspace-layout", title = "Toggle workspace layout" },
     ["Transcode"] = { action = "transcode", title = "Transcode" },
+    ["Tile blueprints"] = { action = "tile-blueprints", title = "Tile blueprints" },
     ["Omarchy menu"] = { action = "omarchy-menu", title = "Omarchy menu" },
     ["Terminal"] = { action = "terminal", title = "Terminal" },
     ["Browser"] = { action = "browser", title = "Browser" },

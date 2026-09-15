@@ -1,0 +1,188 @@
+{
+	"providers": {
+		"kimchi-dev": {
+			"baseUrl": "https://llm.kimchi.dev/openai/v1",
+			"apiKey": "$KIMCHI_API_KEY",
+			"api": "openai-completions",
+			"authHeader": true,
+			"headers": {
+				"User-Agent": "kimchi/1.1.13"
+			},
+			"models": [
+				{
+					"id": "minimax-m3",
+					"name": "minimax-m3",
+					"reasoning": true,
+					"input": [
+						"text",
+						"image"
+					],
+					"contextWindow": 1048576,
+					"maxTokens": 524288,
+					"cost": {
+						"input": 0,
+						"output": 0,
+						"cacheRead": 0,
+						"cacheWrite": 0
+					},
+					"provider": "ai-enabler",
+					"thinkingLevelMap": {
+						"off": "none",
+						"max": "max"
+					}
+				},
+				{
+					"id": "nemotron-3-ultra-fp4",
+					"name": "nemotron-3-ultra-fp4",
+					"reasoning": true,
+					"input": [
+						"text"
+					],
+					"contextWindow": 1048576,
+					"maxTokens": 66000,
+					"cost": {
+						"input": 0,
+						"output": 0,
+						"cacheRead": 0,
+						"cacheWrite": 0
+					},
+					"provider": "ai-enabler",
+					"thinkingLevelMap": {
+						"off": "none",
+						"max": "max"
+					}
+				},
+				{
+					"id": "kimi-k3",
+					"name": "kimi-k3",
+					"reasoning": true,
+					"input": [
+						"text",
+						"image"
+					],
+					"contextWindow": 262144,
+					"maxTokens": 60000,
+					"cost": {
+						"input": 0,
+						"output": 0,
+						"cacheRead": 0,
+						"cacheWrite": 0
+					},
+					"provider": "ai-enabler",
+					"thinkingLevelMap": {
+						"off": "none",
+						"max": "max"
+					}
+				},
+				{
+					"id": "deepseek-v4-flash-0731",
+					"name": "deepseek-v4-flash-0731",
+					"reasoning": true,
+					"input": [
+						"text"
+					],
+					"contextWindow": 1048576,
+					"maxTokens": 512000,
+					"cost": {
+						"input": 0,
+						"output": 0,
+						"cacheRead": 0,
+						"cacheWrite": 0
+					},
+					"provider": "ai-enabler",
+					"thinkingLevelMap": {
+						"off": "none",
+						"max": "max"
+					}
+				},
+				{
+					"id": "glm-5.3",
+					"name": "glm-5.3",
+					"reasoning": true,
+					"input": [
+						"text"
+					],
+					"contextWindow": 1048576,
+					"maxTokens": 131072,
+					"cost": {
+						"input": 0,
+						"output": 0,
+						"cacheRead": 0,
+						"cacheWrite": 0
+					},
+					"provider": "ai-enabler",
+					"thinkingLevelMap": {
+						"off": "none",
+						"max": "max"
+					}
+				},
+				{
+					"id": "glm-5.3-flash",
+					"name": "glm-5.3-flash",
+					"reasoning": true,
+					"input": [
+						"text"
+					],
+					"contextWindow": 1048576,
+					"maxTokens": 131072,
+					"cost": {
+						"input": 0,
+						"output": 0,
+						"cacheRead": 0,
+						"cacheWrite": 0
+					},
+					"provider": "ai-enabler",
+					"thinkingLevelMap": {
+						"off": "none",
+						"max": "max"
+					}
+				},
+				{
+					"id": "kimi-k2.7",
+					"name": "kimi-k2.7",
+					"reasoning": true,
+					"input": [
+						"text",
+						"image"
+					],
+					"contextWindow": 262144,
+					"maxTokens": 60000,
+					"cost": {
+						"input": 0,
+						"output": 0,
+						"cacheRead": 0,
+						"cacheWrite": 0
+					},
+					"provider": "ai-enabler",
+					"thinkingLevelMap": {
+						"off": "none",
+						"max": "max"
+					}
+				},
+				{
+					"id": "auto",
+					"name": "Auto (Kimchi Router)",
+					"api": "kimchi-auto",
+					"provider": "ai-enabler",
+					"reasoning": true,
+					"thinkingLevelMap": {
+						"off": "none",
+						"max": "max"
+					},
+					"input": [
+						"text",
+						"image"
+					],
+					"contextWindow": 128000,
+					"maxTokens": 16384,
+					"cost": {
+						"input": 0,
+						"output": 0,
+						"cacheRead": 0,
+						"cacheWrite": 0
+					}
+				}
+			]
+		}
+	}
+}

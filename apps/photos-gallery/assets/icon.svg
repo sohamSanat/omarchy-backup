@@ -1,0 +1,39 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background subtle rounded rect shadow -->
+    <filter id="shadow" x="10" y="14" width="236" height="236" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <!-- Back card gradient (Cyan / Azure Blue) -->
+    <linearGradient id="backGrad" x1="32" y1="36" x2="204" y2="208" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0078D4"/>
+      <stop offset="100%" stop-color="#00C7FF"/>
+    </linearGradient>
+    <!-- Front card gradient (Magenta / Coral Orange) -->
+    <linearGradient id="frontGrad" x1="72" y1="76" x2="236" y2="236" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E3008C"/>
+      <stop offset="50%" stop-color="#FF4343"/>
+      <stop offset="100%" stop-color="#FFA000"/>
+    </linearGradient>
+    <!-- Glass sheen -->
+    <linearGradient id="sheen" x1="72" y1="76" x2="224" y2="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <!-- Back Card -->
+    <rect x="24" y="32" width="168" height="160" rx="32" fill="url(#backGrad)"/>
+    <circle cx="96" cy="90" r="18" fill="#FFFFFF" fill-opacity="0.9"/>
+    <path d="M40 176 L90 120 L130 160 L160 130 L192 165 V172 C192 183 183 192 172 192 H44 C33 192 24 183 24 172 V176 Z" fill="#FFFFFF" fill-opacity="0.8"/>
+
+    <!-- Front Card overlapping -->
+    <rect x="68" y="72" width="164" height="152" rx="30" fill="url(#frontGrad)"/>
+    <rect x="68" y="72" width="164" height="152" rx="30" fill="url(#sheen)"/>
+    
+    <!-- Mountain landscape in front card -->
+    <circle cx="120" cy="116" r="16" fill="#FFFFFF"/>
+    <path d="M76 210 L130 146 L168 184 L196 152 L232 196 V204 C232 215 223 224 212 224 H88 C77 224 68 215 68 204 V210 Z" fill="#FFFFFF" fill-opacity="0.95"/>
+  </g>
+</svg>

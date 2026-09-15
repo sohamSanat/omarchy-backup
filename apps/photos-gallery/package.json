@@ -1,0 +1,14 @@
+{
+  "name": "p-gallery",
+  "productName": "P-gallery",
+  "version": "1.0.0",
+  "description": "P-gallery - Windows 11 Fluent Photo Gallery with Biometric & Password Lock",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron43 .",
+    "dev": "electron43 ."
+  },
+  "keywords": ["photos", "gallery", "windows-11", "fluent", "omarchy"],
+  "author": "Antigravity",
+  "license": "MIT"
+}

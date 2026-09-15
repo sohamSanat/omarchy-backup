@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# omarchy:summary=Lock and reconcile displays when the laptop lid closes, cleanly stopping screensaver
+
+# Cleanly stop screensaver first so its window close doesn't race with suspend
+pkill -x ttfx 2>/dev/null || true
+pkill -f '[o]rg.omarchy.screensaver' 2>/dev/null || true
+
+# Run standard lid-close logic (locks session and handles clamshell)
+/usr/share/omarchy/bin/omarchy-system-lid-close "$@"
+
+# If internal monitor only and lid is shut, ensure lock is blanked and fingerprint PAM aborted
+if omarchy-hw-laptop-closed 2>/dev/null && ! omarchy-hw-external-monitors 2>/dev/null; then
+  omarchy-shell lock blank >/dev/null 2>&1 || true
+fi

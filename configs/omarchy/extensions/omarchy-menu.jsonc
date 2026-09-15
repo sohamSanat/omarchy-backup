@@ -1,4 +1,32 @@
 {
+  // >>> reidenxerx.tile-blueprints (managed by tile-blueprints-menu-install) >>>
+  "setup.tile-blueprints": {
+    "icon": "󰕴",
+    "label": "Tile blueprints",
+    "aliases": ["tiling", "tiles", "layout", "blueprint", "workspace layout", "arrange"]
+  },
+  "setup.tile-blueprints.open": {
+    "icon": "󰕴",
+    "label": "Edit blueprints",
+    "action": "omarchy-shell shell toggle reidenxerx.tile-blueprints '{}'"
+  },
+  "setup.tile-blueprints.arrange": {
+    "icon": "󰁨",
+    "label": "Arrange apps now",
+    "action": "/home/soham/.config/omarchy/plugins/reidenxerx.tile-blueprints/bin/tile-blueprints arrange"
+  },
+  "setup.tile-blueprints.status": {
+    "icon": "󰄭",
+    "label": "Show blueprints",
+    "action": "omarchy-launch-floating-terminal-with-presentation /home/soham/.config/omarchy/plugins/reidenxerx.tile-blueprints/bin/tile-blueprints status"
+  },
+  "setup.tile-blueprints.remove": {
+    "icon": "󰆴",
+    "label": "Turn blueprints off",
+    "action": "/home/soham/.config/omarchy/plugins/reidenxerx.tile-blueprints/bin/tile-blueprints remove"
+  },
+  // <<< reidenxerx.tile-blueprints <<<
+
 // ricardosuman.pretty-screenshot (begin)
 // Managed by the plugin; removed by `omarchy plugin remove ricardosuman.pretty-screenshot`.
   "trigger.capture.screenshot": { "icon": "", "label": "Screenshot", "action": "~/.config/omarchy/plugins/ricardosuman.pretty-screenshot/omarchy-pretty-screenshot" },
@@ -37,6 +65,31 @@
     "action": "omarchy-default-agent antigravity"
   },
 
+  // Hide apps from the app drawer
+  "apps.about-xfce": { "when": "false" },
+  "apps.xfce4-about": { "when": "false" },
+  "apps.bssh": { "when": "false" },
+  "apps.bvnc": { "when": "false" },
+  "apps.avahi-discover": { "when": "false" },
+  "apps.fcitx5-configtool": { "when": "false" },
+  "apps.lstopo": { "when": "false" },
+  "apps.org.kde.kdeconnect.nonplasma": { "when": "false" },
+  "apps.org.kde.kdeconnect.sms": { "when": "false" },
+  "apps.limine-snapper-restore": { "when": "false" },
+  "apps.cups": { "when": "false" },
+  "apps.qv4l2": { "when": "false" },
+  "apps.qvidcap": { "when": "false" },
+  "apps.org.xfce.ristretto": { "when": "false" },
+  "apps.uuctl": { "when": "false" },
+  "apps.voxtype-configure": { "when": "false" },
+  "apps.WhatsApp": { "when": "false" },
+  "apps.whatsapp": { "when": "false" },
+  "apps.YouTube": { "when": "false" },
+  "apps.youtube": { "when": "false" },
+  "apps.io.github.lgse.Strata": { "when": "false" },
+  "apps.io.github.lgse.strata": { "when": "false" },
+  "apps.strata": { "when": "false" },
+
 ,
 
   // BEGIN OMARCHY SENSEI (managed by omarchy-sensei setup)
@@ -63,6 +116,7 @@
   "trigger.toggle.window-gaps": {"parent":"trigger.toggle","label":"Window Gaps","action":"omarchy-sensei run --action 'toggle-window-gaps' --title 'Toggle window gaps' --shortcut 'SUPER SHIFT + BACKSPACE' -- 'omarchy-hyprland-window-gaps-toggle'","icon":""},
   "trigger.toggle.workspace-layout": {"parent":"trigger.toggle","label":"Workspace Layout","action":"omarchy-sensei run --action 'toggle-workspace-layout' --title 'Toggle workspace layout' --shortcut 'SUPER + L' -- 'omarchy-hyprland-workspace-layout-toggle'","icon":"󱂬"},
   "trigger.transcode": {"parent":"trigger","label":"Transcode","action":"omarchy-sensei run --action 'transcode' --title 'Transcode' --shortcut 'SUPER CTRL + PERIOD' -- 'omarchy-transcode'","icon":"󰧸"},
+  "setup.tile-blueprints.open": {"parent":"setup.tile-blueprints","label":"Edit blueprints","action":"omarchy-sensei run --action 'tile-blueprints' --title 'Tile blueprints' --shortcut 'SUPER ALT + L' -- 'omarchy-shell shell toggle reidenxerx.tile-blueprints '\\''{}'\\'''","icon":"󰕴"},
   // END OMARCHY SENSEI,
   "style.theme": {"icon":"󰸌","label":"Theme","aliases":["theme","themes"],"action":"omarchy-shell themebook pick"}
 }

@@ -319,22 +319,51 @@ This repository contains the full snapshot of user customizations:
    - **`configs/opencode/opencode.json`**:
      - Permission allowances for `~/Ui-skills/**` and `~/.agents/**`.
 
+25. **Standalone GUI Applications (`apps/` -> `~/Projects/`)**:
+   - **`apps/photos-gallery`**:
+     - Modern Windows 11 Fluent Photo Gallery & Vault app with biometric/PIN unlock, non-destructive image adjustments (brightness, contrast, saturation, filters), and EXIF metadata view.
+     - Built with Electron 43. Restored to `~/Projects/photos-gallery`. Launched via `p-gallery.desktop` or `bin/p-gallery` / `bin/photos` / `bin/photo-gallery`. Icon located in `pixmaps/p-gallery.png`.
+   - **`apps/gallery`**:
+     - Minimalist desktop photo viewer restored to `~/Projects/gallery`. Launched via `gallery.desktop` or `bin/gallery`. Icon located in `pixmaps/gallery.png`.
+
+26. **Recent Plugins, Hardware Handlers & Audio/Kimchi Updates**:
+   - **`plugins/nguyenn.clipboard/`**:
+     - Enhanced clipboard history plugin with custom "Clear attachments" dialog and feature patch (`meta/patches/nguyenn.clipboard.patch`).
+     - Bound in Hyprland to `Super + Ctrl + V` (toggle menu) and `Super + Shift + V` (open history).
+   - **`plugins/reidenxerx.tile-blueprints/`**:
+     - Dynamic workspace tile layout blueprint manager. Bound in Hyprland to `Super + Alt + L`.
+   - **Lid Power & System Wake Scripts**:
+     - `bin/omarchy-system-lid-close`, `bin/omarchy-system-lid-open`, and `bin/omarchy-system-wake` handle clamshell mode and lid state changes in `configs/hypr/bindings.lua`, eliminating DPMS suspend race conditions.
+   - **WirePlumber Bluetooth A2DP Auto-Connect**:
+     - `configs/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf` auto-switches connected Bluetooth headsets directly to the high-quality A2DP profile.
+   - **Kimchi AI Agent Harness**:
+     - `configs/kimchi/` backup containing model catalog (`models.json`), trusted workspace settings, UI preferences, and 20 custom themes.
+
+---
+
 ## 3. Fast Restoration (Automated)
 
 To apply everything at once, simply clone this repository onto the target Omarchy machine and execute:
 
 ```bash
 cd omarchy-backup
+
+# Restore all dotfiles, plugins, themes, and standalone apps:
 ./restore.sh
+
+# Or, on a fresh machine, also install all pacman packages, AUR tools, and global npm packages on the fly:
+./restore.sh --install-apps
 ```
 
 The script will:
-1. Create timestamped backups of any pre-existing config files before touching them.
-2. Deploy all configuration files, themes, plugins, scripts, libraries, and desktop entries.
-3. Fix file permissions (`chmod +x`).
-4. Reinstall Node dependencies for the WhatsApp daemon if `npm` is present.
-5. Apply the active theme (`Sakura Mochi`) and font (`JetBrainsMono Nerd Font`).
-6. Reload the shell, terminals, and Hyprland.
+1. When `--install-apps` is passed: Automatically install official packages from `meta/installed-packages.txt`, AUR packages from `meta/aur-packages.txt`, and global npm tools from `meta/npm-global-packages.txt`.
+2. Create timestamped backups of any pre-existing config files before touching them.
+3. Deploy all configuration files, themes, plugins, scripts, libraries, and desktop entries.
+4. Deploy standalone apps (`photos-gallery`, `gallery`) to `~/Projects/` and install mise tools (`mise install`).
+5. Fix file permissions (`chmod +x`).
+6. Reinstall Node dependencies for the WhatsApp daemon if `npm` is present.
+7. Apply the active theme (`Moodpeak`) and font (`JetBrainsMono Nerd Font`).
+8. Reload the shell, terminals, and Hyprland.
 
 ---
 

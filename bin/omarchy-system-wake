@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Guard against waking display or modesetting while the laptop lid is physically closed.
+# This prevents a fatal race condition between screensaver exit, DPMS enable, and system suspend.
+if omarchy-hw-laptop-closed 2>/dev/null && ! omarchy-hw-external-monitors 2>/dev/null; then
+  exit 0
+fi
+
+exec /usr/share/omarchy/bin/omarchy-system-wake "$@"

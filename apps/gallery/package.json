@@ -1,0 +1,14 @@
+{
+  "name": "gallery",
+  "productName": "Gallery",
+  "version": "1.0.0",
+  "description": "Gallery - Windows 11 Fluent Photo Gallery",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron43 .",
+    "dev": "electron43 ."
+  },
+  "keywords": ["photos", "gallery", "windows-11", "fluent", "omarchy"],
+  "author": "Antigravity",
+  "license": "MIT"
+}

@@ -65,7 +65,11 @@ intel-media-driver
 intel-ucode
 inxi
 ipp-usb
+jdk8-openjdk
 jq
+jre21-openjdk
+jre8-openjdk
+jre8-openjdk-headless
 kdeconnect
 kdenlive
 kernel-modules-hook
@@ -87,8 +91,6 @@ meson
 meteobar-bin
 mise-bin
 mkinitcpio
-mpv
-mpv-mpris
 nano
 nautilus
 nautilus-python
@@ -153,9 +155,11 @@ ttfx
 tzupdate
 udiskie
 ufw
+unrar
 usage
 usbutils
 uwsm
+vlc
 voxtype-bin
 vpl-gpu-rt
 vulkan-intel

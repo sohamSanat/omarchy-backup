@@ -143,6 +143,16 @@
       "M omarchy/Panel.qml"
     ]
   },
+  "nguyenn.clipboard": {
+    "remote": "https://github.com/htrnguyen-labs/omarchy-clipboard.git",
+    "commit": "046e94437a652e837f257eca2ae4314d5df3754a",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M Clipboard.qml",
+      "M ClipboardHistory.js"
+    ],
+    "note": "Enhanced with Clear Attachments feature and button"
+  },
   "omaconnect": {
     "remote": "https://github.com/jitendradara12/omaconnect.git",
     "commit": "f44454e710876d9578822c1ad2039c59d0d9ca0e",
@@ -161,6 +171,12 @@
     "has_local_changes": false,
     "dirty_files": []
   },
+  "reidenxerx.tile-blueprints": {
+    "remote": "https://github.com/ReidenXerx/omarchy-tile-blueprints.git",
+    "commit": "a23f39256e237eb7e1f6f51f61a251724e212f14",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
   "reomarchy.workspace-switcher": {
     "remote": "https://github.com/cmyk/omarchy-workspace-switcher.git",
     "commit": "a860155814d0bf563507ff071f4d62b2e7ef81dc",
@@ -168,6 +184,14 @@
     "dirty_files": [
       "M WorkspaceSwitcher.qml",
       "M bindings.lua"
+    ]
+  },
+  "ricardosuman.pretty-screenshot": {
+    "remote": "https://github.com/ricardosuman/omarchy-pretty-screenshot.git",
+    "commit": "5fc021c11173cc37796def3fd6d74b4abc395aed",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M omarchy-pretty-screenshot"
     ]
   },
   "soham.agents": {
@@ -198,13 +222,5 @@
     "commit": "7d50efe23230e07603792d83827585cb8f918908",
     "has_local_changes": false,
     "dirty_files": []
-  },
-  "ricardosuman.pretty-screenshot": {
-    "remote": "https://github.com/ricardosuman/omarchy-pretty-screenshot.git",
-    "commit": "5fc021c11173cc37796def3fd6d74b4abc395aed",
-    "has_local_changes": true,
-    "dirty_files": [
-      "M omarchy-pretty-screenshot"
-    ]
   }
 }

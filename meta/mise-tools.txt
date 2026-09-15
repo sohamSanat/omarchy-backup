@@ -1,0 +1,18 @@
+claude          2.1.260
+claude          2.1.268           ~/.config/mise/config.toml  latest
+codex           0.151.0
+codex           0.154.0           ~/.config/mise/config.toml  latest
+copilot         1.0.82
+copilot         1.0.83            ~/.config/mise/config.toml  latest
+gemini          0.57.0
+gemini          0.59.0            ~/.config/mise/config.toml  latest
+gh              2.98.0
+gh              2.100.0           ~/.config/mise/config.toml  latest
+node            26.7.0            ~/.config/mise/config.toml  26.7.0
+npm:playwright  1.63.0            ~/.config/mise/config.toml  latest
+opencode        1.18.25
+opencode        1.18.30           ~/.config/mise/config.toml  latest
+pi              0.84.4
+pi              0.85.1            ~/.config/mise/config.toml  latest
+python          3.14.7
+rust            stable (symlink)  ~/.config/mise/config.toml  stable

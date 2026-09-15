@@ -1,0 +1,204 @@
+diff --git i/Clipboard.qml w/Clipboard.qml
+index 71de58a..1959411 100644
+--- i/Clipboard.qml
++++ w/Clipboard.qml
+@@ -17,6 +17,8 @@ Item {
+   property int selectedIndex: 0
+   property bool cursorActive: false
+   property bool clearConfirmOpen: false
++  property bool clearAttachmentsConfirmOpen: false
++  readonly property int attachmentCount: ClipboardHistory.attachmentCount(root.history)
+   property var history: []
+ 
+   readonly property string pluginDir: decodeURIComponent(Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "").replace(/\/$/, ""))
+@@ -68,6 +70,7 @@ Item {
+ 
+   function close() {
+     root.cancelClearHistory()
++    root.cancelClearAttachments()
+     root.opened = false
+   }
+ 
+@@ -145,6 +148,29 @@ Item {
+     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+   }
+ 
++  function requestClearAttachments() {
++    if (root.attachmentCount === 0) return
++    clearAttachmentsConfirm.selectedIndex = 1
++    root.clearAttachmentsConfirmOpen = true
++  }
++
++  function cancelClearAttachments() {
++    root.clearAttachmentsConfirmOpen = false
++    root.disarmPointer()
++    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
++  }
++
++  function confirmClearAttachments() {
++    root.history = ClipboardHistory.clearAttachments(root.history)
++    root.saveHistory()
++    root.selectedIndex = 0
++    root.cursorActive = false
++    root.disarmPointer()
++    root.clearAttachmentsConfirmOpen = false
++    root.rebuildDisplay()
++    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
++  }
++
+   function removeDisplayIndex(index) {
+     if (index < 0 || index >= displayModel.count) return
+ 
+@@ -464,7 +490,7 @@ Item {
+       Item {
+         id: keyCatcher
+         anchors.fill: parent
+-        z: root.clearConfirmOpen ? 20 : 0
++        z: (root.clearConfirmOpen || root.clearAttachmentsConfirmOpen) ? 20 : 0
+         focus: true
+ 
+         Keys.priority: Keys.BeforeItem
+@@ -473,6 +499,10 @@ Item {
+             if (clearConfirm.handleKey(event)) event.accepted = true
+             return
+           }
++          if (root.clearAttachmentsConfirmOpen) {
++            if (clearAttachmentsConfirm.handleKey(event)) event.accepted = true
++            return
++          }
+ 
+           if (event.key === Qt.Key_Escape) {
+             if (root.filterText) root.setFilter("")
+@@ -536,6 +566,25 @@ Item {
+           onCanceled: root.cancelClearHistory()
+           onConfirmed: root.confirmClearHistory()
+         }
++
++        ConfirmDialog {
++          id: clearAttachmentsConfirm
++
++          anchors.fill: parent
++          opened: root.clearAttachmentsConfirmOpen
++          z: 10
++          message: "Delete all attachments from clipboard history?"
++          confirmText: "Delete"
++          background: root.background
++          foreground: root.foreground
++          scrim: root.scrim
++          selectedBackground: root.selectedBackground
++          selectedText: root.selectedText
++          fontFamily: root.fontFamily
++          cornerRadius: root.cornerRadius
++          onCanceled: root.cancelClearAttachments()
++          onConfirmed: root.confirmClearAttachments()
++        }
+       }
+ 
+       Column {
+@@ -555,7 +604,8 @@ Item {
+           Text {
+             textFormat: Text.PlainText
+             anchors.left: parent.left
+-            anchors.right: parent.right
++            anchors.right: headerActions.left
++            anchors.rightMargin: Style.spacing.md
+             anchors.verticalCenter: parent.verticalCenter
+             text: root.filterText || "Search clipboard…"
+             color: root.foreground
+@@ -564,6 +614,47 @@ Item {
+             font.pixelSize: Style.font.heading
+             elide: Text.ElideRight
+           }
++
++          Row {
++            id: headerActions
++            anchors.right: parent.right
++            anchors.verticalCenter: parent.verticalCenter
++            spacing: Style.spacing.xs
++
++            Button {
++              id: clearAttachmentsBtn
++              text: root.attachmentCount > 0 ? "Clear attachments (" + root.attachmentCount + ")" : "Clear attachments"
++              iconText: "󰹑"
++              tooltipText: "Delete all attachments (images/files) from clipboard"
++              enabled: root.attachmentCount > 0
++              opacity: enabled ? 1.0 : 0.4
++              bordered: true
++              fontSize: Style.font.caption
++              horizontalPadding: Style.spacing.sm
++              verticalPadding: Style.space(4)
++              onClicked: {
++                root.requestClearAttachments()
++                Qt.callLater(function() { keyCatcher.forceActiveFocus() })
++              }
++            }
++
++            Button {
++              id: clearHistoryBtn
++              text: "Clear all"
++              iconText: "󰅖"
++              tooltipText: "Delete entire clipboard history (Shift+Delete)"
++              enabled: root.history.length > 0
++              opacity: enabled ? 1.0 : 0.4
++              bordered: true
++              fontSize: Style.font.caption
++              horizontalPadding: Style.spacing.sm
++              verticalPadding: Style.space(4)
++              onClicked: {
++                root.requestClearHistory()
++                Qt.callLater(function() { keyCatcher.forceActiveFocus() })
++              }
++            }
++          }
+         }
+ 
+         Item {
+diff --git i/ClipboardHistory.js w/ClipboardHistory.js
+index 0d2ff2a..96eb1a1 100644
+--- i/ClipboardHistory.js
++++ w/ClipboardHistory.js
+@@ -134,6 +134,34 @@ function clearHistory() {
+   return []
+ }
+ 
++function isAttachment(entry) {
++  if (!entry) return false
++  if (entry.type === "image") return true
++  var paths = filePaths(entry)
++  return paths.length > 0
++}
++
++function clearAttachments(values) {
++  var list = Array.isArray(values) ? values : []
++  var next = []
++  for (var i = 0; i < list.length; i++) {
++    var entry = list[i]
++    if (entry && !isAttachment(entry)) {
++      next.push(entry)
++    }
++  }
++  return next
++}
++
++function attachmentCount(values) {
++  var list = Array.isArray(values) ? values : []
++  var count = 0
++  for (var i = 0; i < list.length; i++) {
++    if (isAttachment(list[i])) count++
++  }
++  return count
++}
++
+ function parseEntryJson(line) {
+   var raw = String(line || "").trim()
+   if (!raw) return null
+@@ -279,6 +307,9 @@ if (typeof module !== "undefined") {
+     togglePinAt: togglePinAt,
+     movePinnedAt: movePinnedAt,
+     clearHistory: clearHistory,
++    clearAttachments: clearAttachments,
++    isAttachment: isAttachment,
++    attachmentCount: attachmentCount,
+     parseEntryJson: parseEntryJson,
+     searchableText: searchableText,
+     previewText: previewText,

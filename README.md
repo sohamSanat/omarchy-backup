@@ -60,7 +60,7 @@ Branch: `main`
 
 ### 3. 🎨 Visual Experience, Bar & Theming Pipeline
 - **Theme Collection**: 16 curated themes (`moodpeak` [Active], `nous` [Light research], `sakura-mochi`, `aetheria`, `akaito`, `amekoji`, `artzen`, `city-783`, `harbor`, `harbordark`, `omagen1`, `omarchy_signature`, `quattrocento-light`, `synthetica`).
-- **Floating Bar**: 27 modular plugins in `plugins/` (`io.github.ellion369.omagent`, `reomarchy.workspace-switcher`, `ricardosuman.pretty-screenshot`, `tristonarmstrong.dictionary`, `bhanu.omavideos`, `soham.power`, `mryll.printbar`, `mahmoodkhalil57.qrgen`, `io.github.ricky.whatsapp`, etc.).
+- **Floating Bar**: 29 modular plugins in `plugins/` (`io.github.ellion369.omagent`, `nguyenn.clipboard` [custom attachment cleaner], `reidenxerx.tile-blueprints`, `reomarchy.workspace-switcher`, `ricardosuman.pretty-screenshot`, `tristonarmstrong.dictionary`, `bhanu.omavideos`, `soham.power`, `mryll.printbar`, `mahmoodkhalil57.qrgen`, `io.github.ricky.whatsapp`, etc.).
 - **Visual Workspace Switcher v2**: Hold-Super HUD with screencopy previews, active window titles, corner marks, bottom keymap HUD (`← →`, `↑ ↓`, `1-9`, `↵`, `esc`), and live search filter.
 - **Dynamic Theming Engine**: `omarchy theme set` instantly propagates colors across KDE/Qt (`kdeglobals`), GTK 4, terminal emulators (Ghostty, Alacritty, Kitty, Foot), Zen Browser (userChrome, Dark Reader), Brave Origin Browser, VLC Media Player, Obsidian, Foliate, and ytkew.
 - **Universal Theming Library & Environment**: `omarchy_theme.py` (high-contrast palette math ensuring dark text on light themes) and `omarchy-theme-env` CLI for terminal environment variable sync (`OMARCHY_THEME_MODE`, `COLORFGBG`).
@@ -73,9 +73,15 @@ Branch: `main`
 - **CLI & Automated Hook**: `omarchy-sync-brave` (`--sync`, `--status`) invoked automatically on every theme change via `~/.config/omarchy/hooks/theme-set.d/brave-sync.sh`.
 - **Chromium Wayland Flags (`configs/chromium-flags.conf`)**: Ozone Wayland flags, password store integration, and smooth touchpad history navigation.
 
-### 5. 🛠️ Utilities & System Services
+### 5. 🛠️ Utilities, Standalone Apps & System Services
+- **Standalone GUI Applications (`apps/`)**:
+  - `apps/photos-gallery`: Windows 11 Fluent Photo Gallery & Vault app with biometric/PIN unlock, image adjustments, and EXIF metadata view (Electron 43). Restored to `~/Projects/photos-gallery` with `p-gallery.desktop` and `bin/p-gallery`.
+  - `apps/gallery`: Minimalist desktop photo viewer restored to `~/Projects/gallery` with `gallery.desktop` and `bin/gallery`.
 - **`agy`**: Antigravity CLI Autonomous Folder-Trust Wrapper (`bin/agy`) that pre-registers workspaces and ensures `always-proceed` permissions in `~/.gemini/antigravity-cli/settings.json` to prevent interactive permission prompts during autonomous coding runs.
 - **`firstmate-subagent`**: Multi-agent fleet conductor managing parallel crewmates across Herdr panes (`spawn`, `prompt`, `list`, `skills`, `close`) with automatic workspace trust provisioning.
+- **Lid Power & Sleep Handlers**: `omarchy-system-lid-close`, `omarchy-system-lid-open`, and `omarchy-system-wake` bound in `configs/hypr/bindings.lua` to guard against screensaver and DPMS race conditions during suspend/clamshell mode.
+- **Bluetooth A2DP Auto-Connect**: `configs/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf` auto-switches connected Bluetooth headsets to the high-fidelity A2DP profile.
+- **Kimchi AI Agent Harness**: `configs/kimchi/` backup containing model catalog (`models.json`), trusted directories, UI settings, and 20 curated themes.
 - **`omagent-screenshot`**: Headless browser screenshot tool (`--mobile`, `--tablet`) for automated visual layout validation.
 - **`omarchy-video-idle-inhibit`**: Daemon preventing idle/screensaver lock during media playback and whenever an active Herdr agent swarm workspace is in focus, with screensaver lock-guard.
 - **`omarchy-pretty-screenshot` (`Print`)**: Beautiful window/desktop screenshot tool with wallpaper and gradient frames (`plugins/ricardosuman.pretty-screenshot`).
@@ -99,7 +105,12 @@ On any fresh or existing Omarchy installation:
 ```bash
 git clone https://github.com/sohamSanat/omarchy-backup.git
 cd omarchy-backup
+
+# Restore all dotfiles, plugins, themes, and standalone apps:
 ./restore.sh
+
+# Or, on a fresh machine, also reinstall all official pacman, AUR, and npm packages on the fly:
+./restore.sh --install-apps
 ```
 
 ### Post-Restore Setup: Omagent API Key
@@ -127,20 +138,23 @@ Self-signed TLS certificates for the Nothing Phone PWA bridge (`~/.config/omagen
 ```
 omarchy-backup/
 ├── agents/                  # AI agent skills, rules, and durable learnings (~/.agents)
+├── apps/                    # Standalone GUI applications (Photos Gallery, Gallery) (~/Projects)
 ├── bin/                     # Custom binaries and helper executables (~/.local/bin)
 ├── configs/                 # Dotfiles and application configs (~/.config)
 │   ├── omagent/             # Omagent prompt, mobile PWA web client, and config template
 │   ├── fetch/               # Fetch configuration and Omarchy ASCII branding
 │   ├── hypr/                # Hyprland rules, inputs, look-and-feel, and keybindings
+│   ├── kimchi/              # Kimchi agent harness, model routing, and themes
 │   ├── omarchy/             # Omarchy shell.json, theme templates, and homelab-launcher
 │   ├── terminals/           # Alacritty, Ghostty, Kitty, Foot configs
+│   ├── wireplumber/         # PipeWire/WirePlumber audio configs and Bluetooth profile rules
 │   ├── zen/                 # Zen Browser userChrome, Dark Reader mod, user.js
 │   └── ...                  # Foliate, ytkew, QDirStat, FDM, Ristretto, Strata
 ├── desktop-entries/         # Custom XDG desktop application shortcuts
 ├── lib/                     # Compiled C plugins (hypr-shiny-border.so) and libraries
 ├── meta/                    # Package lists, theme/plugin sources, and git diff patches
 ├── pixmaps/                 # Application icons and assets
-├── plugins/                 # 24 full Omarchy shell plugins (~/.config/omarchy/plugins)
+├── plugins/                 # 29 full Omarchy shell plugins (~/.config/omarchy/plugins)
 ├── systemd/                 # User systemd service units (~/.config/systemd/user)
 ├── themes/                  # 16 complete themes (~/.config/omarchy/themes)
 ├── AI_AGENT_RESTORE_GUIDE.md# Comprehensive architectural and recovery guide for agents

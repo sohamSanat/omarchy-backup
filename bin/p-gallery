@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# P-gallery - Windows 11 Fluent Photo Gallery with Biometric & Password Protection
+APP_DIR="/home/soham/Projects/photos-gallery"
+ELECTRON_BIN="/usr/bin/electron43"
+
+if [ ! -x "$ELECTRON_BIN" ]; then
+  ELECTRON_BIN=$(which electron 2>/dev/null || which electron43 2>/dev/null)
+fi
+
+exec "$ELECTRON_BIN" --ozone-platform-hint=auto "$APP_DIR" "$@"

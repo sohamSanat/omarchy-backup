@@ -1,0 +1,21 @@
+{
+  "skillPaths": [
+    ".config/kimchi/harness/skills",
+    ".pi/agent/skills",
+    ".claude/skills",
+    ".codex/skills",
+    ".agents/skills"
+  ],
+  "migrationState": "done",
+  "apiKey": "YOUR_KIMCHI_API_KEY",
+  "llmEndpoint": "https://llm.kimchi.dev",
+  "onboarding": {
+    "sessionModeWizardSeenAt": "2026-09-08T13:48:15.964Z"
+  },
+  "deviceId": "YOUR_DEVICE_ID",
+  "surveys": {
+    "019e87cc-5033-0000-d9bd-5e6501640b6e": {
+      "seenAt": "2026-09-08T13:52:39.944Z"
+    }
+  }
+}

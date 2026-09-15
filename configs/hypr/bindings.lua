@@ -68,3 +68,23 @@ o.bind("ALT + SPACE", "Omagent overlay", "omarchy-shell shell toggle io.github.e
 o.bind("SUPER + A", "Omagent overlay", "omarchy-shell shell toggle io.github.ellion369.omagent")
 hl.layer_rule({ match = { namespace = "omarchy-omagent" }, blur = true, ignore_alpha = 0.6 })
 -- io.github.ellion369.omagent: end
+
+-- nguyenn.clipboard: begin (overrides built-in omarchy.clipboard)
+hl.unbind("SUPER + CTRL + V")
+o.bind("SUPER + CTRL + V", "Clipboard manager", "omarchy-shell shell toggle nguyenn.clipboard")
+o.bind("SUPER + SHIFT + V", "Clipboard manager", "omarchy-shell shell toggle nguyenn.clipboard")
+-- nguyenn.clipboard: end
+
+-- reidenxerx.tile-blueprints: begin
+o.bind("SUPER + ALT + L", "Tile blueprints", "omarchy-shell shell toggle reidenxerx.tile-blueprints '{}'")
+-- reidenxerx.tile-blueprints: end
+
+-- Laptop Lid Switch: clean suspend on close, reliable wake on open
+hl.unbind("switch:on:Lid Switch")
+o.bind("switch:on:Lid Switch", nil, "omarchy-system-lid-close", { locked = true })
+
+hl.unbind("switch:off:Lid Switch")
+o.bind("switch:off:Lid Switch", nil, "omarchy-system-lid-open", { locked = true })
+
+
+
