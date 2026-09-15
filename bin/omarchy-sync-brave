@@ -171,6 +171,22 @@ do_sync() {
     return 1
   }
 
+  # Ensure extension allowlist policy exists so both Omarchy extensions are never blocked.
+  # Brave Origin enforces an admin blocklist by default; this allowlist overrides it.
+  local ext_policy_dir="/etc/brave/policies/managed"
+  local ext_policy="$ext_policy_dir/extensions.json"
+  local ext_ids='["albfeliokcdknhcifjeifbhckpblkajg","eimadpbcbfnmbkopoojfekhnkhdbieeh","nkkfokpjehpjfjofhcfceboioellhgpl"]'
+  local ext_allowlist="{\"ExtensionInstallAllowlist\": $ext_ids}"
+  if [[ ! -f "$ext_policy" ]] || [[ "$(cat "$ext_policy" 2>/dev/null)" != "$ext_allowlist" ]]; then
+    python3 -c "
+import subprocess, sys
+content = '{\"ExtensionInstallAllowlist\": [\"albfeliokcdknhcifjeifbhckpblkajg\",\"eimadpbcbfnmbkopoojfekhnkhdbieeh\",\"nkkfokpjehpjfjofhcfceboioellhgpl\"]}'
+dest = '/etc/brave/policies/managed/extensions.json'
+r = subprocess.run(['pkexec', 'sh', '-c', 'echo ' + repr(content) + ' > ' + dest], capture_output=True, timeout=30)
+sys.exit(r.returncode)
+" 2>/dev/null && echo "[omarchy-sync-brave] Updated extension allowlist policy." || true
+  fi
+
   # Synchronize Brave policy color for frame & toolbar
   local colors_file="$CURRENT_THEME_DIR/colors.toml"
   if [[ -f "$colors_file" ]]; then
