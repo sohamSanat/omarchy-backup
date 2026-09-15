@@ -126,6 +126,10 @@ do_sync() {
     fi
   done
 
+  # Delete the Cached Theme.pak so Brave re-bakes it from the new manifest.json "theme" block.
+  # If stale, it overrides manifest colors and causes the browser chrome to stay purple/wrong.
+  rm -f "$EXT_DIR/Cached Theme.pak"
+
   # Fail loudly if a raw {{ placeholder }} survived compilation.
   if grep -q "{{" "$EXT_DIR/ntp.css" "$EXT_DIR/polish.css" "$EXT_DIR/global.css" "$EXT_DIR/theme.json" "$EXT_DIR/manifest.json" 2>/dev/null; then
     echo "[omarchy-sync-brave] ERROR: unresolved {{ placeholder }} in extension outputs." >&2
