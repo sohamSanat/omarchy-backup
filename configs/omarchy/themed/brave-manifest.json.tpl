@@ -20,7 +20,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["global.css", "theme.json"],
+      "resources": ["global.css", "theme.json", "ntp.css", "polish.css"],
       "matches": ["*://*/*"]
     }
   ]

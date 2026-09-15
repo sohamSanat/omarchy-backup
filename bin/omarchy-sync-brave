@@ -5,35 +5,36 @@ set -euo pipefail
 # Omarchy -> Brave-Origin Dynamic Theme & Polish Sync
 # ------------------------------------------------------------------------------
 # Script: ~/.local/bin/omarchy-sync-brave
-# Purpose: Synchronizes Brave-Origin's New Tab Page and YouTube/GitHub/Reddit
-#          site polish with the active Omarchy system theme.
+# Purpose: Synchronizes Brave-Origin's New Tab Page (Ctrl + T) and YouTube/GitHub/Reddit
+#          site polish with the active Omarchy system theme, with zero-restart hot-apply.
 #
 # ARCHITECTURE OVERVIEW:
-# 1. Templates (auto-compiled by omarchy-theme-set-templates on theme set):
+# 1. Templates (compiled on sync / theme-set):
 #    - ~/.config/omarchy/themed/brave-ntp.css.tpl    -> .../current/theme/brave-ntp.css
 #    - ~/.config/omarchy/themed/brave-polish.css.tpl -> .../current/theme/brave-polish.css
 #    - ~/.config/omarchy/themed/brave-polish.json.tpl-> .../current/theme/brave-polish.json
+#    - ~/.config/omarchy/themed/brave-manifest.json.tpl -> .../current/theme/brave-manifest.json
+#    - ~/.config/omarchy/themed/brave-global.css.tpl -> .../current/theme/brave-global.css
 #
 # 2. Companion extension (unpacked MV3, loaded once via brave://extensions):
 #    - ~/.config/omarchy/brave-polish/  (manifest, ntp.html/js, loader.js)
 #    - This script copies compiled outputs in as ntp.css / polish.css / theme.json
-#    - loader.js re-fetches polish.css from disk on EVERY navigation, so site
-#      themes hot-apply with no restart. ntp.html re-reads ntp.css per new tab.
+#    - loader.js re-fetches polish.css on every navigation.
+#    - ntp.html re-reads ntp.css per new tab, and ntp.js hot-polls theme.json live.
 #
-# 3. Toolbar color: handled by stock Omarchy (chromium.theme policy +
-#    omarchy-theme-set-browser --refresh-platform-policy). This script does not
-#    touch /etc policies, Preferences, or Secure Preferences.
+# 3. Toolbar & frame recoloring:
+#    - Updates /etc/brave/policies/managed/color.json via omarchy-theme-set-browser-policy
+#    - Sends --refresh-platform-policy to running brave-origin-nightly/brave processes.
 #
 # 4. Automation: ~/.config/omarchy/hooks/theme-set.d/brave-sync.sh runs
 #    `omarchy-sync-brave --sync` after every `omarchy theme set`.
-#
-# 5. Dark Reader is intentionally untouched (user's choice).
 # ==============================================================================
 
 CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
 EXT_DIR="$HOME/.config/omarchy/brave-polish"
 USER_THEMED_DIR="$HOME/.config/omarchy/themed"
 FORK_DIR="$HOME/.config/omarchy/brave-darkreader"
+FORCE_COMPILE=0
 
 show_help() {
   cat <<'EOF'
@@ -42,7 +43,7 @@ Usage: omarchy-sync-brave [OPTIONS]
 Synchronize Brave-Origin NTP + site polish with the active Omarchy theme.
 
 Options:
-  --sync       Copy compiled theme outputs into the companion extension (default)
+  --sync       Recompile templates, sync extension files, and refresh policy (default)
   --status     Show theme, extension, and Brave process status
   -h, --help   Display this help message
 
@@ -53,20 +54,22 @@ EOF
 }
 
 # Compile a template with {{ key }} placeholders from colors.toml.
-# Mirrors omarchy-theme-set-templates resolution via omarchy-theme-color --all.
 compile_template_if_needed() {
   local tpl_path="$1"
   local out_path="$2"
+  local colors_file="$CURRENT_THEME_DIR/colors.toml"
 
-  if [[ -f "$out_path" && -f "$tpl_path" && "$out_path" -nt "$tpl_path" ]]; then
-    return 0
+  if [[ $FORCE_COMPILE -eq 0 && -f "$out_path" && -f "$tpl_path" && "$out_path" -nt "$tpl_path" ]]; then
+    if [[ ! -f "$colors_file" || "$out_path" -nt "$colors_file" ]]; then
+      return 0
+    fi
   fi
+
   if [[ ! -f "$tpl_path" ]]; then
     echo "[omarchy-sync-brave] Warning: template $tpl_path not found. Skipping." >&2
     return 0
   fi
 
-  local colors_file="$CURRENT_THEME_DIR/colors.toml"
   if [[ ! -f "$colors_file" ]]; then
     echo "[omarchy-sync-brave] Warning: $colors_file not found. Cannot compile $(basename "$out_path")." >&2
     return 1
@@ -75,7 +78,7 @@ compile_template_if_needed() {
   local sed_script
   sed_script=$(mktemp)
   omarchy-theme-color --file "$colors_file" --all 2>/dev/null | awk -F'\t' '{print "s|{{ " $1 " }}|" $2 "|g"}' > "$sed_script"
-  # Also support {{ key_rgb }} and {{ key_strip }} like omarchy-theme-set-templates
+  # Support {{ key_rgb }} and {{ key_strip }} like omarchy-theme-set-templates
   while IFS=$'\t' read -r key value; do
     if [[ $value =~ ^#[0-9A-Fa-f]{6}$ ]]; then
       local hex="${value#\#}"
@@ -100,6 +103,7 @@ ensure_theme_compiled() {
 }
 
 do_sync() {
+  FORCE_COMPILE=1
   ensure_theme_compiled || return 1
   mkdir -p "$EXT_DIR"
 
@@ -130,8 +134,6 @@ do_sync() {
   fi
 
   # Feed the Dark Reader fork (Zen treatment): popup styling + theme tokens.
-  # The fork reads config/omarchy-theme.json from disk on every toggle/refresh
-  # and rebuilds its dynamic theme, so this hot-applies on next navigation.
   if [[ -d "$FORK_DIR" ]]; then
     if [[ -f "$CURRENT_THEME_DIR/zen-darkreader.css" ]]; then
       cp "$CURRENT_THEME_DIR/zen-darkreader.css" "$FORK_DIR/ui/popup/omarchy-theme.css"
@@ -152,6 +154,33 @@ do_sync() {
     echo "[omarchy-sync-brave] ERROR: generated theme.json or manifest.json is invalid JSON." >&2
     return 1
   }
+
+  # Synchronize Brave policy color for frame & toolbar
+  local colors_file="$CURRENT_THEME_DIR/colors.toml"
+  if [[ -f "$colors_file" ]]; then
+    local bg_hex
+    bg_hex=$(omarchy-theme-color --file "$colors_file" background 2>/dev/null || true)
+    if [[ $bg_hex =~ ^#[0-9A-Fa-f]{6}$ ]]; then
+      local clean_hex="${bg_hex#\#}"
+      clean_hex=$(echo "$clean_hex" | tr '[:upper:]' '[:lower:]')
+      if command -v omarchy-theme-set-browser-policy >/dev/null 2>&1; then
+        omarchy-theme-set-browser-policy "$clean_hex" 2>/dev/null || true
+      fi
+    fi
+  fi
+
+  # Refresh running Brave Origin / Brave instance policies
+  if pgrep -f "brave" >/dev/null 2>&1; then
+    if command -v brave-origin-nightly >/dev/null 2>&1; then
+      timeout 2 brave-origin-nightly --refresh-platform-policy --no-startup-window >/dev/null 2>&1 &
+    fi
+    if command -v brave-origin >/dev/null 2>&1; then
+      timeout 2 brave-origin --refresh-platform-policy --no-startup-window >/dev/null 2>&1 &
+    fi
+    if command -v brave >/dev/null 2>&1; then
+      timeout 2 brave --refresh-platform-policy --no-startup-window >/dev/null 2>&1 &
+    fi
+  fi
 
   echo "[omarchy-sync-brave] Synced $copied file(s) into $EXT_DIR (hot-applies on next tab/navigation)."
 }
@@ -198,7 +227,7 @@ do_status() {
   fi
   echo ""
   local brave_pid
-  brave_pid=$(pgrep -x brave 2>/dev/null || true)
+  brave_pid=$(pgrep -f "brave.*origin.*nightly" 2>/dev/null || pgrep -x brave 2>/dev/null || true)
   if [[ -n "$brave_pid" ]]; then
     echo "Brave Process        : Running (PID: $brave_pid)"
     echo "Note: new tabs pick up NTP theme immediately; site polish applies on next navigation/reload."

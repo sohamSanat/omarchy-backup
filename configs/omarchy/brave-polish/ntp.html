@@ -1,19 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>New Tab</title>
-<link rel="stylesheet" href="ntp.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>New Tab</title>
+  <link rel="stylesheet" href="ntp.css" id="omarchy-ntp-style" />
 </head>
 <body>
-  <div class="omarchy-clock" id="clock">--:--</div>
-  <div class="omarchy-date" id="date"></div>
-  <form class="omarchy-search" id="search" autocomplete="off">
-    <span class="search-icon">&#8981;</span>
-    <input id="q" type="text" placeholder="Search Brave" aria-label="Search" />
-  </form>
-  <div class="omarchy-topsites" id="topsites"></div>
+  <div id="omarchy-ntp-root">
+    <div id="omarchy-search-card">
+      <div id="omarchy-search-bar">
+        <div class="search-icon-wrapper" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </div>
+        <input 
+          type="text" 
+          id="omarchy-search-input" 
+          placeholder="Search with Google or enter address" 
+          autocomplete="off" 
+          autofocus 
+          spellcheck="false" 
+        />
+        <button id="omarchy-search-clear" class="search-clear-btn" aria-label="Clear search" style="display: none;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div id="omarchy-results-container">
+        <div id="omarchy-results-list" role="listbox"></div>
+      </div>
+      <div id="omarchy-search-hints">
+        <div class="hint-group">
+          <span class="hint-item"><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+          <span class="hint-item"><kbd>↵</kbd> open</span>
+        </div>
+        <div class="hint-group">
+          <span class="hint-item"><kbd>esc</kbd> clear</span>
+        </div>
+      </div>
+    </div>
+  </div>
   <script src="ntp.js"></script>
 </body>
 </html>
