@@ -32,6 +32,7 @@ set -euo pipefail
 
 CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
 EXT_DIR="$HOME/.config/omarchy/brave-polish"
+THEME_EXT_DIR="$HOME/.config/omarchy/brave-theme"
 USER_THEMED_DIR="$HOME/.config/omarchy/themed"
 FORK_DIR="$HOME/.config/omarchy/brave-darkreader"
 FORCE_COMPILE=0
@@ -100,6 +101,7 @@ ensure_theme_compiled() {
   compile_template_if_needed "$USER_THEMED_DIR/brave-polish.json.tpl" "$CURRENT_THEME_DIR/brave-polish.json"
   compile_template_if_needed "$USER_THEMED_DIR/brave-manifest.json.tpl" "$CURRENT_THEME_DIR/brave-manifest.json"
   compile_template_if_needed "$USER_THEMED_DIR/brave-global.css.tpl" "$CURRENT_THEME_DIR/brave-global.css"
+  compile_template_if_needed "$USER_THEMED_DIR/brave-theme.json.tpl" "$CURRENT_THEME_DIR/brave-theme.json"
 }
 
 do_sync() {
@@ -126,8 +128,18 @@ do_sync() {
     fi
   done
 
-  # Delete the Cached Theme.pak so Brave re-bakes it from the new manifest.json "theme" block.
-  # If stale, it overrides manifest colors and causes the browser chrome to stay purple/wrong.
+  # Sync MV2 Chromium theme-only extension (frame, toolbar, tab colors)
+  # This is separate from the MV3 polish extension because Chromium forbids
+  # mixing "theme" with content_scripts/service_worker in a single manifest.
+  mkdir -p "$THEME_EXT_DIR"
+  if [[ -f "$CURRENT_THEME_DIR/brave-theme.json" ]]; then
+    cp "$CURRENT_THEME_DIR/brave-theme.json" "$THEME_EXT_DIR/manifest.json"
+    ((copied++)) || true
+  fi
+  # Bust the MV2 theme cache so Brave re-bakes colors from the new manifest
+  rm -f "$THEME_EXT_DIR/Cached Theme.pak"
+
+  # Bust the MV3 polish extension cache too (no theme block, but keeps it clean)
   rm -f "$EXT_DIR/Cached Theme.pak"
 
   # Fail loudly if a raw {{ placeholder }} survived compilation.
