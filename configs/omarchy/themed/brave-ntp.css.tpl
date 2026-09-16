@@ -43,10 +43,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 24px 32px;
-  background-image:
-    radial-gradient(ellipse 75% 65% at 50% 15%, color-mix(in srgb, var(--omarchy-accent) 18%, transparent), transparent 75%),
-    radial-gradient(ellipse 60% 50% at 85% 85%, color-mix(in srgb, var(--omarchy-fg) 12%, transparent), transparent 70%);
-  background-attachment: fixed;
+  background-color: var(--omarchy-bg) !important;
 }
 
 /* --- Top Header Navigation Bar --- */

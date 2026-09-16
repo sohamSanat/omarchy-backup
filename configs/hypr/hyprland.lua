@@ -31,10 +31,10 @@ require("hypr.autostart")
 require("default.hypr.toggles")
 
 -- Personal Hyprland window rules & configuration
--- Increase transparency for Obsidian so the wallpaper bleeds through with glass blur
+-- Keep Obsidian fully opaque so loaded files and plugins in the center work area do not bleed through wallpaper
 o.window("(obsidian|md\\.obsidian\\.Obsidian)", {
   tag = "-default-opacity",
-  opacity = "0.85 0.78",
+  opacity = "1.0 1.0",
 })
 
 -- Increase transparency for file managers (Strata & Nautilus) for a glass-like blur effect
@@ -46,7 +46,7 @@ o.window("(io\\.github\\.lgse\\.Strata|strata|org\\.gnome\\.Nautilus|nautilus)",
 -- Brave-Origin stays fully opaque: window-level transparency washes out
 -- loaded websites. New-tab styling is handled inside the page (solid
 -- theme background + glass cards), like Zen's solid-chrome approach.
-o.window("(brave-origin-nightly|brave-origin|brave)", {
+o.window("([bB]rave-origin-nightly|[bB]rave-origin|[bB]rave-browser|[bB]rave)", {
   tag = "-default-opacity",
   opacity = "1.0 1.0",
 })
