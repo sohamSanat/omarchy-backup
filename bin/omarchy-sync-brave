@@ -420,7 +420,7 @@ do_status() {
   fi
   echo "Active Omarchy Theme : $current_theme"
   echo "Current Theme Dir    : $CURRENT_THEME_DIR"
-  for f in brave-ntp.css brave-polish.css brave-global.css brave-polish.json brave-manifest.json brave-theme.json; do
+  for f in brave-ntp.css brave-polish.css brave-global.css brave-polish.json brave-manifest.json; do
     if [[ -f "$CURRENT_THEME_DIR/$f" ]]; then
       echo "Compiled $f : Present ($(wc -c < "$CURRENT_THEME_DIR/$f") bytes)"
     else
