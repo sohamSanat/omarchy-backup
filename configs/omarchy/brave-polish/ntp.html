@@ -4,47 +4,86 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>New Tab</title>
-  <link rel="stylesheet" href="ntp.css" id="omarchy-ntp-style" />
+  <link rel="stylesheet" href="ntp.css" />
 </head>
 <body>
-  <div id="omarchy-ntp-root">
-    <div id="omarchy-search-card">
-      <div id="omarchy-search-bar">
-        <div class="search-icon-wrapper" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </div>
+  <!-- Top Header Navigation -->
+  <header class="ntp-header">
+    <div class="ntp-badge-space" title="Active Space">S</div>
+    <div class="ntp-header-right">
+      <div class="ntp-pill-theme" id="theme-pill">
+        <span class="ntp-pill-dot"></span>
+        <span id="theme-name">Aetheria</span>
+      </div>
+      <div class="ntp-pill-clock" id="clock">12:00</div>
+    </div>
+  </header>
+
+  <!-- Center Search & Launchpad -->
+  <main class="ntp-center">
+    <div class="search-container">
+      <form id="search-form" class="search-bar">
+        <svg class="search-icon" viewBox="0 0 24 24">
+          <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+        </svg>
         <input 
+          id="search-input" 
+          class="search-input" 
           type="text" 
-          id="omarchy-search-input" 
-          placeholder="Search with Google or enter address" 
+          name="q"
           autocomplete="off" 
           autofocus 
-          spellcheck="false" 
+          placeholder="Search with Google or enter address" 
+          spellcheck="false"
         />
-        <button id="omarchy-search-clear" class="search-clear-btn" aria-label="Clear search" style="display: none;">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-      <div id="omarchy-results-container">
-        <div id="omarchy-results-list" role="listbox"></div>
-      </div>
-      <div id="omarchy-search-hints">
-        <div class="hint-group">
-          <span class="hint-item"><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
-          <span class="hint-item"><kbd>↵</kbd> open</span>
-        </div>
-        <div class="hint-group">
-          <span class="hint-item"><kbd>esc</kbd> clear</span>
-        </div>
-      </div>
+      </form>
     </div>
-  </div>
+
+    <!-- Quick Launch Shortcuts -->
+    <div class="shortcuts-grid">
+      <a class="shortcut-card" href="https://youtube.com" title="YouTube">
+        <div class="shortcut-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="#FF0000">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+        </div>
+        <span class="shortcut-label">YouTube</span>
+      </a>
+
+      <a class="shortcut-card" href="https://github.com" title="GitHub">
+        <div class="shortcut-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+        </div>
+        <span class="shortcut-label">GitHub</span>
+      </a>
+
+      <a class="shortcut-card" href="https://reddit.com" title="Reddit">
+        <div class="shortcut-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="#FF4500">
+            <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.56 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.56 12 8 12.56 8 13.25c0 .688.56 1.25 1.25 1.25.688 0 1.25-.56 1.25-1.25 0-.688-.56-1.25-1.25-1.25zm5.5 0c-.688 0-1.25.56-1.25 1.25 0 .688.56 1.25 1.25 1.25.688 0 1.25-.56 1.25-1.25 0-.688-.56-1.25-1.25-1.25zm-5.465 3.99a.377.377 0 0 0-.268.644c.731.733 2.016 1.07 2.983 1.07.966 0 2.251-.337 2.984-1.07a.377.377 0 0 0-.535-.533c-.53.53-1.572.776-2.449.776-.878 0-1.921-.247-2.45-.776a.373.373 0 0 0-.265-.111z"/>
+          </svg>
+        </div>
+        <span class="shortcut-label">Reddit</span>
+      </a>
+
+      <a class="shortcut-card" href="https://gemini.google.com" title="AI Assistant">
+        <div class="shortcut-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/>
+          </svg>
+        </div>
+        <span class="shortcut-label">Gemini</span>
+      </a>
+    </div>
+  </main>
+
+  <!-- Footer Info -->
+  <footer class="ntp-footer">
+    Omarchy OS • Dynamic Theme Synergy
+  </footer>
+
   <script src="ntp.js"></script>
 </body>
 </html>

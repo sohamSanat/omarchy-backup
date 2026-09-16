@@ -118,6 +118,13 @@ compile_template_if_needed() {
     fi
   done < <(omarchy-theme-color --file "$colors_file" --all 2>/dev/null)
 
+  # Also support theme_name
+  local theme_name="Omarchy"
+  if [[ -f "$HOME/.local/state/omarchy/current/theme.name" ]]; then
+    theme_name=$(cat "$HOME/.local/state/omarchy/current/theme.name")
+  fi
+  printf 's|{{ theme_name }}|%s|g\n' "$theme_name" >> "$sed_script"
+
   sed -f "$sed_script" "$tpl_path" > "$out_path"
   rm -f "$sed_script"
   echo "[omarchy-sync-brave] Compiled $(basename "$out_path")."
@@ -300,10 +307,18 @@ if os.path.exists(prefs_file):
             pref = json.load(f)
         if 'extensions' in pref and 'theme' in pref['extensions']:
             del pref['extensions']['theme']
-        # Clean omnibox: no local file:// path, blank NTP with empty search bar
+        # Clean omnibox: open standard New Tab Page overridden by brave-polish extension
         pref['homepage'] = ''
         pref['homepage_is_newtabpage'] = True
-        pref.setdefault('brave', {}).setdefault('new_tab_page', {})['shows_options'] = 2
+        ntp_conf = pref.setdefault('brave', {}).setdefault('new_tab_page', {})
+        ntp_conf['shows_options'] = 1
+        ntp_conf['show_background_image'] = False
+        ntp_conf['show_branded_background_image'] = False
+        ntp_conf['show_clock'] = False
+        ntp_conf['show_stats'] = False
+        # Remove bookmarks bar clutter on NTP and all tabs
+        pref.setdefault('bookmark_bar', {})['show_on_all_tabs'] = False
+        pref.setdefault('brave', {})['always_show_bookmark_bar_on_ntp'] = False
         with open(prefs_file, 'w') as f:
             json.dump(pref, f)
     except Exception:

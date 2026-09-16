@@ -1,4 +1,5 @@
 {
+  "name": "{{ theme_name }}",
   "mode": "{{ mode }}",
   "background": "{{ background }}",
   "foreground": "{{ foreground }}",

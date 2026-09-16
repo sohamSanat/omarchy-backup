@@ -4,321 +4,300 @@
  * Template: ~/.config/omarchy/themed/brave-ntp.css.tpl
  * Compiled to: ~/.local/state/omarchy/current/theme/brave-ntp.css
  * Consumed by: ~/.config/omarchy/brave-polish/ntp.html
- *
- * Provides a floating, frosted search & quick access card on New Tab (Ctrl + T),
- * matching the exact aesthetic, typography, and keyboard responsiveness of Zen.
  * ============================================================================== */
 
 :root {
-  /* --- Omarchy System Theme Tokens --- */
   --omarchy-bg: {{ background }};
   --omarchy-fg: {{ foreground }};
   --omarchy-accent: {{ accent }};
   --omarchy-muted: {{ muted }};
-  --omarchy-selection-bg: {{ selection_background }};
-  --omarchy-selection-fg: {{ selection_foreground }};
-
-  /* Surfaces & Interactivity (blended for perfect contrast in both light and dark modes) */
+  
   --omarchy-surface: color-mix(in srgb, {{ foreground }} 7%, {{ background }});
-  --omarchy-surface-hover: color-mix(in srgb, {{ foreground }} 13%, {{ background }});
-  --omarchy-surface-active: color-mix(in srgb, {{ foreground }} 20%, {{ background }});
+  --omarchy-surface-hover: color-mix(in srgb, {{ foreground }} 14%, {{ background }});
+  --omarchy-surface-active: color-mix(in srgb, {{ foreground }} 22%, {{ background }});
   --omarchy-border: color-mix(in srgb, {{ foreground }} 16%, transparent);
-  --omarchy-border-subtle: color-mix(in srgb, {{ foreground }} 10%, transparent);
-  --omarchy-card-bg: color-mix(in srgb, {{ background }} 94%, {{ foreground }} 6%);
+  --omarchy-border-hover: color-mix(in srgb, {{ accent }} 45%, var(--omarchy-border));
+  --omarchy-accent-subtle: color-mix(in srgb, {{ accent }} 22%, transparent);
 }
 
 * {
   box-sizing: border-box;
-}
-
-/* Guard: sweep any unexpected injected browser elements outside the root container */
-body > :not(script):not(style):not(link):not(#omarchy-ntp-root) {
-  display: none !important;
-  visibility: hidden !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
 html, body {
-  margin: 0;
-  padding: 0;
-  min-height: 100vh;
-  width: 100vw;
-  background: var(--omarchy-bg) !important;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
   background-color: var(--omarchy-bg) !important;
-  color: var(--omarchy-fg) !important;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", Helvetica, Arial, sans-serif;
-  overflow-x: hidden;
+  color: var(--omarchy-fg);
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   user-select: none;
 }
 
 body {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  justify-content: flex-start;
-  padding-top: clamp(80px, 16vh, 160px);
-  /* Dynamic ambient glow matching active theme accent */
+  padding: 24px 32px;
   background-image:
-    radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, {{ accent }} 20%, transparent), transparent 70%),
-    radial-gradient(40% 35% at 85% 90%, color-mix(in srgb, {{ accent }} 10%, transparent), transparent 70%);
+    radial-gradient(ellipse 75% 65% at 50% 15%, color-mix(in srgb, var(--omarchy-accent) 18%, transparent), transparent 75%),
+    radial-gradient(ellipse 60% 50% at 85% 85%, color-mix(in srgb, var(--omarchy-fg) 12%, transparent), transparent 70%);
   background-attachment: fixed;
 }
 
-::selection {
-  background: var(--omarchy-selection-bg) !important;
-  color: var(--omarchy-selection-fg) !important;
-}
-
-/* ==============================================================================
-   NTP Root & Search Card (Zen-Grade Floating Card)
-   ============================================================================== */
-
-#omarchy-ntp-root {
+/* --- Top Header Navigation Bar --- */
+.ntp-header {
   width: 100%;
-  max-width: 680px;
-  padding: 0 16px;
+  max-width: 1200px;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  animation: omarchy-card-appear 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeIn 0.4s ease-out;
 }
 
-@keyframes omarchy-card-appear {
-  from {
-    opacity: 0;
-    transform: translateY(-8px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-#omarchy-search-card {
-  width: 100%;
-  background: var(--omarchy-card-bg);
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
-  border: 1px solid var(--omarchy-border);
-  border-radius: 16px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.42), 0 0 0 1px var(--omarchy-border);
-  overflow: hidden;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-#omarchy-search-card:focus-within {
-  border-color: var(--omarchy-accent);
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--omarchy-accent) 40%, transparent),
-    0 24px 60px rgba(0, 0, 0, 0.52);
-}
-
-/* --- Search Input Row --- */
-
-#omarchy-search-bar {
-  display: flex;
-  align-items: center;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--omarchy-border);
-  gap: 12px;
-}
-
-.search-icon-wrapper {
+.ntp-badge-space {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--omarchy-fg);
-  opacity: 0.75;
-  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--omarchy-accent-subtle);
+  border: 1px solid color-mix(in srgb, var(--omarchy-accent) 40%, transparent);
+  color: var(--omarchy-accent);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease, background 0.15s ease;
 }
 
-#omarchy-search-input {
-  flex: 1;
+.ntp-badge-space:hover {
+  transform: scale(1.05);
+  background: color-mix(in srgb, var(--omarchy-accent) 35%, transparent);
+}
+
+.ntp-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ntp-pill-theme {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: var(--omarchy-surface);
+  border: 1px solid var(--omarchy-border);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--omarchy-fg);
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.ntp-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--omarchy-accent);
+  box-shadow: 0 0 8px var(--omarchy-accent);
+  animation: pulseDot 2.5s infinite ease-in-out;
+}
+
+.ntp-pill-clock {
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: var(--omarchy-surface);
+  border: 1px solid var(--omarchy-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--omarchy-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Center Search & Launchpad --- */
+.ntp-center {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+  margin-top: -40px;
+  animation: slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Zen-Style Search Pill */
+.search-container {
+  width: 100%;
+  position: relative;
+}
+
+.search-bar {
+  width: 100%;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  background: var(--omarchy-surface);
+  border: 1px solid var(--omarchy-border);
+  border-radius: 27px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--omarchy-border);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.search-bar:hover {
+  background: var(--omarchy-surface-hover);
+  border-color: var(--omarchy-border-hover);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--omarchy-border-hover);
+}
+
+.search-bar:focus-within {
+  background: color-mix(in srgb, var(--omarchy-bg) 92%, var(--omarchy-fg) 8%);
+  border-color: var(--omarchy-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--omarchy-accent) 35%, transparent), 0 20px 52px rgba(0, 0, 0, 0.65);
+  transform: translateY(-1px);
+}
+
+.search-icon {
+  width: 20px;
+  height: 20px;
+  fill: var(--omarchy-fg);
+  opacity: 0.85;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.search-bar:focus-within .search-icon {
+  opacity: 1;
+  fill: var(--omarchy-accent);
+  transform: scale(1.05);
+}
+
+.search-input {
+  width: 100%;
+  height: 100%;
   background: transparent;
   border: none;
   outline: none;
-  font-size: 15.5px;
+  font-size: 16px;
+  color: var(--omarchy-fg);
+  font-family: inherit;
   font-weight: 500;
-  color: var(--omarchy-fg);
-  caret-color: var(--omarchy-accent);
-  padding: 0;
-  margin: 0;
-  user-select: text;
 }
 
-#omarchy-search-input::placeholder {
-  color: var(--omarchy-muted);
-  opacity: 0.85;
-}
-
-.search-clear-btn {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-  color: var(--omarchy-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.12s ease, color 0.12s ease;
-  flex-shrink: 0;
-}
-
-.search-clear-btn:hover {
-  background-color: var(--omarchy-surface-hover);
-  color: var(--omarchy-fg);
-}
-
-/* --- Results / Quick Access Container --- */
-
-#omarchy-results-container {
-  padding: 6px 8px 8px 8px;
-  max-height: 420px;
-  overflow-y: auto;
-}
-
-#omarchy-results-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-#omarchy-results-container::-webkit-scrollbar-thumb {
-  background: var(--omarchy-border);
-  border-radius: 4px;
-}
-
-#omarchy-results-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-/* --- Row Styling (matches Zen's urlbarView-row) --- */
-
-.omarchy-result-row {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 8px;
-  text-decoration: none;
-  cursor: pointer;
-  background: transparent;
-  border-left: 3px solid transparent;
-  transition: background-color 0.1s ease, border-left-color 0.1s ease;
-  user-select: none;
-  gap: 12px;
-}
-
-.omarchy-result-row:hover {
-  background-color: var(--omarchy-surface-hover);
-}
-
-.omarchy-result-row.selected {
-  background-color: var(--omarchy-surface-active);
-  border-left-color: var(--omarchy-accent);
-}
-
-.omarchy-result-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  background-color: var(--omarchy-surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--omarchy-fg);
-  overflow: hidden;
-}
-
-.omarchy-result-icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.omarchy-result-icon img {
-  width: 16px;
-  height: 16px;
-  object-fit: contain;
-}
-
-.omarchy-result-content {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.omarchy-result-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--omarchy-fg);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.omarchy-result-url {
-  font-size: 12px;
+.search-input::placeholder {
   color: var(--omarchy-accent);
   opacity: 0.9;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: 400;
+  transition: opacity 0.2s ease;
 }
 
-.omarchy-result-tag {
-  font-size: 11px;
+.search-input:focus::placeholder {
+  opacity: 0.45;
+}
+
+/* --- Quick Launch Shortcuts --- */
+.shortcuts-grid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.shortcut-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  min-width: 90px;
+  background: var(--omarchy-surface);
+  border: 1px solid var(--omarchy-border);
+  border-radius: 16px;
+  text-decoration: none;
+  color: var(--omarchy-fg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.shortcut-card:hover {
+  transform: translateY(-3px);
+  background: var(--omarchy-surface-hover);
+  border-color: var(--omarchy-border-hover);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--omarchy-border-hover);
+}
+
+.shortcut-card:active {
+  transform: translateY(-1px);
+  background: var(--omarchy-surface-active);
+}
+
+.shortcut-icon-wrapper {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--omarchy-bg) 70%, transparent);
+  border: 1px solid var(--omarchy-border);
+  transition: transform 0.2s ease;
+}
+
+.shortcut-card:hover .shortcut-icon-wrapper {
+  transform: scale(1.08);
+}
+
+.shortcut-icon-wrapper svg {
+  width: 22px;
+  height: 22px;
+}
+
+.shortcut-label {
+  font-size: 13px;
   font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--omarchy-surface);
-  color: var(--omarchy-muted);
-  border: 1px solid var(--omarchy-border);
-  flex-shrink: 0;
+  letter-spacing: 0.2px;
+  opacity: 0.9;
+  transition: opacity 0.2s ease, color 0.2s ease;
 }
 
-.omarchy-result-row.selected .omarchy-result-tag {
-  color: var(--omarchy-fg);
-  border-color: color-mix(in srgb, var(--omarchy-accent) 40%, var(--omarchy-border));
+.shortcut-card:hover .shortcut-label {
+  opacity: 1;
+  color: var(--omarchy-accent);
 }
 
-/* --- Keyboard Hints Footer --- */
-
-#omarchy-search-hints {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px 10px 16px;
-  border-top: 1px solid var(--omarchy-border-subtle);
+/* Footer info */
+.ntp-footer {
   font-size: 11px;
   color: var(--omarchy-muted);
-  opacity: 0.8;
+  opacity: 0.6;
+  letter-spacing: 0.5px;
+  text-align: center;
 }
 
-.hint-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.hint-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-kbd {
-  font-family: inherit;
-  font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--omarchy-surface);
-  border: 1px solid var(--omarchy-border);
-  color: var(--omarchy-fg);
+@keyframes pulseDot {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.3); }
 }
