@@ -284,9 +284,11 @@ if os.path.exists(local_state_file):
         with open(local_state_file, 'r') as f:
             ls = json.load(f)
         profile_def = ls.setdefault('profile', {}).setdefault('info_cache', {}).setdefault('Default', {})
-        profile_def['profile_color_seed'] = seed_int
-        profile_def['profile_highlight_color'] = bg_int
-        profile_def['default_avatar_fill_color'] = bg_int
+        # Seed 0 forces Chromium to avoid Material 3 Monet palette tinting (no purple/pink frame/sidebar).
+        # This gives Brave the clean 'all-black border' and dark sleek chrome matching Zen.
+        profile_def['profile_color_seed'] = 0
+        profile_def['profile_highlight_color'] = 0
+        profile_def['default_avatar_fill_color'] = 0
         with open(local_state_file, 'w') as f:
             json.dump(ls, f)
     except Exception:
@@ -298,9 +300,10 @@ if os.path.exists(prefs_file):
             pref = json.load(f)
         if 'extensions' in pref and 'theme' in pref['extensions']:
             del pref['extensions']['theme']
-        pref['homepage'] = 'file://' + os.path.expanduser('~/.config/omarchy/brave-polish/ntp.html')
-        pref['homepage_is_newtabpage'] = False
-        pref.setdefault('brave', {}).setdefault('new_tab_page', {})['shows_options'] = 1
+        # Clean omnibox: no local file:// path, blank NTP with empty search bar
+        pref['homepage'] = ''
+        pref['homepage_is_newtabpage'] = True
+        pref.setdefault('brave', {}).setdefault('new_tab_page', {})['shows_options'] = 2
         with open(prefs_file, 'w') as f:
             json.dump(pref, f)
     except Exception:
@@ -365,7 +368,19 @@ do_sync() {
   write_flags_file
   sync_brave_profile_state
 
-  echo "[omarchy-sync-brave] Synced $copied file(s) (NTP + page polish + profile state hot-apply)."
+  # Ensure browser policy uses clean neutral black (or light neutral in light mode)
+  # instead of raw theme background hue which triggers Chromium's Material 3 purple tinting.
+  local policy_color="000000"
+  if command -v omarchy-theme-env >/dev/null 2>&1; then
+    if omarchy-theme-env is-light >/dev/null 2>&1; then
+      policy_color="f5f5f5"
+    fi
+  fi
+  if command -v omarchy-theme-set-browser-policy >/dev/null 2>&1; then
+    omarchy-theme-set-browser-policy "$policy_color" >/dev/null 2>&1 || true
+  fi
+
+  echo "[omarchy-sync-brave] Synced $copied file(s) (All-black border/chrome + page polish hot-apply)."
 
   refresh_running_browser
 }
