@@ -8,5 +8,5 @@
 # ==============================================================================
 
 if [[ -x "$HOME/.local/bin/omarchy-sync-brave" ]]; then
-  "$HOME/.local/bin/omarchy-sync-brave" --sync 2>/dev/null || true
+  "$HOME/.local/bin/omarchy-sync-brave" --sync >/dev/null 2>&1 || true
 fi
