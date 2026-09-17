@@ -19,6 +19,8 @@ background-blur = true
 # Cursor styling
 cursor-style = "block"
 cursor-style-blink = false
+cursor-opacity = 0
+custom-shader = "~/.config/ghostty/shaders/cursor_glide.glsl"
 
 # Cursor styling + SSH session terminfo
 # (all shell integration options must be passed together)

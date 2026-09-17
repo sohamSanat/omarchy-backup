@@ -97,12 +97,16 @@ backup_if_exists "${USER_HOME}/.config/omarchy/shell.json"
 backup_if_exists "${USER_HOME}/.config/omarchy/themebook.json"
 backup_if_exists "${USER_HOME}/.config/omarchy/battery-limiter.json"
 backup_if_exists "${USER_HOME}/.config/omarchy/quicklinks.json"
+backup_if_exists "${USER_HOME}/.config/omarchy/pretty-screenshot.json"
 
 cp -a "${SCRIPT_DIR}/configs/omarchy/shell.json" "${USER_HOME}/.config/omarchy/"
 cp -a "${SCRIPT_DIR}/configs/omarchy/themebook.json" "${USER_HOME}/.config/omarchy/"
 cp -a "${SCRIPT_DIR}/configs/omarchy/battery-limiter.json" "${USER_HOME}/.config/omarchy/"
 if [[ -f "${SCRIPT_DIR}/configs/omarchy/quicklinks.json" ]]; then
   cp -a "${SCRIPT_DIR}/configs/omarchy/quicklinks.json" "${USER_HOME}/.config/omarchy/"
+fi
+if [[ -f "${SCRIPT_DIR}/configs/omarchy/pretty-screenshot.json" ]]; then
+  cp -a "${SCRIPT_DIR}/configs/omarchy/pretty-screenshot.json" "${USER_HOME}/.config/omarchy/"
 fi
 cp -a "${SCRIPT_DIR}/configs/omarchy/branding/." "${USER_HOME}/.config/omarchy/branding/"
 cp -a "${SCRIPT_DIR}/configs/omarchy/defaults/." "${USER_HOME}/.config/omarchy/defaults/"
@@ -212,6 +216,24 @@ fi
 if [[ -f "${SCRIPT_DIR}/configs/chromium-flags.conf" ]]; then
   cp -a "${SCRIPT_DIR}/configs/chromium-flags.conf" "${USER_HOME}/.config/"
   echo "  [OK] Restored Chromium / Brave Wayland ozone flags: ~/.config/chromium-flags.conf"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/environment.d" ]]; then
+  mkdir -p "${USER_HOME}/.config/environment.d"
+  cp -a "${SCRIPT_DIR}/configs/environment.d/." "${USER_HOME}/.config/environment.d/"
+  echo "  [OK] Restored environment configurations: ~/.config/environment.d/"
+fi
+if [[ -f "${SCRIPT_DIR}/configs/brave-origin-nightly-flags.conf" ]]; then
+  cp -a "${SCRIPT_DIR}/configs/brave-origin-nightly-flags.conf" "${USER_HOME}/.config/"
+  echo "  [OK] Restored Brave Origin Nightly startup flags: ~/.config/brave-origin-nightly-flags.conf"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/hyprland-preview-share-picker" ]]; then
+  mkdir -p "${USER_HOME}/.config/hyprland-preview-share-picker"
+  cp -a "${SCRIPT_DIR}/configs/hyprland-preview-share-picker/." "${USER_HOME}/.config/hyprland-preview-share-picker/"
+  echo "  [OK] Restored Hyprland screen share picker configuration"
+fi
+if [[ -f "${SCRIPT_DIR}/configs/user-dirs.dirs" ]]; then
+  cp -a "${SCRIPT_DIR}/configs/user-dirs.dirs" "${USER_HOME}/.config/"
+  echo "  [OK] Restored XDG user directory layout: ~/.config/user-dirs.dirs"
 fi
 if [[ -f "${SCRIPT_DIR}/configs/brave/policies/managed/omarchy-ntp.json" ]]; then
   echo "  -> Restoring Brave Origin managed policies..."
@@ -542,6 +564,9 @@ for wa_bin in omarchy-whatsapp omarchy-whatsapp-ctl omarchy-whatsapp-daemon omar
 done
 if [[ -f "${USER_HOME}/.config/omarchy/plugins/reidenxerx.tile-blueprints/bin/tile-blueprints" ]]; then
   ln -nsf "${USER_HOME}/.config/omarchy/plugins/reidenxerx.tile-blueprints/bin/tile-blueprints" "${USER_HOME}/.local/bin/tile-blueprints"
+fi
+if [[ -f "${USER_HOME}/.config/omarchy/plugins/tiertek.scratchpad-deck/bin/scratchpad-deck" ]]; then
+  ln -nsf "${USER_HOME}/.config/omarchy/plugins/tiertek.scratchpad-deck/bin/scratchpad-deck" "${USER_HOME}/.local/bin/scratchpad-deck"
 fi
 if [[ -f "${USER_HOME}/.local/bin/photos" ]]; then
   ln -nsf "${USER_HOME}/.local/bin/photos" "${USER_HOME}/.local/bin/photo-gallery"

@@ -86,5 +86,30 @@ o.bind("switch:on:Lid Switch", nil, "omarchy-system-lid-close", { locked = true 
 hl.unbind("switch:off:Lid Switch")
 o.bind("switch:off:Lid Switch", nil, "omarchy-system-lid-open", { locked = true })
 
+-- tiertek.scratchpad-deck: begin
+local deck = os.getenv("HOME") .. "/.config/omarchy/plugins/tiertek.scratchpad-deck/bin/scratchpad-deck"
 
+hl.unbind("SUPER + S")
+o.bind("SUPER + S", "Open scratchpad deck", deck .. " toggle")
 
+hl.unbind("SUPER + ALT + S")
+o.bind("SUPER + ALT + S", "Send window to scratchpad 1", deck .. " send 1")
+
+for index = 1, 9 do
+  o.bind(
+    "SUPER + CTRL + code:" .. tostring(index + 9),
+    "Show scratchpad " .. index,
+    deck .. " slot " .. index
+  )
+end
+
+for index = 1, 9 do
+  o.bind(
+    "SUPER + CTRL + ALT + code:" .. tostring(index + 9),
+    "Send window to scratchpad " .. index,
+    deck .. " send " .. index
+  )
+end
+
+o.bind("SUPER + CTRL + SLASH", "Next scratchpad", deck .. " next")
+-- tiertek.scratchpad-deck: end

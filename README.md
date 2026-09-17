@@ -80,12 +80,17 @@ Branch: `main`
 - **Brave Dark Reader Fork (`configs/omarchy/brave-darkreader/`)**: Full Chromium MV3 port of Zen's Dark Reader mod featuring ITU-R BT.601 perceptual luminance checking and dual-mode color mathematics.
 - **Managed Policy (`/etc/brave/policies/managed/omarchy-ntp.json`)**: Locks Brave's New Tab Page URL to the Omarchy NTP extension canvas.
 - **CLI & Automated Hook**: `omarchy-sync-brave` (`--sync`, `--status`) invoked automatically on every theme change via `~/.config/omarchy/hooks/theme-set.d/brave-sync.sh`.
-- **Chromium Wayland Flags (`configs/chromium-flags.conf`)**: Ozone Wayland flags, password store integration, and smooth touchpad history navigation.
+- **Chromium & Brave Startup Flags**: `configs/chromium-flags.conf`, `configs/brave-origin-nightly-flags.conf` (pre-loads Brave Polish and essential system extensions), and `configs/environment.d/brave.conf`.
 
 ### 5. 🛠️ Utilities, Standalone Apps & System Services
 - **Standalone GUI Applications (`apps/`)**:
   - `apps/photos-gallery`: Windows 11 Fluent Photo Gallery & Vault app with biometric/PIN unlock, image adjustments, and EXIF metadata view (Electron 43). Restored to `~/Projects/photos-gallery` with `p-gallery.desktop` and `bin/p-gallery`.
   - `apps/gallery`: Minimalist desktop photo viewer restored to `~/Projects/gallery` with `gallery.desktop` and `bin/gallery`.
+- **Ghostty Smooth Cursor Shader**: Custom GLSL shader `configs/terminals/ghostty/shaders/cursor_glide.glsl` enabling cubic-eased cell-to-cell cursor gliding with SDF edge antialiasing.
+- **Hyprland Screen Share Picker**: `configs/hyprland-preview-share-picker/config.yaml` applying active Omarchy theme tokens to the Wayland window and output picker.
+- **XDG Clean User Dirs Layout**: `configs/user-dirs.dirs` directing projects to `~/Projects` and eliminating home folder clutter.
+- **Pretty Screenshot Config**: `configs/omarchy/pretty-screenshot.json` (wallpaper frame, padding, drop shadows).
+- **Mise Agentic CLI Runners**: `bin/crush`, `bin/grok`, and `bin/omp` for one-shot tool execution.
 - **`agy`**: Antigravity CLI Autonomous Folder-Trust Wrapper (`bin/agy`) that pre-registers workspaces and ensures `always-proceed` permissions in `~/.gemini/antigravity-cli/settings.json` to prevent interactive permission prompts during autonomous coding runs.
 - **`firstmate-subagent`**: Multi-agent fleet conductor managing parallel crewmates across Herdr panes (`spawn`, `prompt`, `list`, `skills`, `close`) with automatic workspace trust provisioning.
 - **Lid Power & Sleep Handlers**: `omarchy-system-lid-close`, `omarchy-system-lid-open`, and `omarchy-system-wake` bound in `configs/hypr/bindings.lua` to guard against screensaver and DPMS race conditions during suspend/clamshell mode.
