@@ -34,8 +34,9 @@ return {
 							vim.cmd("syntax reset")
 						end
 
-						-- Reset background to default so colorscheme can set it properly (light themes will set to light)
-						vim.o.background = "dark"
+						-- Reset background to match current theme mode
+						local is_light = os.getenv("OMARCHY_THEME_MODE") == "light" or vim.fn.filereadable(vim.fn.expand("~/.local/state/omarchy/current/theme/light.mode")) == 1
+						vim.o.background = is_light and "light" or "dark"
 
 						-- Unload theme plugin modules to force full reload
 						if theme_plugin_name then

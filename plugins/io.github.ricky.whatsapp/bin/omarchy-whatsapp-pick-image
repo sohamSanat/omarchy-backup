@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+import sys
+import os
+import subprocess
+import shutil
+
+def pick_image():
+    # Priority 1: Omarchy system portal file chooser (opens Strata)
+    portal_picker = shutil.which("omarchy-file-select")
+    if portal_picker:
+        try:
+            res = subprocess.run(
+                [portal_picker, "--title", "Select image to attach", "--extensions", "png jpg jpeg webp gif heic avif"],
+                capture_output=True,
+                text=True
+            )
+            if res.returncode == 0:
+                selected = res.stdout.strip()
+                if selected and os.path.isfile(selected):
+                    print(selected)
+                    return 0
+            elif res.returncode == 1:
+                # User cancelled selection in Strata
+                return 0
+        except Exception:
+            pass
+
+    # Priority 2: Fallback without extension filter if first attempt didn't launch
+    if portal_picker:
+        try:
+            res = subprocess.run(
+                [portal_picker, "--title", "Select image to attach"],
+                capture_output=True,
+                text=True
+            )
+            if res.returncode == 0:
+                selected = res.stdout.strip()
+                if selected and os.path.isfile(selected):
+                    print(selected)
+                    return 0
+        except Exception:
+            pass
+
+    # Priority 3: Fallback to native GTK FileChooserDialog
+    try:
+        import gi
+        gi.require_version('Gtk', '3.0')
+        from gi.repository import Gtk
+
+        dialog = Gtk.FileChooserDialog(
+            title="Select Image to Attach",
+            action=Gtk.FileChooserAction.OPEN
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OPEN, Gtk.ResponseType.ACCEPT
+        )
+        dialog.set_default_response(Gtk.ResponseType.ACCEPT)
+
+        filter_images = Gtk.FileFilter()
+        filter_images.set_name("Images (*.png, *.jpg, *.jpeg, *.webp, *.gif)")
+        for mime in ["image/png", "image/jpeg", "image/webp", "image/gif"]:
+            filter_images.add_mime_type(mime)
+        for pat in ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.gif", "*.PNG", "*.JPG", "*.JPEG", "*.WEBP", "*.GIF"]:
+            filter_images.add_pattern(pat)
+        dialog.add_filter(filter_images)
+
+        filter_all = Gtk.FileFilter()
+        filter_all.set_name("All Files (*.*)")
+        filter_all.add_pattern("*")
+        dialog.add_filter(filter_all)
+
+        response = dialog.run()
+        selected = None
+        if response == Gtk.ResponseType.ACCEPT:
+            selected = dialog.get_filename()
+        dialog.destroy()
+        while Gtk.events_pending():
+            Gtk.main_iteration_do(False)
+
+        if selected and os.path.isfile(selected):
+            print(selected)
+            return 0
+    except Exception:
+        pass
+
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(pick_image())

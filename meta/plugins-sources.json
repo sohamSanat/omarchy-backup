@@ -108,8 +108,18 @@
   "io.github.ricky.whatsapp": {
     "remote": "https://github.com/srineshr1/omarchy-whatsapp.git",
     "commit": "0a9b19cbc7c6e376ecf4dc3d3229543620caecca",
-    "has_local_changes": false,
-    "dirty_files": []
+    "has_local_changes": true,
+    "dirty_files": [
+      "?? bin/omarchy-whatsapp-pick-image",
+      "M Model.js",
+      "M Panel.qml",
+      "M WhatsAppClient.qml",
+      "M daemon/ctl.js",
+      "M daemon/index.js",
+      "M daemon/lib/message.js",
+      "M daemon/lib/store.js"
+    ],
+    "note": "Enhanced with image attachments, image picker script, and store improvements"
   },
   "io.github.weedwhitesandwine.obsiduous": {
     "remote": "https://github.com/weedwhitesandwine/obsiduous.git",
@@ -191,8 +201,13 @@
   "omaconnect": {
     "remote": "https://github.com/jitendradara12/omaconnect.git",
     "commit": "f44454e710876d9578822c1ad2039c59d0d9ca0e",
-    "has_local_changes": false,
-    "dirty_files": []
+    "has_local_changes": true,
+    "dirty_files": [
+      "M BarWidget.qml",
+      "M Panel.qml",
+      "M scripts/pick_file.sh"
+    ],
+    "note": "Enhanced with file picker integration"
   },
   "omamail": {
     "remote": "https://github.com/huacnlee/omamail.git",

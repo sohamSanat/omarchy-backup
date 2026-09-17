@@ -122,10 +122,15 @@ Item {
     root.setChats(list)
   }
 
-  function sendMessage(jid, text, quotedId) {
-    if (!jid || !text || !text.length) return false
-    var payload = { t: "send", jid: jid, text: text }
+  function sendMessage(jid, text, quotedId, imagePath) {
+    if (!jid) return false
+    var hasText = text && text.length > 0
+    var hasImage = imagePath && imagePath.length > 0
+    if (!hasText && !hasImage) return false
+    var payload = { t: "send", jid: jid }
+    if (hasText) payload.text = text
     if (quotedId) payload.quoted = quotedId
+    if (hasImage) payload.image = imagePath
     return request(payload)
   }
 

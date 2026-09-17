@@ -556,6 +556,11 @@ Item {
       return "ok"
     }
 
+    function blank(): string {
+      root.runBlank()
+      return "ok"
+    }
+
     function status(): string {
       return JSON.stringify({
         locked: root.locked,

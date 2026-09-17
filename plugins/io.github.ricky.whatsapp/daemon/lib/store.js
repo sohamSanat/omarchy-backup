@@ -58,6 +58,34 @@ export class Store {
     return key
   }
 
+  resolveDeliveryJid(jid) {
+    if (!jid) return ''
+    const norm = normalizeJid(jid)
+    if (!norm) return ''
+    if (norm.endsWith('@g.us') || norm === 'status@broadcast' || norm.endsWith('@newsletter')) {
+      return norm
+    }
+    if (norm.endsWith('@lid')) {
+      return norm
+    }
+
+    const canonical = this.canonicalJid(norm) || norm
+    const messages = this.messages.get(canonical) || this.messages.get(norm) || []
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const remoteJid = messages[i]?.key?.remoteJid
+      if (remoteJid && normalizeJid(remoteJid).endsWith('@lid')) {
+        return normalizeJid(remoteJid)
+      }
+    }
+
+    const alias = this.aliases.get(norm) || this.aliases.get(canonical)
+    if (alias && normalizeJid(alias).endsWith('@lid')) {
+      return normalizeJid(alias)
+    }
+
+    return canonical || norm
+  }
+
   load() {
     let raw
     try {

@@ -9,8 +9,15 @@ BarWidget {
     id: root
     moduleName: "omaconnect"
 
-    readonly property var service: bar && bar.shell && typeof bar.shell.serviceFor === "function"
-        ? bar.shell.serviceFor("omaconnect") : null
+    KdeConnectController {
+        id: fallbackController
+    }
+
+    readonly property var service: {
+        var hostService = bar && bar.shell && typeof bar.shell.serviceFor === "function"
+            ? bar.shell.serviceFor("omaconnect") : null
+        return hostService || fallbackController
+    }
     readonly property var device: service ? service.selectedDevice : null
     readonly property string deviceName: device && typeof device.name === "string" ? device.name : "KDE Connect"
     readonly property Item button: buttonItem

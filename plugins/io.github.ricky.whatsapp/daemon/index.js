@@ -1,10 +1,13 @@
-import { chmodSync, readdirSync, readFileSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
+import { chmodSync, copyFileSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
 import { spawn } from 'node:child_process'
-import { join } from 'node:path'
+import { extname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import makeWASocket, {
   Browsers,
   DisconnectReason,
   fetchLatestBaileysVersion,
+  jidDecode,
+  jidEncode,
   jidNormalizedUser,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
@@ -18,8 +21,8 @@ import { logger, waLogger } from './lib/logger.js'
 import { Store, normalizeJid } from './lib/store.js'
 import { Notifier } from './lib/notify.js'
 import { Bus } from './lib/server.js'
-import { extractImage, isGroupJid, isIgnorableChat, isPhotoPlaceholder, isSilent, messageText, messageType, prettyJid } from './lib/message.js'
-import { existingMediaPath, MediaCache } from './lib/media.js'
+import { extractImage, extractQuotedInfo, isGroupJid, isIgnorableChat, isPhotoPlaceholder, isSilent, messageText, messageType, prettyJid } from './lib/message.js'
+import { existingMediaPath, mediaPathFor, MediaCache } from './lib/media.js'
 import {
   applyChatNotificationPreferences,
   isChatMuted,
@@ -27,6 +30,27 @@ import {
   shouldNotifyChat
 } from './lib/preferences.js'
 import { watchPluginState as observePluginState } from './lib/plugin-state.js'
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url))
+
+// Ensure Baileys does not drop peer retry receipts due to recipient attribute
+function ensureBaileysPatched() {
+  try {
+    const target = join(__dirname, 'node_modules', 'baileys', 'lib', 'Socket', 'messages-recv.js')
+    if (!existsSync(target)) return
+    let content = readFileSync(target, 'utf8')
+    const unpatched = "const fromMe = !attrs.recipient || ((attrs.type === 'sender') && isNodeFromMe);"
+    const patched = "const fromMe = !attrs.recipient || attrs.type === 'retry' || ((attrs.type === 'sender') && isNodeFromMe);"
+    if (content.includes(unpatched)) {
+      content = content.replace(unpatched, patched)
+      writeFileSync(target, content, 'utf8')
+      logger.info('baileys: auto-patched retry receipt handling in messages-recv.js')
+    }
+  } catch (err) {
+    logger.warn({ err }, 'baileys: failed to patch messages-recv.js')
+  }
+}
+ensureBaileysPatched()
 
 const RECONNECT_BASE_MS = 2000
 const RECONNECT_MAX_MS = 60000
@@ -59,6 +83,104 @@ const MSG_DELIVERED = 3
 const MSG_READ = 4
 const MSG_PLAYED = 5
 
+// In-memory cache of recent proto.Messages (sent and received) for fulfilling
+// Baileys retry requests and rich quotes with 100% fidelity.
+const MAX_MESSAGE_CACHE = 1000
+const messageCache = new Map()
+
+function cacheMessage(id, rawMsg) {
+  if (!id || !rawMsg) return
+  if (messageCache.size >= MAX_MESSAGE_CACHE) {
+    const firstKey = messageCache.keys().next().value
+    messageCache.delete(firstKey)
+  }
+  messageCache.set(id, rawMsg)
+}
+
+// Signal sessions are per-peer-device negotiation state. When a contact
+// relinks their phone (or after a WhatsApp outage), the session both sides
+// believed was current goes stale: messages the panel sends are accepted by the
+// server (grey tick) but encrypted with a key the peer no longer holds.
+// Genuine crypto failures (Bad MAC or No session) are recorded and automatically
+// healed without requiring manual intervention.
+// Note: MessageCounterError is normal replay protection for duplicate offline
+// stanzas in libsignal-protocol and is intentionally NOT treated as session failure.
+const brokenSessions = new Map() // remoteJid -> { count, lastSeen }
+const autoHealTimers = new Map() // remoteJid -> timestamp
+let cryptoErrorCount = 0
+let lastCryptoError = ''
+
+function rememberCryptoFailure(jid, message) {
+  if (!jid) return
+  const entry = brokenSessions.get(jid) || { count: 0, lastSeen: 0 }
+  entry.count += 1
+  entry.lastSeen = Date.now()
+  brokenSessions.set(jid, entry)
+  cryptoErrorCount += 1
+  lastCryptoError = String(message || 'signal session error').slice(0, 240)
+  pushState()
+}
+
+function scheduleAutoHeal(jid) {
+  if (!jid) return
+  const norm = normalizeJid(jid)
+  if (!norm) return
+  const lastHeal = autoHealTimers.get(norm) || 0
+  const now = Date.now()
+  if (now - lastHeal < 60_000) return
+  autoHealTimers.set(norm, now)
+
+  logger.info({ jid: norm }, 'session: auto-healing Signal session for contact')
+  setTimeout(async () => {
+    try {
+      if (!sock || connection !== 'open') return
+      clearSignalSessions(norm)
+      await rekeyAllSessions(norm)
+      brokenSessions.delete(norm)
+      if (brokenSessions.size === 0) {
+        cryptoErrorCount = 0
+        lastCryptoError = ''
+        pushState()
+      }
+      logger.info({ jid: norm }, 'session: auto-heal completed for contact')
+    } catch (err) {
+      logger.warn({ err, jid: norm }, 'session: auto-heal encountered an error')
+    }
+  }, 1000).unref?.()
+}
+
+// Watch the logger handed to Baileys so session breakage on any peer is noticed
+// and healed automatically. This only records state; it never alters or swallows log lines.
+function wrapWaLogger(base) {
+  return new Proxy(base, {
+    get(target, prop) {
+      if (typeof prop !== 'string') return target[prop]
+      const value = target[prop]
+      if (typeof value !== 'function' || !['error', 'fatal', 'warn'].includes(prop)) return value
+      return (...args) => {
+        try {
+          const obj = args.find((a) => a && typeof a === 'object') || {}
+          const err = obj.err || obj
+          const remoteJid = typeof obj.key === 'string' ? obj.key : obj.key?.remoteJid || ''
+          const message = String(err?.message || err?.name || err?.type || '')
+          if (
+            /Bad MAC/.test(message) ||
+            (err?.type === 'SessionError' && /No session/.test(message))
+          ) {
+            const jid = String(remoteJid || '')
+            rememberCryptoFailure(jid, `${err.type || err.name || 'CryptoError'}: ${message}`)
+            if (jid) scheduleAutoHeal(jid)
+          }
+        } catch {
+          // Watching must never take logging down with it.
+        }
+        return value.apply(target, args)
+      }
+    }
+  })
+}
+const watchedWaLogger = wrapWaLogger(waLogger)
+
 const store = new Store()
 const notifier = new Notifier()
 const media = new MediaCache()
@@ -87,6 +209,9 @@ let chatsFlushTimer = null
 let lastStateJson = ''
 let resolvingNames = false
 let refreshInFlight = false
+// `repair` wipes and rebuilds the key store; a concurrent second run could
+// delete sessions the first just wrote, so it must be single-flight.
+let repairInFlight = false
 const groupNames = new Map()
 const wantedChats = new Set()
 /** @type {Map<string, NodeJS.Timeout>} */
@@ -158,6 +283,11 @@ function state() {
     me: store.me,
     unread: store.totalUnread(),
     lastError,
+    cryptoErrorCount,
+    lastCryptoError,
+    repairHint: cryptoErrorCount > 0
+      ? `stale signal sessions with ${brokenSessions.size} contact(s); run: omarchy-whatsapp-ctl repair`
+      : '',
     daemonPid: process.pid
   }
 }
@@ -229,7 +359,9 @@ function storedToWaContent(message) {
   if (message.media) {
     const node = { mimetype: message.media.mimetype }
     if (message.text && !isPhotoPlaceholder(message.text)) node.caption = message.text
-    return message.media.kind === 'sticker' ? { stickerMessage: node } : { imageMessage: node }
+    if (message.media.kind === 'sticker') return { stickerMessage: node }
+    if (message.media.kind === 'video') return { videoMessage: node }
+    return { imageMessage: node }
   }
   if (!message.text) return undefined
   return { conversation: message.text }
@@ -237,7 +369,10 @@ function storedToWaContent(message) {
 
 async function getStoredMessage(key) {
   if (!key?.id) return undefined
-  const found = store.findMessage(key.remoteJid, key.id)
+  const cached = messageCache.get(key.id)
+  if (cached) return cached
+  const canonical = store.canonicalJid(key.remoteJid) || key.remoteJid
+  const found = store.findMessage(key.remoteJid, key.id) || (canonical ? store.findMessage(canonical, key.id) : null)
   return storedToWaContent(found)
 }
 
@@ -320,6 +455,52 @@ function flatten(chatJid, message) {
     flat.media = payload
     flat.imagePath = existingMediaPath({ id, media: payload, imagePath: '' })
   }
+
+  const quotedInfo = extractQuotedInfo(message.message)
+  if (quotedInfo) {
+    const existingQuoted = store.findMessage(chatJid, quotedInfo.id)
+    const normParticipant = quotedInfo.participant ? (jidNormalizedUser(quotedInfo.participant) || quotedInfo.participant) : ''
+
+    let isFromMe = false
+    if (existingQuoted) {
+      isFromMe = !!existingQuoted.fromMe
+    } else if (normParticipant) {
+      const myId = store.me?.id ? jidNormalizedUser(store.me.id) : ''
+      const myPn = myId ? myId.split('@')[0].split(':')[0] : ''
+      const partPn = normParticipant.split('@')[0].split(':')[0]
+      if (myPn && partPn && myPn === partPn) isFromMe = true
+    } else if (!isGroupJid(chatJid) && message.key?.fromMe === false) {
+      isFromMe = true
+    }
+
+    let quotedText = ''
+    if (existingQuoted && existingQuoted.text) {
+      quotedText = existingQuoted.text
+    } else if (quotedInfo.quotedMessage) {
+      const qImage = extractImage(quotedInfo.quotedMessage)
+      quotedText = qImage ? (qImage.caption || messageText(quotedInfo.quotedMessage)) : messageText(quotedInfo.quotedMessage)
+    }
+
+    let senderName = ''
+    if (isFromMe) {
+      senderName = 'You'
+    } else if (existingQuoted && existingQuoted.senderName) {
+      senderName = existingQuoted.senderName
+    } else if (normParticipant) {
+      senderName = store.lookupName(normParticipant) || prettyJid(normParticipant)
+    } else if (!isGroupJid(chatJid)) {
+      senderName = store.lookupName(chatJid) || prettyJid(chatJid)
+    }
+
+    flat.quoted = {
+      id: quotedInfo.id,
+      fromMe: isFromMe,
+      senderName: senderName || (isFromMe ? 'You' : 'Message'),
+      senderJid: normParticipant,
+      text: quotedText || ''
+    }
+  }
+
   return flat
 }
 
@@ -340,6 +521,10 @@ async function resolveGroupName(jid) {
 function ingest(chatJid, raw) {
   if (isIgnorableChat(chatJid)) return null
   if (isSilent(raw.message)) return null
+
+  if (raw?.key?.id && raw.message) {
+    cacheMessage(raw.key.id, raw.message)
+  }
 
   learnAliasesFromMessage(raw)
   const hintedPn = raw?.key?.remoteJidAlt || raw?.key?.senderPn
@@ -517,6 +702,178 @@ async function resolveContactLids() {
   } finally {
     resolvingNames = false
   }
+}
+
+// --- Session repair -----------------------------------------------------------
+//
+// Sessions and sender keys are pure negotiation state, unlike creds.json (the
+// linked login) and the pre-keys (our identity on the wire). Relinking a phone,
+// a WhatsApp outage, or an older session left behind by a previous run makes
+// them go stale, and then messages silently stop decrypting on one side. The
+// fix is to wipe that state and let every peer re-key from a fresh prekey
+// bundle — exactly what the official apps do when they resync encryption.
+
+function clearSignalSessions(onlyJid = '') {
+  let removed = 0
+  const targetUsers = new Set()
+  if (onlyJid) {
+    const norm = normalizeJid(onlyJid) || onlyJid
+    const u1 = jidDecode(norm)?.user
+    if (u1) targetUsers.add(u1)
+    const alias = store.aliases.get(norm)
+    if (alias) {
+      const u2 = jidDecode(normalizeJid(alias))?.user
+      if (u2) targetUsers.add(u2)
+    }
+  }
+  try {
+    for (const name of readdirSync(authDir)) {
+      if (!name.startsWith('session-') && !name.startsWith('sender-key')) continue
+      if (targetUsers.size) {
+        let matches = false
+        for (const u of targetUsers) {
+          if (name.startsWith(`session-${u}.`) || name.includes(`--${u}--`)) {
+            matches = true
+            break
+          }
+        }
+        if (!matches) continue
+      }
+      unlinkSync(join(authDir, name))
+      removed += 1
+    }
+  } catch (err) {
+    logger.warn({ err }, 'repair: wiping sessions failed')
+  }
+  return removed
+}
+
+// Fold a raw jid (anything the store has seen) into the peer map, remembering
+// both addressing forms under every user key they touch — the phone number and
+// the linked-id of the same account are separate signal users, and a peer whose
+// client sends with its LID needs a session asserted under the LID user too.
+function addPeerJid(peers, raw, alt) {
+  const pairs = []
+  for (const value of [raw, alt]) {
+    if (!value) continue
+    const { user } = jidDecode(String(value)) || {}
+    if (user) pairs.push([user, String(value)])
+  }
+  if (!pairs.length) return
+  const forms = { pn: '', lid: '' }
+  for (const [, value] of pairs) {
+    if (value.endsWith('@lid')) forms.lid = value
+    else if (value.endsWith('@s.whatsapp.net')) forms.pn = value
+  }
+  for (const [user] of pairs) {
+    const entry = peers.get(user) || { pn: '', lid: '' }
+    if (forms.pn) entry.pn = forms.pn
+    if (forms.lid) entry.lid = forms.lid
+    peers.set(user, entry)
+  }
+}
+
+// Re-establish fresh Signal sessions with every known peer — all aliased
+// contacts, every chat, and every group member — by fetching current prekey
+// bundles and injecting them, exactly as Baileys does on a normal send. Nothing
+// user-visible is sent to anyone; the peer is not notified.
+async function rekeyAllSessions(onlyJid = '') {
+  if (!sock || connection !== 'open') return 0
+  const peers = new Map()
+
+  if (onlyJid) {
+    const norm = normalizeJid(onlyJid) || onlyJid
+    let resolved = false
+    for (const [from, to] of store.aliases) {
+      if (from === onlyJid || from === norm || to === onlyJid || to === norm) {
+        addPeerJid(peers, from, to)
+        resolved = true
+      }
+    }
+    if (!resolved) {
+      addPeerJid(peers, onlyJid)
+      const mate = store.aliases.get(norm)
+      if (mate) addPeerJid(peers, mate)
+    }
+  } else {
+    for (const [from, to] of store.aliases) {
+      addPeerJid(peers, from, to)
+    }
+    for (const chat of store.chats.values()) {
+      addPeerJid(peers, chat.jid)
+    }
+
+    // Lid-addressed groups re-key every participant from fresh metadata so
+    // members who only ever appear in group send-key fanout are covered too.
+    for (const chat of store.chats.values()) {
+      if (!chat.isGroup) continue
+      try {
+        const meta = await sock.groupMetadata(chat.jid)
+        for (const participant of meta?.participants || []) {
+          addPeerJid(peers, participant?.id, participant?.lid)
+          addPeerJid(peers, participant?.lid)
+        }
+      } catch {
+        // Best-effort; 1:1 peers above already cover most of the account.
+      }
+    }
+  }
+
+  // Resolve the current device list for every peer (both addressing forms).
+  // The server normalizes every device row to the phone-number user, so after
+  // fetching devices we assert each device under *every* form the account is
+  // known by — peers that address messages with their linked-id need a session
+  // stored under the LID user too, or their incoming messages won't decrypt.
+  const requested = []
+  for (const pair of peers.values()) {
+    if (pair.pn) requested.push(pair.pn)
+    if (pair.lid) requested.push(pair.lid)
+  }
+  const deviceJids = new Set()
+  for (let i = 0; i < requested.length; i += 25) {
+    const chunk = requested.slice(i, i + 25)
+    const serverOf = new Map()
+    for (const jid of chunk) {
+      const { user } = jidDecode(jid) || {}
+      if (user) serverOf.set(user, jid.endsWith('@lid') ? 'lid' : 's.whatsapp.net')
+    }
+    const devices = await sock.getUSyncDevices(chunk, false, false).catch(() => [])
+    for (const device of devices || []) {
+      if (!device?.user || device.device === undefined) continue
+      const forms = new Set()
+      if (serverOf.get(device.user)) forms.add(serverOf.get(device.user))
+      const peer = peers.get(device.user)
+      if (peer) {
+        if (peer.lid) forms.add('lid')
+        if (peer.pn) forms.add('s.whatsapp.net')
+      }
+      if (!forms.size) forms.add('s.whatsapp.net')
+      for (const server of forms) {
+        const userPart = server === 'lid' && peer?.lid ? (jidDecode(peer.lid)?.user || device.user) : device.user
+        deviceJids.add(jidEncode(userPart, server, device.device))
+      }
+    }
+  }
+
+  if (deviceJids.size) {
+    // Keep batches small: the encrypt-IQ for a batch of ~100 linked-id jids
+    // routinely exceeded the query timeout and aborted the whole re-key. 25
+    // stays well under it, and one slow batch must not sink the rest.
+    const allDeviceJids = [...deviceJids]
+    let failedBatches = 0
+    for (let i = 0; i < allDeviceJids.length; i += 25) {
+      try {
+        await sock.assertSessions(allDeviceJids.slice(i, i + 25), true)
+      } catch (err) {
+        failedBatches += 1
+        logger.debug({ err, offset: i }, 'repair: session batch re-key failed, continuing')
+      }
+    }
+    if (failedBatches) {
+      logger.warn({ failedBatches, total: Math.ceil(allDeviceJids.length / 25) }, 'repair: some session batches failed; any next send still re-keys automatically')
+    }
+  }
+  return deviceJids.size
 }
 
 function applyContacts(contacts) {
@@ -714,7 +1071,7 @@ async function connect() {
         creds: authState.creds,
         keys: makeCacheableSignalKeyStore(authState.keys, waLogger)
       },
-      logger: waLogger,
+      logger: watchedWaLogger,
       // The phone keeps pushing its own notifications while this device stays
       // "offline", so the user never loses phone alerts by linking Omarchy.
       markOnlineOnConnect: false,
@@ -1172,31 +1529,92 @@ async function handleCommand(payload, reply) {
     case 'send': {
       const rawJid = payload.jid
       const text = String(payload.text || '')
+      const imagePath = payload.image ? String(payload.image) : ''
       if (!rawJid) throw new Error('send: jid required')
-      if (!text.trim()) throw new Error('send: empty message')
+      if (!text.trim() && !imagePath) throw new Error('send: empty message')
+      if (imagePath && !existsSync(imagePath)) throw new Error(`send: image file not found: ${imagePath}`)
       if (!sock || connection !== 'open') throw new Error('send: not connected to WhatsApp')
 
-      const canonical = store.canonicalJid(rawJid) || rawJid
+      const targetJid = store.resolveDeliveryJid(rawJid) || rawJid
+      const canonical = store.canonicalJid(targetJid) || store.canonicalJid(rawJid) || rawJid
+      const isGroup = isGroupJid(targetJid) || isGroupJid(rawJid)
       const options = {}
+      let quotedMsgObj = null
       if (payload.quoted) {
-        const list = store.messages.get(canonical) || []
-        const quoted = list.find((m) => m.id === payload.quoted)
-        if (quoted?.key) options.quoted = { key: quoted.key, message: { conversation: quoted.text } }
+        const quoted = store.findMessage(canonical, payload.quoted)
+          || store.findMessage(targetJid, payload.quoted)
+          || store.findMessage(rawJid, payload.quoted)
+        if (quoted) {
+          const quotedKey = {
+            remoteJid: targetJid,
+            id: quoted.key?.id || quoted.id,
+            fromMe: !!quoted.fromMe,
+            participant: isGroup ? (quoted.key?.participant || quoted.senderJid || undefined) : undefined
+          }
+          const content = messageCache.get(quoted.id) || storedToWaContent(quoted) || { conversation: quoted.text || '' }
+          options.quoted = { key: quotedKey, message: content }
+          quotedMsgObj = quoted
+        }
       }
 
-      const sent = await sock.sendMessage(rawJid, { text }, options)
+      const waContent = imagePath
+        ? {
+            image: { url: imagePath },
+            caption: text || undefined
+          }
+        : { text }
+
+      const sent = await sock.sendMessage(targetJid, waContent, options)
       if (sent) {
+        if (sent.key?.id && sent.message) {
+          cacheMessage(sent.key.id, sent.message)
+        }
+        if (imagePath && sent.key?.id) {
+          const ext = extname(imagePath).toLowerCase()
+          const mime = ext === '.png' ? 'image/png' : (ext === '.webp' ? 'image/webp' : (ext === '.gif' ? 'image/gif' : 'image/jpeg'))
+          const cachedTarget = mediaPathFor(sent.key.id, mime)
+          try {
+            copyFileSync(imagePath, cachedTarget)
+          } catch (err) {
+            logger.warn({ err, imagePath }, 'media: failed to cache sent image')
+          }
+        }
+
         // generateWAMessage stamps PENDING. relayMessage has already succeeded
         // here, so the server has the stanza — show a single tick immediately.
         if (asStatus(sent.status) < MSG_SERVER_ACK) sent.status = MSG_SERVER_ACK
-        const res = ingest(rawJid, sent)
+        const res = ingest(targetJid, sent)
         if (res) {
           const { message, canonicalTarget } = res
+          if (imagePath && !message.imagePath) {
+            const ext = extname(imagePath).toLowerCase()
+            const mime = ext === '.png' ? 'image/png' : (ext === '.webp' ? 'image/webp' : (ext === '.gif' ? 'image/gif' : 'image/jpeg'))
+            const cachedTarget = mediaPathFor(sent.key.id, mime)
+            if (existsSync(cachedTarget)) message.imagePath = cachedTarget
+            else message.imagePath = imagePath
+            store.upsertMessage(canonicalTarget, message)
+          }
+          if (quotedMsgObj && !message.quoted) {
+            message.quoted = {
+              id: quotedMsgObj.id,
+              fromMe: !!quotedMsgObj.fromMe,
+              senderName: quotedMsgObj.fromMe ? 'You' : (quotedMsgObj.senderName || 'Message'),
+              senderJid: quotedMsgObj.senderJid || '',
+              text: quotedMsgObj.text || ''
+            }
+            store.upsertMessage(canonicalTarget, message)
+          }
           if ((message.status || 0) < MSG_SERVER_ACK) {
             message.status = MSG_SERVER_ACK
             store.upsertMessage(canonicalTarget, message)
           }
           bus.broadcast({ t: 'message', jid: rawJid, message: publicMessage(message), chat: store.chat(canonicalTarget), unread: store.totalUnread() })
+          if (rawJid !== canonicalTarget) {
+            bus.broadcast({ t: 'message', jid: canonicalTarget, message: publicMessage(message), chat: store.chat(canonicalTarget), unread: store.totalUnread() })
+          }
+          if (targetJid !== rawJid && targetJid !== canonicalTarget) {
+            bus.broadcast({ t: 'message', jid: targetJid, message: publicMessage(message), chat: store.chat(canonicalTarget), unread: store.totalUnread() })
+          }
           applyMessageStatus(canonicalTarget, message.id, MSG_SERVER_ACK)
           pushChats()
         }
@@ -1264,6 +1682,42 @@ async function handleCommand(payload, reply) {
       await connect()
       reply({ t: 'ack', id, ok: true })
       return
+
+        case 'repair': {
+      if (!sock || connection !== 'open') throw new Error('repair: not connected to WhatsApp')
+      if (repairInFlight) {
+        reply({ t: 'ack', id, ok: false, message: 'repair already running' })
+        return
+      }
+      const jid = payload.jid ? String(payload.jid) : ''
+      repairInFlight = true
+      {
+        const removed = clearSignalSessions(jid)
+        let rekeyed = 0
+        try {
+          rekeyed = await rekeyAllSessions(jid)
+        } catch (err) {
+          logger.warn({ err, jid }, 'repair: proactive re-key incomplete (next send to any contact still re-keys automatically)')
+        }
+        brokenSessions.clear()
+        cryptoErrorCount = 0
+        lastCryptoError = ''
+        reply({ t: 'ack', id, ok: true, removed, rekeyed, reconnecting: true, targeted: !!jid, jid })
+        setTimeout(async () => {
+          repairInFlight = false
+          if (stopping) return
+          reconnectAttempts = 0
+          cancelReconnect()
+          connecting = false
+          try {
+            await connect()
+          } catch (err) {
+            logger.warn({ err }, 'repair: reconnect failed, will retry')
+          }
+        }, 300).unref?.()
+        return
+      }
+    }
 
     case 'logout':
       try {

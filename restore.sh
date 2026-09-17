@@ -535,7 +535,7 @@ fi
 if [[ -f "${USER_HOME}/.config/omarchy/plugins/soham.power/scripts/battery-limiter.sh" ]]; then
   ln -nsf "${USER_HOME}/.config/omarchy/plugins/soham.power/scripts/battery-limiter.sh" "${USER_HOME}/.local/bin/omarchy-battery-limit"
 fi
-for wa_bin in omarchy-whatsapp omarchy-whatsapp-ctl omarchy-whatsapp-daemon omarchy-whatsapp-focus omarchy-whatsapp-login omarchy-whatsapp-open; do
+for wa_bin in omarchy-whatsapp omarchy-whatsapp-ctl omarchy-whatsapp-daemon omarchy-whatsapp-focus omarchy-whatsapp-login omarchy-whatsapp-open omarchy-whatsapp-pick-image; do
   if [[ -f "${USER_HOME}/.config/omarchy/plugins/io.github.ricky.whatsapp/bin/${wa_bin}" ]]; then
     ln -nsf "${USER_HOME}/.config/omarchy/plugins/io.github.ricky.whatsapp/bin/${wa_bin}" "${USER_HOME}/.local/bin/${wa_bin}"
   fi

@@ -243,3 +243,29 @@ export function prettyJid(jid) {
   if (server === 'lid') return user
   return /^\d{6,}$/.test(user) ? `+${user}` : user
 }
+
+export function extractContextInfo(message) {
+  const rawContent = normalizeMessageContent(message)
+  if (!rawContent) return null
+  const content = unwrapMessage(rawContent) || rawContent
+  if (!content || typeof content !== 'object') return null
+  if (content.contextInfo) return content.contextInfo
+  for (const key of Object.keys(content)) {
+    const val = content[key]
+    if (val && typeof val === 'object' && val.contextInfo) {
+      return val.contextInfo
+    }
+  }
+  return null
+}
+
+export function extractQuotedInfo(message) {
+  const ci = extractContextInfo(message)
+  if (!ci || !ci.stanzaId) return null
+  return {
+    id: String(ci.stanzaId),
+    participant: ci.participant ? String(ci.participant) : '',
+    remoteJid: ci.remoteJid ? String(ci.remoteJid) : '',
+    quotedMessage: ci.quotedMessage || null
+  }
+}

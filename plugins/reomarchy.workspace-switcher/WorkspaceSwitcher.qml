@@ -399,7 +399,7 @@ Item {
         Quickshell.execDetached([
           "hyprctl",
           "dispatch",
-          'hl.dsp.focus({ workspace = "' + targetId + '" })'
+          'hl.dsp.focus({ workspace = ' + targetId + ' })'
         ])
         root.dismiss()
       }
@@ -489,12 +489,14 @@ Item {
 
     if (root.selectedWindowIndex >= 0 && root.selectedWindowIndex < row.windows.length) {
       var win = row.windows[root.selectedWindowIndex]
-      if (win && win.address) {
+      var winAddr = win.address
+      if (winAddr && winAddr.indexOf("0x") !== 0) winAddr = "0x" + winAddr
+      console.log("SWITCHER: activate win idx:", root.selectedWindowIndex, "address:", winAddr, "class:", win ? win.className : "null")
+      if (winAddr) {
         Quickshell.execDetached([
           "hyprctl",
           "dispatch",
-          "focuswindow",
-          "address:" + win.address
+          'hl.dsp.focus({ window = "address:' + winAddr + '" })'
         ])
         root.dismiss()
         return
@@ -504,7 +506,7 @@ Item {
     Quickshell.execDetached([
       "hyprctl",
       "dispatch",
-      'hl.dsp.focus({ workspace = "' + workspaceId + '" })'
+      'hl.dsp.focus({ workspace = ' + workspaceId + ' })'
     ])
     root.dismiss()
   }
@@ -713,7 +715,7 @@ Item {
             Quickshell.execDetached([
               "hyprctl",
               "dispatch",
-              'hl.dsp.focus({ workspace = "' + targetId + '" })'
+              'hl.dsp.focus({ workspace = ' + targetId + ' })'
             ])
             root.dismiss()
           }
@@ -734,7 +736,7 @@ Item {
             Quickshell.execDetached([
               "hyprctl",
               "dispatch",
-              'hl.dsp.focus({ workspace = "' + targetId + '" })'
+              'hl.dsp.focus({ workspace = ' + targetId + ' })'
             ])
             root.dismiss()
           }

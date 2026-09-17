@@ -82,6 +82,12 @@ systemctl --user edit omarchy-whatsapp     # Environment=OMARCHY_WHATSAPP_PAIRIN
 | Refresh chats | Refresh button, or `r` |
 | Open a chat | `Enter` |
 | Reply | Type, then `Enter` |
+| Reply to specific message | Hover over bubble and click , or right-click bubble |
+| Copy message | Hover over bubble and click  |
+| Cancel specific reply | `Escape` or click `✕` on reply banner |
+| Jump to quoted message | Click the quoted preview box inside a message bubble |
+| Attach image | Click paperclip icon (📎), or paste image directly with `Ctrl+V` |
+| Remove attached image | Click `✕` on image preview banner |
 | Back to the chat list | `Escape` |
 | Close the panel | `Escape` from the list |
 | Full WhatsApp Web | Right-click the icon, or the ⧉ button in the panel |
@@ -103,6 +109,8 @@ mutes muted before this fix are rewritten from WhatsApp app-state.
 ```sh
 omarchy-whatsapp status                          # connection, account, unread
 omarchy-whatsapp send 919812345678@s.whatsapp.net "on my way"
+omarchy-whatsapp send 919812345678@s.whatsapp.net "looks great" --image ~/Pictures/photo.jpg
+omarchy-whatsapp send 919812345678@s.whatsapp.net "agreed" --reply <messageId>
 omarchy-whatsapp chats 10                        # recent chats as JSON
 omarchy-whatsapp refresh                         # resync the chat list from WhatsApp
 omarchy-whatsapp focus 919812345678@s.whatsapp.net   # open the panel on a chat

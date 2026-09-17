@@ -19,6 +19,8 @@ const USAGE = `Usage: omarchy-whatsapp-ctl <command> [args]
   login                  start QR pairing (stops after 5 minutes)
   pair <phone>           request an 8-digit pairing code instead of a QR
   reconnect              drop the socket and reconnect
+  repair [jid]            reset stale encrypted sessions and re-key contacts;
+                          with a jid, only that contact (fast re-key)
   logout                 unlink this device and clear local credentials
   ping                   check the daemon is alive
 `
@@ -41,9 +43,27 @@ function buildRequest() {
     case 'messages':
       if (!args[0]) fail('messages: jid required')
       return { t: 'messages', jid: args[0], limit: Number(args[1]) || 60 }
-    case 'send':
-      if (args.length < 2) fail('send: jid and text required')
-      return { t: 'send', jid: args[0], text: args.slice(1).join(' ') }
+    case 'send': {
+      let replyId = undefined
+      let imagePath = undefined
+      const cleanArgs = []
+      for (let i = 0; i < args.length; i++) {
+        if ((args[i] === '--reply' || args[i] === '--quote') && i + 1 < args.length) {
+          replyId = args[++i]
+        } else if ((args[i] === '--image' || args[i] === '--attach' || args[i] === '-i') && i + 1 < args.length) {
+          imagePath = args[++i]
+        } else {
+          cleanArgs.push(args[i])
+        }
+      }
+      if (cleanArgs.length < 1) fail('send: jid required (usage: send <jid> [text...] [--image <path>] [--reply <id>])')
+      if (cleanArgs.length < 2 && !imagePath) fail('send: message text or --image required')
+      const payload = { t: 'send', jid: cleanArgs[0] }
+      if (cleanArgs.length > 1) payload.text = cleanArgs.slice(1).join(' ')
+      if (replyId) payload.quoted = replyId
+      if (imagePath) payload.image = imagePath
+      return payload
+    }
     case 'read':
       if (!args[0]) fail('read: jid required')
       return { t: 'read', jid: args[0] }
@@ -57,6 +77,8 @@ function buildRequest() {
       return { t: 'pair', phone: args[0] }
     case 'reconnect':
       return { t: 'reconnect' }
+    case 'repair':
+      return { t: 'repair', jid: args[0] || undefined }
     case 'logout':
       return { t: 'logout' }
     default:
@@ -74,12 +96,13 @@ const socket = net.connect(socketPath)
 let buffer = ''
 let settled = false
 
+// Large accounts re-key hundreds of peers; allow the repair plenty of time.
 const timeout = setTimeout(() => {
   if (settled) return
   settled = true
   socket.destroy()
   fail('timed out waiting for the daemon')
-}, 15000)
+}, 300000)
 
 socket.on('connect', () => socket.write(`${JSON.stringify(request)}\n`))
 
@@ -99,9 +122,14 @@ socket.on('data', (chunk) => {
       continue
     }
 
-    // Every client gets a `state` push on connect. For `status` that *is* the
-    // answer; for anything else it is noise to skip.
+    // Every client gets a `state` push on connect (for `status` that *is* the
+    // answer) and, while commands run, the daemon broadcasts live activity to
+    // every connected client: chats updates, incoming messages, status ticks,
+    // media paths, focus requests. Those are all noise to a one-shot CLI caller
+    // — only the direct reply to this command settles it.
+    const broadcastTypes = new Set(['state', 'chats', 'message', 'messageStatus', 'messageMedia', 'focus', 'pairCode'])
     if (payload.t === 'state' && command !== 'status') continue
+    if (command !== 'status' && broadcastTypes.has(payload.t)) continue
 
     settled = true
     clearTimeout(timeout)

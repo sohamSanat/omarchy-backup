@@ -41,18 +41,35 @@ LIMITS_CACHE_SECONDS = 30
 PROBE_MIN_INTERVAL_SECONDS = 15
 
 # Strict hard bounds to prevent unbounded CPU/memory consumption on large local histories
-HISTORY_CUTOFF_DAYS = 30
+HISTORY_CUTOFF_DAYS = 3650            # 10 years to preserve full persistent history
 MAX_TAIL_BYTES = 256 * 1024           # 256 KB max for history tail buffer
-MAX_TRANSCRIPT_FILES = 100            # Max recent files to inspect
-MAX_DIRS_TO_SCAN = 300                # Max directories visited during traversal
+MAX_TRANSCRIPT_FILES = 500            # Max recent files to inspect
+MAX_DIRS_TO_SCAN = 2000               # Max directories visited during traversal
 MAX_FILE_SIZE_BYTES = 4 * 1024 * 1024 # 4 MB max per transcript file
 MAX_SESSIONS_RECORDED = 500
 MAX_MODELS_RECORDED = 15
 MAX_DIR_ENTRIES_SCANNED = 200000      # Global directory-entry budget for one traversal
 MAX_ENTRIES_PER_DIR = 4000            # Per-directory share of that budget
-MAX_PENDING_DIRS = 1000               # Max directories retained in the pending stack
+MAX_PENDING_DIRS = 2000               # Max directories retained in the pending stack
 MAX_LINE_BYTES = 256 * 1024           # 256 KB max retained for a single line
 READ_CHUNK_BYTES = 64 * 1024          # Read granularity for bounded line iteration
+
+SKIP_DIR_NAMES = {
+  "steps",
+  "tasks",
+  "messages",
+  "chunks",
+  "scratch",
+  "node_modules",
+  ".git",
+  "vendor",
+  "__pycache__",
+  ".venv",
+  "venv",
+  "terminals",
+  ".tempmediaStorage",
+  ".user_uploaded",
+}
 
 
 def expand_path(value: str) -> Path:
@@ -309,9 +326,9 @@ def find_recent_files(
             break
           try:
             if entry.is_dir(follow_symlinks=False):
-              # Hidden dirs are skipped, bar Antigravity's .system_generated.
-              # The queue is capped too, so a wide tree cannot retain an
-              # unbounded list of pending paths.
+              # Skip non-transcript subdirectories and hidden dirs (except .system_generated)
+              if entry.name in SKIP_DIR_NAMES or entry.name.isdigit():
+                continue
               if entry.name.startswith(".") and entry.name != ".system_generated":
                 continue
               if len(pending) < MAX_PENDING_DIRS:
@@ -589,38 +606,91 @@ def scan_antigravity_history() -> tuple[int, set[str], set[str], dict[str, int]]
   return today_prompts, today_sessions, all_sessions, active_days
 
 
+def history_db_path() -> Path:
+  state_dir = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "omarchy" / "agents" / "usage"
+  state_dir.mkdir(parents=True, exist_ok=True)
+  return state_dir / "gemini-history.sqlite"
+
+
+def init_history_db(db_path: Path) -> sqlite3.Connection:
+  conn = sqlite3.connect(db_path, timeout=5.0)
+  conn.execute("PRAGMA journal_mode = WAL")
+  conn.execute("PRAGMA synchronous = NORMAL")
+  conn.execute("""
+  CREATE TABLE IF NOT EXISTS daily_tokens (
+      date TEXT PRIMARY KEY,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      total_tokens INTEGER NOT NULL DEFAULT 0,
+      prompts INTEGER NOT NULL DEFAULT 0,
+      sessions INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+  )
+  """)
+  conn.execute("""
+  CREATE TABLE IF NOT EXISTS session_tokens (
+      session_id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      total_tokens INTEGER NOT NULL DEFAULT 0,
+      prompts INTEGER NOT NULL DEFAULT 0,
+      mtime REAL NOT NULL,
+      updated_at TEXT NOT NULL
+  )
+  """)
+  return conn
+
+
 def scan_antigravity_transcripts() -> dict[str, Any]:
-  """Scan recent transcripts in ~/.gemini/antigravity-cli/brain/ with bounded traversal."""
+  """Scan transcripts in ~/.gemini/antigravity-cli/brain/ with persistent SQLite history tracking."""
   today = local_date_string()
   recent_dates = recent_date_strings()
-  min_cutoff_date = cutoff_date_string()
   cutoff_time = time.time() - HISTORY_CUTOFF_DAYS * 86400
 
   recent = {day: {"date": day, "messageCount": 0} for day in recent_dates}
-  sessions: set[str] = set()
-  active_days: set[str] = set()
-  today_sessions: set[str] = set()
-  today_tokens: dict[str, int] = {}
-  usage_by_model: dict[str, dict[str, int]] = {}
-  prompts = 0
-  today_prompt_count = 0
-  today_token_total = 0
-
   brain_dir = Path.home() / ".gemini" / "antigravity-cli" / "brain"
-  selected_files = find_recent_files(brain_dir, "transcript*.jsonl", cutoff_time, MAX_TRANSCRIPT_FILES, MAX_DIRS_TO_SCAN)
+
+  db_path = history_db_path()
+  conn = init_history_db(db_path)
+  cached_mtimes = {r[0]: r[1] for r in conn.execute("SELECT session_id, mtime FROM session_tokens")}
+
+  matched_files = find_recent_files(brain_dir, "transcript*.jsonl", cutoff_time, MAX_TRANSCRIPT_FILES, MAX_DIRS_TO_SCAN)
+
+  # Deduplicate by conversation ID, preferring transcript_full.jsonl over transcript.jsonl
+  files_by_session: dict[str, Path] = {}
+  for p in matched_files:
+    sid = p.parent.parent.parent.name if p.parent.name == "logs" and p.parent.parent.name == ".system_generated" else p.parent.name
+    if sid not in files_by_session or p.name == "transcript_full.jsonl":
+      files_by_session[sid] = p
+
+  selected_files = list(files_by_session.values())
+  now_iso = dt.datetime.now(dt.timezone.utc).isoformat()
+  new_or_updated = 0
 
   for path in selected_files:
-    session_id = path.parent.parent.name
-    if len(sessions) < MAX_SESSIONS_RECORDED:
-      sessions.add(session_id)
+    if path.parent.name == "logs" and path.parent.parent.name == ".system_generated":
+      session_id = path.parent.parent.parent.name
+    else:
+      session_id = path.parent.name
+
     try:
+      st = path.stat(follow_symlinks=False)
+      # If this session is already parsed and its mtime hasn't changed, skip re-parsing
+      if session_id in cached_mtimes and abs(cached_mtimes[session_id] - st.st_mtime) < 0.001:
+        continue
+
       opened = open_regular(path, max_bytes=MAX_FILE_SIZE_BYTES)
       if opened is None:
         continue
       handle, _ = opened
+      in_tok = 0
+      out_tok = 0
+      session_prompts = 0
+      dates_in_file: set[str] = set()
+
       with handle:
         for line in iter_bounded_lines(handle):
-          # Cheap pre-filter before JSON decode
           if '"USER_INPUT"' not in line and '"PLANNER_RESPONSE"' not in line and '"GENERIC"' not in line and '"usage"' not in line:
             continue
           try:
@@ -630,107 +700,120 @@ def scan_antigravity_transcripts() -> dict[str, Any]:
 
           created_at = entry.get("created_at")
           day = local_date_from_timestamp(created_at)
-          if day < min_cutoff_date:
-            continue
+          if day:
+            dates_in_file.add(day)
 
-          active_days.add(day)
           entry_type = entry.get("type")
           source = entry.get("source")
 
-          model = "gemini-3.7-flash"
-          input_tokens = 0
-          output_tokens = 0
-          cache_read = 0
-          cache_write = 0
-
           if "usage" in entry and isinstance(entry["usage"], dict):
             u = entry["usage"]
-            input_tokens = number(u.get("prompt_tokens") or u.get("input_tokens") or u.get("inputTokens"))
-            output_tokens = number(u.get("completion_tokens") or u.get("output_tokens") or u.get("outputTokens"))
-            cache_read = number(u.get("cached_tokens") or u.get("cacheReadInputTokens"))
+            in_tok += number(u.get("prompt_tokens") or u.get("input_tokens") or u.get("inputTokens"))
+            out_tok += number(u.get("completion_tokens") or u.get("output_tokens") or u.get("outputTokens"))
           elif entry_type == "USER_INPUT":
-            prompts += 1
+            session_prompts += 1
             content = str(entry.get("content") or "")
-            input_tokens = max(1, len(content) // 4)
-            if day == today:
-              today_prompt_count += 1
-              if len(today_sessions) < MAX_SESSIONS_RECORDED:
-                today_sessions.add(session_id)
+            in_tok += max(1, len(content) // 4)
           elif entry_type in ("PLANNER_RESPONSE", "GENERIC") and source == "MODEL":
             content = str(entry.get("content") or "")
             thinking = str(entry.get("thinking") or "")
-            output_tokens = max(1, (len(content) + len(thinking)) // 4)
-          else:
-            continue
+            tc = json.dumps(entry.get("tool_calls")) if entry.get("tool_calls") else ""
+            out_tok += max(1, (len(content) + len(thinking) + len(tc)) // 4)
 
-          total = input_tokens + output_tokens + cache_read + cache_write
-          if total <= 0:
-            continue
-
-          bucket = usage_by_model.setdefault(model, empty_bucket())
-          bucket["inputTokens"] += input_tokens
-          bucket["outputTokens"] += output_tokens
-          bucket["cacheReadInputTokens"] += cache_read
-          bucket["cacheCreationInputTokens"] += cache_write
-
-          if day in recent:
-            recent[day]["messageCount"] += total
-
-          if day == today:
-            today_token_total += total
-            today_tokens[model] = today_tokens.get(model, 0) + total
+      date_str = max(dates_in_file) if dates_in_file else local_date_from_timestamp(st.st_mtime)
+      total_tok = in_tok + out_tok
+      conn.execute("""
+      INSERT OR REPLACE INTO session_tokens (session_id, date, input_tokens, output_tokens, total_tokens, prompts, mtime, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      """, (session_id, date_str, in_tok, out_tok, total_tok, session_prompts, st.st_mtime, now_iso))
+      new_or_updated += 1
     except Exception:
       continue
 
-  # Read summaries db for additional sessions (bounded query)
-  db_path = Path.home() / ".gemini" / "antigravity-cli" / "conversation_summaries.db"
-  if db_path.is_file():
-    try:
-      conn = sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
-      conn.execute("PRAGMA query_only = ON")
-      for row in conn.execute(
-        "SELECT conversation_id, last_modified_time FROM conversation_summaries"
-        " ORDER BY last_modified_time DESC LIMIT 200"
-      ):
-        cid = str(row[0] or "")
-        day = local_date_from_timestamp(row[1])
-        if day >= min_cutoff_date:
-          active_days.add(day)
-          if cid and len(sessions) < MAX_SESSIONS_RECORDED:
-            sessions.add(cid)
-      conn.close()
-    except Exception:
-      pass
+  if new_or_updated > 0 or not cached_mtimes:
+    conn.execute("DELETE FROM daily_tokens")
+    conn.execute("""
+    INSERT INTO daily_tokens (date, input_tokens, output_tokens, total_tokens, prompts, sessions, updated_at)
+    SELECT date, sum(input_tokens), sum(output_tokens), sum(total_tokens), sum(prompts), count(distinct session_id), ?
+    FROM session_tokens
+    GROUP BY date
+    """, (now_iso,))
+    conn.commit()
 
-  # History scan merge for prompt counts
-  hist_today_prompts, hist_today_sessions, hist_all_sessions, hist_days = scan_antigravity_history()
-  today_prompt_count = max(today_prompt_count, hist_today_prompts)
-  today_sessions = (today_sessions | hist_today_sessions)
-  sessions = (sessions | hist_all_sessions)
-  for d in hist_days:
-    if d >= min_cutoff_date:
-      active_days.add(d)
+  # Query persistent SQLite ledger for all historical days
+  daily_rows = conn.execute(
+    "SELECT date, total_tokens, input_tokens, output_tokens, prompts, sessions FROM daily_tokens ORDER BY date DESC"
+  ).fetchall()
 
-  # Bound model maps and active dates
-  bounded_model_usage = dict(
-    sorted(usage_by_model.items(), key=lambda x: sum(x[1].values()), reverse=True)[:MAX_MODELS_RECORDED]
-  )
-  bounded_today_tokens = dict(
-    sorted(today_tokens.items(), key=lambda x: x[1], reverse=True)[:MAX_MODELS_RECORDED]
-  )
-  bounded_active_dates = sorted([d for d in active_days if d >= min_cutoff_date])
+  daily_history = [
+    {
+      "date": r[0],
+      "messageCount": r[1],
+      "inputTokens": r[2],
+      "outputTokens": r[3],
+      "prompts": r[4],
+      "sessions": r[5],
+    }
+    for r in daily_rows
+  ]
+  daily_map = {r["date"]: r for r in daily_history}
+
+  summary_row = conn.execute(
+    "SELECT COALESCE(SUM(total_tokens), 0), COALESCE(SUM(input_tokens), 0), "
+    "COALESCE(SUM(output_tokens), 0), COALESCE(SUM(prompts), 0), "
+    "COUNT(DISTINCT date), MIN(date) FROM daily_tokens"
+  ).fetchone()
+
+  all_time_tokens = summary_row[0]
+  all_time_in = summary_row[1]
+  all_time_out = summary_row[2]
+  all_time_prompts = summary_row[3]
+  all_time_active_days = summary_row[4]
+  all_time_start_date = summary_row[5] or ""
+  all_time_sessions = conn.execute("SELECT COUNT(DISTINCT session_id) FROM session_tokens").fetchone()[0]
+  conn.close()
+
+  # Populate recent 7 days
+  for day in recent_dates:
+    if day in daily_map:
+      recent[day]["messageCount"] = daily_map[day]["messageCount"]
+
+  # Today stats
+  today_info = daily_map.get(today, {})
+  today_token_total = today_info.get("messageCount", 0)
+  today_prompt_count = today_info.get("prompts", 0)
+  today_sessions_count = today_info.get("sessions", 0)
+  today_tokens = {"gemini-3.7-flash": today_token_total} if today_token_total > 0 else {}
+
+  # Model usage
+  model_usage = {
+    "gemini-3.7-flash": {
+      "inputTokens": all_time_in,
+      "outputTokens": all_time_out,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+    }
+  }
+
+  # History prompt merge
+  _, _, hist_all_sessions, hist_days = scan_antigravity_history()
 
   return {
     "todayPrompts": today_prompt_count,
-    "todaySessions": len(today_sessions),
+    "todaySessions": today_sessions_count,
     "todayTotalTokens": today_token_total,
-    "todayTokensByModel": bounded_today_tokens,
+    "todayTokensByModel": today_tokens,
     "recentDays": [recent[day] for day in recent_dates],
-    "modelUsage": bounded_model_usage,
-    "totalPrompts": max(prompts, sum(hist_days.values())),
-    "totalSessions": len(sessions),
-    "activeDays": len(bounded_active_dates),
-    "activeDates": bounded_active_dates,
+    "dailyHistory": daily_history,
+    "allTimeStartDate": all_time_start_date,
+    "modelUsage": model_usage,
+    "totalTokens": all_time_tokens,
+    "totalInputTokens": all_time_in,
+    "totalOutputTokens": all_time_out,
+    "totalPrompts": max(all_time_prompts, sum(hist_days.values())),
+    "totalSessions": max(all_time_sessions, len(hist_all_sessions)),
+    "activeDays": all_time_active_days,
+    "activeDates": [r["date"] for r in reversed(daily_history)],
   }
 
 
@@ -1132,6 +1215,15 @@ def merge_stats(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
   bounded_dates = sorted([d for d in dates if d >= cutoff_date_string()])
   merged["activeDates"] = bounded_dates
   merged["activeDays"] = max(len(bounded_dates), min(number(base.get("activeDays")), HISTORY_CUTOFF_DAYS))
+
+  total_in = sum(b.get("inputTokens", 0) for b in merged["modelUsage"].values())
+  total_out = sum(b.get("outputTokens", 0) for b in merged["modelUsage"].values())
+  total_cache = sum(b.get("cacheReadInputTokens", 0) + b.get("cacheCreationInputTokens", 0) for b in merged["modelUsage"].values())
+  merged["totalInputTokens"] = total_in
+  merged["totalOutputTokens"] = total_out
+  merged["totalTokens"] = total_in + total_out + total_cache
+  merged["dailyHistory"] = extra.get("dailyHistory") or base.get("dailyHistory") or []
+  merged["allTimeStartDate"] = str(extra.get("allTimeStartDate") or base.get("allTimeStartDate") or "")
   return merged
 
 

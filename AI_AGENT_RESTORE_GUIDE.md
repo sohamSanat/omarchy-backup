@@ -428,7 +428,7 @@ update-desktop-database ~/.local/share/applications 2>/dev/null || true
 ```bash
 ln -nsf ~/.config/omarchy/plugins/soham.power/scripts/battery-limiter.sh ~/.local/bin/omarchy-battery-limit
 
-for wa_bin in omarchy-whatsapp omarchy-whatsapp-ctl omarchy-whatsapp-daemon omarchy-whatsapp-focus omarchy-whatsapp-login omarchy-whatsapp-open; do
+for wa_bin in omarchy-whatsapp omarchy-whatsapp-ctl omarchy-whatsapp-daemon omarchy-whatsapp-focus omarchy-whatsapp-login omarchy-whatsapp-open omarchy-whatsapp-pick-image; do
   ln -nsf ~/.config/omarchy/plugins/io.github.ricky.whatsapp/bin/$wa_bin ~/.local/bin/$wa_bin
 done
 ```

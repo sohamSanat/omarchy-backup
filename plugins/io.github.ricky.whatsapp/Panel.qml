@@ -32,6 +32,9 @@ Panel {
   property bool refreshing: false
   property string peekImagePath: ""
   readonly property bool peekActive: peekImagePath.length > 0
+  property var replyingTo: null
+  property string highlightedMessageId: ""
+  property string attachedImagePath: ""
 
   readonly property var chats: client ? client.chats : []
   readonly property bool daemonOnline: client ? client.daemonOnline : false
@@ -79,6 +82,9 @@ Panel {
     root.activeJid = jid
     root.activeChat = null
     root.messages = []
+    root.replyingTo = null
+    root.highlightedMessageId = ""
+    root.attachedImagePath = ""
     root.pinToLatest = true
     root.view = "chat"
     root.client.loadMessages(jid, root.messageLimit)
@@ -97,6 +103,9 @@ Panel {
     root.activeJid = ""
     root.activeChat = null
     root.messages = []
+    root.replyingTo = null
+    root.highlightedMessageId = ""
+    root.attachedImagePath = ""
     composer.text = ""
     Qt.callLater(function () { keyCatcher.forceActiveFocus() })
   }
@@ -136,15 +145,69 @@ Panel {
     if (chat) root.selectChat(chat.jid)
   }
 
+  function startReply(msg) {
+    if (!msg) return
+    root.replyingTo = msg
+    Qt.callLater(function () { composer.forceActiveFocus() })
+  }
+
+  function cancelReply() {
+    root.replyingTo = null
+  }
+
+  function jumpToMessage(messageId) {
+    if (!messageId) return
+    for (var i = 0; i < root.messages.length; i++) {
+      if (root.messages[i] && root.messages[i].id === messageId) {
+        root.pinToLatest = false
+        messageList.positionViewAtIndex(i, ListView.Center)
+        root.highlightedMessageId = messageId
+        highlightTimer.restart()
+        return
+      }
+    }
+  }
+
+  function clearAttachedImage() {
+    root.attachedImagePath = ""
+  }
+
+  function copyMessage(msg) {
+    if (!msg) return
+    var rawText = msg.text || ""
+    var img = msg.imagePath || ""
+    var isPhotoOnly = img && (!rawText || Model.isPhotoPlaceholder(rawText))
+
+    if (isPhotoOnly) {
+      Quickshell.execDetached(["bash", "-c", "if command -v wl-copy >/dev/null 2>&1; then wl-copy < " + Util.shellQuote(img) + "; fi"])
+    } else {
+      var textToCopy = Model.copyableText(rawText)
+      if (!textToCopy && img) {
+        Quickshell.execDetached(["bash", "-c", "if command -v wl-copy >/dev/null 2>&1; then wl-copy < " + Util.shellQuote(img) + "; fi"])
+      } else if (textToCopy) {
+        Quickshell.execDetached(["bash", "-c", "if command -v wl-copy >/dev/null 2>&1; then printf %s " + Util.shellQuote(textToCopy) + " | wl-copy; fi"])
+      }
+    }
+  }
+
+  function copyImage(path) {
+    if (!path) return
+    Quickshell.execDetached(["bash", "-c", "if command -v wl-copy >/dev/null 2>&1; then wl-copy < " + Util.shellQuote(path) + "; fi"])
+  }
+
   function sendReply() {
     var text = composer.text
-    if (!text || !text.trim().length) return
+    var img = root.attachedImagePath
+    if ((!text || !text.trim().length) && (!img || !img.length)) return
     if (!root.client || !root.client.ready) {
       root.statusLine = "Not connected to WhatsApp"
       return
     }
-    if (root.client.sendMessage(root.activeJid, text)) {
+    var quotedId = root.replyingTo ? root.replyingTo.id : undefined
+    if (root.client.sendMessage(root.activeJid, text, quotedId, img)) {
       composer.text = ""
+      root.attachedImagePath = ""
+      root.replyingTo = null
       root.statusLine = ""
       typingTimer.stop()
       root.client.setTyping(root.activeJid, "paused")
@@ -248,6 +311,10 @@ Panel {
       if (root.refreshing && root.view !== "chat") root.finishRefresh()
     }
 
+    function onChatsEpochChanged() {
+      if (root.refreshing && root.view !== "chat") root.finishRefresh()
+    }
+
     function onMessageArrived(jid, message, chat) {
       if (jid !== root.activeJid) return
       if (chat) root.activeChat = chat
@@ -308,6 +375,40 @@ Panel {
     }
   }
 
+  Process {
+    id: imagePickerProcess
+    command: [root.pluginDir + "/bin/omarchy-whatsapp-pick-image"]
+    stdout: SplitParser {
+      onRead: function (data) {
+        var path = String(data || "").trim()
+        if (path.length > 0) {
+          root.attachedImagePath = path
+          Qt.callLater(function () { composer.forceActiveFocus() })
+        }
+      }
+    }
+    function pick() {
+      if (!running) running = true
+    }
+  }
+
+  Process {
+    id: clipboardPaster
+    command: ["bash", "-c", "TMP=\"/tmp/wa-clip-$(date +%s%N).png\"; wl-paste --type image/png > \"$TMP\" 2>/dev/null && [ -s \"$TMP\" ] && echo \"$TMP\" || { rm -f \"$TMP\"; exit 1; }"]
+    stdout: SplitParser {
+      onRead: function (data) {
+        var path = String(data || "").trim()
+        if (path.length > 0) {
+          root.attachedImagePath = path
+          Qt.callLater(function () { composer.forceActiveFocus() })
+        }
+      }
+    }
+    function paste() {
+      running = true
+    }
+  }
+
   // Coalesces keystrokes into one "composing" presence, then one "paused" a
   // few seconds after the user stops.
   Timer {
@@ -322,6 +423,13 @@ Panel {
     interval: 8000
     repeat: false
     onTriggered: root.finishRefresh()
+  }
+
+  Timer {
+    id: highlightTimer
+    interval: 1500
+    repeat: false
+    onTriggered: root.highlightedMessageId = ""
   }
 
   KeyboardPanel {
@@ -690,7 +798,7 @@ Panel {
               Item {
                 id: bubbleRow
                 width: parent.width
-                implicitHeight: bubble.height
+                implicitHeight: Math.max(bubble.height, actionButtons.implicitHeight)
                 height: implicitHeight
 
                 readonly property real pad: Style.space(8)
@@ -699,9 +807,9 @@ Panel {
                 // content to both bubble edges instead would make the bubble's
                 // width depend on content that depends on the bubble: a binding
                 // loop, which collapses every bubble to a few pixels.
-                readonly property real maxInner: Math.max(Style.space(60), bubbleRow.width * 0.82 - bubbleRow.pad * 2)
-                readonly property bool hasImage: messageRow.modelData.imagePath
-                  && String(messageRow.modelData.imagePath).length > 0
+                readonly property real maxInner: Math.max(Style.space(60), bubbleRow.width * 0.76 - bubbleRow.pad * 2)
+                readonly property bool hasImage: !!(messageRow.modelData && messageRow.modelData.imagePath
+                  && String(messageRow.modelData.imagePath).length > 0)
                 readonly property bool showBody: {
                   var text = messageRow.modelData.text || ""
                   if (!text.length) return false
@@ -711,6 +819,120 @@ Panel {
                 readonly property bool showSender: !messageRow.modelData.fromMe
                   && root.activeChat !== null
                   && root.activeChat.isGroup === true
+                readonly property bool canCopy: !!(messageRow.modelData && (
+                  String(messageRow.modelData.text || "").trim().length > 0 ||
+                  String(messageRow.modelData.imagePath || "").length > 0
+                ))
+
+                MouseArea {
+                  id: bubbleRowHover
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  acceptedButtons: Qt.RightButton
+                  cursorShape: Qt.ArrowCursor
+                  onClicked: function (mouse) {
+                    if (mouse.button === Qt.RightButton) {
+                      root.startReply(messageRow.modelData)
+                    }
+                  }
+                }
+
+                Row {
+                  id: actionButtons
+                  visible: bubbleRowHover.containsMouse || replyBtnMouse.containsMouse || copyBtnMouse.containsMouse
+                  spacing: Style.space(4)
+                  anchors.verticalCenter: bubble.verticalCenter
+                  anchors.left: messageRow.modelData.fromMe ? undefined : bubble.right
+                  anchors.leftMargin: messageRow.modelData.fromMe ? 0 : Style.space(6)
+                  anchors.right: messageRow.modelData.fromMe ? bubble.left : undefined
+                  anchors.rightMargin: messageRow.modelData.fromMe ? Style.space(6) : 0
+                  z: 3
+
+                  Rectangle {
+                    id: replyBtn
+                    width: Style.space(22)
+                    height: Style.space(22)
+                    radius: width / 2
+                    color: replyBtnMouse.containsMouse
+                      ? Style.hoverFillFor(root.foreground, root.bar ? root.bar.urgent : Color.accent)
+                      : Style.normalFillFor(root.foreground, Color.accent)
+                    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+                    border.width: 1
+
+                    Text {
+                      anchors.centerIn: parent
+                      text: "\uf112"
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                    }
+
+                    MouseArea {
+                      id: replyBtnMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.startReply(messageRow.modelData)
+                    }
+
+                    PanelToolTip {
+                      visible: replyBtnMouse.containsMouse
+                      text: "Reply"
+                      fontFamily: root.fontFamily
+                    }
+                  }
+
+                  Rectangle {
+                    id: copyBtn
+                    visible: bubbleRow.canCopy
+                    property bool copied: false
+                    width: Style.space(22)
+                    height: Style.space(22)
+                    radius: width / 2
+                    color: (copyBtnMouse.containsMouse || copyBtn.copied)
+                      ? Style.hoverFillFor(root.foreground, root.bar ? root.bar.urgent : Color.accent)
+                      : Style.normalFillFor(root.foreground, Color.accent)
+                    border.color: copyBtn.copied
+                      ? (root.bar ? root.bar.urgent : Color.accent)
+                      : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+                    border.width: 1
+
+                    Text {
+                      anchors.centerIn: parent
+                      text: copyBtn.copied ? "\uf00c" : "\uf0c5"
+                      color: copyBtn.copied
+                        ? (root.bar ? root.bar.urgent : Color.accent)
+                        : root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                    }
+
+                    MouseArea {
+                      id: copyBtnMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: {
+                        root.copyMessage(messageRow.modelData)
+                        copyBtn.copied = true
+                        copyResetTimer.restart()
+                      }
+                    }
+
+                    Timer {
+                      id: copyResetTimer
+                      interval: 1500
+                      repeat: false
+                      onTriggered: copyBtn.copied = false
+                    }
+
+                    PanelToolTip {
+                      visible: copyBtnMouse.containsMouse
+                      text: copyBtn.copied ? "Copied!" : "Copy message"
+                      fontFamily: root.fontFamily
+                    }
+                  }
+                }
 
                 Rectangle {
                   id: bubble
@@ -722,14 +944,19 @@ Panel {
                   color: messageRow.modelData.fromMe
                     ? Style.selectedFillFor(root.foreground, root.bar ? root.bar.urgent : Color.accent)
                     : Style.normalFillFor(root.foreground, Color.accent)
+                  border.color: root.highlightedMessageId === messageRow.modelData.id
+                    ? (root.bar ? root.bar.urgent : Color.accent)
+                    : "transparent"
+                  border.width: root.highlightedMessageId === messageRow.modelData.id ? 2 : 0
 
                   Column {
                     id: bubbleContent
                     x: bubbleRow.pad
                     y: bubbleRow.pad / 2
-                    spacing: Style.space(1)
+                    spacing: Style.space(2)
                     width: Math.max(
                       bubbleRow.showSender ? senderLabel.width : 0,
+                      quotedBox.visible ? quotedBox.width : 0,
                       bubbleRow.hasImage ? photo.width : 0,
                       bodyLabel.visible ? bodyLabel.width : 0,
                       Math.min(metaLabel.implicitWidth, bubbleRow.maxInner))
@@ -744,6 +971,67 @@ Panel {
                       font.pixelSize: Style.font.caption
                       font.bold: true
                       elide: Text.ElideRight
+                    }
+
+                    Rectangle {
+                      id: quotedBox
+                      readonly property var quoted: messageRow.modelData ? messageRow.modelData.quoted : null
+                      visible: !!(quoted && (quoted.text || quoted.id))
+                      width: Math.min(bubbleRow.maxInner, Math.max(quotedInner.implicitWidth + Style.space(16), Style.space(120)))
+                      implicitHeight: quotedInner.implicitHeight + Style.space(6)
+                      height: implicitHeight
+                      radius: Style.cornerRadius > 0 ? Math.max(2, Style.cornerRadius - 2) : Style.space(4)
+                      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
+                      clip: true
+
+                      Rectangle {
+                        id: quotedBar
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        width: Style.space(3)
+                        color: root.bar ? root.bar.urgent : Color.accent
+                      }
+
+                      Column {
+                        id: quotedInner
+                        anchors.left: quotedBar.right
+                        anchors.leftMargin: Style.space(6)
+                        anchors.right: parent.right
+                        anchors.rightMargin: Style.space(6)
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Style.space(1)
+
+                        Text {
+                          width: parent.width
+                          text: Model.quotedTitle(quotedBox.quoted)
+                          color: root.bar ? root.bar.urgent : Color.accent
+                          font.family: root.fontFamily
+                          font.pixelSize: Style.font.caption
+                          font.bold: true
+                          elide: Text.ElideRight
+                        }
+
+                        Text {
+                          width: parent.width
+                          text: Model.quotedPreview(quotedBox.quoted)
+                          color: root.secondaryForeground
+                          font.family: root.fontFamily
+                          font.pixelSize: Style.font.caption
+                          elide: Text.ElideRight
+                        }
+                      }
+
+                      MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                          if (quotedBox.quoted && quotedBox.quoted.id) {
+                            root.jumpToMessage(quotedBox.quoted.id)
+                          }
+                        }
+                      }
                     }
 
                     Image {
@@ -840,43 +1128,292 @@ Panel {
           }
 
           // ── Inline reply ───────────────────────────────────────────────
-          Item {
+          Column {
             width: parent.width
-            implicitHeight: Math.max(composer.implicitHeight, sendButton.implicitHeight)
+            spacing: Style.space(4)
 
-            TextField {
-              id: composer
-              anchors.left: parent.left
-              anchors.right: sendButton.left
-              anchors.rightMargin: Style.space(6)
-              anchors.verticalCenter: parent.verticalCenter
-              foreground: root.foreground
-              accent: root.bar ? root.bar.urgent : Color.accent
-              placeholderText: root.linked ? "Reply\u2026" : "Not connected"
-              enabled: root.linked
-              onAccepted: root.sendReply()
-              onTextChanged: {
-                if (!root.client || !root.activeJid || !text.length) return
-                if (!typingTimer.running) root.client.setTyping(root.activeJid, "composing")
-                typingTimer.restart()
+            // Replying to banner
+            Rectangle {
+              id: replyBanner
+              visible: root.replyingTo !== null
+              width: parent.width
+              implicitHeight: replyBannerContent.implicitHeight + Style.space(8)
+              height: implicitHeight
+              radius: Style.cornerRadius > 0 ? Style.cornerRadius : Style.space(4)
+              color: Style.normalFillFor(root.foreground, Color.accent)
+              border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.15)
+              border.width: 1
+              clip: true
+
+              Rectangle {
+                id: replyIndicator
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: Style.space(3)
+                color: root.bar ? root.bar.urgent : Color.accent
               }
-              Keys.onEscapePressed: function (event) {
-                if (composer.text.length > 0) composer.text = ""
-                else root.back()
-                event.accepted = true
+
+              Row {
+                id: replyBannerContent
+                anchors.left: replyIndicator.right
+                anchors.leftMargin: Style.space(8)
+                anchors.right: parent.right
+                anchors.rightMargin: Style.space(6)
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(6)
+
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "\uf112"
+                  color: root.bar ? root.bar.urgent : Color.accent
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                }
+
+                Column {
+                  id: replyBannerText
+                  width: parent.width - Style.space(52)
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(1)
+
+                  Text {
+                    width: parent.width
+                    text: {
+                      if (!root.replyingTo) return ""
+                      var name = root.replyingTo.fromMe ? "You" : (root.replyingTo.senderName || "Message")
+                      return "Replying to " + name
+                    }
+                    color: root.bar ? root.bar.urgent : Color.accent
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    font.bold: true
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    text: {
+                      if (!root.replyingTo) return ""
+                      var t = Model.oneLine(root.replyingTo.text)
+                      if (!t && root.replyingTo.imagePath) return "Photo"
+                      return Model.truncate(t, 60)
+                    }
+                    color: root.secondaryForeground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    elide: Text.ElideRight
+                  }
+                }
+
+                Rectangle {
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: Style.space(20)
+                  height: Style.space(20)
+                  radius: width / 2
+                  color: cancelReplyMouse.containsMouse
+                    ? Style.hoverFillFor(root.foreground, root.bar ? root.bar.urgent : Color.accent)
+                    : "transparent"
+
+                  Text {
+                    anchors.centerIn: parent
+                    text: "\uf00d"
+                    color: root.secondaryForeground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+
+                  MouseArea {
+                    id: cancelReplyMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.cancelReply()
+                  }
+                }
               }
             }
 
-            PanelActionButton {
-              id: sendButton
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              iconText: "\uf1d8"
-              tooltipText: "Send"
-              enabled: root.linked && composer.text.trim().length > 0
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              onClicked: root.sendReply()
+            // Attached Image Preview Banner
+            Rectangle {
+              id: imageAttachmentBanner
+              visible: root.attachedImagePath.length > 0
+              width: parent.width
+              implicitHeight: attachRow.implicitHeight + Style.space(8)
+              height: implicitHeight
+              radius: Style.cornerRadius > 0 ? Style.cornerRadius : Style.space(4)
+              color: Style.normalFillFor(root.foreground, Color.accent)
+              border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.15)
+              border.width: 1
+              clip: true
+
+              Rectangle {
+                id: imageIndicator
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: Style.space(3)
+                color: root.bar ? root.bar.urgent : Color.accent
+              }
+
+              Row {
+                id: attachRow
+                anchors.left: imageIndicator.right
+                anchors.leftMargin: Style.space(8)
+                anchors.right: parent.right
+                anchors.rightMargin: Style.space(6)
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(8)
+
+                Image {
+                  id: attachThumbnail
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: Style.space(34)
+                  height: Style.space(34)
+                  fillMode: Image.PreserveAspectCrop
+                  asynchronous: true
+                  cache: false
+                  source: root.attachedImagePath.length > 0
+                    ? Qt.resolvedUrl("file://" + root.attachedImagePath)
+                    : ""
+                  clip: true
+
+                  Rectangle {
+                    anchors.fill: parent
+                    color: "transparent"
+                    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.2)
+                    border.width: 1
+                    radius: Style.cornerRadius > 0 ? Math.max(2, Style.cornerRadius - 2) : Style.space(2)
+                  }
+                }
+
+                Column {
+                  id: attachTextCol
+                  width: parent.width - attachThumbnail.width - cancelAttachBtn.width - Style.space(26)
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(1)
+
+                  Text {
+                    width: parent.width
+                    text: {
+                      if (!root.attachedImagePath) return ""
+                      var parts = root.attachedImagePath.split("/")
+                      return parts[parts.length - 1] || "Image attached"
+                    }
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    font.bold: true
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    text: composer.text.length > 0 ? "Caption added" : "Attach image (Enter to send)"
+                    color: root.secondaryForeground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    elide: Text.ElideRight
+                  }
+                }
+
+                Rectangle {
+                  id: cancelAttachBtn
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: Style.space(20)
+                  height: Style.space(20)
+                  radius: width / 2
+                  color: cancelAttachMouse.containsMouse
+                    ? Style.hoverFillFor(root.foreground, root.bar ? root.bar.urgent : Color.accent)
+                    : "transparent"
+
+                  Text {
+                    anchors.centerIn: parent
+                    text: "\uf00d"
+                    color: root.secondaryForeground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+
+                  MouseArea {
+                    id: cancelAttachMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.clearAttachedImage()
+                  }
+                }
+              }
+            }
+
+            Item {
+              width: parent.width
+              implicitHeight: Math.max(composer.implicitHeight, sendButton.implicitHeight, attachButton.implicitHeight)
+
+              PanelActionButton {
+                id: attachButton
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                iconText: "\uf0c6"
+                tooltipText: "Attach image (or paste with Ctrl+V)"
+                enabled: root.linked
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                onClicked: imagePickerProcess.pick()
+              }
+
+              TextField {
+                id: composer
+                anchors.left: attachButton.right
+                anchors.leftMargin: Style.space(6)
+                anchors.right: sendButton.left
+                anchors.rightMargin: Style.space(6)
+                anchors.verticalCenter: parent.verticalCenter
+                foreground: root.foreground
+                accent: root.bar ? root.bar.urgent : Color.accent
+                placeholderText: {
+                  if (!root.linked) return "Not connected"
+                  if (root.attachedImagePath.length > 0) return "Add a caption\u2026"
+                  if (root.replyingTo !== null) return "Type a reply\u2026"
+                  return "Reply\u2026"
+                }
+                enabled: root.linked
+                onAccepted: root.sendReply()
+                onTextChanged: {
+                  if (!root.client || !root.activeJid || !text.length) return
+                  if (!typingTimer.running) root.client.setTyping(root.activeJid, "composing")
+                  typingTimer.restart()
+                }
+                Keys.onPressed: function (event) {
+                  if ((event.modifiers & Qt.ControlModifier) && (event.key === Qt.Key_V)) {
+                    clipboardPaster.paste()
+                  }
+                }
+                Keys.onEscapePressed: function (event) {
+                  if (root.attachedImagePath.length > 0) {
+                    root.attachedImagePath = ""
+                  } else if (root.replyingTo !== null) {
+                    root.replyingTo = null
+                  } else if (composer.text.length > 0) {
+                    composer.text = ""
+                  } else {
+                    root.back()
+                  }
+                  event.accepted = true
+                }
+              }
+
+              PanelActionButton {
+                id: sendButton
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                iconText: "\uf1d8"
+                tooltipText: "Send"
+                enabled: root.linked && (composer.text.trim().length > 0 || root.attachedImagePath.length > 0)
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                onClicked: root.sendReply()
+              }
             }
           }
         }
@@ -956,6 +1493,58 @@ Panel {
           MouseArea {
             anchors.fill: parent
             onClicked: function (event) { event.accepted = true }
+          }
+
+          Rectangle {
+            id: peekCopyBtn
+            property bool copied: false
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.margins: Style.space(12)
+            width: Style.space(32)
+            height: Style.space(32)
+            radius: width / 2
+            color: (peekCopyMouse.containsMouse || peekCopyBtn.copied)
+              ? Style.hoverFillFor(root.foreground, root.bar ? root.bar.urgent : Color.accent)
+              : Qt.rgba(0, 0, 0, 0.6)
+            border.color: peekCopyBtn.copied
+              ? (root.bar ? root.bar.urgent : Color.accent)
+              : Qt.rgba(255, 255, 255, 0.3)
+            border.width: 1
+            z: 10
+
+            Text {
+              anchors.centerIn: parent
+              text: peekCopyBtn.copied ? "\uf00c" : "\uf0c5"
+              color: peekCopyBtn.copied ? (root.bar ? root.bar.urgent : Color.accent) : "#ffffff"
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+            }
+
+            MouseArea {
+              id: peekCopyMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                root.copyImage(root.peekImagePath)
+                peekCopyBtn.copied = true
+                peekCopyTimer.restart()
+              }
+            }
+
+            Timer {
+              id: peekCopyTimer
+              interval: 1500
+              repeat: false
+              onTriggered: peekCopyBtn.copied = false
+            }
+
+            PanelToolTip {
+              visible: peekCopyMouse.containsMouse
+              text: peekCopyBtn.copied ? "Copied!" : "Copy image"
+              fontFamily: root.fontFamily
+            }
           }
         }
       }

@@ -20,7 +20,13 @@ KeyboardPanel {
     open: opened
     property Item focusTarget: keyCatcher
 
-    readonly property var service: hostWidget && hostWidget.service ? hostWidget.service : (bar && bar.shell && typeof bar.shell.serviceFor === "function" ? bar.shell.serviceFor("omaconnect") : null)
+    KdeConnectController {
+        id: panelFallbackController
+    }
+
+    readonly property var service: hostWidget && hostWidget.service
+        ? hostWidget.service
+        : ((bar && bar.shell && typeof bar.shell.serviceFor === "function" ? bar.shell.serviceFor("omaconnect") : null) || panelFallbackController)
     readonly property var device: service ? service.selectedDevice : null
     readonly property string deviceName: device && typeof device.name === "string" ? device.name : "KDE Connect"
 

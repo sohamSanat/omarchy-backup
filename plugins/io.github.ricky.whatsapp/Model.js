@@ -93,6 +93,19 @@ function chatPreview(chat) {
   return text
 }
 
+function quotedTitle(quoted) {
+  if (!quoted) return ""
+  if (quoted.fromMe) return "You"
+  return quoted.senderName || "Message"
+}
+
+function quotedPreview(quoted) {
+  if (!quoted) return ""
+  var text = oneLine(quoted.text)
+  if (!text && quoted.imagePath) return "Photo"
+  return truncate(text, 50)
+}
+
 // Baileys status enum: 1 pending, 2 server ack, 3 delivered, 4 read, 5 played.
 // Two nf-fa-check glyphs, not nf-fa-check-double: that codepoint is a copy
 // icon in a lot of Nerd Fonts, so "delivered" was rendering as one tick.
@@ -234,5 +247,8 @@ function formatMessageText(text, linkColor) {
   return docPrefix + result
 }
 
-
-
+function copyableText(text) {
+  if (!text) return ""
+  var raw = String(text)
+  return raw.replace(/^[\uf000-\uf2e0]\s*/, "")
+}

@@ -7,6 +7,15 @@ else
     export PATH="$HOME/.local/bin:$PATH"
 fi
 
+if command -v omarchy-file-select >/dev/null 2>&1; then
+    picked=$(omarchy-file-select --title "Select file to send" 2>/dev/null || true)
+    if [[ -n "$picked" && -e "$picked" ]]; then
+        printf '%s\n' "$picked"
+        exit 0
+    fi
+    exit 0
+fi
+
 roots=("$HOME/Downloads" "$HOME/Documents" "$HOME/Pictures" "$HOME/Videos")
 formats=(jpg jpeg png webp gif heic avif mp4 mov m4v mkv webm avi pdf txt zip tar gz iso)
 
