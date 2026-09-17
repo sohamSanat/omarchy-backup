@@ -82,6 +82,8 @@ libyaml
 limine
 linux
 linux-firmware
+linux-omarchy
+linux-omarchy-headers
 llvm
 lua51
 luarocks
@@ -91,6 +93,7 @@ meson
 meteobar-bin
 mise-bin
 mkinitcpio
+mpv
 nano
 nautilus
 nautilus-python
@@ -100,8 +103,8 @@ noto-fonts
 noto-fonts-cjk
 noto-fonts-emoji
 nss-mdns
-obs-studio
 obsidian
+obs-studio
 omacalc
 omacut
 omarchy

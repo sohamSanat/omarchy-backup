@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.enovara.teach-voxtype",
+  "name": "Teach Voxtype",
+  "version": "1.0.0",
+  "author": "Enovara",
+  "description": "Teach voxtype dictation a word: say it a few times, review how Whisper mishears it, and map the mishearings to the right spelling",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Teach Voxtype",
+    "description": "Voxtype status mic that opens the word trainer",
+    "category": "System",
+    "allowMultiple": false
+  }
+}

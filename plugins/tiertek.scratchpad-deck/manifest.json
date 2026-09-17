@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "tiertek.scratchpad-deck",
+  "name": "Scratchpad Deck",
+  "version": "0.1.0",
+  "author": "TierTek",
+  "license": "MIT",
+  "description": "A visual scratchpad switcher for the Omarchy bar. Shows live previews of the windows hiding in your scratchpads and gives each one its own hotkey.",
+  "homepage": "https://github.com/TIerTek/omarchy-scratchpad-deck",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Scratchpad Deck",
+    "description": "Live previews of your scratchpad windows, with a hotkey per scratchpad",
+    "category": "Compositor",
+    "allowMultiple": false,
+    "defaultSection": "left"
+  }
+}

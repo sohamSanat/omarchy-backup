@@ -1,0 +1,114 @@
+[
+  {
+    "prefix": "fmhy",
+    "name": "FMHY",
+    "url": "https://fmhy.net/search?q={query}",
+    "home": "https://fmhy.net",
+    "icon": "󰘧",
+    "description": "Search FMHY Directory (14,500+ curated resources)"
+  },
+  {
+    "prefix": "yt",
+    "name": "YouTube",
+    "url": "https://www.youtube.com/results?search_query={query}",
+    "home": "https://www.youtube.com",
+    "icon": "󰗃",
+    "description": "Search YouTube videos"
+  },
+  {
+    "prefix": "g",
+    "name": "Google",
+    "url": "https://www.google.com/search?q={query}",
+    "home": "https://www.google.com",
+    "icon": "󰊭",
+    "description": "Search Google"
+  },
+  {
+    "prefix": "gh",
+    "name": "GitHub",
+    "url": "https://github.com/search?q={query}",
+    "home": "https://github.com",
+    "icon": "",
+    "description": "Search GitHub repositories & code"
+  },
+  {
+    "prefix": "wiki",
+    "name": "Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Special:Search?search={query}",
+    "home": "https://en.wikipedia.org",
+    "icon": "󰖬",
+    "description": "Search Wikipedia articles"
+  },
+  {
+    "prefix": "maps",
+    "name": "Google Maps",
+    "url": "https://www.google.com/maps/search/{query}",
+    "home": "https://www.google.com/maps",
+    "icon": "󰆊",
+    "description": "Search Google Maps locations"
+  },
+  {
+    "prefix": "r",
+    "name": "Reddit",
+    "url": "https://www.reddit.com/search/?q={query}",
+    "home": "https://www.reddit.com",
+    "icon": "",
+    "description": "Search Reddit communities & posts"
+  },
+  {
+    "prefix": "ddg",
+    "name": "DuckDuckGo",
+    "url": "https://duckduckgo.com/?q={query}",
+    "home": "https://duckduckgo.com",
+    "icon": "󰇧",
+    "description": "Search DuckDuckGo"
+  },
+  {
+    "prefix": "x",
+    "name": "Twitter / X",
+    "url": "https://x.com/search?q={query}",
+    "home": "https://x.com",
+    "icon": "",
+    "description": "Search Twitter / X"
+  },
+  {
+    "prefix": "npm",
+    "name": "NPM",
+    "url": "https://www.npmjs.com/search?q={query}",
+    "home": "https://www.npmjs.com",
+    "icon": "󰏗",
+    "description": "Search NPM packages"
+  },
+  {
+    "prefix": "arch",
+    "name": "ArchWiki",
+    "url": "https://wiki.archlinux.org/index.php?search={query}",
+    "home": "https://wiki.archlinux.org",
+    "icon": "󰣇",
+    "description": "Search Arch Linux Wiki"
+  },
+  {
+    "prefix": "aur",
+    "name": "AUR",
+    "url": "https://aur.archlinux.org/packages?K={query}",
+    "home": "https://aur.archlinux.org",
+    "icon": "󰣇",
+    "description": "Search Arch User Repository"
+  },
+  {
+    "prefix": "so",
+    "name": "StackOverflow",
+    "url": "https://stackoverflow.com/search?q={query}",
+    "home": "https://stackoverflow.com",
+    "icon": "󰘷",
+    "description": "Search StackOverflow questions"
+  },
+  {
+    "prefix": "ai",
+    "name": "ChatGPT",
+    "url": "https://chatgpt.com/?q={query}",
+    "home": "https://chatgpt.com",
+    "icon": "󰭹",
+    "description": "Ask ChatGPT"
+  }
+]

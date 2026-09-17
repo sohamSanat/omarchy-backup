@@ -96,10 +96,14 @@ echo "==> Step 2: Restoring Omarchy core configurations..."
 backup_if_exists "${USER_HOME}/.config/omarchy/shell.json"
 backup_if_exists "${USER_HOME}/.config/omarchy/themebook.json"
 backup_if_exists "${USER_HOME}/.config/omarchy/battery-limiter.json"
+backup_if_exists "${USER_HOME}/.config/omarchy/quicklinks.json"
 
 cp -a "${SCRIPT_DIR}/configs/omarchy/shell.json" "${USER_HOME}/.config/omarchy/"
 cp -a "${SCRIPT_DIR}/configs/omarchy/themebook.json" "${USER_HOME}/.config/omarchy/"
 cp -a "${SCRIPT_DIR}/configs/omarchy/battery-limiter.json" "${USER_HOME}/.config/omarchy/"
+if [[ -f "${SCRIPT_DIR}/configs/omarchy/quicklinks.json" ]]; then
+  cp -a "${SCRIPT_DIR}/configs/omarchy/quicklinks.json" "${USER_HOME}/.config/omarchy/"
+fi
 cp -a "${SCRIPT_DIR}/configs/omarchy/branding/." "${USER_HOME}/.config/omarchy/branding/"
 cp -a "${SCRIPT_DIR}/configs/omarchy/defaults/." "${USER_HOME}/.config/omarchy/defaults/"
 cp -a "${SCRIPT_DIR}/configs/omarchy/extensions/." "${USER_HOME}/.config/omarchy/extensions/"
@@ -484,6 +488,12 @@ for plugin_path in "${SCRIPT_DIR}/plugins"/*; do
     cp -a "${plugin_path}/." "${USER_HOME}/.config/omarchy/plugins/${plugin_name}/"
   fi
 done
+
+# Ensure all plugin helper scripts are executable
+find "${USER_HOME}/.config/omarchy/plugins" -type d -name scripts -exec chmod +x {}/* + 2>/dev/null || true
+if [[ -f "${USER_HOME}/.config/omarchy/plugins/tiertek.scratchpad-deck/bin/scratchpad-deck" ]]; then
+  chmod +x "${USER_HOME}/.config/omarchy/plugins/tiertek.scratchpad-deck/bin/scratchpad-deck"
+fi
 
 # Install node dependencies for plugins if needed (e.g. whatsapp daemon)
 if [[ -f "${USER_HOME}/.config/omarchy/plugins/io.github.ricky.whatsapp/daemon/package.json" ]]; then

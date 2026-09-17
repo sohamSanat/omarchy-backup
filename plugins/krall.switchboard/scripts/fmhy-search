@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/fmhy-deck/index-v1.json"
+db="${XDG_CACHE_HOME:-$HOME/.cache}/fmhy-deck/fmhy.db"
+dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ ! -f "$cache" ]]; then
+  echo "[]"
+  exit 0
+fi
+
+# If db doesn't exist or is older than cache, rebuild
+if [[ ! -f "$db" || "$cache" -nt "$db" ]]; then
+  python3 "$dir/fmhy-sync.py" "$cache" "$db" 2>/dev/null || true
+fi
+
+if [[ ! -f "$db" ]]; then
+  echo "[]"
+  exit 0
+fi
+
+query="${1:-}"
+
+if [[ -z "$query" ]]; then
+  sqlite3 -json "$db" "SELECT title, url, category, description, hostname, starred FROM fmhy WHERE starred = 1 LIMIT 20;"
+  exit 0
+fi
+
+# Sanitize query for FTS5: strip non-alphanumeric, split into tokens with prefix matching
+clean=$(echo "$query" | tr -c "[:alnum:]" " " | xargs)
+
+if [[ -z "$clean" ]]; then
+  sqlite3 -json "$db" "SELECT title, url, category, description, hostname, starred FROM fmhy WHERE starred = 1 LIMIT 20;"
+  exit 0
+fi
+
+match=""
+for w in $clean; do
+  match="$match \"$w\"*"
+done
+
+sqlite3 -json "$db" "SELECT title, url, category, description, hostname, starred FROM fmhy WHERE fmhy MATCH '$match' ORDER BY starred DESC, bm25(fmhy) LIMIT 25;"

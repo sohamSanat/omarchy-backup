@@ -20,10 +20,10 @@
           "id": "omarchy.system-update"
         },
         {
-          "id": "io.github.diegopluna.argus"
+          "id": "akshit.island"
         },
         {
-          "id": "io.github.weedwhitesandwine.obsiduous"
+          "id": "io.github.diegopluna.argus"
         }
       ],
       "left": [
@@ -31,17 +31,16 @@
           "id": "omarchy.workspaces"
         },
         {
-          "id": "tristonarmstrong.dictionary"
+          "id": "io.github.enovara.teach-voxtype"
+        },
+        {
+          "id": "tiertek.scratchpad-deck"
         },
         {
           "id": "soham.agents"
         },
         {
-          "id": "bhanu.omavideos",
-          "audioOnly": false,
-          "trim": false,
-          "trimStart": "",
-          "trimEnd": ""
+          "id": "io.github.weedwhitesandwine.obsiduous"
         }
       ],
       "right": [
@@ -49,13 +48,14 @@
           "id": "omaconnect"
         },
         {
+          "id": "bhanu.omavideos",
+          "audioOnly": false,
+          "trim": false,
+          "trimStart": "",
+          "trimEnd": ""
+        },
+        {
           "id": "jkoestinger.vpn"
-        },
-        {
-          "id": "io.github.nilszeilon.omarchy-sensei"
-        },
-        {
-          "id": "omamail"
         },
         {
           "id": "io.github.ricky.whatsapp"
@@ -68,7 +68,7 @@
         },
         {
           "id": "jrmmhm.pocket",
-          "members": "omarchy.tray, omaconnect, jkoestinger.vpn, io.github.nilszeilon.omarchy-sensei, omamail, io.github.ricky.whatsapp, io.github.r-witz.nothing-ear, mahmoodkhalil57.qrgen, io.github.elevate08.qs-bitwarden-cli"
+          "members": "omarchy.tray, omaconnect, bhanu.omavideos, jkoestinger.vpn, io.github.ricky.whatsapp, io.github.r-witz.nothing-ear, omamail, io.github.nilszeilon.omarchy-sensei, mahmoodkhalil57.qrgen, io.github.elevate08.qs-bitwarden-cli"
         },
         {
           "id": "omarchy.bluetooth"

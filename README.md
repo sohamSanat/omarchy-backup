@@ -60,7 +60,16 @@ Branch: `main`
 
 ### 3. 🎨 Visual Experience, Bar & Theming Pipeline
 - **Theme Collection**: 16 curated themes (`moodpeak` [Active], `nous` [Light research], `sakura-mochi`, `aetheria`, `akaito`, `amekoji`, `artzen`, `city-783`, `harbor`, `harbordark`, `omagen1`, `omarchy_signature`, `quattrocento-light`, `synthetica`).
-- **Floating Bar**: 29 modular plugins in `plugins/` (`io.github.ellion369.omagent`, `nguyenn.clipboard` [custom attachment cleaner], `reidenxerx.tile-blueprints`, `reomarchy.workspace-switcher`, `ricardosuman.pretty-screenshot`, `tristonarmstrong.dictionary`, `bhanu.omavideos`, `soham.power`, `mryll.printbar`, `mahmoodkhalil57.qrgen`, `io.github.ricky.whatsapp`, etc.).
+- **Floating Bar**: 33 modular plugins in `plugins/` (`krall.switchboard` [Raycast intelligence launcher], `io.github.ellion369.omagent`, `io.github.i12bp8.fmhy-deck`, `akshit.island`, `io.github.enovara.teach-voxtype`, `tiertek.scratchpad-deck`, `nguyenn.clipboard` [custom attachment cleaner], `reidenxerx.tile-blueprints`, `reomarchy.workspace-switcher`, `ricardosuman.pretty-screenshot`, `tristonarmstrong.dictionary`, `bhanu.omavideos`, `soham.power`, `mryll.printbar`, `mahmoodkhalil57.qrgen`, `io.github.ricky.whatsapp`, etc.).
+- **Switchboard Launcher v2 (`krall.switchboard`)**:
+  - **Raycast-Like Intelligence Engine (`RaycastSearch.js`)**:
+    - **Math Calculator**: Live expression evaluation (`=`), base conversions (`255 to hex`, `10 to bin`, `oct`), percentages (`15% of 80`), scientific functions (`sqrt`, `sin`, `log`, `pow`).
+    - **Currency & FX Conversions**: 50+ fiat currencies and crypto with live cache support.
+    - **Quick Links System (`configs/omarchy/quicklinks.json`)**: 14 customizable shortcuts (`fmhy`, `yt`, `g`, `gh`, `wiki`, `maps`, `r`, `ddg`, `npm`, `arch`, `aur`, `so`, `ai`).
+    - **Timezone Converter**: City, country, and abbreviation lookup with live offset diffs and scheduling math.
+    - **FMHY FreeMediaHeckYeah Search**: Built-in SQLite FTS5 search (`scripts/fmhy-search`, `scripts/fmhy-sync.py`), category portals, search recommendations, and 1-click launch to `io.github.i12bp8.fmhy-deck`.
+    - **Fuzzy Application Search (`AppSearch.js`)**: Weighted scoring prioritizing prefix matches, acronyms (`gimp` -> GNU Image Manipulation Program), and keyword metadata.
+    - **Precise Text Navigation**: Word token jumping (`prevTokenPos`, `nextTokenPos`) and inline cursor editing.
 - **Visual Workspace Switcher v2**: Hold-Super HUD with screencopy previews, active window titles, corner marks, bottom keymap HUD (`← →`, `↑ ↓`, `1-9`, `↵`, `esc`), and live search filter.
 - **Dynamic Theming Engine**: `omarchy theme set` instantly propagates colors across KDE/Qt (`kdeglobals`), GTK 4, terminal emulators (Ghostty, Alacritty, Kitty, Foot), Zen Browser (userChrome, Dark Reader), Brave Origin Browser, VLC Media Player, Obsidian, Foliate, and ytkew.
 - **Universal Theming Library & Environment**: `omarchy_theme.py` (high-contrast palette math ensuring dark text on light themes) and `omarchy-theme-env` CLI for terminal environment variable sync (`OMARCHY_THEME_MODE`, `COLORFGBG`).
@@ -154,7 +163,7 @@ omarchy-backup/
 ├── lib/                     # Compiled C plugins (hypr-shiny-border.so) and libraries
 ├── meta/                    # Package lists, theme/plugin sources, and git diff patches
 ├── pixmaps/                 # Application icons and assets
-├── plugins/                 # 29 full Omarchy shell plugins (~/.config/omarchy/plugins)
+├── plugins/                 # 33 full Omarchy shell plugins (~/.config/omarchy/plugins)
 ├── systemd/                 # User systemd service units (~/.config/systemd/user)
 ├── themes/                  # 16 complete themes (~/.config/omarchy/themes)
 ├── AI_AGENT_RESTORE_GUIDE.md# Comprehensive architectural and recovery guide for agents

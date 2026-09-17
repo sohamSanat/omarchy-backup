@@ -1,4 +1,17 @@
 {
+  "akshit.island": {
+    "remote": "https://github.com/AkshitThapar21/Omarchy-Dynamic-Island.git",
+    "commit": "594af6de7fe7132e85f0bf80556a573be62802d7",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M BarWidget.qml",
+      "M IslandModel.js",
+      "M Panel.qml",
+      "M README.md",
+      "M manifest.json",
+      "M tests/test_adversarial.js"
+    ]
+  },
   "bhanu.omavideos": {
     "remote": "https://github.com/Bhanu4417/OmaVideos.git",
     "commit": "2193bb8bab364475075e60511093cdc2424617b7",
@@ -64,6 +77,19 @@
       "?? tests/"
     ]
   },
+  "io.github.enovara.teach-voxtype": {
+    "remote": "https://github.com/Enovara/omarchy-teach-voxtype.git",
+    "commit": "31cd6885bf04942f3371b7fa838ed171345adb84",
+    "has_local_changes": false,
+    "dirty_files": []
+  },
+  "io.github.i12bp8.fmhy-deck": {
+    "remote": "https://github.com/i12bp8/fmhy-deck.git",
+    "commit": "49ad7da20ea77b14cf316d0c3098e54662567899",
+    "has_local_changes": false,
+    "dirty_files": [],
+    "note": "Integrated with Switchboard Raycast search for FMHY Deck panel invocations"
+  },
   "io.github.nilszeilon.omarchy-sensei": {
     "remote": "https://github.com/nilszeilon/omarchy-sensei.git",
     "commit": "f8817e9a84478304eb4409103983d11f05c419e4",
@@ -115,8 +141,17 @@
   "krall.switchboard": {
     "remote": "https://github.com/krall12/omarchy-switchboard.git",
     "commit": "fa9b45af82658306148dbd2240c970dafcb5d252",
-    "has_local_changes": false,
-    "dirty_files": []
+    "has_local_changes": true,
+    "dirty_files": [
+      "M Switchboard.qml",
+      "M scripts/enabled",
+      "M scripts/toggle",
+      "?? AppSearch.js",
+      "?? RaycastSearch.js",
+      "?? scripts/fmhy-search",
+      "?? scripts/fmhy-sync.py"
+    ],
+    "note": "Supercharged with Raycast-like intelligence engine (math calculations, currency conversions, quick links, timezone conversion, FMHY SQLite search), application fuzzy search, and text navigation"
   },
   "mahmoodkhalil57.qrgen": {
     "remote": "https://github.com/MahmoodKhalil57/omarchy-qrgen.git",
@@ -208,6 +243,16 @@
   "soham.power": {
     "remote": null,
     "custom": true
+  },
+  "tiertek.scratchpad-deck": {
+    "remote": "https://github.com/TIerTek/omarchy-scratchpad-deck.git",
+    "commit": "78a5d5e62364cfca51ac9bdd29fde48b3681642a",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M BarWidget.qml",
+      "M SlotModel.js",
+      "M tests/test-slot-model.cjs"
+    ]
   },
   "tristonarmstrong.dictionary": {
     "remote": "https://github.com/tristonarmstrong/omarchy-dictionary.git",

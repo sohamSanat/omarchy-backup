@@ -1,3 +1,5 @@
 #!/bin/bash
 # Exit 0 when Switchboard is the active menu (used by `checked:` guards).
-exec omarchy-plugin-list --json | jq -e 'any(.[]; .id == "krall.switchboard" and .enabled)' >/dev/null
+config="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json"
+[[ -f "$config" ]] || exit 1
+exec jq -e '((.plugins // []) | any(.id == "krall.switchboard")) and (((.disabledPlugins // []) | index("krall.switchboard")) | not)' "$config" >/dev/null

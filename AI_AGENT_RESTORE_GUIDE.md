@@ -78,7 +78,14 @@ This repository contains the full snapshot of user customizations:
 - `sakura-mochi`, `aetheria`, `akaito`, `amekoji`, `artzen`, `city-783`, `harbor`, `harbordark`, `nous` (light-mode research theme), `omagen1`, `omarchy_signature`, `quattrocento-light`, `synthetica`.
 
 ### E. Shell Plugins (`plugins/` -> `~/.config/omarchy/plugins/`)
-24 plugins included with complete source code:
+33 plugins included with complete source code:
+- **`krall.switchboard`**: Full-screen grid launcher replacement for default `omarchy.menu`. Supercharged with a Raycast-like intelligence engine (`RaycastSearch.js` with math/base/percentage calculations, currency conversions, timezone converter, FMHY SQLite FTS5 search, and 14 quick links in `~/.config/omarchy/quicklinks.json`), weighted application fuzzy search (`AppSearch.js`), token navigation, and custom scripts (`scripts/enabled`, `scripts/toggle`, `scripts/fmhy-search`, `scripts/fmhy-sync.py`).
+- **`io.github.i12bp8.fmhy-deck`**: FreeMediaHeckYeah Deck bar widget and category panel (14,500+ resources) with seamless Switchboard search integration.
+- **`akshit.island`**: Dynamic Island status widget for media playback, battery level, and active alerts.
+- **`io.github.enovara.teach-voxtype`**: Voxtype speech dictation helper and vocabulary learning panel.
+- **`tiertek.scratchpad-deck`**: Scratchpad deck manager for quick notes and Hyprland scratchpad toggling (`bin/scratchpad-deck`).
+- **`nguyenn.clipboard`**: Clipboard history plugin with custom "Clear attachments" feature and patch.
+- **`reidenxerx.tile-blueprints`**: Dynamic layout blueprint manager bound to `Super + Alt + L`.
 - **`io.github.ellion369.omagent`**: Personal AI Assistant with 3-lane multi-intent router (Flash chat, Web search, Herdr coding execution), Nothing Phone PWA intercom bridge, and Quickshell glass HUD overlay.
 - **`reomarchy.workspace-switcher`**: Visual workspace switcher with hold-Super activation, live screencopy previews, active window titles, corner marks, bottom navigation HUD (`← →`, `↑ ↓`, `1-9`, `↵`, `esc`), and type-to-filter search (includes custom patch).
 - **`kenny.nightlight`**: Night light color temperature bar control widget.
@@ -99,7 +106,6 @@ This repository contains the full snapshot of user customizations:
 - **`io.github.ricky.whatsapp`**: WhatsApp bar widget & daemon.
 - **`io.github.r-witz.nothing-ear`**: Nothing Ear device controller.
 - **`jkoestinger.vpn`**: VPN connection widget.
-- **`krall.switchboard`**: Quick settings switcher.
 - **`mryll.meteobar`**: Weather bar widget.
 - **`omaconnect`**: KDE Connect bar integration.
 - **`omamail`**: Email notification widget.
@@ -391,6 +397,7 @@ chmod +x ~/.config/omarchy/hooks/*/*
 
 cp -a themes/. ~/.config/omarchy/themes/
 cp -a plugins/. ~/.config/omarchy/plugins/
+find ~/.config/omarchy/plugins -type d -name scripts -exec chmod +x {}/* + 2>/dev/null || true
 ```
 
 ### Step 3: Deploy Hyprland & Terminals

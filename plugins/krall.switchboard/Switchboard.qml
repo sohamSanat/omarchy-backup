@@ -6,6 +6,8 @@ import qs.Commons
 import qs.Ui
 import "MenuModel.js" as MenuModel
 import "Keybinds.js" as Keybinds
+import "AppSearch.js" as AppSearch
+import "RaycastSearch.js" as RaycastSearch
 
 // Switchboard — a grid launcher for Omarchy.
 //
@@ -29,7 +31,9 @@ Item {
   property string omarchyPath: Quickshell.env("OMARCHY_PATH")
   property var shell: null
   property var manifest: null
-  readonly property string pluginDir: manifest && manifest.__sourceDir ? String(manifest.__sourceDir) : ""
+  readonly property string pluginDir: (manifest && manifest.__sourceDir)
+    ? String(manifest.__sourceDir)
+    : (manifest && manifest.id ? Quickshell.env("HOME") + "/.config/omarchy/plugins/" + manifest.id : Quickshell.env("HOME") + "/.config/omarchy/plugins/krall.switchboard")
 
   // --------------------------------------------------------------- lifecycle
 
@@ -43,6 +47,9 @@ Item {
       root.openDmenu(payload)
     } else {
       root.openRoute(payload.initialMenu || payload.menu || "root")
+      if (payload.query || payload.filter) {
+        root.setFilter(String(payload.query || payload.filter))
+      }
     }
   }
 
@@ -51,14 +58,48 @@ Item {
   }
 
   function refresh() {
-    root.loadMenuFile(defaultMenuProc, root.defaultMenuPath)
-    root.loadMenuFile(userMenuProc, root.userMenuPath)
-    root.loadKeybinds(true)
-    root.loadStatus()
-    return "ok"
+    try {
+      root.loadMenuFile(defaultMenuProc, root.defaultMenuPath)
+      root.loadMenuFile(userMenuProc, root.userMenuPath)
+      root.loadKeybinds(true)
+      root.loadStatus()
+      root.loadQuickLinks()
+      root.loadExchangeRates()
+      return "ok"
+    } catch (e) {
+      return "error: " + e
+    }
   }
 
   function ping() { return "ok" }
+
+  function appCount() {
+    return root.appLibrary ? root.appLibrary.sortedEntries("").length : 0
+  }
+
+  function testSearch(query) {
+    var q = String(query || "")
+    var smart = RaycastSearch.getSmartRows(q, {
+      quickLinks: root.quickLinksList,
+      exchangeRates: root.exchangeRates,
+      localOffsetMin: root.localTzOffsetMin,
+      fmhyResults: root.currentFmhyResults,
+      fmhySearching: root.fmhySearching
+    })
+    var glyph = RaycastSearch.detectSearchGlyph(q, root.quickLinksList)
+    return JSON.stringify({
+      query: q,
+      glyph: glyph,
+      count: smart.length,
+      first: smart.length > 0 ? {
+        label: smart[0].label,
+        detail: smart[0].detail,
+        action: smart[0].action,
+        kind: smart[0].kind,
+        icon: smart[0].icon
+      } : null
+    })
+  }
 
   // ---------------------------------------------------------------- tunables
 
@@ -81,6 +122,34 @@ Item {
   property string fontFamily: Style.font.menuFamily
   property string defaultMenuPath: omarchyPath + "/default/omarchy/omarchy-menu.jsonc"
   property string userMenuPath: Quickshell.env("HOME") + "/.config/omarchy/extensions/omarchy-menu.jsonc"
+  property string quickLinksPath: Quickshell.env("HOME") + "/.config/omarchy/quicklinks.json"
+  property var quickLinksList: RaycastSearch.DEFAULT_QUICKLINKS
+  property var exchangeRates: null
+  property int localTzOffsetMin: -new Date().getTimezoneOffset()
+  property var fmhyCache: ({})
+  property var currentFmhyResults: []
+  property bool fmhySearching: false
+  property int textCursorPos: 0
+  readonly property bool isMathMode: {
+    if (!root.filterText) return false
+    var q = root.filterText.trim()
+    if (q.charAt(0) === "=") return true
+    var lower = q.toLowerCase()
+    if (lower === "calc" || lower === "math" || lower.indexOf("calc ") === 0 || lower.indexOf("math ") === 0) return true
+    if (RaycastSearch.isMathQuery && RaycastSearch.isMathQuery(q)) return true
+    if (RaycastSearch.evaluateMath(q) !== null) return true
+    if (displayModel.count > 0) {
+      var first = displayModel.get(0)
+      if (first && (first.type === "calc" || (first.itemId && String(first.itemId).indexOf("!calc.") === 0))) return true
+    }
+    return false
+  }
+
+  onFilterTextChanged: {
+    if (root.textCursorPos > root.filterText.length) {
+      root.textCursorPos = root.filterText.length
+    }
+  }
   property var defaultMenuItems: []
   property var userMenuItems: []
   property bool opened: false
@@ -126,10 +195,69 @@ Item {
   property string versionText: ""
   property int updateCount: 0
 
-  readonly property var appLibrary: root.shell ? root.shell.appLibrary : null
+  QtObject {
+    id: fallbackAppLibrary
+
+    signal appsChanged()
+
+    function entryName(entry) {
+      return AppSearch.entryName(entry)
+    }
+
+    function entrySubtext(entry) {
+      return AppSearch.entrySubtext(entry)
+    }
+
+    function sortedEntries(query) {
+      var values = (typeof DesktopEntries !== "undefined" && DesktopEntries.applications && DesktopEntries.applications.values) ? DesktopEntries.applications.values : []
+      return AppSearch.sortedEntries(values, query, function(entry) {
+        return !!(entry && entry.noDisplay)
+      })
+    }
+
+    function iconSource(icon) {
+      var value = String(icon || "")
+      if (value.length === 0) return Quickshell.iconPath("application-x-executable", true)
+      if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0) return value
+      if (value.charAt(0) === "/") return Util.fileUrl(value)
+      var themed = Quickshell.iconPath(value, true)
+      if (themed.length > 0) return themed
+      return Quickshell.iconPath("application-x-executable", true)
+    }
+
+    function refreshIcons() {}
+
+    function launch(desktopId, name) {
+      var id = String(desktopId || "")
+      if (!id) return
+      Util.execDetached("uwsm-app -- gtk-launch " + Util.shellQuote(id + ".desktop"))
+    }
+
+    function remove(desktopId, name) {
+      var id = String(desktopId || "")
+      if (!id) return
+      Util.execDetached(Util.shellQuote(root.omarchyPath + "/bin/omarchy-remove-launcher-entry") + " " + Util.shellQuote(id) + " " + Util.shellQuote(String(name || id)))
+    }
+  }
+
+  Connections {
+    target: typeof DesktopEntries !== "undefined" && DesktopEntries.applications ? DesktopEntries.applications : null
+    function onValuesChanged() {
+      fallbackAppLibrary.appsChanged()
+    }
+  }
+
+  readonly property var appLibrary: (root.shell && root.shell.appLibrary) ? root.shell.appLibrary : fallbackAppLibrary
   property bool deleteConfirmOpen: false
   property var deleteTarget: null
-  onOpenedChanged: if (!opened) { deleteConfirmOpen = false; deleteTarget = null }
+  onOpenedChanged: {
+    if (!opened) {
+      deleteConfirmOpen = false
+      deleteTarget = null
+    } else {
+      root.textCursorPos = root.filterText.length
+    }
+  }
 
   // ------------------------------------------------------------------ theme
   //
@@ -613,6 +741,49 @@ Item {
     }
 
     if (query) {
+      var lowerQuery = query.toLowerCase()
+      var isFmhyMode = lowerQuery === "fmhy" || lowerQuery.indexOf("fmhy ") === 0 || (lowerQuery.indexOf("f ") === 0)
+
+      if (isFmhyMode) {
+        var fmhySub = query.replace(/^(?:fmhy|f)\s+/i, "").trim()
+        if (fmhySub) {
+          if (root.fmhyCache[fmhySub]) {
+            root.currentFmhyResults = root.fmhyCache[fmhySub]
+            root.fmhySearching = false
+          } else {
+            root.currentFmhyResults = []
+            root.fmhySearching = true
+            root.dispatchFmhySearch(fmhySub)
+          }
+        } else {
+          root.currentFmhyResults = []
+          root.fmhySearching = false
+        }
+      }
+
+      var smartRows = RaycastSearch.getSmartRows(query, {
+        quickLinks: root.quickLinksList,
+        exchangeRates: root.exchangeRates,
+        localOffsetMin: root.localTzOffsetMin,
+        fmhyResults: root.currentFmhyResults,
+        fmhySearching: root.fmhySearching
+      })
+
+      var isExclusiveSmart = smartRows.length > 0 && (
+        query.charAt(0) === "=" ||
+        (smartRows.length === 1 && smartRows[0].type === "calc") ||
+        lowerQuery === "ql" || lowerQuery === "quicklinks" || lowerQuery === "quicklink" || lowerQuery === "links" ||
+        lowerQuery === "tz" || lowerQuery === "timezone" || lowerQuery === "timezones" || lowerQuery === "world clock" ||
+        lowerQuery === "currency" || lowerQuery === "fx" ||
+        lowerQuery === "calc" || lowerQuery === "math" ||
+        isFmhyMode
+      )
+
+      if (isExclusiveSmart) {
+        root.appendRows(smartRows)
+        return
+      }
+
       var currentRows = []
       var drilldownRows = []
 
@@ -638,6 +809,23 @@ Item {
         for (var d = 0; d < drilldownRows.length; d++) drilldownRows[d].section = "drilldown"
       }
       rows = currentRows.concat(drilldownRows)
+
+      var topSmart = []
+      var bottomSmart = []
+      for (var s = 0; s < smartRows.length; s++) {
+        if (smartRows[s].type === "fmhy-suggest") {
+          bottomSmart.push(smartRows[s])
+        } else {
+          topSmart.push(smartRows[s])
+        }
+      }
+
+      if (topSmart.length > 0) {
+        rows = topSmart.concat(rows)
+      }
+      if (bottomSmart.length > 0) {
+        rows = rows.concat(bottomSmart)
+      }
     } else {
       for (var j = 0; j < root.itemOrder.length; j++) {
         var child = root.item(root.itemOrder[j])
@@ -690,6 +878,28 @@ Item {
       if (path === "~" || path.indexOf("~/") === 0) path = Quickshell.env("HOME") + path.slice(1)
       Util.execDetached("xdg-open " + Util.shellQuote(path))
     }
+  }
+
+  function openUrl(url) {
+    applySerial = requestSerial
+    opened = false
+    filterText = ""
+    Util.execDetached("xdg-open " + Util.shellQuote(url))
+  }
+
+  function copyToClipboard(text, label, detail, icon) {
+    applySerial = requestSerial
+    opened = false
+    filterText = ""
+    Util.execDetached("printf %s " + Util.shellQuote(text) + " | wl-copy")
+    var glyph = (icon && icon.length > 0) ? icon : "󰃬"
+    var title = "Copied to clipboard"
+    var msg = (label && label.length > 0) ? label : text
+    Util.execDetached("omarchy-notification-send -g " + Util.shellQuote(glyph) + " " + Util.shellQuote(title) + " " + Util.shellQuote(msg))
+  }
+
+  function currentSearchGlyph() {
+    return RaycastSearch.detectSearchGlyph(root.filterText, root.quickLinksList)
   }
 
   // ------------------------------------------------------------- navigation
@@ -751,13 +961,61 @@ Item {
     revealCursor()
   }
 
-  function setFilter(nextFilter) {
+  function setFilter(nextFilter, newCursorPos) {
     root.filterText = nextFilter
+    if (typeof newCursorPos === "number") {
+      root.textCursorPos = Math.max(0, Math.min(nextFilter.length, newCursorPos))
+    } else {
+      root.textCursorPos = nextFilter.length
+    }
     root.selectedIndex = 0
     root.cursorActive = root.mode !== "input"
     root.disarmPointer()
     if (!root.dmenuActive && root.filterText.trim()) root.loadProvidersForSearch()
     root.rebuildDisplay()
+  }
+
+  function prevTokenPos(text, pos) {
+    if (!text || pos <= 0) return 0
+    var p = pos
+    while (p > 0 && /\s/.test(text.charAt(p - 1))) p--
+    if (p === 0) return 0
+    var isWord = /[a-zA-Z0-9_.]/.test(text.charAt(p - 1))
+    if (isWord) {
+      while (p > 0 && /[a-zA-Z0-9_.]/.test(text.charAt(p - 1))) p--
+    } else {
+      while (p > 0 && !/[a-zA-Z0-9_.\s]/.test(text.charAt(p - 1))) p--
+    }
+    return p
+  }
+
+  function nextTokenPos(text, pos) {
+    if (!text || pos >= text.length) return text ? text.length : 0
+    var p = pos
+    while (p < text.length && /\s/.test(text.charAt(p))) p++
+    if (p >= text.length) return text.length
+    var isWord = /[a-zA-Z0-9_.]/.test(text.charAt(p))
+    if (isWord) {
+      while (p < text.length && /[a-zA-Z0-9_.]/.test(text.charAt(p))) p++
+    } else {
+      while (p < text.length && !/[a-zA-Z0-9_.\s]/.test(text.charAt(p))) p++
+    }
+    return p
+  }
+
+  function cursorPosFromX(clickX) {
+    if (!root.filterText || clickX <= 0) return 0
+    var bestPos = 0
+    var bestDist = Math.abs(clickX)
+    for (var i = 1; i <= root.filterText.length; i++) {
+      probeMetrics.text = root.filterText.slice(0, i)
+      var dist = Math.abs(clickX - probeMetrics.width)
+      if (dist < bestDist) {
+        bestDist = dist
+        bestPos = i
+      }
+    }
+    return bestPos
   }
 
   function setActiveMenu(id, pushHistory, fromPointer) {
@@ -815,6 +1073,16 @@ Item {
       opened = false
       filterText = ""
       if (root.appLibrary) root.appLibrary.launch(appId, label)
+    } else if (row.kind === "url") {
+      root.openUrl(row.action)
+    } else if (row.kind === "copy") {
+      root.copyToClipboard(row.action, row.label, row.detail, row.icon)
+    } else if (row.kind === "fill") {
+      root.setFilter(row.action)
+    } else if (row.kind === "fmhy-deck") {
+      root.summonFmhyDeck(row.action)
+    } else if (row.kind === "noop") {
+      // placeholder row
     } else {
       root.applySelected(row.itemId, row.action)
     }
@@ -883,6 +1151,8 @@ Item {
     root.evaluateGuards()
     root.ensureAppRows()
     root.pickTip()
+    root.loadQuickLinks()
+    root.loadExchangeRates()
     opened = true
     rebuildDisplay()
     invalidateVolatileProvider(activeMenu)
@@ -959,6 +1229,22 @@ Item {
     if (root.mode === "input") return "⏎ confirm   esc cancel"
     if (root.dmenuActive) return "type to filter   ↑↓ move   ⏎ select   esc cancel"
     if (root.filterText.charAt(0) === "!") return "⏎ run in terminal   esc clear"
+    if (root.isMathMode) {
+      var isCopyable = displayModel.count > 0 && displayModel.get(0).kind === "copy"
+      if (isCopyable) {
+        return "←→ cursor   ⏎ copy to clipboard   esc clear"
+      }
+      return "←→ cursor   esc clear"
+    }
+    if (displayModel.count > 0 && root.cursorActive) {
+      var sel = displayModel.get(root.selectedIndex)
+      if (sel) {
+        if (sel.kind === "copy") return "↑↓←→ move   ⏎ copy to clipboard   esc clear"
+        if (sel.kind === "url") return "↑↓←→ move   ⏎ open in browser   esc clear"
+        if (sel.kind === "fill") return "↑↓←→ move   ⏎ select   esc clear"
+        if (sel.kind === "fmhy-deck") return "↑↓←→ move   ⏎ open FMHY Deck   esc clear"
+      }
+    }
     if (root.filterText) return "↑↓←→ move   ⏎ open   esc clear"
     var hint = "type to search   ↑↓←→ move   ⏎ open"
     return hint + "   esc " + (root.activeMenu === "root" ? "close" : "back")
@@ -1154,6 +1440,8 @@ Item {
       root.loadMenuFile(userMenuProc, root.userMenuPath)
       root.loadKeybinds(true)
       root.loadStatus()
+      root.loadQuickLinks()
+      root.loadExchangeRates()
     }
   }
   onPluginDirChanged: if (root.pluginDir) bootTimer.restart()
@@ -1187,6 +1475,101 @@ Item {
     watchChanges: true
     printErrors: false
     onFileChanged: root.loadMenuFile(userMenuProc, root.userMenuPath)
+  }
+
+  FileView {
+    id: quickLinksWatch
+    path: root.quickLinksPath
+    preload: false
+    watchChanges: true
+    printErrors: false
+    onFileChanged: root.loadQuickLinks()
+  }
+
+  BoundedProcess {
+    id: quickLinksProc
+    onExited: function(code) {
+      if (code === 0 && quickLinksProc.ok && quickLinksProc.collected.length > 0) {
+        try {
+          var parsed = JSON.parse(quickLinksProc.collected)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            root.quickLinksList = parsed
+            if (root.opened && root.filterText.trim()) root.rebuildDisplay()
+          }
+        } catch (e) {}
+      }
+    }
+  }
+
+  function loadQuickLinks() {
+    if (!root.pluginDir) return
+    quickLinksProc.deadlineMs = root.helperTimeoutMs
+    quickLinksProc.command = [root.pluginDir + "/scripts/read-file", root.quickLinksPath, String(root.maxMenuFileBytes)]
+    quickLinksProc.running = true
+  }
+
+  BoundedProcess {
+    id: exchangeRatesProc
+    onExited: function(code) {
+      if (code === 0 && exchangeRatesProc.ok && exchangeRatesProc.collected.length > 0) {
+        try {
+          var parsed = JSON.parse(exchangeRatesProc.collected)
+          if (parsed && parsed.rates) {
+            root.exchangeRates = parsed.rates
+            if (root.opened && root.filterText.trim()) root.rebuildDisplay()
+          }
+        } catch (e) {}
+      }
+    }
+  }
+
+  function loadExchangeRates() {
+    exchangeRatesProc.deadlineMs = 15000
+    exchangeRatesProc.command = ["bash", "-c", "cache=\"$HOME/.cache/omarchy/exchange_rates.json\"; if [[ ! -f \"$cache\" || $(find \"$cache\" -mtime +1 2>/dev/null) ]]; then mkdir -p \"$HOME/.cache/omarchy\" && curl -fsSL --max-time 4 https://open.er-api.com/v6/latest/USD -o \"$cache\" 2>/dev/null; fi; cat \"$cache\" 2>/dev/null || true"]
+    exchangeRatesProc.running = true
+  }
+
+  BoundedProcess {
+    id: fmhyProc
+    property string targetQuery: ""
+    onExited: function(code) {
+      root.fmhySearching = false
+      if (code === 0 && fmhyProc.ok && fmhyProc.collected.length > 0) {
+        try {
+          var parsed = JSON.parse(fmhyProc.collected)
+          if (Array.isArray(parsed)) {
+            var cache = Object.assign({}, root.fmhyCache)
+            cache[fmhyProc.targetQuery] = parsed
+            root.fmhyCache = cache
+            if (root.opened && root.filterText.trim()) {
+              var currSub = root.filterText.trim().replace(/^(?:fmhy|f)\s+/i, "").trim()
+              if (currSub === fmhyProc.targetQuery) {
+                root.currentFmhyResults = parsed
+                root.rebuildDisplay()
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    }
+  }
+
+  function dispatchFmhySearch(subQuery) {
+    if (!root.pluginDir || !subQuery) return
+    if (fmhyProc.running && fmhyProc.targetQuery === subQuery) return
+    fmhyProc.running = false
+    fmhyProc.deadlineMs = 5000
+    fmhyProc.targetQuery = subQuery
+    fmhyProc.command = [root.pluginDir + "/scripts/fmhy-search", subQuery]
+    fmhyProc.running = true
+  }
+
+  function summonFmhyDeck(action) {
+    applySerial = requestSerial
+    opened = false
+    filterText = ""
+    var q = (action === "fmhy-panel" || !action) ? "" : action
+    Util.execDetached("qs ipc -n -p /usr/share/omarchy/shell call io.github.i12bp8.fmhy-deck search " + Util.shellQuote(q))
   }
 
   // ------------------------------------------------------------------ guards
@@ -1307,8 +1690,38 @@ Item {
             else if (root.filterText) root.setFilter("")
             else if (!root.goBack()) root.cancel()
             event.accepted = true
-          } else if (event.key === Qt.Key_Delete && !root.filterText) {
-            root.requestDeleteSelected()
+          } else if (event.key === Qt.Key_Delete || (root.isMathMode && event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier))) {
+            if (root.isMathMode && root.filterText) {
+              if (root.textCursorPos < root.filterText.length) {
+                var beforeDel = root.filterText.slice(0, root.textCursorPos)
+                var afterDel = root.filterText.slice(root.textCursorPos + 1)
+                root.setFilter(beforeDel + afterDel, root.textCursorPos)
+              }
+              event.accepted = true
+            } else if (!root.filterText) {
+              root.requestDeleteSelected()
+              event.accepted = true
+            }
+          } else if (event.key === Qt.Key_Backspace && root.isMathMode && root.filterText) {
+            if (event.modifiers & Qt.ControlModifier) {
+              var prevPos = root.prevTokenPos(root.filterText, root.textCursorPos)
+              var beforeCtrl = root.filterText.slice(0, prevPos)
+              var afterCtrl = root.filterText.slice(root.textCursorPos)
+              root.setFilter(beforeCtrl + afterCtrl, prevPos)
+            } else if (root.textCursorPos > 0) {
+              var beforeChar = root.filterText.slice(0, root.textCursorPos - 1)
+              var afterChar = root.filterText.slice(root.textCursorPos)
+              root.setFilter(beforeChar + afterChar, root.textCursorPos - 1)
+            }
+            event.accepted = true
+          } else if (root.isMathMode && event.key === Qt.Key_W && (event.modifiers & Qt.ControlModifier)) {
+            var prevPosW = root.prevTokenPos(root.filterText, root.textCursorPos)
+            var beforeW = root.filterText.slice(0, prevPosW)
+            var afterW = root.filterText.slice(root.textCursorPos)
+            root.setFilter(beforeW + afterW, prevPosW)
+            event.accepted = true
+          } else if (root.isMathMode && event.key === Qt.Key_K && (event.modifiers & Qt.ControlModifier)) {
+            root.setFilter(root.filterText.slice(0, root.textCursorPos), root.textCursorPos)
             event.accepted = true
           } else if (Util.editsFilter(event, root.filterText)) {
             root.setFilter(Util.editedFilter(event, root.filterText))
@@ -1323,11 +1736,29 @@ Item {
             root.moveVertical(1)
             event.accepted = true
           } else if (event.key === Qt.Key_Left) {
-            root.moveHorizontal(-1)
-            event.accepted = true
+            if (root.isMathMode && root.filterText) {
+              if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier)) {
+                root.textCursorPos = root.prevTokenPos(root.filterText, root.textCursorPos)
+              } else {
+                root.textCursorPos = Math.max(0, root.textCursorPos - 1)
+              }
+              event.accepted = true
+            } else {
+              root.moveHorizontal(-1)
+              event.accepted = true
+            }
           } else if (event.key === Qt.Key_Right) {
-            root.moveHorizontal(1)
-            event.accepted = true
+            if (root.isMathMode && root.filterText) {
+              if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier)) {
+                root.textCursorPos = root.nextTokenPos(root.filterText, root.textCursorPos)
+              } else {
+                root.textCursorPos = Math.min(root.filterText.length, root.textCursorPos + 1)
+              }
+              event.accepted = true
+            } else {
+              root.moveHorizontal(1)
+              event.accepted = true
+            }
           } else if (event.key === Qt.Key_Tab) {
             root.moveHorizontal(1)
             event.accepted = true
@@ -1340,19 +1771,35 @@ Item {
           } else if (event.key === Qt.Key_PageDown) {
             root.moveVertical(3)
             event.accepted = true
-          } else if (event.key === Qt.Key_Home && !root.filterText) {
-            root.cursorActive = true; root.selectedIndex = 0; root.revealCursor()
-            event.accepted = true
-          } else if (event.key === Qt.Key_End && !root.filterText) {
-            root.cursorActive = true; root.selectedIndex = Math.max(0, displayModel.count - 1); root.revealCursor()
-            event.accepted = true
+          } else if (event.key === Qt.Key_Home || (root.isMathMode && event.key === Qt.Key_A && (event.modifiers & Qt.ControlModifier))) {
+            if (root.isMathMode && root.filterText) {
+              root.textCursorPos = 0
+              event.accepted = true
+            } else if (!root.filterText) {
+              root.cursorActive = true; root.selectedIndex = 0; root.revealCursor()
+              event.accepted = true
+            }
+          } else if (event.key === Qt.Key_End || (root.isMathMode && event.key === Qt.Key_E && (event.modifiers & Qt.ControlModifier))) {
+            if (root.isMathMode && root.filterText) {
+              root.textCursorPos = root.filterText.length
+              event.accepted = true
+            } else if (!root.filterText) {
+              root.cursorActive = true; root.selectedIndex = Math.max(0, displayModel.count - 1); root.revealCursor()
+              event.accepted = true
+            }
           } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             if (root.mode === "input") root.applyDmenuSelection(root.filterText)
             else if (root.cursorActive) root.activateIndex(root.selectedIndex)
             else if (displayModel.count > 0) root.activateIndex(0)
             event.accepted = true
           } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
-            root.setFilter(root.filterText + event.text)
+            if (root.isMathMode && root.filterText && root.textCursorPos < root.filterText.length) {
+              var beforeText = root.filterText.slice(0, root.textCursorPos)
+              var afterText = root.filterText.slice(root.textCursorPos)
+              root.setFilter(beforeText + event.text + afterText, root.textCursorPos + 1)
+            } else {
+              root.setFilter(root.filterText + event.text, root.filterText.length + 1)
+            }
             event.accepted = true
           }
         }
@@ -1444,7 +1891,7 @@ Item {
             anchors.left: parent.left
             anchors.leftMargin: Style.space(12)
             anchors.verticalCenter: parent.verticalCenter
-            text: ""
+            text: root.currentSearchGlyph()
             color: searchBox.active ? root.selectedText : root.foreground
             opacity: searchBox.active ? 1 : 0.6
             font.family: root.fontFamily
@@ -1455,7 +1902,7 @@ Item {
             id: searchText
             anchors.left: searchGlyph.right
             anchors.leftMargin: Style.space(10)
-            anchors.right: parent.right
+            anchors.right: searchBox.active ? clearHint.left : parent.right
             anchors.rightMargin: Style.space(12)
             anchors.verticalCenter: parent.verticalCenter
             text: root.filterText || root.searchPlaceholder()
@@ -1466,15 +1913,31 @@ Item {
             elide: Text.ElideRight
           }
 
+          TextMetrics {
+            id: cursorMetrics
+            font.family: searchText.font.family
+            font.pixelSize: searchText.font.pixelSize
+            font.weight: searchText.font.weight
+            text: root.filterText ? root.filterText.slice(0, Math.min(root.textCursorPos, root.filterText.length)) : ""
+          }
+
+          TextMetrics {
+            id: probeMetrics
+            font.family: searchText.font.family
+            font.pixelSize: searchText.font.pixelSize
+            font.weight: searchText.font.weight
+          }
+
           Rectangle {
             id: caret
             visible: true
-            x: searchText.x + (root.filterText ? Math.min(searchText.contentWidth, searchText.width) + Style.space(2) : 0)
+            x: searchText.x + (root.filterText ? Math.min(cursorMetrics.width, searchText.width) + Style.space(2) : 0)
             width: Math.max(1, Style.space(2))
             height: Style.font.heading + Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             color: root.selectedText
             SequentialAnimation on opacity {
+              id: caretAnim
               running: caret.visible
               loops: Animation.Infinite
               NumberAnimation { to: 0; duration: 500 }
@@ -1482,10 +1945,45 @@ Item {
             }
           }
 
+          Connections {
+            target: root
+            function onTextCursorPosChanged() {
+              caret.opacity = 1
+              caretAnim.restart()
+            }
+          }
+
+          Text {
+            id: clearHint
+            visible: searchBox.active
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(12)
+            anchors.verticalCenter: parent.verticalCenter
+            text: "esc"
+            color: root.foreground
+            opacity: root.mutedOpacity
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          MouseArea {
+            anchors.fill: clearHint
+            anchors.margins: -Style.space(6)
+            visible: clearHint.visible
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.setFilter("")
+          }
+
           MouseArea {
             anchors.fill: parent
             cursorShape: Qt.IBeamCursor
-            onClicked: keyCatcher.forceActiveFocus()
+            onClicked: function(mouse) {
+              keyCatcher.forceActiveFocus()
+              if (root.isMathMode && root.filterText) {
+                var clickX = mouse.x - searchText.x
+                root.textCursorPos = root.cursorPosFromX(clickX)
+              }
+            }
           }
         }
 

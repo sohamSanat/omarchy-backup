@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# scratchpad-deck — the command Hyprland keybindings call.
+#
+# Everything is routed through the running omarchy-shell so that declared slots
+# (the ones that launch an app when empty) behave the same from a keybind as
+# they do from a click. If the shell is not running, or the Scratchpad Deck
+# widget is not in the bar, slot switching falls back to talking to Hyprland
+# directly — jumping to a scratchpad you can already see is too basic a thing
+# to lose because a bar widget is disabled.
+#
+# Usage:
+#   scratchpad-deck toggle        open/close the deck
+#   scratchpad-deck slot N        show scratchpad N (1-9)
+#   scratchpad-deck send N        send the focused window to scratchpad N
+#   scratchpad-deck next|prev     cycle through occupied scratchpads
+
+set -uo pipefail
+
+SHELL_PATH="${OMARCHY_SHELL_PATH:-/usr/share/omarchy/shell}"
+TARGET="tiertek.scratchpad-deck"
+
+die() { printf 'scratchpad-deck: %s\n' "$1" >&2; exit 1; }
+
+usage() {
+  cat <<'EOF'
+Usage:
+  scratchpad-deck toggle        open/close the deck
+  scratchpad-deck slot N        show scratchpad N (1-9)
+  scratchpad-deck send N        send the focused window to scratchpad N
+  scratchpad-deck next|prev     cycle through occupied scratchpads
+EOF
+  exit "${1:-0}"
+}
+
+# Returns non-zero when the shell is not up or the widget is not loaded, which
+# is what lets the caller decide whether a fallback is worth attempting.
+ipc() {
+  command -v qs >/dev/null 2>&1 || return 1
+  qs -p "$SHELL_PATH" ipc call "$TARGET" "$@" >/dev/null 2>&1
+}
+
+require_slot() {
+  local n="${1:-}"
+  [[ "$n" =~ ^[1-9]$ ]] || die "slot must be a number from 1 to 9 (got '${n:-}')"
+}
+
+# Hyprland 0.56 parses `hyprctl dispatch` as Lua, so the old
+# `hyprctl dispatch togglespecialworkspace scratch-1` form is a parse error now.
+lua_dispatch() {
+  hyprctl dispatch_lua_expression "$1" >/dev/null 2>&1
+}
+
+cmd="${1:-}"
+[[ -n "$cmd" ]] || usage 1
+
+case "$cmd" in
+  toggle|open|close)
+    # No fallback: without the shell there is no deck to show.
+    ipc "$cmd" || die "the Omarchy shell is not running, or the Scratchpad Deck widget is not in your bar"
+    ;;
+
+  slot)
+    require_slot "${2:-}"
+    ipc slot "$2" || lua_dispatch "hl.dsp.workspace.toggle_special([[scratch-$2]])" \
+      || die "could not reach the shell or Hyprland"
+    ;;
+
+  send)
+    require_slot "${2:-}"
+    ipc send "$2" \
+      || lua_dispatch "hl.dsp.window.move({ workspace = [[special:scratch-$2]], follow = false })" \
+      || die "could not reach the shell or Hyprland"
+    ;;
+
+  next|prev)
+    ipc "$cmd" || die "cycling needs the Omarchy shell; use 'slot N' instead"
+    ;;
+
+  -h|--help|help)
+    usage 0
+    ;;
+
+  *)
+    die "unknown command '$cmd' (try --help)"
+    ;;
+esac
