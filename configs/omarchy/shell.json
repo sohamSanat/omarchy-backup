@@ -31,44 +31,48 @@
           "id": "omarchy.workspaces"
         },
         {
-          "id": "io.github.enovara.teach-voxtype"
+          "id": "soham.pocket-left",
+          "members": "io.github.weedwhitesandwine.obsiduous, soham.easyeffects, soham.agents, io.github.enovara.teach-voxtype, tiertek.scratchpad-deck"
         },
         {
-          "id": "tiertek.scratchpad-deck"
+          "id": "io.github.weedwhitesandwine.obsiduous"
+        },
+        {
+          "id": "soham.easyeffects"
         },
         {
           "id": "soham.agents"
         },
         {
-          "id": "io.github.weedwhitesandwine.obsiduous"
+          "id": "io.github.enovara.teach-voxtype"
+        },
+        {
+          "id": "tiertek.scratchpad-deck"
         }
       ],
       "right": [
         {
-          "id": "omaconnect"
-        },
-        {
-          "id": "bhanu.omavideos",
-          "audioOnly": false,
-          "trim": false,
-          "trimStart": "",
-          "trimEnd": ""
+          "id": "tristonarmstrong.dictionary"
         },
         {
           "id": "jkoestinger.vpn"
         },
         {
+          "id": "bhanu.omavideos",
+          "audioOnly": true,
+          "trim": false,
+          "trimEnd": "",
+          "trimStart": ""
+        },
+        {
+          "id": "omaconnect"
+        },
+        {
           "id": "io.github.ricky.whatsapp"
         },
         {
-          "id": "io.github.r-witz.nothing-ear"
-        },
-        {
-          "id": "omarchy.tray"
-        },
-        {
           "id": "jrmmhm.pocket",
-          "members": "omarchy.tray, omaconnect, bhanu.omavideos, jkoestinger.vpn, io.github.ricky.whatsapp, io.github.r-witz.nothing-ear, omamail, io.github.nilszeilon.omarchy-sensei, mahmoodkhalil57.qrgen, io.github.elevate08.qs-bitwarden-cli"
+          "members": "tristonarmstrong.dictionary, jkoestinger.vpn, bhanu.omavideos, omaconnect, io.github.ricky.whatsapp, io.github.r-witz.nothing-ear, omamail, io.github.nilszeilon.omarchy-sensei, mahmoodkhalil57.qrgen, io.github.elevate08.qs-bitwarden-cli"
         },
         {
           "id": "omarchy.bluetooth"
@@ -133,6 +137,9 @@
       "id": "io.github.adamcbrewer.voxtype-aura"
     },
     {
+      "id": "io.github.ef-code.omarchy-flow"
+    },
+    {
       "id": "io.github.ellion369.omagent"
     },
     {
@@ -143,6 +150,9 @@
     },
     {
       "id": "reidenxerx.tile-blueprints"
+    },
+    {
+      "id": "soham.easyeffects"
     }
   ],
   "version": 1

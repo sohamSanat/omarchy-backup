@@ -12,3 +12,14 @@ hl.monitor({ output = "", mode = "preferred", position = "auto", scale = omarchy
 
 -- Portrait/rotated secondary monitor (transform: 1 = 90°, 3 = 270°).
 -- hl.monitor({ output = "DP-2", mode = "preferred", position = "auto", scale = 1, transform = 1 })
+
+-- Redmi Pad SE (Hardware decoder limited to 1080p by Snapdragon 680)
+hl.monitor({ output = "HEADLESS-1", mode = "1920x1080@60", position = "auto-right", scale = 1.75, transform = 1 })
+
+-- Keep normal workspaces (1-9) strictly on the laptop monitor
+for ws = 1, 9 do
+  hl.workspace_rule({ workspace = tostring(ws), monitor = "eDP-1" })
+end
+
+-- Assign Workspace 10 as the dedicated tablet workspace
+hl.workspace_rule({ workspace = "10", monitor = "HEADLESS-1", default = true })

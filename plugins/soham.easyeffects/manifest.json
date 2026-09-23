@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "soham.easyeffects",
+  "name": "EasyEffects",
+  "version": "1.0.0",
+  "author": "Soham",
+  "description": "Switch EasyEffects equalizer presets and toggle bypass directly from the navbar",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "EasyEffects",
+    "description": "Switch IEM equalizer presets and toggle bypass",
+    "category": "Audio",
+    "allowMultiple": false
+  }
+}

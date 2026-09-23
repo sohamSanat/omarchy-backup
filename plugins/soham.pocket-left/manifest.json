@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "soham.pocket-left",
+  "name": "Pocket (Left)",
+  "version": "0.3.2",
+  "author": "jrmmhm",
+  "license": "MIT",
+  "description": "Tuck a run of bar widgets behind one mark and fan them back out on hover.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Pocket (Left)",
+    "description": "Hides the bar widgets you drag onto it and shows them again while the pointer is on them",
+    "category": "Appearance",
+    "allowMultiple": false,
+    "defaultSection": "left",
+    "defaults": {
+      "members": ""
+    },
+    "schema": [
+      {
+        "key": "members",
+        "type": "string",
+        "label": "Widget ids to tuck away, comma separated",
+        "description": "Usually set by dragging widgets onto the pocket. Edit it here to name them by hand."
+      }
+    ]
+  },
+  "omarchy": {
+    "clonedFrom": "jrmmhm.pocket"
+  }
+}

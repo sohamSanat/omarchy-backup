@@ -1,0 +1,773 @@
+diff --git i/BarWidget.qml w/BarWidget.qml
+index 0b16771..6f6f4f7 100644
+--- i/BarWidget.qml
++++ w/BarWidget.qml
+@@ -17,6 +17,7 @@ BarWidget {
+ 
+   readonly property var modelOptions: [
+     { id: "whisper-base.en", title: "Local Whisper", subtitle: "base.en · Offline" },
++    { id: "gemini-3.5-flash-lite", title: "Gemini 3.5 Flash Lite", subtitle: "Cloud · Ultra-fast transcription" },
+     { id: "gemini-3.5-transcribe", title: "Gemini 3.5 Transcribe", subtitle: "Cloud · Dedicated transcription" },
+     { id: "gemini-3.8-flash", title: "Gemini 3.8 Flash", subtitle: "Cloud · Speech understanding" }
+   ]
+diff --git i/Pill.qml w/Pill.qml
+index c1288d8..2173d80 100644
+--- i/Pill.qml
++++ w/Pill.qml
+@@ -29,7 +29,7 @@ Item {
+         if (!raw || typeof raw !== "string") return "whisper-base.en"
+         var s = raw.trim()
+         if (s.length > 64) s = s.slice(0, 64)
+-        if (s === "whisper-base.en" || s === "gemini-3.5-transcribe" || s === "gemini-3.8-flash") return s
++        if (s === "whisper-base.en" || s === "gemini-3.5-flash-lite" || s === "gemini-3.5-transcribe" || s === "gemini-3.8-flash") return s
+         return "whisper-base.en"
+     }
+ 
+@@ -316,6 +316,7 @@ Item {
+                     Repeater {
+                         model: [
+                             { id: "whisper-base.en", title: "Local Whisper", subtitle: "base.en • Offline" },
++                            { id: "gemini-3.5-flash-lite", title: "Gemini 3.5 Flash Lite", subtitle: "Cloud • Ultra-fast transcription" },
+                             { id: "gemini-3.5-transcribe", title: "Gemini 3.5 Transcribe", subtitle: "Cloud • Dedicated transcription" },
+                             { id: "gemini-3.8-flash", title: "Gemini 3.8 Flash", subtitle: "Cloud • Speech transcription" }
+                         ]
+@@ -537,6 +538,7 @@ Item {
+                                     if (root.stateMode === "status") return root.statusText || "Status"
+                                     if (root.stateMode === "transcribing") return "Transcribing..."
+                                     if (root.selectedModel === "whisper-base.en") return "Whisper"
++                                    if (root.selectedModel === "gemini-3.5-flash-lite") return "3.5 Flash Lite"
+                                     if (root.selectedModel === "gemini-3.5-transcribe") return "3.5 Transcribe"
+                                     if (root.selectedModel === "gemini-3.8-flash") return "3.8 Flash"
+                                     return root.selectedModel
+diff --git i/SettingsView.qml w/SettingsView.qml
+index d4b892e..b6331ae 100644
+--- i/SettingsView.qml
++++ w/SettingsView.qml
+@@ -39,6 +39,7 @@ Item {
+ 
+   readonly property var modelOptions: [
+     { value: "whisper-base.en", label: "Local Whisper (base.en)" },
++    { value: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash Lite" },
+     { value: "gemini-3.5-transcribe", label: "Gemini 3.5 Transcribe" },
+     { value: "gemini-3.8-flash", label: "Gemini 3.8 Flash" }
+   ]
+diff --git i/scripts/flowctl w/scripts/flowctl
+index b0265b5..d58ca67 100755
+--- i/scripts/flowctl
++++ w/scripts/flowctl
+@@ -41,13 +41,20 @@ if [[ "$ACTION" == "qml" ]]; then
+ fi
+ 
+ case "$ACTION" in
+-  toggle|toggle-submit|start|stop|done|transcribe|submit|send|pause|toggle-pause|resume|cancel|status|list-models|settings|get-settings|reset-settings|remove-hotkeys|migrate-hotkeys|list-audio-sources|hotkeys-status|doctor|test-audio)
++  toggle|toggle-submit|start|stop|done|submit|send|pause|toggle-pause|resume|cancel|status|list-models|settings|get-settings|reset-settings|remove-hotkeys|migrate-hotkeys|list-audio-sources|hotkeys-status|doctor|test-audio)
+     if [[ $# -gt 1 ]]; then
+       echo "Error: '$ACTION' does not accept arguments." >&2
+       exit 1
+     fi
+     exec "$PYTHON_BIN" "$BACKEND_PY" "$ACTION"
+     ;;
++  transcribe)
++    if [[ $# -lt 2 || $# -gt 3 ]]; then
++      echo "Usage: flowctl transcribe <audio_file> [model]" >&2
++      exit 1
++    fi
++    exec "$PYTHON_BIN" "$BACKEND_PY" "$@"
++    ;;
+   model)
+     case $# in
+       1)
+@@ -106,6 +113,7 @@ case "$ACTION" in
+     echo "  toggle-submit    Toggle voice dictation and press Return on stop"
+     echo "  start            Start voice recording immediately"
+     echo "  stop             Stop voice recording and inject transcribed text"
++    echo "  transcribe <wav> [model] Transcribe an audio file and print text"
+     echo "  submit           Stop voice recording, inject text, and press Return"
+     echo "  pause            Toggle pause / resume during active recording"
+     echo "  resume           Resume recording if paused"
+diff --git i/scripts/gemini-dictate.py w/scripts/gemini-dictate.py
+index dad964a..5af305e 100755
+--- i/scripts/gemini-dictate.py
++++ w/scripts/gemini-dictate.py
+@@ -102,6 +102,7 @@ RUNTIME_DIR = os.path.join(XDG_RUNTIME_DIR, "omarchy-flow")
+ STATE_DIR = os.path.join(XDG_STATE_HOME, "omarchy-flow")
+ 
+ LOG_FILE = os.path.join(STATE_DIR, "flow.log")
++QUOTA_MARKER_FILE = os.path.join(STATE_DIR, "transcribe_quota_exceeded")
+ TEMP_AUDIO = os.path.join(RUNTIME_DIR, "recording.wav")
+ PID_FILE = os.path.join(RUNTIME_DIR, "recording.pid")
+ STATE_FILE = os.path.join(RUNTIME_DIR, "state.json")
+@@ -122,6 +123,7 @@ LOCAL_VOXTYPE_MODEL = "base.en"
+ 
+ SUPPORTED_MODELS = [
+     {"id": LOCAL_MODEL_ID, "name": "Local Whisper (base.en)", "desc": "Local • Offline", "provider": "local"},
++    {"id": "gemini-3.5-flash-lite", "name": "Gemini 3.5 Flash Lite", "desc": "Cloud • Ultra-fast transcription", "provider": "gemini"},
+     {"id": "gemini-3.5-transcribe", "name": "Gemini 3.5 Transcribe", "desc": "Cloud • Dedicated transcription", "provider": "gemini"},
+     {"id": "gemini-3.8-flash", "name": "Gemini 3.8 Flash", "desc": "Cloud • Speech transcription", "provider": "gemini"},
+ ]
+@@ -1185,6 +1187,7 @@ def run_audio_test():
+     target = None
+     capture_dir = None
+     capture_fd = None
++    _prepare_bluetooth_headset()
+     try:
+         target, capture_dir, capture_fd = _create_exclusive_capture_target()
+         result = _run_captured(
+@@ -1209,6 +1212,7 @@ def run_audio_test():
+     except (OSError, subprocess.SubprocessError):
+         return {"ok": False, "message": "Microphone capture failed"}
+     finally:
++        _restore_bluetooth_music()
+         if capture_fd is not None:
+             try:
+                 os.close(capture_fd)
+@@ -1521,6 +1525,18 @@ def _read_private_secret(path):
+ 
+ def get_gemini_api_key(deadline=None):
+     """Load a Gemini API key without logging or exposing its value."""
++    key_files = [
++        os.path.join(CONFIG_DIR, "gemini_api_key"),
++        os.path.join(XDG_CONFIG_HOME, "gemini", "api_key"),
++        os.path.join(XDG_CONFIG_HOME, "omarchy", "gemini_api_key"),
++    ]
++    for kf in key_files:
++        if deadline is not None and time.monotonic() >= deadline:
++            return None
++        key = _read_private_secret(kf)
++        if key:
++            return key
++
+     env_key = os.environ.get("GEMINI_API_KEY", "").strip()
+     if env_key:
+         return env_key
+@@ -1544,31 +1560,26 @@ def get_gemini_api_key(deadline=None):
+         except Exception:
+             pass
+ 
+-    key_files = [
+-        os.path.join(CONFIG_DIR, "gemini_api_key"),
+-        os.path.join(XDG_CONFIG_HOME, "gemini", "api_key"),
+-        os.path.join(XDG_CONFIG_HOME, "omarchy", "gemini_api_key"),
+-    ]
+-    for kf in key_files:
+-        if deadline is not None and time.monotonic() >= deadline:
+-            return None
+-        key = _read_private_secret(kf)
+-        if key:
+-            return key
+-
+     return None
+ 
+ def pill_ipc(action, *args):
+-    """Send one HUD IPC call, preferring the canonical namespaced target."""
++    """Send one HUD IPC call, broadcasting to available HUD targets."""
+     clean_env = _safe_subprocess_env()
+ 
+-    targets = ["io.github.ef-code.omarchy-flow.pill", "geminipill"]
++    targets = [
++        "io.github.adamcbrewer.voxtype-aura",
++        "voxtype-aura",
++        "io.github.enovara.teach-voxtype",
++        "io.github.ef-code.omarchy-flow.pill",
++        "geminipill",
++    ]
+     config_paths = [
+         os.path.join(os.environ.get("OMARCHY_PATH", "/usr/share/omarchy"), "shell"),
+         os.path.join(XDG_CONFIG_HOME, "gemini-pill", "shell.qml"),
+         None,
+     ]
+     str_args = [str(a) for a in args]
++    any_success = False
+     for cfg in config_paths:
+         if cfg and not os.path.exists(cfg):
+             continue
+@@ -1578,12 +1589,14 @@ def pill_ipc(action, *args):
+                 cmd.extend(["-p", cfg])
+             cmd.extend(["call", target, action, *str_args])
+             try:
+-                res = _run_captured(cmd, text=True, env=clean_env, timeout=1.0)
++                res = _run_captured(cmd, text=True, env=clean_env, timeout=0.5)
+                 if res.returncode == 0 and res.stdout.strip() == "ok":
+-                    return True
++                    any_success = True
+             except Exception:
+                 pass
+-    return False
++        if any_success:
++            return True
++    return any_success
+ 
+ 
+ def _read_pid(path):
+@@ -2036,13 +2049,68 @@ def _mirror_legacy_audio():
+         pass
+ 
+ 
++def _prepare_bluetooth_headset():
++    """Ensure Bluetooth headset is in headset profile and unmuted before recording."""
++    if "unittest" in sys.modules:
++        return
++    try:
++        source = get_settings().get("audio_source", "")
++        if not source.startswith("bluez") and source != "default":
++            return
++        pactl = shutil.which("pactl")
++        if not pactl:
++            return
++        if source.startswith("bluez_input."):
++            mac_part = source.split("bluez_input.", 1)[1]
++            card_name = f"bluez_card.{mac_part.replace(':', '_')}"
++            subprocess.run([pactl, "set-card-profile", card_name, "headset-head-unit"], timeout=0.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
++            subprocess.run([pactl, "set-source-mute", source, "0"], timeout=0.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
++            subprocess.run([pactl, "set-source-volume", source, "150%"], timeout=0.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
++            return
++        res = subprocess.run([pactl, "list", "cards", "short"], capture_output=True, text=True, timeout=0.5)
++        for line in (res.stdout or "").splitlines():
++            parts = line.split()
++            if len(parts) >= 2 and parts[1].startswith("bluez_card"):
++                card_name = parts[1]
++                subprocess.run([pactl, "set-card-profile", card_name, "headset-head-unit"], timeout=0.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
++                break
++    except Exception:
++        pass
++
++
++def _restore_bluetooth_music():
++    """Restore Bluetooth headset back to Hi-Fi A2DP playback after recording."""
++    if "unittest" in sys.modules:
++        return
++    try:
++        source = get_settings().get("audio_source", "")
++        if not source.startswith("bluez") and source != "default":
++            return
++        pactl = shutil.which("pactl")
++        if not pactl:
++            return
++        if source.startswith("bluez_input."):
++            mac_part = source.split("bluez_input.", 1)[1]
++            card_name = f"bluez_card.{mac_part.replace(':', '_')}"
++            subprocess.run([pactl, "set-card-profile", card_name, "a2dp-sink"], timeout=0.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
++            return
++        res = subprocess.run([pactl, "list", "cards", "short"], capture_output=True, text=True, timeout=0.5)
++        for line in (res.stdout or "").splitlines():
++            parts = line.split()
++            if len(parts) >= 2 and parts[1].startswith("bluez_card"):
++                card_name = parts[1]
++                subprocess.run([pactl, "set-card-profile", card_name, "a2dp-sink"], timeout=0.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
++                break
++    except Exception:
++        pass
++
++
+ def _start_recording():
+     if is_recording():
+         log("start called, but already recording")
+         return False
+ 
+     log("Starting audio recording")
+-    pill_ipc("setListening")
+     _clear_audio_files()
+ 
+     try:
+@@ -2067,6 +2135,8 @@ def _start_recording():
+         pill_ipc("setStatus", "Recorder Error")
+         return False
+ 
++    _prepare_bluetooth_headset()
++
+     try:
+         _clean_env = _safe_subprocess_env()
+         proc = subprocess.Popen(
+@@ -2135,6 +2205,7 @@ def _start_recording():
+             "recording", paused=False, pid=proc.pid, audio_path=capture_target,
+             model=get_selected_model(),
+         )
++        pill_ipc("setListening")
+     except OSError as error:
+         log(f"Failed to persist recording state: {type(error).__name__}")
+         _terminate_recorder(proc.pid, signal.SIGTERM)
+@@ -2263,6 +2334,7 @@ def _cancel_recording(pids=None):
+     pids = _active_recording_pids() if pids is None else pids
+     for pid in pids:
+         _terminate_recorder(pid, signal.SIGTERM)
++    _restore_bluetooth_music()
+     _clear_runtime_markers()
+     _clear_audio_files()
+     pill_ipc("hide")
+@@ -2393,6 +2465,88 @@ class MissingApiKeyError(RuntimeError):
+     """Raised when a cloud model is selected without a configured API key."""
+ 
+ 
++def _load_voxtype_word_mappings():
++    """Load text replacements and initial prompt vocabulary from voxtype config."""
++    config_path = os.path.join(XDG_CONFIG_HOME, "voxtype", "config.toml")
++    replacements = {}
++    vocabulary = []
++    if not os.path.exists(config_path):
++        return replacements, vocabulary
++
++    try:
++        import tomllib
++        with open(config_path, "rb") as f:
++            cfg = tomllib.load(f)
++
++        raw_repl = cfg.get("text", {}).get("replacements", {})
++        if isinstance(raw_repl, dict):
++            for k, v in raw_repl.items():
++                if k and v and isinstance(k, str) and isinstance(v, str):
++                    replacements[k.strip().lower()] = v.strip()
++
++        raw_prompt = cfg.get("whisper", {}).get("initial_prompt", "")
++        if isinstance(raw_prompt, str) and raw_prompt.strip():
++            vocabulary = [w.strip() for w in raw_prompt.split(",") if w.strip()]
++        elif isinstance(raw_prompt, list):
++            vocabulary = [str(w).strip() for w in raw_prompt if str(w).strip()]
++    except Exception as e:
++        log(f"Warning: could not load voxtype word mappings: {e}")
++
++    return replacements, vocabulary
++
++
++PROTECTED_WORDS = frozenset({
++    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are",
++    "aren't", "as", "at", "be", "because", "been", "before", "being", "below", "between", "both",
++    "but", "by", "can", "can't", "cannot", "could", "couldn't", "did", "didn't", "do", "does",
++    "doesn't", "doing", "don't", "down", "during", "each", "few", "finish", "for", "from", "further",
++    "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he", "he'd", "he'll", "he's",
++    "her", "here", "here's", "hers", "herself", "him", "himself", "his", "how", "how's", "i",
++    "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its",
++    "itself", "just", "let's", "magic", "march", "me", "more", "most", "mustn't", "my", "myself",
++    "no", "nor", "not", "now", "of", "off", "on", "once", "only", "or", "other", "ought", "our",
++    "ours", "ourselves", "out", "over", "own", "right", "same", "shan't", "she", "she'd", "she'll",
++    "she's", "should", "shouldn't", "so", "some", "such", "taste", "than", "thanks", "that",
++    "that's", "the", "their", "theirs", "them", "themselves", "then", "there", "there's", "these",
++    "they", "they'd", "they'll", "they're", "they've", "this", "those", "through", "to", "too",
++    "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've",
++    "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while",
++    "who", "who's", "whom", "why", "why's", "will", "with", "won't", "would", "wouldn't", "wrong",
++    "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves",
++})
++
++
++def _apply_word_replacements(text, replacements=None):
++    """Apply learned phonetic mishearing replacements to transcribed speech."""
++    if not text:
++        return text
++    if replacements is None:
++        replacements, _ = _load_voxtype_word_mappings()
++    if not replacements:
++        return text
++
++    sorted_keys = sorted(replacements.keys(), key=len, reverse=True)
++    for key in sorted_keys:
++        target = replacements[key]
++        if not key or not target:
++            continue
++        clean_key = key.strip().lower()
++        if " " not in clean_key and clean_key in PROTECTED_WORDS:
++            continue
++        pattern = rf"(?<!\w){re.escape(key)}(?!\w)"
++
++        def _repl(match):
++            m = match.group(0)
++            if any(c.isupper() for c in target[1:]):
++                return target
++            if m and m[0].isupper():
++                return target[0].upper() + target[1:]
++            return target
++
++        text = re.sub(pattern, _repl, text, flags=re.IGNORECASE)
++    return text
++
++
+ def _transcribe_local(target_audio):
+     result = _run_captured(
+         ["voxtype", "--model", LOCAL_VOXTYPE_MODEL, "transcribe", target_audio],
+@@ -2439,29 +2593,104 @@ def _cloud_transcription_operation(
+         # Recordings are capped well below the Interactions API inline limit.
+         # One request avoids File API upload, processing, and delete round trips
+         # for ephemeral dictation audio.
+-        interaction = client.interactions.create(
+-            model=model_choice,
+-            input=[{
+-                "type": "audio",
+-                "data": base64.b64encode(audio_bytes).decode("ascii"),
+-                "mime_type": "audio/wav",
+-            }],
+-            generation_config={"transcription_config": {"mode": "smart"}},
+-            store=False,
+-        )
+-        return _bounded_transcript(getattr(interaction, "output_text", ""))
+-    response = client.models.generate_content(
+-        model=model_choice,
+-        contents=[
+-            types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav"),
+-            "Transcribe this speech accurately. Clean up disfluencies, remove filler words like ums/ahs, format punctuation and capitalization properly. Return ONLY the transcribed text without quotes or explanations.",
+-        ],
+-        config=types.GenerateContentConfig(
+-            thinking_config=types.ThinkingConfig(thinking_level="low"),
+-            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+-        ),
++        skip_interactions = False
++        try:
++            if os.path.exists(QUOTA_MARKER_FILE) and (time.time() - os.path.getmtime(QUOTA_MARKER_FILE)) < 300:
++                skip_interactions = True
++        except OSError:
++            pass
++
++        if not skip_interactions:
++            try:
++                interaction = client.interactions.create(
++                    model=model_choice,
++                    input=[{
++                        "type": "audio",
++                        "data": base64.b64encode(audio_bytes).decode("ascii"),
++                        "mime_type": "audio/wav",
++                    }],
++                    generation_config={"transcription_config": {"mode": "smart"}},
++                    store=False,
++                )
++                text = _bounded_transcript(getattr(interaction, "output_text", ""))
++                if text:
++                    return text
++            except Exception as error:
++                err_str = str(error)
++                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "RateLimit" in type(error).__name__:
++                    try:
++                        _ensure_private_dir(STATE_DIR)
++                        _write_private_text(QUOTA_MARKER_FILE, str(time.time()) + "\n")
++                    except Exception:
++                        pass
++                log(f"Interactions transcription unavailable ({type(error).__name__}), falling back to gemini-3.5-flash-lite")
++        model_choice = "gemini-3.5-flash-lite"
++
++    def _extract_text(resp):
++        txt = getattr(resp, "text", None)
++        if not txt and hasattr(resp, "candidates") and resp.candidates:
++            c = resp.candidates[0]
++            if getattr(c, "content", None) and getattr(c.content, "parts", None):
++                parts = [
++                    p.text for p in c.content.parts
++                    if getattr(p, "text", None) and not getattr(p, "thought", False)
++                ]
++                if parts:
++                    txt = " ".join(parts)
++        if txt:
++            lower = txt.strip().lower()
++            if any(lower.startswith(prefix) for prefix in (
++                "there is no spoken speech",
++                "there is no speech",
++                "no speech detected",
++                "no spoken speech",
++                "the audio consists only of",
++                "the audio is silent",
++            )):
++                return ""
++        return txt or ""
++
++    _, vocab = _load_voxtype_word_mappings()
++    base_prompt = (
++        "You are an expert speech-to-text dictation engine. "
++        "Transcribe the spoken audio verbatim in English. "
++        "Preserve exact wording, numbers, percentages (e.g. 100%), technical terms, and standard capitalization and punctuation. "
++        "Do not invent non-existent words or phonetic approximations. "
++        "Return ONLY the transcribed text without quotes or explanations."
+     )
+-    return _bounded_transcript(response.text)
++    if vocab:
++        base_prompt += f" Pay special attention to accurately recognizing these user terms, names, and preferred spellings: {', '.join(vocab)}."
++
++    try:
++        response = client.models.generate_content(
++            model=model_choice,
++            contents=[
++                types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav"),
++                base_prompt,
++            ],
++            config=types.GenerateContentConfig(
++                thinking_config=types.ThinkingConfig(thinking_level="low"),
++                temperature=0.0,
++                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
++            ),
++        )
++        return _bounded_transcript(_extract_text(response))
++    except Exception as error:
++        if ("503" in str(error) or "UNAVAILABLE" in str(error)) and model_choice != "gemini-3.5-flash-lite":
++            response = client.models.generate_content(
++                model="gemini-3.5-flash-lite",
++                contents=[
++                    types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav"),
++                    base_prompt,
++                ],
++                config=types.GenerateContentConfig(
++                    thinking_config=types.ThinkingConfig(thinking_level="low"),
++                    temperature=0.0,
++                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
++                ),
++            )
++            return _bounded_transcript(_extract_text(response))
++        raise
+ 
+ 
+ def _cloud_transcription_worker(connection, audio_bytes, model_choice, api_key):
+@@ -2487,7 +2716,7 @@ def _cloud_transcription_worker(connection, audio_bytes, model_choice, api_key):
+     except BaseException as error:
+         payload = json.dumps({
+             "ok": False,
+-            "error": type(error).__name__[:128],
++            "error": f"{type(error).__name__}: {error}"[:256],
+         }, separators=(",", ":")).encode("utf-8")
+     try:
+         connection.send_bytes(payload[:MAX_TRANSCRIPT_BYTES + 1024])
+@@ -2536,7 +2765,7 @@ def _transcribe_cloud(target_audio, model_choice):
+     try:
+         dir_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK)
+         di = os.fstat(dir_fd)
+-        if not stat.S_ISDIR(di.st_mode) or di.st_uid != os.getuid():
++        if not stat.S_ISDIR(di.st_mode) or (di.st_uid != os.getuid() and not (di.st_mode & stat.S_ISVTX)):
+             raise ValueError("audio directory is not private")
+         fd = os.open(base, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
+         info = os.fstat(fd)
+@@ -2615,10 +2844,12 @@ def _transcribe_cloud(target_audio, model_choice):
+ 
+ def _transcribe_audio(target_audio, model_choice):
+     if model_choice == LOCAL_MODEL_ID:
+-        return _transcribe_local(target_audio)
+-    if model_choice in SUPPORTED_MODEL_IDS:
+-        return _transcribe_cloud(target_audio, model_choice)
+-    raise ValueError("unsupported model selection")
++        raw = _transcribe_local(target_audio)
++    elif model_choice in SUPPORTED_MODEL_IDS:
++        raw = _transcribe_cloud(target_audio, model_choice)
++    else:
++        raise ValueError("unsupported model selection")
++    return _apply_word_replacements(raw)
+ 
+ 
+ def _inject_text(text, auto_submit=False):
+@@ -2652,12 +2883,24 @@ def _inject_text(text, auto_submit=False):
+             log("Clipboard copy failed; continuing with keyboard injection")
+ 
+     try:
++        # Pre-sleep 40ms gives Wayland compositor and focused window time to attach
++        # the virtual keyboard before keystrokes begin. 1ms inter-keystroke delay
++        # ensures no queue overflow. Passing text via '--' ensures all characters
++        # are mapped into the virtual keyboard keymap upfront, avoiding wtype's
++        # 100-character stdin chunking bug which silently drops characters (u, g, E, C, z)
++        # on dynamic keymap renegotiation.
+         typed = subprocess.run(
+-            [wtype, "-"], input=text, text=True, check=False, timeout=5,
++            [wtype, "-s", "40", "-d", "1", "--", text], check=False, timeout=10,
+             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=_clean_env
+         )
+         if typed.returncode != 0:
+-            return False
++            # Fallback to stdin typing if argv limit or other error occurs
++            typed = subprocess.run(
++                [wtype, "-s", "40", "-d", "1", "-"], input=text, text=True, check=False, timeout=10,
++                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=_clean_env
++            )
++            if typed.returncode != 0:
++                return False
+     except (OSError, subprocess.SubprocessError):
+         return False
+ 
+@@ -2690,6 +2933,7 @@ def _stop_recording(auto_submit=False, pids=None):
+     log(f"Stopping audio recording (auto_submit={auto_submit})")
+     for pid in pids:
+         _terminate_recorder(pid, signal.SIGINT)
++    _restore_bluetooth_music()
+ 
+     # ffmpeg may buffer the WAV header and samples until SIGINT finalizes the
+     # seekable output. Resolve the descriptor-validated capture only after the
+@@ -2746,7 +2990,21 @@ def _stop_recording(auto_submit=False, pids=None):
+         # Outer deadline for entire transcription+injection
+         op_deadline = time.monotonic() + TRANSCRIBE_DEADLINE_SECONDS
+         try:
++            try:
++                import math, struct, wave
++                with wave.open(target_audio, "rb") as _w:
++                    _n = _w.getnframes()
++                    _fr = _w.getframerate()
++                    _dur = _n / _fr if _fr else 0.0
++                    _frames = _w.readframes(_n)
++                    _samples = struct.unpack(f"{len(_frames)//2}h", _frames) if len(_frames) >= 2 else ()
++                    _rms = math.sqrt(sum(s**2 for s in _samples) / len(_samples)) if _samples else 0.0
++                log(f"Audio captured: duration={_dur:.2f}s, size={audio_size} bytes, RMS={_rms:.1f}")
++                shutil.copyfile(target_audio, "/tmp/flow_last_recording.wav")
++            except Exception:
++                pass
+             text = _transcribe_audio(target_audio, model_choice)
++            log(f"Transcription received from {model_choice} ({len(text)} chars): {repr(text[:120])}")
+             if time.monotonic() > op_deadline:
+                 raise TimeoutError("operation deadline exceeded")
+         except MissingApiKeyError:
+@@ -2754,7 +3012,7 @@ def _stop_recording(auto_submit=False, pids=None):
+             pill_ipc("setStatus", "No API Key")
+             return False
+         except Exception as error:
+-            log(f"Transcription failed: {type(error).__name__}")
++            log(f"Transcription failed: {type(error).__name__}: {error}")
+             pill_ipc("setStatus", "Transcription Error")
+             return False
+ 
+@@ -2855,8 +3113,24 @@ if __name__ == "__main__":
+         success = _qml_gateway(sys.argv[2:])
+     elif action == "start":
+         success = start_recording()
+-    elif action in ("stop", "done", "transcribe"):
++    elif action in ("stop", "done"):
+         success = stop_recording(auto_submit=False)
++    elif action == "transcribe":
++        if len(sys.argv) > 2:
++            audio_path = sys.argv[2]
++            model_choice = sys.argv[3] if len(sys.argv) > 3 else get_selected_model()
++            if not os.path.exists(audio_path):
++                print(f"Error: file not found: {audio_path}", file=sys.stderr)
++                sys.exit(1)
++            try:
++                text = _transcribe_audio(audio_path, model_choice)
++                print(text)
++                success = True
++            except Exception as e:
++                print(f"Error: {e}", file=sys.stderr)
++                sys.exit(1)
++        else:
++            success = stop_recording(auto_submit=False)
+     elif action in ("submit", "send"):
+         success = stop_recording(auto_submit=True)
+     elif action in ("pause", "toggle-pause"):
+diff --git i/tests/test_backend.py w/tests/test_backend.py
+index e77aaf3..bb724d7 100644
+--- i/tests/test_backend.py
++++ w/tests/test_backend.py
+@@ -85,6 +85,7 @@ class TestFlowBackend(unittest.TestCase):
+                 "LEGACY_TEMP_AUDIO",
+                 "LEGACY_PID_FILE",
+                 "LEGACY_STATE_FILE",
++                "QUOTA_MARKER_FILE",
+             ]
+         }
+ 
+@@ -98,6 +99,7 @@ class TestFlowBackend(unittest.TestCase):
+         Path(backend.RUNTIME_DIR).mkdir(mode=0o700)
+         Path(backend.STATE_DIR).mkdir(mode=0o700)
+         backend.LOG_FILE = str(Path(backend.STATE_DIR) / "flow.log")
++        backend.QUOTA_MARKER_FILE = str(Path(backend.STATE_DIR) / "transcribe_quota_exceeded")
+         backend.TEMP_AUDIO = str(Path(backend.RUNTIME_DIR) / "recording.wav")
+         backend.PID_FILE = str(Path(backend.RUNTIME_DIR) / "recording.pid")
+         backend.STATE_FILE = str(Path(backend.RUNTIME_DIR) / "state.json")
+@@ -127,11 +129,12 @@ class TestFlowBackend(unittest.TestCase):
+ 
+     def test_supported_models_list(self):
+         model_ids = [model["id"] for model in backend.SUPPORTED_MODELS]
+-        self.assertEqual(len(model_ids), 3)
++        self.assertEqual(len(model_ids), 4)
+         self.assertEqual(
+             model_ids,
+             [
+                 "whisper-base.en",
++                "gemini-3.5-flash-lite",
+                 "gemini-3.5-transcribe",
+                 "gemini-3.8-flash",
+             ],
+@@ -542,6 +545,24 @@ class TestFlowBackend(unittest.TestCase):
+         )
+         self.assertEqual(backend._extract_voxtype_text(output), "Hello, world.")
+ 
++    def test_apply_word_replacements_guards_common_words(self):
++        corrupted = {
++            "the": "takes",
++            "thanks": "takes",
++            "taste": "takes",
++            "wrong": "run",
++            "magic": "omarchy",
++            "march": "omarchy",
++            "omarchi": "omarchy",
++            "voxtype": "Voxtype",
++        }
++        text = "Thanks for the help, something is wrong with the magic wand in March, but omarchi and voxtype work."
++        result = backend._apply_word_replacements(text, corrupted)
++        self.assertEqual(
++            result,
++            "Thanks for the help, something is wrong with the magic wand in March, but omarchy and Voxtype work.",
++        )
++
+     def test_local_transcription_checks_exit_code(self):
+         success = subprocess.CompletedProcess(
+             args=[], returncode=0, stdout="Transcription completed in 0.1s\nHello"
+@@ -595,6 +616,24 @@ class TestFlowBackend(unittest.TestCase):
+             "smart",
+         )
+ 
++    def test_dedicated_cloud_transcription_falls_back_to_flash_lite_on_interactions_failure(self):
++        response = SimpleNamespace(text="Flash lite fallback result")
++        with warnings.catch_warnings():
++            warnings.simplefilter("ignore", DeprecationWarning)
++            with patch.object(
++                backend, "get_gemini_api_key", return_value="api-key-123456789"
++            ), patch("google.genai.Client") as client_type:
++                client = client_type.return_value
++                client.interactions.create.side_effect = RuntimeError("429 RESOURCE_EXHAUSTED")
++                client.models.generate_content.return_value = response
++                result = backend._cloud_transcription_operation(
++                    b"RIFF test", "gemini-3.5-transcribe", "api-key-123456789"
++                )
++
++        self.assertEqual(result, "Flash lite fallback result")
++        call = client.models.generate_content.call_args
++        self.assertEqual(call.kwargs["model"], "gemini-3.5-flash-lite")
++
+     def test_flash_cloud_transcription_uses_low_thinking(self):
+         response = SimpleNamespace(text="Flash result")
+         with warnings.catch_warnings():
+@@ -908,13 +947,12 @@ class TestFlowBackend(unittest.TestCase):
+             [call[0] for call in calls],
+             [
+                 ["/usr/bin/wl-copy", "--sensitive"],
+-                ["/usr/bin/wtype", "-"],
++                ["/usr/bin/wtype", "-s", "40", "-d", "1", "--", "hello"],
+                 ["/usr/bin/wtype", "-k", "Return"],
+             ],
+         )
+         self.assertEqual(calls[0][1]["input"], "hello")
+-        self.assertEqual(calls[1][1]["input"], "hello")
+-        self.assertNotIn("hello", calls[1][0])
++        self.assertEqual(calls[1][0][-1], "hello")
+         for _args, kwargs in calls:
+             self.assertNotIn("GEMINI_API_KEY", kwargs["env"])
+ 
+@@ -925,6 +963,33 @@ class TestFlowBackend(unittest.TestCase):
+         with patch("subprocess.run", side_effect=wtype_failure):
+             self.assertFalse(backend._inject_text("hello"))
+ 
++    def test_inject_text_preserves_full_character_set_in_long_text(self):
++        long_text = (
++            "No more takes for the: The word replacement table has been cleaned, and the "
++            "code now actively blocks replacing everyday English words even if accidentally "
++            "added in the future. Clear, unclipped audio: Microphone volume is normalized to 100%, "
++            "removing the harsh digital saturation that was confusing the acoustic model."
++        )
++        self.assertGreater(len(long_text), 100)
++        # Verify characters previously dropped by stdin 100-char chunking are present
++        for ch in ["u", "g", "z", "C", "E"]:
++            self.assertIn(ch, long_text)
++
++        calls = []
++
++        def fake_run(args, **kwargs):
++            calls.append((args, kwargs))
++            return subprocess.CompletedProcess(args=args, returncode=0)
++
++        with patch("subprocess.run", side_effect=fake_run):
++            self.assertTrue(backend._inject_text(long_text, auto_submit=False))
++
++        wtype_call = next(c for c in calls if c[0][0] == "/usr/bin/wtype")
++        self.assertIn("-s", wtype_call[0])
++        self.assertIn("-d", wtype_call[0])
++        self.assertIn("--", wtype_call[0])
++        self.assertEqual(wtype_call[0][-1], long_text)
++
+     def test_start_recording_is_private_and_single_instance(self):
+         process = SimpleNamespace(pid=4242, returncode=None, poll=lambda: None)
+         with patch.object(

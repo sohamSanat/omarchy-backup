@@ -7,5 +7,19 @@
         "type": "command"
       }
     ]
+  },
+  "ask-question-ting": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "command": "/home/soham/.gemini/config/hooks/ring-ting.sh",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      }
+    ]
   }
 }

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# tablet-mode: Manage HEADLESS-1 orientation (vertical vs horizontal) and scaling for tablet streaming
+
+# Theme support if interactive
+if [[ -t 1 && -f "/home/soham/.local/lib/omarchy-theme.sh" ]]; then
+  source "/home/soham/.local/lib/omarchy-theme.sh"
+else
+  COLOR_RESET="\033[0m"
+  COLOR_BOLD="\033[1m"
+  COLOR_BLUE="\033[38;5;75m"
+  COLOR_GREEN="\033[38;5;84m"
+  COLOR_YELLOW="\033[38;5;220m"
+  COLOR_MUTED="\033[38;5;245m"
+  COLOR_TEXT="\033[38;5;253m"
+fi
+
+MODE="${1:-status}"
+SCALE="${2:-1.75}"
+
+ensure_headless() {
+  if command -v hyprctl &>/dev/null; then
+    if ! hyprctl monitors all 2>/dev/null | grep -q "HEADLESS-1"; then
+      hyprctl output create headless HEADLESS-1 >/dev/null 2>&1 || true
+      sleep 0.2
+    fi
+  fi
+}
+
+case "$MODE" in
+  vertical|portrait|v)
+    ensure_headless
+    hyprctl eval "hl.monitor({ output = 'HEADLESS-1', mode = '1920x1080@60', position = 'auto-right', scale = ${SCALE}, transform = 1 })" >/dev/null 2>&1
+    echo -e "${COLOR_GREEN}✔${COLOR_RESET} ${COLOR_BOLD}Tablet Mode:${COLOR_RESET} ${COLOR_BLUE}Vertical${COLOR_RESET} ${COLOR_MUTED}(Portrait, scale ${SCALE}, 90° rotated for portrait stand)${COLOR_RESET}"
+    ;;
+  horizontal|landscape|h)
+    ensure_headless
+    hyprctl eval "hl.monitor({ output = 'HEADLESS-1', mode = '1920x1080@60', position = 'auto-right', scale = ${SCALE}, transform = 0 })" >/dev/null 2>&1
+    echo -e "${COLOR_GREEN}✔${COLOR_RESET} ${COLOR_BOLD}Tablet Mode:${COLOR_RESET} ${COLOR_BLUE}Horizontal${COLOR_RESET} ${COLOR_MUTED}(Landscape, scale ${SCALE}, 16:9)${COLOR_RESET}"
+    ;;
+  scale|s)
+    if [[ -n "$2" ]]; then
+      SCALE="$2"
+      transform=$(hyprctl monitors 2>/dev/null | awk '/HEADLESS-1/{flag=1} flag && /transform:/{print $2; exit}')
+      transform="${transform:-1}"
+      ensure_headless
+      hyprctl eval "hl.monitor({ output = 'HEADLESS-1', mode = '1920x1080@60', position = 'auto-right', scale = ${SCALE}, transform = ${transform} })" >/dev/null 2>&1
+      echo -e "${COLOR_GREEN}✔${COLOR_RESET} ${COLOR_BOLD}Scale updated to ${SCALE}${COLOR_RESET} ${COLOR_MUTED}(transform ${transform})${COLOR_RESET}"
+    else
+      echo "Usage: tablet-mode scale <number> (e.g. tablet-mode scale 1.5)"
+    fi
+    ;;
+  status)
+    info=$(hyprctl monitors 2>/dev/null | awk '/HEADLESS-1/{flag=1} flag && /scale:/{scale=$2} flag && /transform:/{transform=$2; print scale, transform; exit}')
+    cur_scale=$(echo "$info" | awk '{print $1}')
+    cur_transform=$(echo "$info" | awk '{print $2}')
+    if [[ "$cur_transform" == "1" ]]; then
+      echo -e "${COLOR_BLUE}●${COLOR_RESET} ${COLOR_BOLD}Current Mode:${COLOR_RESET} ${COLOR_TEXT}Vertical (Portrait)${COLOR_RESET} | ${COLOR_MUTED}Scale: ${cur_scale:-1.5}${COLOR_RESET}"
+    elif [[ "$cur_transform" == "0" ]]; then
+      echo -e "${COLOR_BLUE}●${COLOR_RESET} ${COLOR_BOLD}Current Mode:${COLOR_RESET} ${COLOR_TEXT}Horizontal (Landscape)${COLOR_RESET} | ${COLOR_MUTED}Scale: ${cur_scale:-1.5}${COLOR_RESET}"
+    else
+      echo -e "${COLOR_YELLOW}●${COLOR_RESET} ${COLOR_MUTED}HEADLESS-1 is currently inactive.${COLOR_RESET}"
+    fi
+    ;;
+  *)
+    echo "Usage: tablet-mode [vertical|horizontal|scale <value>|status]"
+    exit 1
+    ;;
+esac

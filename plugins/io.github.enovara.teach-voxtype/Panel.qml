@@ -211,8 +211,41 @@ Panel {
     function show() { root.open() }
     function hide() { root.close() }
     function toggle() { root.toggle() }
-    function teach(word: string): void { root.requestFromIpc("teach", word) }
-    function review(word: string): void { root.requestFromIpc("review", word) }
+    function teach(word: string) { root.requestFromIpc("teach", word) }
+    function review(word: string) { root.requestFromIpc("review", word) }
+
+    function setListening(): string {
+      root.micState = "recording"
+      root.micTooltip = "Omarchy Flow: Recording"
+      return "ok"
+    }
+    function setTranscribing(status: string): string {
+      root.micState = "transcribing"
+      root.micTooltip = "Omarchy Flow: " + (status || "Transcribing...")
+      return "ok"
+    }
+    function setDone(): string {
+      root.micState = "idle"
+      root.micTooltip = "Omarchy Flow: Ready"
+      return "ok"
+    }
+    function setPaused(): string {
+      root.micState = "paused"
+      root.micTooltip = "Omarchy Flow: Paused"
+      return "ok"
+    }
+    function setResumed(): string {
+      root.micState = "recording"
+      root.micTooltip = "Omarchy Flow: Recording"
+      return "ok"
+    }
+    function setStatus(status: string): string {
+      if (status) {
+        root.micState = "idle"
+        root.micTooltip = "Omarchy Flow: " + status
+      }
+      return "ok"
+    }
   }
 
   implicitWidth: button.implicitWidth
@@ -227,9 +260,11 @@ Panel {
       onRead: function(line) {
         try {
           var s = JSON.parse(line)
-          root.micGlyph = s.text || ""
-          root.micState = s["class"] || s.alt || "idle"
-          root.micTooltip = s.tooltip || "Voxtype"
+          if (s.text) root.micGlyph = s.text
+          if (root.micState !== "recording" && root.micState !== "transcribing") {
+            root.micState = s["class"] || s.alt || "idle"
+            root.micTooltip = s.tooltip || "Voxtype"
+          }
         } catch (e) {}
       }
     }
@@ -287,10 +322,18 @@ Panel {
     bar: root.bar
     text: root.micGlyph
     active: root.micState === "recording" || root.phase === "recording"
-    tooltipText: root.opened ? "" : root.micTooltip + "\nClick: teach voxtype a word"
+    tooltipText: root.opened ? "" : (root.micTooltip || "Voice Dictation") + "\nLeft-click: teach a word\nRight-click: toggle voice dictation"
     onPressed: function(b) {
-      if (b === Qt.RightButton) root.bar.run("voxtype record toggle")
-      else root.toggle()
+      if (b === Qt.RightButton) {
+        var shell = root.bar ? root.bar.shell : null
+        if (shell && typeof shell.call === "function") {
+          shell.call("io.github.ef-code.omarchy-flow", "toggle", "")
+        } else {
+          root.bar.run("flowctl toggle")
+        }
+      } else {
+        root.toggle()
+      }
     }
   }
 

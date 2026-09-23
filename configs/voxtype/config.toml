@@ -43,6 +43,7 @@ model = "base.en"
 language = "en"
 translate = false
 threads = 4
+initial_prompt = "Omarchy, Voxtype, Hyprland, Flow"
 
 [output]
 # Primary output mode: "type" via wtype on Wayland
@@ -65,4 +66,22 @@ on_transcription = false
 [text]
 # Convert spoken punctuation (e.g. say "period" -> ".", "comma" -> ",")
 spoken_punctuation = true
-replacements = { "omarchy" = "Omarchy", "hyprland" = "Hyprland", "voxtype" = "Voxtype" }
+
+[text.replacements]
+omarchi = "omarchy"
+"oh marchee" = "omarchy"
+marchee = "omarchy"
+omarji = "omarchy"
+"oh margie" = "omarchy"
+hyprland = "Hyprland"
+omarchy = "Omarchy"
+voxtype = "Voxtype"
+"omarchief low" = "Omarchy Flow"
+"dictate voxscribe" = "Teach Voxtype"
+voxscribe = "Voxtype"
+hateomarchy = "omarchy"
+omachi = "omarchy"
+marchi = "omarchy"
+marche = "omarchy"
+omar = "omarchy"
+marmshoot = "omarchy"

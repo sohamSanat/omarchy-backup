@@ -1,6 +1,9 @@
 # Omarchy environment (OMARCHY_PATH + PATH), needed even for non-interactive shells
 [[ -r /usr/share/omarchy/default/bash/env-bootstrap ]] && source /usr/share/omarchy/default/bash/env-bootstrap
 
+# Omarchy theme environment (OMARCHY_THEME_MODE, COLORFGBG, etc.)
+[[ -r "$HOME/.local/state/omarchy/theme-mode.env" ]] && source "$HOME/.local/state/omarchy/theme-mode.env"
+
 # If not running interactively, don't do anything else (leave this above the rc source)
 [[ $- != *i* ]] && return
 
@@ -11,8 +14,45 @@ source "$OMARCHY_PATH/default/bash/rc"
 # Add your own exports, aliases, and functions here.
 #
 # Make an alias for invoking commands you use constantly
-# alias p='python'
+# Brave flags (use X11 ozone platform to avoid wayland-vulkan crash)
+export BRAVE_FLAGS="--ozone-platform=x11"
 
 
 # Added by Antigravity CLI installer
 export PATH="/home/soham/.local/bin:$PATH"
+
+# Auto-export GEMINI_API_KEY from ~/.config/omagent/config.json
+if [[ -z "${GEMINI_API_KEY:-}" && -f "$HOME/.config/omagent/config.json" ]]; then
+  export GEMINI_API_KEY="$(jq -r '.gemini_api_key // empty' "$HOME/.config/omagent/config.json" 2>/dev/null)"
+fi
+
+# Herdr aliases
+alias h='herdr'
+alias hs='herdr status'
+
+# Spinning Arch ASCII logo for fastfetch (user customization).
+# Spins forever until any key / Ctrl+C, which lands on the static Arch logo.
+# Bypass with `command fastfetch` or FASTFETCH_NO_ANIM=1.
+fastfetch() {
+  if [[ -x "$HOME/.local/bin/fastfetch-arch-anim" ]]; then
+    "$HOME/.local/bin/fastfetch-arch-anim" "$@"
+  else
+    command fastfetch "$@"
+  fi
+}
+
+# Dynamic Omarchy theme synchronization across active terminal sessions
+_omarchy_theme_prompt_hook() {
+  local env_file="$HOME/.local/state/omarchy/theme-mode.env"
+  if [[ -f "$env_file" && "$env_file" -nt "${_OMARCHY_THEME_ENV_MTIME:-}" ]]; then
+    source "$env_file"
+    _OMARCHY_THEME_ENV_MTIME="$env_file"
+  fi
+}
+if [[ "${PROMPT_COMMAND:-}" != *"_omarchy_theme_prompt_hook"* ]]; then
+  PROMPT_COMMAND="_omarchy_theme_prompt_hook;${PROMPT_COMMAND:-}"
+fi
+
+
+# opencode
+export PATH=/home/soham/.opencode/bin:$PATH

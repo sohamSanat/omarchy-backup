@@ -70,8 +70,51 @@ EOF
   # Copy current Omarchy theme CSS to the Omarchy community theme
   cp "$CURRENT_THEME_DIR/obsidian.css" "$theme_dir/theme.css"
 
+  # Ensure calendar and rainbow tokens are present even for legacy themes
+  if ! grep -q -- "--wp-rose" "$theme_dir/theme.css" 2>/dev/null; then
+    if [[ -f "$CURRENT_THEME_DIR/colors.toml" ]] && command -v omarchy-theme-color >/dev/null 2>&1; then
+      declare -A C_COLORS=()
+      while IFS=$'\t' read -r k v; do
+        C_COLORS["$k"]="$v"
+      done < <(omarchy-theme-color --file "$CURRENT_THEME_DIR/colors.toml" --all 2>/dev/null || true)
+
+      c_bg="${C_COLORS[background]:-#0e091d}"
+      c_fg="${C_COLORS[foreground]:-#ffffff}"
+      c_magenta="${C_COLORS[magenta]:-${C_COLORS[pink]:-#f472b6}}"
+      c_orange="${C_COLORS[orange]:-#fbbf24}"
+      c_purple="${C_COLORS[purple]:-#c084fc}"
+      c_cyan="${C_COLORS[cyan]:-#38bdf8}"
+      c_green="${C_COLORS[green]:-#2dd4bf}"
+      c_blue="${C_COLORS[blue]:-#818cf8}"
+
+      cat >> "$theme_dir/theme.css" <<EOF
+
+/* Injected Omarchy Calendar / Journals HUD Palette */
+.theme-dark, .theme-light {
+  --color-red: ${C_COLORS[red]:-#f43f5e};
+  --color-orange: ${c_orange};
+  --color-yellow: ${C_COLORS[yellow]:-#eab308};
+  --color-green: ${c_green};
+  --color-cyan: ${c_cyan};
+  --color-blue: ${c_blue};
+  --color-purple: ${c_purple};
+  --color-pink: ${c_magenta};
+
+  --wp-rose: ${c_magenta};
+  --wp-amber: ${c_orange};
+  --wp-purple: ${c_purple};
+  --wp-cyan: ${c_cyan};
+  --wp-teal: ${c_green};
+  --wp-indigo: ${c_blue};
+  --wp-hud-bg: color-mix(in srgb, ${c_bg} 85%, transparent);
+  --wp-border: color-mix(in srgb, ${c_fg} 12%, transparent);
+}
+EOF
+    fi
+  fi
+
   # Also write to snippets as omarchy-theme.css for flexibility
-  cp "$CURRENT_THEME_DIR/obsidian.css" "$snippets_dir/omarchy-theme.css"
+  cp "$theme_dir/theme.css" "$snippets_dir/omarchy-theme.css"
 
   # Update appearance.json to activate the Omarchy theme
   appearance_file="$vault_path/.obsidian/appearance.json"

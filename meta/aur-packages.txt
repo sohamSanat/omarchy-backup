@@ -3,3 +3,4 @@ fetch-git
 libfprint-fpc1022
 meteobar-bin
 qdirstat
+wayscrollshot-bin

@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# Sunshine CLI wrapper for Omarchy
+# Prevents port collision crashes by managing the systemd user service.
+
+# Load Omarchy theme palette if available
+if [[ -f "/home/soham/.local/lib/omarchy-theme.sh" ]]; then
+  source "/home/soham/.local/lib/omarchy-theme.sh"
+else
+  COLOR_RESET="\033[0m"
+  COLOR_BOLD="\033[1m"
+  COLOR_BLUE="\033[38;5;75m"
+  COLOR_GREEN="\033[38;5;84m"
+  COLOR_YELLOW="\033[38;5;220m"
+  COLOR_RED="\033[38;5;196m"
+  COLOR_MUTED="\033[38;5;245m"
+  COLOR_TEXT="\033[38;5;253m"
+fi
+
+REAL_BIN="/usr/bin/sunshine"
+SERVICE_NAME="app-dev.lizardbyte.app.Sunshine.service"
+
+ensure_headless_monitor() {
+  if command -v hyprctl &>/dev/null; then
+    if ! hyprctl monitors all 2>/dev/null | grep -q "HEADLESS-1"; then
+      hyprctl output create headless HEADLESS-1 >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+remove_headless_monitor() {
+  if command -v hyprctl &>/dev/null; then
+    if hyprctl monitors all 2>/dev/null | grep -q "HEADLESS-1"; then
+      hyprctl output remove HEADLESS-1 >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+start_sunshine() {
+  echo -e "${COLOR_YELLOW}==>${COLOR_RESET} ${COLOR_BOLD}Starting Sunshine streaming service...${COLOR_RESET}"
+  ensure_headless_monitor
+  systemctl --user start "$SERVICE_NAME"
+  sleep 1
+  if systemctl --user is-active --quiet "$SERVICE_NAME"; then
+    pid=$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value 2>/dev/null)
+    echo -e "${COLOR_GREEN}✔${COLOR_RESET} ${COLOR_BOLD}Sunshine started in background${COLOR_RESET} ${COLOR_MUTED}(PID: ${pid})${COLOR_RESET}"
+    echo -e "  ${COLOR_BLUE}Web UI:${COLOR_RESET}  ${COLOR_TEXT}https://localhost:47990${COLOR_RESET}"
+    echo -e "  ${COLOR_BLUE}Monitor:${COLOR_RESET} ${COLOR_TEXT}HEADLESS-1 (Ready for tablet)${COLOR_RESET}"
+    echo ""
+    echo -e "${COLOR_MUTED}Run '${COLOR_TEXT}sunshine stop${COLOR_MUTED}' whenever you are done to shut it down.${COLOR_RESET}"
+  else
+    echo -e "${COLOR_RED}✘ Failed to start Sunshine service.${COLOR_RESET} Check logs: journalctl --user -u $SERVICE_NAME"
+    exit 1
+  fi
+}
+
+stop_sunshine() {
+  echo -e "${COLOR_YELLOW}==>${COLOR_RESET} ${COLOR_BOLD}Stopping Sunshine streaming service...${COLOR_RESET}"
+  systemctl --user stop "$SERVICE_NAME" >/dev/null 2>&1 || true
+  pkill -x sunshine >/dev/null 2>&1 || true
+  remove_headless_monitor
+  echo -e "${COLOR_GREEN}✔${COLOR_RESET} ${COLOR_MUTED}Sunshine is stopped and tablet virtual display removed.${COLOR_RESET}"
+}
+
+cmd="${1:-}"
+
+case "$cmd" in
+  start|on)
+    if systemctl --user is-active --quiet "$SERVICE_NAME" || pgrep -x sunshine >/dev/null; then
+      echo -e "${COLOR_BLUE}●${COLOR_RESET} ${COLOR_BOLD}Sunshine is already running.${COLOR_RESET}"
+      ensure_headless_monitor
+    else
+      start_sunshine
+    fi
+    ;;
+  stop|off|close|kill)
+    stop_sunshine
+    ;;
+  toggle)
+    if systemctl --user is-active --quiet "$SERVICE_NAME" || pgrep -x sunshine >/dev/null; then
+      stop_sunshine
+    else
+      start_sunshine
+    fi
+    ;;
+  restart|-r|--restart)
+    echo -e "${COLOR_BLUE}==>${COLOR_RESET} ${COLOR_BOLD}Restarting Sunshine streaming service...${COLOR_RESET}"
+    ensure_headless_monitor
+    systemctl --user restart "$SERVICE_NAME"
+    sleep 1
+    systemctl --user status "$SERVICE_NAME" --no-pager
+    ;;
+  status)
+    if systemctl --user is-active --quiet "$SERVICE_NAME"; then
+      pid=$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value 2>/dev/null)
+      echo -e "${COLOR_GREEN}●${COLOR_RESET} ${COLOR_BOLD}Sunshine is RUNNING${COLOR_RESET} ${COLOR_MUTED}(PID: ${pid})${COLOR_RESET}"
+      systemctl --user status "$SERVICE_NAME" --no-pager
+    else
+      echo -e "${COLOR_MUTED}○ Sunshine is STOPPED (Autostart is disabled).${COLOR_RESET}"
+      echo -e "  Run '${COLOR_BLUE}sunshine start${COLOR_RESET}' to start it manually."
+    fi
+    ;;
+  logs|log|-l|--logs)
+    echo -e "${COLOR_BLUE}==>${COLOR_RESET} ${COLOR_BOLD}Streaming live Sunshine logs (Ctrl+C to exit):${COLOR_RESET}"
+    journalctl --user -u "$SERVICE_NAME" -f
+    ;;
+  raw|--raw|--foreground|-f)
+    shift
+    stop_sunshine
+    ensure_headless_monitor
+    exec "$REAL_BIN" "$@"
+    ;;
+  --help|-h)
+    echo -e "${COLOR_BOLD}Sunshine Streaming Manager (Manual Control)${COLOR_RESET}"
+    echo -e "  ${COLOR_BLUE}sunshine start${COLOR_RESET}  - Start streaming server & create tablet screen"
+    echo -e "  ${COLOR_BLUE}sunshine stop${COLOR_RESET}   - Stop streaming server & remove tablet screen"
+    echo -e "  ${COLOR_BLUE}sunshine toggle${COLOR_RESET} - Toggle streaming on / off"
+    echo -e "  ${COLOR_BLUE}sunshine status${COLOR_RESET} - Check if service is active"
+    echo -e "  ${COLOR_BLUE}sunshine restart${COLOR_RESET}- Restart the background service"
+    echo -e "  ${COLOR_BLUE}sunshine logs${COLOR_RESET}   - Follow live server logs"
+    echo -e "  ${COLOR_BLUE}sunshine raw ...${COLOR_RESET}- Run upstream /usr/bin/sunshine directly"
+    ;;
+  --version|-v)
+    "$REAL_BIN" --version
+    ;;
+  "")
+    if systemctl --user is-active --quiet "$SERVICE_NAME" || pgrep -x sunshine >/dev/null; then
+      pid=$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value 2>/dev/null || pgrep -x sunshine)
+      echo -e "${COLOR_GREEN}●${COLOR_RESET} ${COLOR_BOLD}Sunshine is currently active in background${COLOR_RESET} ${COLOR_MUTED}(PID: ${pid})${COLOR_RESET}"
+      echo -e "  ${COLOR_BLUE}Web UI:${COLOR_RESET}    ${COLOR_TEXT}https://localhost:47990${COLOR_RESET}"
+      echo -e "  ${COLOR_BLUE}Monitor:${COLOR_RESET}   ${COLOR_TEXT}HEADLESS-1 (Active)${COLOR_RESET}"
+      echo ""
+      echo -e "${COLOR_MUTED}To shut it down completely:${COLOR_RESET}  ${COLOR_TEXT}sunshine stop${COLOR_RESET}"
+    else
+      start_sunshine
+    fi
+    ;;
+  *)
+    # Any other arguments passed to sunshine
+    stop_sunshine
+    ensure_headless_monitor
+    exec "$REAL_BIN" "$@"
+    ;;
+esac

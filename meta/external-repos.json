@@ -58,5 +58,12 @@
     "path": "/home/soham/Projects/battery-monitor",
     "remote": "local",
     "commit": "git-tracked"
+  },
+  "wayscrollshot": {
+    "path": "/home/soham/wayscrollshot",
+    "remote": "https://github.com/jswysnemc/wayscrollshot",
+    "commit": "e42f3b9e68f0018809ff9d8390ce9d3424c79cf3",
+    "has_local_changes": true,
+    "patch": "meta/patches/wayscrollshot.patch"
   }
 }

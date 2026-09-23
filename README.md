@@ -60,7 +60,7 @@ Branch: `main`
 
 ### 3. 🎨 Visual Experience, Bar & Theming Pipeline
 - **Theme Collection**: 16 curated themes (`moodpeak` [Active], `nous` [Light research], `sakura-mochi`, `aetheria`, `akaito`, `amekoji`, `artzen`, `city-783`, `harbor`, `harbordark`, `omagen1`, `omarchy_signature`, `quattrocento-light`, `synthetica`).
-- **Floating Bar**: 33 modular plugins in `plugins/` (`krall.switchboard` [Raycast intelligence launcher], `io.github.ellion369.omagent`, `io.github.i12bp8.fmhy-deck`, `akshit.island`, `io.github.enovara.teach-voxtype`, `tiertek.scratchpad-deck`, `nguyenn.clipboard` [custom attachment cleaner], `reidenxerx.tile-blueprints`, `reomarchy.workspace-switcher`, `ricardosuman.pretty-screenshot`, `tristonarmstrong.dictionary`, `bhanu.omavideos`, `soham.power`, `mryll.printbar`, `mahmoodkhalil57.qrgen`, `io.github.ricky.whatsapp`, etc.).
+- **Floating Bar**: 36 modular plugins in `plugins/` (`io.github.ef-code.omarchy-flow` [low-latency Gemini voice dictation], `soham.easyeffects` [navbar IEM EQ switcher & bypass toggle], `soham.pocket-left` [tuck-away widget dock for left bar], `krall.switchboard` [Raycast intelligence launcher], `io.github.ellion369.omagent`, `io.github.i12bp8.fmhy-deck`, `akshit.island`, `io.github.enovara.teach-voxtype`, `tiertek.scratchpad-deck`, `nguyenn.clipboard` [custom attachment cleaner], `reidenxerx.tile-blueprints`, `reomarchy.workspace-switcher`, `ricardosuman.pretty-screenshot`, `tristonarmstrong.dictionary`, `bhanu.omavideos`, `soham.power`, `mryll.printbar`, `mahmoodkhalil57.qrgen`, `io.github.ricky.whatsapp`, etc.).
 - **Switchboard Launcher v2 (`krall.switchboard`)**:
   - **Raycast-Like Intelligence Engine (`RaycastSearch.js`)**:
     - **Math Calculator**: Live expression evaluation (`=`), base conversions (`255 to hex`, `10 to bin`, `oct`), percentages (`15% of 80`), scientific functions (`sqrt`, `sin`, `log`, `pow`).
@@ -106,8 +106,14 @@ Branch: `main`
 - **Fastfetch Enhancements**: `fastfetch-arch-anim` (smooth spinning Arch ASCII animation) and `fastfetch-theme-accent` (theme accent mapper).
 - **`fetch`**: Ultra-fast C/ASCII 3D donut spinning system info fetcher with Omarchy profile.
 - **Wayland Idle Inhibitors**: `omarchy-wayland-inhibit` (compiled C Wayland protocol client) and `omarchy-video-idle-inhibit` (MPRIS and PipeWire audio stream daemon with screensaver lock-guard).
+- **Sunshine & Tablet Mode Streaming**: `bin/tablet-mode` and `configs/sunshine/` enabling zero-latency wireless streaming and virtual display scaling to Redmi Pad SE via `HEADLESS-1` (1200x2000 90° portrait or 2000x1200 landscape).
+- **EasyEffects Audio Service & Navbar Switcher**: `configs/systemd/user/easyeffects.service` and `plugins/soham.easyeffects` for seamless IEM equalizer profile switching and DSP bypass toggling from the Omarchy navbar.
+- **Omarchy Flow Voice Dictation**: `plugins/io.github.ef-code.omarchy-flow` and `bin/flowctl` providing ultra-low-latency Gemini 3.5 transcribe & fallback with character injection guards.
+- **Antigravity Interactive Question Ting**: `configs/antigravity-app/gemini-config/hooks/ring-ting.sh` and `sounds/ting.wav` ringing an audio chime and terminal bell whenever interactive choices (`ask_question`) await user input.
+- **Agy Command Watcher**: `bin/agy-ting-watcher` tailing logs to emit audio chimes upon background command completion.
+- **Wayscrollshot & IPv4 Library**: `bin/wayscrollshot` paired with `lib/force_ipv4.so` (`lib/force_ipv4.c`) for reliable full-page scrolling Wayland screenshots over IPv4 networks.
 - **Screensaver Launcher**: `omarchy-launch-screensaver` with intelligent audio and stay-awake inhibition.
-- **Systemd User Units**: Daemons for Omagent mobile bridge, crash monitor, video inhibitor, WhatsApp bridge, and cleanup timers.
+- **Systemd User Units**: Daemons for EasyEffects, Omagent mobile bridge, crash monitor, video inhibitor, WhatsApp bridge, and cleanup timers.
 
 ---
 

@@ -235,6 +235,24 @@ if [[ -f "${SCRIPT_DIR}/configs/user-dirs.dirs" ]]; then
   cp -a "${SCRIPT_DIR}/configs/user-dirs.dirs" "${USER_HOME}/.config/"
   echo "  [OK] Restored XDG user directory layout: ~/.config/user-dirs.dirs"
 fi
+if [[ -d "${SCRIPT_DIR}/configs/sunshine" ]]; then
+  echo "  -> Restoring Sunshine game streaming & virtual display configuration..."
+  mkdir -p "${USER_HOME}/.config/sunshine"
+  cp -a "${SCRIPT_DIR}/configs/sunshine/sunshine.conf" "${USER_HOME}/.config/sunshine/" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/sunshine/apps.json" "${USER_HOME}/.config/sunshine/" 2>/dev/null || true
+  echo "  [OK] Restored Sunshine configurations: ~/.config/sunshine/"
+fi
+if [[ -d "${SCRIPT_DIR}/configs/omarchy-flow" ]]; then
+  echo "  -> Restoring Omarchy Flow voice dictation configuration..."
+  mkdir -p "${USER_HOME}/.config/omarchy-flow"
+  cp -a "${SCRIPT_DIR}/configs/omarchy-flow/settings.json" "${USER_HOME}/.config/omarchy-flow/" 2>/dev/null || true
+  cp -a "${SCRIPT_DIR}/configs/omarchy-flow/selected_model.txt" "${USER_HOME}/.config/omarchy-flow/" 2>/dev/null || true
+  if [[ ! -f "${USER_HOME}/.config/omarchy-flow/gemini_api_key" && -f "${SCRIPT_DIR}/configs/omarchy-flow/gemini_api_key.example" ]]; then
+    cp -a "${SCRIPT_DIR}/configs/omarchy-flow/gemini_api_key.example" "${USER_HOME}/.config/omarchy-flow/gemini_api_key"
+    echo "  [INFO] Installed template ~/.config/omarchy-flow/gemini_api_key. Please update with your Gemini API key."
+  fi
+  echo "  [OK] Restored Omarchy Flow configurations: ~/.config/omarchy-flow/"
+fi
 if [[ -f "${SCRIPT_DIR}/configs/brave/policies/managed/omarchy-ntp.json" ]]; then
   echo "  -> Restoring Brave Origin managed policies..."
   if [[ -w "/etc/brave/policies/managed" ]]; then
@@ -368,7 +386,11 @@ if [[ -d "${SCRIPT_DIR}/configs/antigravity-app" ]]; then
   if [[ -d "${SCRIPT_DIR}/configs/antigravity-app/gemini-config" ]]; then
     mkdir -p "${USER_HOME}/.gemini/config/hooks"
     cp -a "${SCRIPT_DIR}/configs/antigravity-app/gemini-config/." "${USER_HOME}/.gemini/config/"
-    chmod +x "${USER_HOME}/.gemini/config/hooks/herdr-agent-state.sh" 2>/dev/null || true
+    chmod +x "${USER_HOME}/.gemini/config/hooks/"*.sh 2>/dev/null || true
+  fi
+  if [[ -d "${SCRIPT_DIR}/configs/antigravity-app/sounds" ]]; then
+    mkdir -p "${USER_HOME}/.gemini/antigravity-cli/sounds"
+    cp -a "${SCRIPT_DIR}/configs/antigravity-app/sounds/." "${USER_HOME}/.gemini/antigravity-cli/sounds/"
   fi
   if [[ -f "${USER_HOME}/.local/bin/agy" ]]; then
     ln -nsf "${USER_HOME}/.local/bin/agy" "${USER_HOME}/.local/bin/antigravity"
@@ -568,6 +590,9 @@ fi
 if [[ -f "${USER_HOME}/.config/omarchy/plugins/tiertek.scratchpad-deck/bin/scratchpad-deck" ]]; then
   ln -nsf "${USER_HOME}/.config/omarchy/plugins/tiertek.scratchpad-deck/bin/scratchpad-deck" "${USER_HOME}/.local/bin/scratchpad-deck"
 fi
+if [[ -f "${USER_HOME}/.config/omarchy/plugins/io.github.ef-code.omarchy-flow/scripts/flowctl" ]]; then
+  ln -nsf "${USER_HOME}/.config/omarchy/plugins/io.github.ef-code.omarchy-flow/scripts/flowctl" "${USER_HOME}/.local/bin/flowctl"
+fi
 if [[ -f "${USER_HOME}/.local/bin/photos" ]]; then
   ln -nsf "${USER_HOME}/.local/bin/photos" "${USER_HOME}/.local/bin/photo-gallery"
 fi
@@ -586,6 +611,11 @@ echo "==> Step 9: Restoring custom libraries..."
 if [[ -f "${SCRIPT_DIR}/lib/hypr/hypr-shiny-border.so" ]]; then
   cp -a "${SCRIPT_DIR}/lib/hypr/hypr-shiny-border.so" "${USER_HOME}/.local/lib/hypr/"
   echo "  [OK] Installed ~/.local/lib/hypr/hypr-shiny-border.so"
+fi
+if [[ -f "${SCRIPT_DIR}/lib/force_ipv4.so" ]]; then
+  mkdir -p "${USER_HOME}/.local/lib"
+  cp -a "${SCRIPT_DIR}/lib/force_ipv4.so" "${USER_HOME}/.local/lib/"
+  echo "  [OK] Installed ~/.local/lib/force_ipv4.so"
 fi
 if [[ -f "${SCRIPT_DIR}/lib/omarchy-whatsapp/sweep" ]]; then
   cp -a "${SCRIPT_DIR}/lib/omarchy-whatsapp/sweep" "${USER_HOME}/.local/lib/omarchy-whatsapp/"
@@ -650,7 +680,7 @@ echo "==> Step 11: Applying customizations and restarting components..."
 if command -v systemctl >/dev/null 2>&1; then
   echo "  -> Reloading systemd user daemon and enabling user services..."
   systemctl --user daemon-reload 2>/dev/null || true
-  systemctl --user enable omagent-crash-watch.service omagent-mobile-bridge.service 2>/dev/null || true
+  systemctl --user enable easyeffects.service omagent-crash-watch.service omagent-mobile-bridge.service 2>/dev/null || true
 fi
 
 if command -v omarchy >/dev/null 2>&1; then

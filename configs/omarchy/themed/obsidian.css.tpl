@@ -66,6 +66,16 @@
   --color-purple: {{ purple }};
   --color-pink: {{ magenta }};
 
+  /* Calendar / Journals HUD palette */
+  --wp-rose: {{ magenta }};
+  --wp-amber: {{ orange }};
+  --wp-purple: {{ purple }};
+  --wp-cyan: {{ cyan }};
+  --wp-teal: {{ green }};
+  --wp-indigo: {{ blue }};
+  --wp-hud-bg: color-mix(in srgb, {{ background }} 85%, transparent);
+  --wp-border: color-mix(in srgb, {{ foreground }} 12%, transparent);
+
   /* Headings */
   --text-title-h1: {{ red }};
   --text-title-h2: {{ green }};

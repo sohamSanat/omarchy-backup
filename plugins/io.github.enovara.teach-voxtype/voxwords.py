@@ -37,12 +37,23 @@ def run(argv):
     return subprocess.run(argv, capture_output=True, text=True)
 
 
-def default_models():
-    """The Whisper model dictation uses, plus base.en when it is installed.
+FLOWCTL = os.path.expanduser("~/.config/omarchy/plugins/io.github.ef-code.omarchy-flow/scripts/flowctl")
 
-    base.en mishears more, so it surfaces likely future errors, but not every
-    machine has it downloaded; only installed models are used.
+
+def default_models():
+    """The models dictation uses, plus base.en when it is installed.
+
+    Includes Flow's active model (e.g. gemini-3.5-transcribe) when Flow is available.
     """
+    models = []
+    if os.path.exists(FLOWCTL):
+        try:
+            flow_model = run([FLOWCTL, "model"]).stdout.strip()
+            if flow_model and flow_model != "null" and not flow_model.startswith("Error"):
+                models.append(flow_model)
+        except Exception:
+            pass
+
     configured = run(["voxtype", "config", "get", "whisper.model"]).stdout.strip().strip('"')
     installed = set()
     in_whisper = False
@@ -55,7 +66,8 @@ def default_models():
         m = re.match(r"^\s*installed\s+(\S+)", line)
         if in_whisper and m:
             installed.add(m.group(1))
-    models = [configured] if configured and configured != "null" else []
+    if configured and configured != "null" and configured not in models:
+        models.append(configured)
     for extra in ("base.en",) + tuple(sorted(installed)):
         if extra in installed and extra not in models:
             models.append(extra)
@@ -68,6 +80,10 @@ def letters(s):
 
 
 def transcribe(model, wav):
+    if (model.startswith("gemini-") or model == "flow" or model.startswith("voxtype-local")) and os.path.exists(FLOWCTL):
+        proc = run([FLOWCTL, "transcribe", wav, model])
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout.strip()
     proc = run(["voxtype", "-q", "--model", model, "transcribe", wav])
     lines = [l.strip() for l in proc.stdout.splitlines()]
     return " ".join(l for l in lines if l and not NOISE.match(l))

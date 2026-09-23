@@ -63,6 +63,20 @@
       "?? BarWidget.qml.bak.1788189441"
     ]
   },
+  "io.github.ef-code.omarchy-flow": {
+    "remote": "https://github.com/EF-Code/omarchy-flow.git",
+    "commit": "393cf43b9a5a016bcc69e79de8091df5215e4f61",
+    "branch": "fix/transcription-latency",
+    "has_local_changes": true,
+    "dirty_files": [
+      "M BarWidget.qml",
+      "M Pill.qml",
+      "M SettingsView.qml",
+      "M scripts/flowctl",
+      "M scripts/gemini-dictate.py",
+      "M tests/test_backend.py"
+    ]
+  },
   "io.github.ellion369.omagent": {
     "remote": "https://github.com/ellion369/Omarchy-Omagent.git",
     "commit": "2979e9728b11ada6a29c9b315a2ac8e0a48380c4",
@@ -251,9 +265,20 @@
     "dirty_files": [],
     "note": "User customized fork of omarchy.agents"
   },
+  "soham.easyeffects": {
+    "remote": null,
+    "custom": true,
+    "description": "EasyEffects IEM EQ switcher and bypass toggle navbar widget"
+  },
   "soham.lock": {
     "remote": null,
     "custom": true
+  },
+  "soham.pocket-left": {
+    "remote": null,
+    "custom": true,
+    "cloned_from": "jrmmhm.pocket",
+    "description": "Specialized Pocket widget for the left section of the bar"
   },
   "soham.power": {
     "remote": null,

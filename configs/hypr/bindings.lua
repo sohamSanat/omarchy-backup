@@ -25,8 +25,8 @@
 
 -- Logitech MX Keys examples:
 -- o.bind("SUPER + SHIFT + S", nil, "omarchy-capture-screenshot")
-o.bind("SUPER + H", "Toggle dictation", "voxtype-dictate-toggle")
-o.bind("CTRL + H", "Toggle dictation", "voxtype-dictate-toggle")
+o.bind("SUPER + H", "Toggle dictation", "omarchy-shell io.github.ef-code.omarchy-flow.service toggle")
+o.bind("CTRL + H", "Toggle dictation", "omarchy-shell io.github.ef-code.omarchy-flow.service toggle")
 -- o.bind("SUPER + PERIOD", nil, "omarchy-shell shell toggle omarchy.emojis")
 
 -- Use Strata instead of Nautilus for Omarchy's file-manager shortcuts.
@@ -89,11 +89,7 @@ o.bind("switch:off:Lid Switch", nil, "omarchy-system-lid-open", { locked = true 
 -- tiertek.scratchpad-deck: begin
 local deck = os.getenv("HOME") .. "/.config/omarchy/plugins/tiertek.scratchpad-deck/bin/scratchpad-deck"
 
-hl.unbind("SUPER + S")
-o.bind("SUPER + S", "Open scratchpad deck", deck .. " toggle")
-
-hl.unbind("SUPER + ALT + S")
-o.bind("SUPER + ALT + S", "Send window to scratchpad 1", deck .. " send 1")
+-- Kept Omarchy's default scratchpad for SUPER + S (toggle) and SUPER + ALT + S (send window)
 
 for index = 1, 9 do
   o.bind(
@@ -113,3 +109,18 @@ end
 
 o.bind("SUPER + CTRL + SLASH", "Next scratchpad", deck .. " next")
 -- tiertek.scratchpad-deck: end
+
+-- >>> omarchy-flow managed hotkeys >>>
+-- Managed by Omarchy Flow. Configure these in the Flow settings menu.
+hl.unbind("SUPER + ALT + V")
+o.bind("SUPER + ALT + V", "Flow: Toggle dictation", "omarchy-shell io.github.ef-code.omarchy-flow.service toggle")
+hl.unbind("SUPER + ALT + SHIFT + V")
+o.bind("SUPER + ALT + SHIFT + V", "Flow: Dictate & submit", "omarchy-shell io.github.ef-code.omarchy-flow.service toggleSubmit")
+hl.unbind("F6")
+o.bind("F6", "Flow: Push to talk", "omarchy-shell io.github.ef-code.omarchy-flow.service start")
+o.bind("F6", "Flow: Push to talk (release)", "omarchy-shell io.github.ef-code.omarchy-flow.service stop", { release = true })
+hl.unbind("SUPER + ALT + P")
+o.bind("SUPER + ALT + P", "Flow: Pause / resume", "omarchy-shell io.github.ef-code.omarchy-flow.service pause")
+hl.unbind("SUPER + ALT + C")
+o.bind("SUPER + ALT + C", "Flow: Cancel recording", "omarchy-shell io.github.ef-code.omarchy-flow.service cancel")
+-- <<< omarchy-flow managed hotkeys <<<

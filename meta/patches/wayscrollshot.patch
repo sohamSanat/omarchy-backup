@@ -1,0 +1,402 @@
+diff --git i/Cargo.lock w/Cargo.lock
+index 4c56e26..3413cbb 100644
+--- i/Cargo.lock
++++ w/Cargo.lock
+@@ -706,8 +706,7 @@ checksum = "fc0fef456e4baa96da950455cd02c081ca953b141298e41db3fc7e36b1da849c"
+ [[package]]
+ name = "hora"
+ version = "0.1.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "c42c851d1dc97de92a1a50574295b1b36f0a9443cb33e05eb379147bd34bf1ff"
++source = "git+https://github.com/hora-search/hora?rev=239bd366693cd4fabf11c30786139ea9cc5cf40f#239bd366693cd4fabf11c30786139ea9cc5cf40f"
+ dependencies = [
+  "bincode",
+  "fixedbitset",
+diff --git i/Cargo.toml w/Cargo.toml
+index b5057ac..99ef692 100644
+--- i/Cargo.toml
++++ w/Cargo.toml
+@@ -8,7 +8,7 @@ anyhow = "1"
+ chrono = "0.4"
+ clap = { version = "4", features = ["derive"] }
+ env_logger = "0.11"
+-hora = "0.1"
++hora = { git = "https://github.com/hora-search/hora", rev = "239bd366693cd4fabf11c30786139ea9cc5cf40f" }
+ image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+ imageproc = "0.24"
+ log = "0.4"
+diff --git i/src/constants.rs w/src/constants.rs
+index 6101e36..a6accb5 100644
+--- i/src/constants.rs
++++ w/src/constants.rs
+@@ -1,7 +1,7 @@
+-/// Default preview width in pixels.
+-pub const PREVIEW_MAX_WIDTH: u32 = 280;
++/// Default preview / control bar width in pixels.
++pub const PREVIEW_MAX_WIDTH: u32 = 72;
+ /// Height of the overlay control bar in pixels.
+-pub const CONTROL_BAR_HEIGHT: u32 = 36;
++pub const CONTROL_BAR_HEIGHT: u32 = 26;
+ /// Border width for the selected capture region overlay.
+ pub const REGION_BORDER_WIDTH: u32 = 2;
+ /// Border color (RGBA) for the selected capture region overlay.
+diff --git i/src/overlay.rs w/src/overlay.rs
+index d02b0aa..86a534c 100644
+--- i/src/overlay.rs
++++ w/src/overlay.rs
+@@ -37,15 +37,15 @@ use crate::types::{LayerMessage, PreviewImage, Region, UserCommand};
+ mod drawing;
+ mod placement;
+ 
+-use drawing::{blit_preview_bottom, draw_control_bar};
++use drawing::draw_control_bar;
+ use placement::{
+     compute_layer_margins, find_output_by_id, output_rects_from_state, probe_output_rects,
+     select_output_for_region, OutputRect,
+ };
+ 
+-const CONTROL_BUTTON_COUNT: u32 = 4;
++const CONTROL_BUTTON_COUNT: u32 = 2;
+ const INITIAL_HEIGHT: u32 = CONTROL_BAR_HEIGHT;
+-const PREVIEW_GAP: i32 = 8;
++const PREVIEW_GAP: i32 = 16;
+ 
+ pub struct LayerShellOverlay {
+     tx: Option<mpsc::Sender<LayerMessage>>,
+@@ -115,7 +115,6 @@ struct LayerPreview {
+     region: Region,
+     configured: bool,
+     exit: bool,
+-    preview: Option<PreviewImage>,
+     command_tx: mpsc::Sender<UserCommand>,
+     paused: bool,
+     keyboard: Option<wl_keyboard::WlKeyboard>,
+@@ -136,31 +135,8 @@ impl LayerPreview {
+         self.layer.set_margin(margin_top, 0, 0, margin_left);
+     }
+ 
+-    fn desired_size_from_preview(&self, preview: &PreviewImage) -> (u32, u32) {
+-        let target_width = preview.width.max(1);
+-        let max_preview_height = self.max_height.saturating_sub(CONTROL_BAR_HEIGHT);
+-        let display_preview_height = preview.height.min(max_preview_height);
+-        let target_height = display_preview_height
+-            .saturating_add(CONTROL_BAR_HEIGHT)
+-            .max(1);
+-        (target_width, target_height)
+-    }
+-
+-    fn update_preview(&mut self, qh: &QueueHandle<Self>, preview: PreviewImage) {
+-        let (target_width, target_height) = self.desired_size_from_preview(&preview);
+-        let size_changed = self.width != target_width || self.height != target_height;
+-
+-        self.preview = Some(preview);
+-
+-        if size_changed {
+-            self.width = target_width;
+-            self.height = target_height;
+-            self.layer.set_size(self.width, self.height);
+-            self.update_position();
+-            self.update_input_region();
+-        }
+-
+-        self.request_redraw(qh);
++    fn update_preview(&mut self, _qh: &QueueHandle<Self>, _preview: PreviewImage) {
++        // Preview image display is removed; keep only the compact control bar.
+     }
+ 
+     fn set_paused(&mut self, qh: &QueueHandle<Self>, paused: bool) {
+@@ -178,8 +154,8 @@ impl LayerPreview {
+             self.input_region
+                 .subtract(0, old_y as i32, old_w as i32, old_h as i32);
+         }
+-        // Control bar is at the bottom
+-        let bar_y = self.height.saturating_sub(bar_height);
++        // Control bar fills the overlay height
++        let bar_y = 0;
+         self.input_region
+             .add(0, bar_y as i32, width as i32, bar_height as i32);
+         self.input_size = Some((width, bar_height, bar_y));
+@@ -226,27 +202,12 @@ impl LayerPreview {
+ 
+         canvas.fill(0);
+ 
+-        // Draw preview - show bottom part if preview is taller than available space
+-        if let Some(preview) = &self.preview {
+-            if preview.width != self.width {
+-                log::warn!(
+-                    "preview width mismatch: {} vs {}",
+-                    preview.width,
+-                    self.width
+-                );
+-            } else {
+-                let available_height = self.height.saturating_sub(CONTROL_BAR_HEIGHT);
+-                blit_preview_bottom(canvas, self.width, available_height, preview);
+-            }
+-        }
+-
+-        // Draw control bar at the bottom
+-        let bar_y = self.height.saturating_sub(CONTROL_BAR_HEIGHT);
++        // Draw control bar
+         draw_control_bar(
+             canvas,
+             self.width,
+             self.height,
+-            bar_y,
++            0,
+             self.paused,
+             self.hover_button,
+         );
+@@ -273,13 +234,7 @@ impl LayerPreview {
+         if self.width == 0 {
+             return;
+         }
+-        if position.1 < 0.0 || position.0 < 0.0 {
+-            return;
+-        }
+-
+-        // Control bar is at the bottom
+-        let bar_y = self.height.saturating_sub(CONTROL_BAR_HEIGHT) as f64;
+-        if position.1 < bar_y || position.1 >= self.height as f64 {
++        if position.1 < 0.0 || position.0 < 0.0 || position.1 >= self.height as f64 {
+             return;
+         }
+ 
+@@ -292,8 +247,6 @@ impl LayerPreview {
+         };
+         let command = match index {
+             0 => UserCommand::Save,
+-            1 => UserCommand::Copy,
+-            2 => UserCommand::TogglePause,
+             _ => UserCommand::Cancel,
+         };
+         self.handle_command(qh, command);
+@@ -304,9 +257,8 @@ impl LayerPreview {
+             return;
+         }
+ 
+-        let bar_y = self.height.saturating_sub(CONTROL_BAR_HEIGHT) as f64;
+         let new_hover = if position.0 >= 0.0
+-            && position.1 >= bar_y
++            && position.1 >= 0.0
+             && position.1 < self.height as f64
+             && position.0 < self.width as f64
+         {
+@@ -432,18 +384,10 @@ impl LayerShellHandler for LayerPreview {
+         configure: LayerSurfaceConfigure,
+         _serial: u32,
+     ) {
+-        let (desired_w, desired_h) = self
+-            .preview
+-            .as_ref()
+-            .map(|preview| self.desired_size_from_preview(preview))
+-            .unwrap_or((self.width.max(1), self.height.max(1)));
+-        if configure.new_size.0 == 0 || configure.new_size.1 == 0 {
+-            self.width = desired_w;
+-            self.height = desired_h;
+-        } else {
++        if configure.new_size.0 != 0 {
+             self.width = configure.new_size.0;
+-            self.height = configure.new_size.1;
+         }
++        self.height = CONTROL_BAR_HEIGHT;
+         self.configured = true;
+         self.layer.set_size(self.width, self.height);
+         self.update_position();
+@@ -554,9 +498,7 @@ impl KeyboardHandler for LayerPreview {
+         if let Some(text) = event.utf8.as_deref() {
+             match text {
+                 "s" | "S" => self.handle_command(qh, UserCommand::Save),
+-                "c" | "C" => self.handle_command(qh, UserCommand::Copy),
+-                "q" | "Q" => self.handle_command(qh, UserCommand::Cancel),
+-                " " => self.handle_command(qh, UserCommand::TogglePause),
++                "q" | "Q" | "x" | "X" => self.handle_command(qh, UserCommand::Cancel),
+                 _ => {}
+             }
+         }
+@@ -721,7 +663,6 @@ fn run_layer_shell_overlay(
+         region,
+         configured: false,
+         exit: false,
+-        preview: None,
+         command_tx,
+         paused: false,
+         keyboard: None,
+diff --git i/src/overlay/drawing.rs w/src/overlay/drawing.rs
+index e13b5fc..ab52c63 100644
+--- i/src/overlay/drawing.rs
++++ w/src/overlay/drawing.rs
+@@ -3,21 +3,18 @@ use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
+ use crate::constants::CONTROL_BAR_HEIGHT;
+ use crate::types::PreviewImage;
+ 
+-const CONTROL_BUTTON_COUNT: u32 = 4;
++const CONTROL_BUTTON_COUNT: u32 = 2;
+ const COLOR_SAVE: [u8; 4] = [39, 174, 96, 230];
+-const COLOR_COPY: [u8; 4] = [52, 152, 219, 230];
+-const COLOR_PAUSE: [u8; 4] = [241, 196, 15, 230];
+-const COLOR_RESUME: [u8; 4] = [26, 188, 156, 230];
+ const COLOR_CANCEL: [u8; 4] = [231, 76, 60, 230];
+ const COLOR_LABEL: [u8; 4] = [255, 255, 255, 255];
+ 
+-/// Draws the control bar (Save/Copy/Pause/Cancel) at the bottom.
++/// Draws the control bar (Save/Cancel).
+ pub(super) fn draw_control_bar(
+     canvas: &mut [u8],
+     width: u32,
+     height: u32,
+     bar_y: u32,
+-    paused: bool,
++    _paused: bool,
+     hover_button: Option<u32>,
+ ) {
+     let bar_height = CONTROL_BAR_HEIGHT.min(height.saturating_sub(bar_y));
+@@ -32,7 +29,7 @@ pub(super) fn draw_control_bar(
+ 
+     let segment = (width / CONTROL_BUTTON_COUNT).max(1);
+     let padding = 2.0;
+-    let radius = 6.0;
++    let radius = 5.0;
+ 
+     for index in 0..CONTROL_BUTTON_COUNT {
+         let start_x = index * segment;
+@@ -49,14 +46,6 @@ pub(super) fn draw_control_bar(
+         let is_hovered = hover_button == Some(index);
+         let base_color = match index {
+             0 => COLOR_SAVE,
+-            1 => COLOR_COPY,
+-            2 => {
+-                if paused {
+-                    COLOR_RESUME
+-                } else {
+-                    COLOR_PAUSE
+-                }
+-            }
+             _ => COLOR_CANCEL,
+         };
+ 
+@@ -86,8 +75,6 @@ pub(super) fn draw_control_bar(
+ 
+         let label = match index {
+             0 => 'S',
+-            1 => 'C',
+-            2 => 'P',
+             _ => 'X',
+         };
+         let scale = ((bar_height as f32 - 8.0) / 7.0).max(1.0) as u32;
+@@ -173,6 +160,7 @@ fn draw_glyph_to_pixmap(pixmap: &mut Pixmap, x: u32, y: u32, scale: u32, ch: cha
+     }
+ }
+ 
++#[allow(dead_code)]
+ pub(super) fn blit_preview_bottom(
+     canvas: &mut [u8],
+     canvas_width: u32,
+diff --git i/src/overlay/placement.rs w/src/overlay/placement.rs
+index 745e821..985a0f3 100644
+--- i/src/overlay/placement.rs
++++ w/src/overlay/placement.rs
+@@ -174,6 +174,22 @@ fn compute_preview_margin_left(region: &Region, preview_width: u32, outputs: &[O
+     i64_to_i32_saturating(clamped)
+ }
+ 
++fn compute_preview_margin_top(region: &Region, bar_height: u32, outputs: &[OutputRect]) -> i32 {
++    let bar_height_i64 = i64::from(bar_height);
++    let top_candidate = i64::from(region.y);
++
++    let Some(output) = select_output_for_region(region, outputs) else {
++        return i64_to_i32_saturating(top_candidate);
++    };
++
++    let output_top = i64::from(output.y);
++    let output_bottom = i64::from(output.bottom());
++    let max_top = output_bottom.saturating_sub(bar_height_i64);
++
++    let clamped = top_candidate.clamp(output_top, max_top.max(output_top));
++    i64_to_i32_saturating(clamped)
++}
++
+ /// Computes layer-shell margins using the selected output as coordinate origin.
+ pub(crate) fn compute_layer_margins(
+     region: &Region,
+@@ -181,13 +197,14 @@ pub(crate) fn compute_layer_margins(
+     outputs: &[OutputRect],
+ ) -> (i32, i32) {
+     let left_global = compute_preview_margin_left(region, preview_width, outputs);
++    let top_global = compute_preview_margin_top(region, crate::constants::CONTROL_BAR_HEIGHT, outputs);
+     if let Some(output) = select_output_for_region(region, outputs) {
+         (
+-            region.y.saturating_sub(output.y),
++            top_global.saturating_sub(output.y),
+             left_global.saturating_sub(output.x),
+         )
+     } else {
+-        (region.y, left_global)
++        (top_global, left_global)
+     }
+ }
+ 
+@@ -338,4 +355,24 @@ mod tests {
+ 
+         assert_eq!(left, 50 + 120 + PREVIEW_GAP);
+     }
++
++    #[test]
++    fn aligns_control_bar_to_top_of_region() {
++        let outputs = [output(0, 0, 1920, 1080)];
++        let region = region(200, 100, 400, 300);
++
++        let top = super::compute_preview_margin_top(&region, 26, &outputs);
++
++        assert_eq!(top, 100);
++    }
++
++    #[test]
++    fn clamps_control_bar_top_within_screen() {
++        let outputs = [output(0, 0, 1920, 1080)];
++        let region = region(200, 1070, 400, 300);
++
++        let top = super::compute_preview_margin_top(&region, 26, &outputs);
++
++        assert_eq!(top, 1080 - 26);
++    }
+ }
+diff --git i/src/session.rs w/src/session.rs
+index 79d83f7..5e6448b 100644
+--- i/src/session.rs
++++ w/src/session.rs
+@@ -12,7 +12,7 @@ use crate::cli::{Algorithm, Args};
+ use crate::output::{copy_to_clipboard, save_image};
+ use crate::overlay::LayerShellOverlay;
+ use crate::region_overlay::RegionOverlay;
+-use crate::stitch::{build_preview, init_opencv_runtime, MatchConfig, StitchOutcome, Stitcher};
++use crate::stitch::{init_opencv_runtime, MatchConfig, StitchOutcome, Stitcher};
+ use crate::types::{Control, LayerMessage, Region, StitchState, UserCommand};
+ 
+ const CAPTURE_INTERVAL: Duration = Duration::from_millis(45);
+@@ -292,23 +292,16 @@ fn spawn_capture_worker(
+     })
+ }
+ 
+-/// Applies a successful stitch update and publishes preview frame.
++/// Applies a successful stitch update.
+ fn apply_state_update(
+     state: &Arc<Mutex<StitchState>>,
+     stitcher: &Stitcher,
+     message: String,
+-    preview_tx: Option<&mpsc::Sender<LayerMessage>>,
+-    preview_width: u32,
++    _preview_tx: Option<&mpsc::Sender<LayerMessage>>,
++    _preview_width: u32,
+ ) {
+-    let preview = stitcher
+-        .full_image()
+-        .map(|img| build_preview(img.as_ref(), preview_width));
+-    if let (Some(tx), Some(preview)) = (preview_tx, preview.as_ref()) {
+-        let _ = tx.send(LayerMessage::Preview(preview.clone()));
+-    }
+     let mut st = state.lock().expect("state lock");
+     st.full_image = stitcher.full_image();
+-    st.preview = preview;
+     st.stats = stitcher.stats();
+     st.last_message = message;
+     st.last_error = None;

@@ -1,0 +1,1169 @@
+#!/usr/bin/env python3
+"""Unit tests for the Omarchy Flow backend and command dispatcher."""
+
+import importlib.util
+import json
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+import warnings
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
+
+warnings.simplefilter("ignore", DeprecationWarning)
+
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+spec = importlib.util.spec_from_file_location(
+    "flow_backend", REPO_ROOT / "scripts" / "gemini-dictate.py"
+)
+backend = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(backend)
+
+
+def file_mode(path):
+    return stat.S_IMODE(os.stat(path).st_mode)
+
+
+def process_is_running(pid):
+    try:
+        state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+        return state != "Z"
+    except (OSError, IndexError):
+        return False
+
+
+class TestFlowBackend(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        root = Path(self.temp_dir.name)
+        self.config_home = root / "config"
+        self.runtime_home = root / "runtime"
+        self.state_home = root / "state"
+        self.legacy_runtime = root / "legacy-runtime"
+        for directory in [
+            self.config_home,
+            self.runtime_home,
+            self.state_home,
+            self.legacy_runtime,
+        ]:
+            directory.mkdir(mode=0o700)
+
+        self.config_dir = self.config_home / "omarchy-flow"
+        self.legacy_config_dir = self.config_home / "gemini-pill"
+        self.config_dir.mkdir(mode=0o700)
+        self.legacy_config_dir.mkdir(mode=0o700)
+
+        self.backend_paths = {
+            name: getattr(backend, name)
+            for name in [
+                "XDG_CONFIG_HOME",
+                "XDG_RUNTIME_DIR",
+                "XDG_STATE_HOME",
+                "CONFIG_DIR",
+                "LEGACY_CONFIG_DIR",
+                "RUNTIME_DIR",
+                "STATE_DIR",
+                "LOG_FILE",
+                "TEMP_AUDIO",
+                "PID_FILE",
+                "STATE_FILE",
+                "LOCK_FILE",
+                "MODEL_FILE",
+                "LEGACY_MODEL_FILE",
+                "SETTINGS_FILE",
+                "LEGACY_RUNTIME_DIR",
+                "LEGACY_TEMP_AUDIO",
+                "LEGACY_PID_FILE",
+                "LEGACY_STATE_FILE",
+                "QUOTA_MARKER_FILE",
+            ]
+        }
+
+        backend.XDG_CONFIG_HOME = str(self.config_home)
+        backend.XDG_RUNTIME_DIR = str(self.runtime_home)
+        backend.XDG_STATE_HOME = str(self.state_home)
+        backend.CONFIG_DIR = str(self.config_dir)
+        backend.LEGACY_CONFIG_DIR = str(self.legacy_config_dir)
+        backend.RUNTIME_DIR = str(self.runtime_home / "omarchy-flow")
+        backend.STATE_DIR = str(self.state_home / "omarchy-flow")
+        Path(backend.RUNTIME_DIR).mkdir(mode=0o700)
+        Path(backend.STATE_DIR).mkdir(mode=0o700)
+        backend.LOG_FILE = str(Path(backend.STATE_DIR) / "flow.log")
+        backend.QUOTA_MARKER_FILE = str(Path(backend.STATE_DIR) / "transcribe_quota_exceeded")
+        backend.TEMP_AUDIO = str(Path(backend.RUNTIME_DIR) / "recording.wav")
+        backend.PID_FILE = str(Path(backend.RUNTIME_DIR) / "recording.pid")
+        backend.STATE_FILE = str(Path(backend.RUNTIME_DIR) / "state.json")
+        backend.LOCK_FILE = str(Path(backend.RUNTIME_DIR) / "operation.lock")
+        backend.MODEL_FILE = str(self.config_dir / "selected_model.txt")
+        backend.LEGACY_MODEL_FILE = str(self.legacy_config_dir / "selected_model.txt")
+        backend.SETTINGS_FILE = str(self.config_dir / "settings.json")
+        backend.LEGACY_RUNTIME_DIR = str(self.legacy_runtime)
+        backend.LEGACY_TEMP_AUDIO = str(self.legacy_runtime / "gemini_dictation.wav")
+        backend.LEGACY_PID_FILE = str(self.legacy_runtime / "gemini_dictation.pid")
+        backend.LEGACY_STATE_FILE = str(self.legacy_runtime / "gemini_dictation.state")
+
+        self.child_env = os.environ.copy()
+        self.child_env.update(
+            {
+                "XDG_CONFIG_HOME": str(self.config_home),
+                "XDG_RUNTIME_DIR": str(self.runtime_home),
+                "XDG_STATE_HOME": str(self.state_home),
+                "OMARCHY_FLOW_PYTHON": sys.executable,
+            }
+        )
+
+    def tearDown(self):
+        for name, value in self.backend_paths.items():
+            setattr(backend, name, value)
+        self.temp_dir.cleanup()
+
+    def test_supported_models_list(self):
+        model_ids = [model["id"] for model in backend.SUPPORTED_MODELS]
+        self.assertEqual(len(model_ids), 4)
+        self.assertEqual(
+            model_ids,
+            [
+                "whisper-base.en",
+                "gemini-3.5-flash-lite",
+                "gemini-3.5-transcribe",
+                "gemini-3.8-flash",
+            ],
+        )
+
+    def test_virtualenv_package_discovery_preserves_priority_order(self):
+        original_path = list(sys.path)
+
+        def fake_glob(pattern):
+            if "active-env" in pattern:
+                return ["/active-env/lib/python3.14/site-packages"]
+            return []
+
+        with patch.dict(os.environ, {"VIRTUAL_ENV": "/active-env"}), patch.object(
+            backend.glob, "glob", side_effect=fake_glob
+        ), patch.object(backend.os.path, "isdir", return_value=True):
+            backend._ensure_venv_packages()
+
+        self.assertEqual(sys.path[0], "/active-env/lib/python3.14/site-packages")
+        sys.path[:] = original_path
+
+    def test_private_directory_rejects_foreign_owner(self):
+        foreign = SimpleNamespace(st_mode=stat.S_IFDIR | 0o777, st_uid=os.getuid() + 1)
+        with patch.object(backend.os, "lstat", return_value=foreign), patch.object(
+            backend.os, "makedirs"
+        ):
+            with self.assertRaisesRegex(OSError, "not owned"):
+                backend._ensure_private_dir("/tmp/foreign-runtime")
+
+    def test_get_and_set_selected_model(self):
+        self.assertEqual(backend.get_selected_model(), "whisper-base.en")
+        self.assertTrue(backend.set_selected_model("gemini-3.5-transcribe"))
+        self.assertEqual(backend.get_selected_model(), "gemini-3.5-transcribe")
+        self.assertEqual(Path(backend.MODEL_FILE).read_text().strip(), "gemini-3.5-transcribe")
+        self.assertEqual(Path(backend.LEGACY_MODEL_FILE).read_text().strip(), "gemini-3.5-transcribe")
+        self.assertEqual(file_mode(backend.MODEL_FILE), 0o600)
+
+    def test_private_read_accepts_directory_link_count_one(self):
+        path = Path(backend.MODEL_FILE)
+        path.write_text("gemini-3.5-transcribe\n")
+        os.chmod(path, 0o600)
+        real_fstat = backend.os.fstat
+        calls = 0
+
+        def btrfs_like_fstat(fd):
+            nonlocal calls
+            info = real_fstat(fd)
+            calls += 1
+            if calls == 1:
+                return SimpleNamespace(
+                    st_mode=info.st_mode, st_uid=info.st_uid,
+                    st_nlink=1, st_size=info.st_size,
+                )
+            return info
+
+        with patch.object(backend.os, "fstat", side_effect=btrfs_like_fstat):
+            self.assertEqual(
+                backend._read_owned_text(str(path)),
+                "gemini-3.5-transcribe\n",
+            )
+
+    def test_invalid_model_is_rejected_and_falls_back(self):
+        self.assertFalse(backend.set_selected_model("not-a-real-model"))
+        Path(backend.MODEL_FILE).write_text("not-a-real-model\n")
+        os.chmod(backend.MODEL_FILE, 0o600)
+        self.assertEqual(backend.get_selected_model(), "whisper-base.en")
+        Path(backend.LEGACY_MODEL_FILE).write_text("removed-model\n")
+        os.chmod(backend.LEGACY_MODEL_FILE, 0o600)
+        self.assertEqual(backend.get_selected_model(), "whisper-base.en")
+
+    def test_settings_defaults_and_persistence(self):
+        settings = backend.get_settings()
+        self.assertEqual(settings["toggle_action"], "transcribe")
+        self.assertEqual(settings["audio_source"], "default")
+        self.assertTrue(settings["copy_to_clipboard"])
+        self.assertTrue(backend.set_setting("toggle_action", "submit"))
+        self.assertTrue(backend.set_setting("copy_to_clipboard", "false"))
+        self.assertTrue(backend.set_setting("hotkeys.toggle", "ctrl + shift + f6"))
+        updated = backend.get_settings()
+        self.assertEqual(updated["toggle_action"], "submit")
+        self.assertFalse(updated["copy_to_clipboard"])
+        self.assertEqual(updated["hotkeys"]["toggle"], "CTRL + SHIFT + F6")
+        self.assertEqual(file_mode(backend.SETTINGS_FILE), 0o600)
+
+    def test_settings_reject_invalid_values(self):
+        original = backend.get_settings()
+        self.assertFalse(backend.set_setting("toggle_action", "send-email"))
+        self.assertFalse(backend.set_setting("audio_source", "source with spaces"))
+        self.assertFalse(backend.set_setting("hud_position", "left"))
+        self.assertFalse(backend.set_setting("hotkeys.toggle", "SUPER + SUPER + V"))
+        self.assertEqual(backend.get_settings(), original)
+
+    def test_audio_source_listing_filters_non_input_nodes(self):
+        pactl_output = json.dumps([
+            {
+                "name": "speaker.monitor",
+                "description": "Monitor",
+                "properties": {"media.class": "Audio/Sink"},
+            },
+            {
+                "name": "desk-mic",
+                "description": "Desk microphone",
+                "properties": {"media.class": "Audio/Source"},
+            },
+        ])
+        result = subprocess.CompletedProcess(args=[], returncode=0, stdout=pactl_output, stderr="")
+        with patch.object(backend, "_run_captured", return_value=result):
+            sources = backend.list_audio_sources()
+        self.assertEqual(sources, [
+            {"id": "default", "name": "System default"},
+            {"id": "desk-mic", "name": "Desk microphone"},
+        ])
+
+    def test_cloud_diagnostics_require_google_sdk(self):
+        self.assertTrue(backend.set_selected_model("gemini-3.5-transcribe"))
+        with patch.object(backend.shutil, "which", return_value="/usr/bin/tool"), patch.object(
+            backend.importlib.util, "find_spec", return_value=None
+        ), patch.object(backend, "get_gemini_api_key", return_value="configured-key"), patch.object(
+            backend, "list_audio_sources", return_value=[{"id": "default", "name": "System default"}]
+        ):
+            report = backend.diagnostics()
+
+        sdk_check = next(check for check in report["checks"] if check["id"] == "google-genai")
+        self.assertFalse(sdk_check["ok"])
+        self.assertFalse(report["ok"])
+
+    def test_local_diagnostics_require_downloaded_voxtype_model(self):
+        model_list = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="Installed Whisper Models\n\n  tiny.en (75 MB)\n"
+        )
+        with patch.object(backend.shutil, "which", return_value="/usr/bin/tool"), patch.object(
+            backend, "_run_captured", return_value=model_list
+        ), patch.object(
+            backend, "list_audio_sources", return_value=[{"id": "default", "name": "System default"}]
+        ):
+            report = backend.diagnostics()
+
+        model_check = next(check for check in report["checks"] if check["id"] == "voxtype-model")
+        self.assertFalse(model_check["ok"])
+        self.assertIn("base.en", model_check["detail"])
+        self.assertFalse(report["ok"])
+
+        model_list.stdout += "  base.en (141 MB) - Good balance\n"
+        with patch.object(backend.shutil, "which", return_value="/usr/bin/tool"), patch.object(
+            backend, "_run_captured", return_value=model_list
+        ), patch.object(
+            backend, "list_audio_sources", return_value=[{"id": "default", "name": "System default"}]
+        ):
+            report = backend.diagnostics()
+
+        model_check = next(check for check in report["checks"] if check["id"] == "voxtype-model")
+        self.assertTrue(model_check["ok"])
+        self.assertTrue(report["ok"])
+
+    def test_toggle_uses_saved_completion_action(self):
+        self.assertTrue(backend.set_setting("toggle_action", "submit"))
+        with patch.object(backend, "_active_recording_pids", return_value=[12345]), patch.object(
+            backend, "_stop_recording", return_value=True
+        ) as stop:
+            self.assertTrue(backend.toggle_recording())
+        stop.assert_called_once_with(auto_submit=True, pids=[12345])
+
+    def test_apply_hotkeys_writes_managed_block(self):
+        reload_ok = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+        def fake_run(args, **kwargs):
+            if args == ["hyprctl", "reload"] or args == ["hyprctl", "configerrors"]:
+                return reload_ok
+            raise AssertionError(f"unexpected subprocess call: {args}")
+
+        with patch.object(backend, "_run_captured", side_effect=fake_run):
+            self.assertTrue(backend.apply_hotkeys({
+                "toggle": "SUPER + ALT + F6",
+                "toggle_submit": "",
+                "push_to_talk": "F7",
+                "pause": "SUPER + ALT + P",
+                "cancel": "SUPER + ALT + C",
+            }))
+
+        bindings_path = Path(backend.XDG_CONFIG_HOME) / "hypr" / "bindings.lua"
+        content = bindings_path.read_text()
+        self.assertIn(backend.HOTKEY_MARKER_START, content)
+        self.assertIn('o.bind("SUPER + ALT + F6"', content)
+        self.assertIn('o.bind("F7", "Flow: Push to talk (release)"', content)
+        self.assertIn(
+            '"omarchy-shell io.github.ef-code.omarchy-flow.service toggle"', content
+        )
+        self.assertIn(
+            '"omarchy-shell io.github.ef-code.omarchy-flow.service stop"', content
+        )
+        self.assertNotIn("quickshell ipc call", content)
+        self.assertNotIn("toggleSubmit", content)
+        self.assertEqual(backend.get_settings()["hotkeys"]["toggle_submit"], "")
+
+    def test_reset_settings_restores_every_preference_with_installed_hotkeys(self):
+        reload_ok = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+        self.assertTrue(backend.set_setting("toggle_action", "submit"))
+        self.assertTrue(backend.set_setting("copy_to_clipboard", "false"))
+        self.assertTrue(backend.set_setting("hud_enabled", "false"))
+
+        with patch.object(backend, "_run_captured", return_value=reload_ok):
+            self.assertTrue(backend.apply_hotkeys({"toggle": "SUPER + ALT + F6"}))
+            self.assertTrue(backend.reset_settings())
+
+        self.assertEqual(backend.get_settings(), backend.DEFAULT_SETTINGS)
+
+    def test_remove_hotkeys_preserves_unrelated_bindings(self):
+        bindings_path = Path(backend.XDG_CONFIG_HOME) / "hypr" / "bindings.lua"
+        bindings_path.parent.mkdir(parents=True, mode=0o700)
+        bindings_path.write_text(
+            "o.bind(\"SUPER + T\", \"Terminal\", \"foot\")\n\n"
+            + backend._hotkey_block(backend.DEFAULT_SETTINGS["hotkeys"])
+            + "\n\no.bind(\"SUPER + B\", \"Browser\", \"brave\")\n"
+        )
+        reload_ok = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+        with patch.object(backend, "_run_captured", return_value=reload_ok):
+            self.assertTrue(backend.remove_hotkeys())
+
+        content = bindings_path.read_text()
+        self.assertIn('o.bind("SUPER + T"', content)
+        self.assertIn('o.bind("SUPER + B"', content)
+        self.assertNotIn(backend.HOTKEY_MARKER_START, content)
+        self.assertNotIn(backend.HOTKEY_MARKER_END, content)
+
+    def test_migrate_hotkeys_refreshes_only_an_existing_managed_block(self):
+        bindings_path = Path(backend.XDG_CONFIG_HOME) / "hypr" / "bindings.lua"
+        bindings_path.parent.mkdir(parents=True, mode=0o700)
+        bindings_path.write_text(
+            "o.bind(\"SUPER + T\", \"Terminal\", \"foot\")\n\n"
+            + backend.HOTKEY_MARKER_START
+            + "\n-- old Flow block\n"
+            + 'o.bind("F6", "Flow: Push to talk", "quickshell ipc call old.target start")\n'
+            + backend.HOTKEY_MARKER_END
+            + "\n"
+        )
+        reload_ok = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+        with patch.object(backend, "_run_captured", return_value=reload_ok):
+            self.assertTrue(backend.migrate_hotkeys())
+
+        content = bindings_path.read_text()
+        self.assertIn('o.bind("SUPER + T"', content)
+        self.assertIn("omarchy-shell io.github.ef-code.omarchy-flow.service start", content)
+        self.assertNotIn("old.target", content)
+
+        bindings_path.unlink()
+        with patch.object(backend, "apply_hotkeys") as apply:
+            self.assertTrue(backend.migrate_hotkeys())
+        apply.assert_not_called()
+
+    def test_get_current_state(self):
+        state = backend.get_current_state()
+        self.assertEqual(set(state), {"recording", "paused", "model"})
+        self.assertFalse(state["recording"])
+        self.assertFalse(state["paused"])
+
+    def test_update_runtime_state(self):
+        backend.update_runtime_state("recording", paused=True, pid=12345)
+        data = json.loads(Path(backend.STATE_FILE).read_text())
+        self.assertEqual(data["status"], "recording")
+        self.assertTrue(data["paused"])
+        self.assertEqual(data["pid"], 12345)
+        self.assertEqual(file_mode(backend.STATE_FILE), 0o600)
+
+    def test_runtime_model_is_pinned_across_pause_updates(self):
+        backend.update_runtime_state(
+            "recording", paused=False, pid=12345, model="gemini-3.5-transcribe"
+        )
+        with patch.object(backend, "get_selected_model", return_value="gemini-3.8-flash"):
+            backend.update_runtime_state("paused", paused=True, pid=12345)
+        data = json.loads(Path(backend.STATE_FILE).read_text())
+        self.assertEqual(data["model"], "gemini-3.5-transcribe")
+
+    def test_legacy_pid_marker_failure_does_not_block_recording_state(self):
+        original_write = backend._write_private_text
+
+        def fail_legacy(path, content):
+            if path == backend.LEGACY_PID_FILE:
+                raise OSError("legacy path unavailable")
+            return original_write(path, content)
+
+        with patch.object(backend, "_write_private_text", side_effect=fail_legacy):
+            backend._write_pid_markers(4242)
+
+        self.assertEqual(Path(backend.PID_FILE).read_text().strip(), "4242")
+        self.assertEqual(file_mode(backend.PID_FILE), 0o600)
+        self.assertFalse(Path(backend.LEGACY_PID_FILE).exists())
+
+    def test_api_key_lookup_env(self):
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test_env_key_123456789"}):
+            self.assertEqual(backend.get_gemini_api_key(), "test_env_key_123456789")
+
+    def test_api_key_lookup_secure_file_only(self):
+        key_file = Path(backend.CONFIG_DIR) / "gemini_api_key"
+        key_file.write_text("test_file_key_987654321\n")
+        os.chmod(key_file, 0o600)
+        failed_lookup = subprocess.CompletedProcess(
+            args=[], returncode=1, stdout="", stderr=""
+        )
+        with patch.dict(os.environ, {"GEMINI_API_KEY": ""}), patch.object(
+            backend, "_run_captured", return_value=failed_lookup
+        ):
+            self.assertEqual(backend.get_gemini_api_key(), "test_file_key_987654321")
+
+        os.chmod(key_file, 0o644)
+        with patch.dict(os.environ, {"GEMINI_API_KEY": ""}), patch.object(
+            backend, "_run_captured", return_value=failed_lookup
+        ):
+            self.assertIsNone(backend.get_gemini_api_key())
+
+    def test_is_recording_rejects_stale_and_pid_reuse_markers(self):
+        Path(backend.PID_FILE).write_text("9999999\n")
+        self.assertFalse(backend.is_recording())
+
+    def test_recorder_identity_accepts_held_fd_output_shape(self):
+        command = [
+            "ffmpeg", "-loglevel", "error", "-f", "pulse", "-i", "default",
+            "-t", "600", "-fs", "20971520", "-ar", "16000", "-ac", "1",
+            "-f", "wav", "-y", "/proc/self/fd/7",
+        ]
+        with patch.object(backend, "_process_alive", return_value=True), patch.object(
+            backend.os, "stat", return_value=SimpleNamespace(st_uid=os.getuid())
+        ), patch.object(backend, "_process_cmdline", return_value=command):
+            self.assertTrue(backend._is_recorder_process(4242))
+        self.assertFalse(Path(backend.PID_FILE).exists())
+
+        Path(backend.PID_FILE).write_text(f"{os.getpid()}\n")
+        self.assertFalse(backend.is_recording())
+        self.assertFalse(Path(backend.PID_FILE).exists())
+
+    def test_cancel_recording_cleanup(self):
+        for path in [
+            backend.PID_FILE,
+            backend.LEGACY_PID_FILE,
+            backend.STATE_FILE,
+            backend.LEGACY_STATE_FILE,
+        ]:
+            Path(path).write_text("9999999\n")
+        for path in [backend.TEMP_AUDIO, backend.LEGACY_TEMP_AUDIO]:
+            Path(path).write_bytes(b"dummy audio content")
+
+        with patch.object(backend, "pill_ipc"):
+            self.assertTrue(backend.cancel_recording())
+        for path in [
+            backend.PID_FILE,
+            backend.LEGACY_PID_FILE,
+            backend.STATE_FILE,
+            backend.LEGACY_STATE_FILE,
+            backend.TEMP_AUDIO,
+            backend.LEGACY_TEMP_AUDIO,
+        ]:
+            self.assertFalse(Path(path).exists())
+
+    def test_stop_without_recorder_cleans_orphaned_audio(self):
+        Path(backend.TEMP_AUDIO).write_bytes(b"orphaned audio")
+        with patch.object(backend, "pill_ipc"):
+            self.assertFalse(backend.stop_recording())
+        self.assertFalse(Path(backend.TEMP_AUDIO).exists())
+
+    def test_flowctl_uses_isolated_xdg_state_and_validates_arguments(self):
+        flowctl = REPO_ROOT / "scripts" / "flowctl"
+        set_result = subprocess.run(
+            [str(flowctl), "model", "gemini-3.8-flash"],
+            env=self.child_env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(set_result.returncode, 0, set_result.stderr)
+        get_result = subprocess.run(
+            [str(flowctl), "model"],
+            env=self.child_env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(get_result.returncode, 0, get_result.stderr)
+        self.assertEqual(get_result.stdout.strip(), "gemini-3.8-flash")
+
+        invalid = subprocess.run(
+            [str(flowctl), "model", "unsupported", "extra"],
+            env=self.child_env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(invalid.returncode, 0)
+
+        unknown = subprocess.run(
+            [str(flowctl), "not-a-command"],
+            env=self.child_env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(unknown.returncode, 0)
+
+        remove_result = subprocess.run(
+            [str(flowctl), "remove-hotkeys"],
+            env=self.child_env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(remove_result.returncode, 0, remove_result.stderr)
+
+    def test_extract_voxtype_text(self):
+        output = (
+            "\x1b[32mLoading model\x1b[0m\n"
+            "Transcription completed in 0.42s\n"
+            "  Hello, world.  \n"
+        )
+        self.assertEqual(backend._extract_voxtype_text(output), "Hello, world.")
+
+    def test_apply_word_replacements_guards_common_words(self):
+        corrupted = {
+            "the": "takes",
+            "thanks": "takes",
+            "taste": "takes",
+            "wrong": "run",
+            "magic": "omarchy",
+            "march": "omarchy",
+            "omarchi": "omarchy",
+            "voxtype": "Voxtype",
+        }
+        text = "Thanks for the help, something is wrong with the magic wand in March, but omarchi and voxtype work."
+        result = backend._apply_word_replacements(text, corrupted)
+        self.assertEqual(
+            result,
+            "Thanks for the help, something is wrong with the magic wand in March, but omarchy and Voxtype work.",
+        )
+
+    def test_local_transcription_checks_exit_code(self):
+        success = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="Transcription completed in 0.1s\nHello"
+        )
+        with patch.object(backend, "_run_captured", return_value=success) as run:
+            self.assertEqual(backend._transcribe_local("recording.wav"), "Hello")
+        self.assertEqual(
+            run.call_args.args[0],
+            ["voxtype", "--model", "base.en", "transcribe", "recording.wav"],
+        )
+        self.assertEqual(run.call_args.kwargs["timeout"], 120)
+
+        failure = subprocess.CompletedProcess(args=[], returncode=1, stdout="")
+        with patch.object(backend, "_run_captured", return_value=failure):
+            with self.assertRaises(RuntimeError):
+                backend._transcribe_local("recording.wav")
+
+    def test_dedicated_cloud_transcription_uses_inline_audio(self):
+        interaction = SimpleNamespace(output_text="  Cloud result  ")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            with patch.object(
+                backend, "get_gemini_api_key", return_value="api-key-123456789"
+            ), patch("google.genai.Client") as client_type:
+                client = client_type.return_value
+                client.interactions.create.return_value = interaction
+                result = backend._cloud_transcription_operation(
+                    b"RIFF test", "gemini-3.5-transcribe", "api-key-123456789"
+                )
+
+        self.assertEqual(result, "Cloud result")
+        self.assertEqual(
+            client_type.call_args.kwargs["http_options"].timeout,
+            backend.NETWORK_TIMEOUT_MS,
+        )
+        self.assertEqual(
+            client_type.call_args.kwargs["http_options"].retry_options.attempts,
+            1,
+        )
+        client.files.upload.assert_not_called()
+        client.files.delete.assert_not_called()
+        call = client.interactions.create.call_args
+        self.assertEqual(call.kwargs["model"], "gemini-3.5-transcribe")
+        self.assertEqual(
+            call.kwargs["input"],
+            [{"type": "audio", "data": "UklGRiB0ZXN0", "mime_type": "audio/wav"}],
+        )
+        self.assertFalse(call.kwargs["store"])
+        self.assertEqual(
+            call.kwargs["generation_config"]["transcription_config"]["mode"],
+            "smart",
+        )
+
+    def test_dedicated_cloud_transcription_falls_back_to_flash_lite_on_interactions_failure(self):
+        response = SimpleNamespace(text="Flash lite fallback result")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            with patch.object(
+                backend, "get_gemini_api_key", return_value="api-key-123456789"
+            ), patch("google.genai.Client") as client_type:
+                client = client_type.return_value
+                client.interactions.create.side_effect = RuntimeError("429 RESOURCE_EXHAUSTED")
+                client.models.generate_content.return_value = response
+                result = backend._cloud_transcription_operation(
+                    b"RIFF test", "gemini-3.5-transcribe", "api-key-123456789"
+                )
+
+        self.assertEqual(result, "Flash lite fallback result")
+        call = client.models.generate_content.call_args
+        self.assertEqual(call.kwargs["model"], "gemini-3.5-flash-lite")
+
+    def test_flash_cloud_transcription_uses_low_thinking(self):
+        response = SimpleNamespace(text="Flash result")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            with patch("google.genai.Client") as client_type:
+                client = client_type.return_value
+                client.models.generate_content.return_value = response
+                result = backend._cloud_transcription_operation(
+                    b"RIFF test", "gemini-3.8-flash", "api-key-123456789"
+                )
+
+        self.assertEqual(result, "Flash result")
+        call = client.models.generate_content.call_args
+        self.assertEqual(call.kwargs["model"], "gemini-3.8-flash")
+        self.assertEqual(call.kwargs["config"].thinking_config.thinking_level.value, "LOW")
+        self.assertTrue(call.kwargs["config"].automatic_function_calling.disable)
+
+    def test_model_dispatch_rejects_unknown_model(self):
+        with self.assertRaises(ValueError):
+            backend._transcribe_audio("recording.wav", "unsupported-model")
+
+    def test_cloud_transcription_rejects_oversized_audio_before_upload(self):
+        audio = Path(backend.TEMP_AUDIO)
+        with audio.open("wb") as handle:
+            handle.truncate(backend.MAX_AUDIO_BYTES + 1)
+        with patch.object(
+            backend, "get_gemini_api_key", return_value="api-key-123456789"
+        ), patch("google.genai.Client") as client_type:
+            with self.assertRaisesRegex(ValueError, "byte limit"):
+                backend._transcribe_cloud(str(audio), "gemini-3.5-transcribe")
+        client_type.return_value.files.upload.assert_not_called()
+
+    def test_captured_output_limit_stops_the_producer(self):
+        for stream in ["stdout", "stderr"]:
+            with self.subTest(stream=stream):
+                command = [
+                    sys.executable, "-c",
+                    f"import sys; sys.{stream}.buffer.write(b'x' * 8192)",
+                ]
+                with self.assertRaises(backend.CapturedOutputLimitError):
+                    backend._run_captured(command, timeout=2, max_output_bytes=1024)
+
+    def test_subprocess_boundary_excludes_credentials_and_ignores_path(self):
+        hostile_dir = Path(self.temp_dir.name) / "hostile-bin"
+        hostile_dir.mkdir()
+        fake_helper = hostile_dir / "flow-untrusted-helper"
+        fake_helper.write_text("#!/bin/sh\nexit 0\n")
+        fake_helper.chmod(0o755)
+        source = {
+            "PATH": str(hostile_dir),
+            "GEMINI_API_KEY": "must-not-leak",
+            "AWS_SECRET_ACCESS_KEY": "must-not-leak-either",
+            "WAYLAND_DISPLAY": "wayland-test",
+            "LD_PRELOAD": "/tmp/evil.so",
+        }
+        child_env = backend._safe_subprocess_env(source)
+        self.assertEqual(child_env["WAYLAND_DISPLAY"], "wayland-test")
+        self.assertEqual(child_env["PATH"], "/usr/bin")
+        self.assertNotIn("GEMINI_API_KEY", child_env)
+        self.assertNotIn("AWS_SECRET_ACCESS_KEY", child_env)
+        self.assertNotIn("LD_PRELOAD", child_env)
+        with patch.dict(os.environ, source, clear=True):
+            with self.assertRaises(FileNotFoundError):
+                backend._run_captured(["flow-untrusted-helper"], timeout=1)
+            with self.assertRaises(FileNotFoundError):
+                backend._run_captured([str(fake_helper)], timeout=1)
+            result = backend._run_captured(["/usr/bin/env"], timeout=1, text=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("must-not-leak", result.stdout)
+        self.assertNotIn("GEMINI_API_KEY", result.stdout)
+        self.assertIn("WAYLAND_DISPLAY=wayland-test", result.stdout)
+
+    def test_captured_timeout_kills_descendants_after_leader_exits(self):
+        pid_file = Path(self.temp_dir.name) / "descendant.pid"
+        command = [
+            "bash", "-c",
+            f'trap "" TERM; sleep 30 & echo $! > "{pid_file}"; exit 0',
+        ]
+        with self.assertRaises(subprocess.TimeoutExpired):
+            backend._run_captured(command, timeout=0.2, max_output_bytes=1024)
+        descendant = int(pid_file.read_text())
+        deadline = time.monotonic() + 1
+        while process_is_running(descendant) and time.monotonic() < deadline:
+            time.sleep(0.02)
+        self.assertFalse(process_is_running(descendant))
+
+    def test_captured_timeout_kills_descendant_in_nested_session(self):
+        pid_file = Path(self.temp_dir.name) / "nested-session.pid"
+        command = [
+            sys.executable, "-c",
+            "import pathlib,subprocess,time; "
+            f"p=subprocess.Popen(['sleep','30'],start_new_session=True); pathlib.Path({str(pid_file)!r}).write_text(str(p.pid)); "
+            "time.sleep(30)",
+        ]
+        with self.assertRaises(subprocess.TimeoutExpired):
+            backend._run_captured(command, timeout=0.3, max_output_bytes=1024)
+        descendant = int(pid_file.read_text())
+        self.assertFalse(process_is_running(descendant))
+
+    def test_captured_timeout_kills_reparented_nested_pipe_holder(self):
+        pid_file = Path(self.temp_dir.name) / "reparented-nested-session.pid"
+        command = [
+            sys.executable, "-c",
+            "import pathlib,subprocess; "
+            f"p=subprocess.Popen(['sleep','30'],start_new_session=True); pathlib.Path({str(pid_file)!r}).write_text(str(p.pid))",
+        ]
+        with self.assertRaises(subprocess.TimeoutExpired):
+            backend._run_captured(command, timeout=0.3, max_output_bytes=1024)
+        descendant = int(pid_file.read_text())
+        self.assertFalse(process_is_running(descendant))
+
+    def test_captured_success_preserves_detached_child_without_output_pipes(self):
+        pid_file = Path(self.temp_dir.name) / "successful-detached.pid"
+        command = [
+            sys.executable, "-c",
+            "import subprocess,sys; "
+            "p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)'], "
+            "stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL, "
+            "start_new_session=True); "
+            f"open({str(pid_file)!r},'w').write(str(p.pid))",
+        ]
+        result = backend._run_captured(command, timeout=2, max_output_bytes=1024)
+        self.assertEqual(result.returncode, 0)
+        child_pid = int(pid_file.read_text())
+        try:
+            self.assertTrue(process_is_running(child_pid))
+        finally:
+            try:
+                os.kill(child_pid, 9)
+            except OSError:
+                pass
+
+    def test_cloud_deadline_kills_blocked_worker(self):
+        audio = Path(backend.TEMP_AUDIO)
+        audio.write_bytes(b"R" * 1200)
+        pid_file = Path(self.temp_dir.name) / "cloud-worker.pid"
+
+        def blocked_worker(connection, audio_bytes, model_choice, api_key):
+            pid_file.write_text(str(os.getpid()))
+            time.sleep(30)
+
+        with patch.object(backend, "get_gemini_api_key", return_value="api-key"), patch.object(
+            backend, "TRANSCRIBE_DEADLINE_SECONDS", 0.2
+        ), patch.object(backend, "_cloud_transcription_worker", blocked_worker):
+            started = time.monotonic()
+            with self.assertRaisesRegex(TimeoutError, "deadline"):
+                backend._transcribe_cloud(str(audio), "gemini-3.5-transcribe")
+            self.assertLess(time.monotonic() - started, 1.5)
+
+        worker_pid = int(pid_file.read_text())
+        self.assertFalse(process_is_running(worker_pid))
+
+    def test_cloud_timeout_after_upload_attempts_bounded_cleanup(self):
+        audio = Path(backend.TEMP_AUDIO)
+        audio.write_bytes(b"R" * 1200)
+        cleanup_marker = Path(self.temp_dir.name) / "cleanup-name"
+
+        def uploaded_then_blocked(connection, audio_bytes, model_choice, api_key):
+            connection.send_bytes(json.dumps({
+                "event": "uploaded", "name": "uploaded-audio",
+            }).encode())
+            time.sleep(30)
+
+        def record_cleanup(name, api_key):
+            cleanup_marker.write_text(name)
+
+        with patch.object(backend, "get_gemini_api_key", return_value="api-key"), patch.object(
+            backend, "TRANSCRIBE_DEADLINE_SECONDS", 0.4
+        ), patch.object(backend, "CLOUD_CLEANUP_RESERVE_SECONDS", 0.2), patch.object(
+            backend, "_cloud_transcription_worker", uploaded_then_blocked
+        ), patch.object(backend, "_cloud_delete_worker", record_cleanup):
+            with self.assertRaisesRegex(TimeoutError, "deadline"):
+                backend._transcribe_cloud(str(audio), "gemini-3.5-transcribe")
+
+        self.assertEqual(cleanup_marker.read_text(), "uploaded-audio")
+
+    def test_cloud_deadline_includes_key_lookup(self):
+        audio = Path(backend.TEMP_AUDIO)
+        audio.write_bytes(b"R" * 1200)
+
+        def slow_key_lookup(deadline=None):
+            time.sleep(0.15)
+            return "api-key"
+
+        with patch.object(backend, "get_gemini_api_key", side_effect=slow_key_lookup), patch.object(
+            backend, "TRANSCRIBE_DEADLINE_SECONDS", 0.1
+        ):
+            started = time.monotonic()
+            with self.assertRaisesRegex(TimeoutError, "deadline"):
+                backend._transcribe_cloud(str(audio), "gemini-3.5-transcribe")
+            self.assertLess(time.monotonic() - started, 0.3)
+
+    def test_cloud_cleanup_failure_is_retried_by_parent(self):
+        audio = Path(backend.TEMP_AUDIO)
+        audio.write_bytes(b"R" * 1200)
+        cleanup_marker = Path(self.temp_dir.name) / "cleanup-retry"
+
+        def completed_with_cleanup_needed(connection, audio_bytes, model_choice, api_key):
+            connection.send_bytes(json.dumps({
+                "event": "cleanup_needed", "name": "uploaded-audio",
+            }).encode())
+            connection.send_bytes(json.dumps({"ok": True, "text": "hello"}).encode())
+            connection.close()
+
+        def record_cleanup(name, api_key):
+            cleanup_marker.write_text(name)
+
+        with patch.object(backend, "get_gemini_api_key", return_value="api-key"), patch.object(
+            backend, "TRANSCRIBE_DEADLINE_SECONDS", 1
+        ), patch.object(
+            backend, "_cloud_transcription_worker", completed_with_cleanup_needed
+        ), patch.object(backend, "_cloud_delete_worker", record_cleanup):
+            self.assertEqual(
+                backend._transcribe_cloud(str(audio), "gemini-3.5-transcribe"), "hello"
+            )
+        self.assertEqual(cleanup_marker.read_text(), "uploaded-audio")
+
+    def test_transcribing_status_does_not_expose_model_name(self):
+        Path(backend.TEMP_AUDIO).write_bytes(b"R" * 1200)
+        with patch.object(backend, "_terminate_recorder", return_value=True), patch.object(
+            backend, "get_selected_model", return_value="gemini-3.5-transcribe"
+        ), patch.object(backend, "_transcribe_audio", return_value="hello"), patch.object(
+            backend, "_inject_text", return_value=True
+        ), patch.object(backend, "pill_ipc") as ipc:
+            self.assertTrue(backend._stop_recording(pids=[4242]))
+
+        ipc.assert_any_call("setTranscribing", "Transcribing...")
+        self.assertFalse(
+            any("gemini-3.5-transcribe" in str(call.args) for call in ipc.call_args_list)
+        )
+
+    def test_stop_rejects_oversized_audio_before_any_transcriber(self):
+        with Path(backend.TEMP_AUDIO).open("wb") as handle:
+            handle.truncate(backend.MAX_AUDIO_BYTES + 1)
+        with patch.object(backend, "_terminate_recorder", return_value=True), patch.object(
+            backend, "_transcribe_audio"
+        ) as transcribe, patch.object(backend, "pill_ipc") as ipc:
+            self.assertFalse(backend._stop_recording(pids=[4242]))
+        transcribe.assert_not_called()
+        ipc.assert_any_call("setStatus", "Audio too long")
+
+    def test_stop_transcribes_audio_after_capped_recorder_exits(self):
+        Path(backend.TEMP_AUDIO).write_bytes(b"R" * 1200)
+        backend.update_runtime_state("recording", paused=False, pid=4242)
+        with patch.object(backend, "_process_alive", return_value=False), patch.object(
+            backend, "_transcribe_audio", return_value="completed text"
+        ) as transcribe, patch.object(
+            backend, "_inject_text", return_value=True
+        ), patch.object(backend, "pill_ipc"):
+            self.assertTrue(backend._stop_recording())
+        transcribe.assert_called_once_with(backend.TEMP_AUDIO, backend.DEFAULT_MODEL_ID)
+        self.assertFalse(Path(backend.TEMP_AUDIO).exists())
+
+    def test_stop_uses_model_pinned_when_recording_started(self):
+        Path(backend.TEMP_AUDIO).write_bytes(b"R" * 1200)
+        backend.update_runtime_state(
+            "recording", paused=False, pid=4242, model="gemini-3.5-transcribe"
+        )
+        with patch.object(backend, "get_selected_model", return_value="gemini-3.8-flash"), patch.object(
+            backend, "_terminate_recorder", return_value=True
+        ), patch.object(
+            backend, "_transcribe_audio", return_value="pinned text"
+        ) as transcribe, patch.object(
+            backend, "_inject_text", return_value=True
+        ), patch.object(backend, "pill_ipc"):
+            self.assertTrue(backend._stop_recording(pids=[4242]))
+        transcribe.assert_called_once_with(backend.TEMP_AUDIO, "gemini-3.5-transcribe")
+
+    def test_stop_resolves_exclusive_capture_before_clearing_state(self):
+        target, _capture_dir, capture_fd = backend._create_exclusive_capture_target()
+        os.close(capture_fd)
+        backend.update_runtime_state(
+            "recording", paused=False, pid=4242, audio_path=target,
+            model="whisper-base.en",
+        )
+
+        def finalize_recording(_pid, _signal):
+            Path(target).write_bytes(b"R" * 1200)
+            return True
+
+        with patch.object(backend, "_terminate_recorder", side_effect=finalize_recording), patch.object(
+            backend, "_transcribe_audio", return_value="exclusive text"
+        ) as transcribe, patch.object(
+            backend, "_inject_text", return_value=True
+        ), patch.object(backend, "pill_ipc"):
+            self.assertTrue(backend._stop_recording(pids=[4242]))
+        transcribe.assert_called_once_with(target, "whisper-base.en")
+        self.assertFalse(Path(target).exists())
+
+    def test_status_poll_preserves_completed_capped_recording(self):
+        Path(backend.TEMP_AUDIO).write_bytes(b"R" * 1200)
+        backend.update_runtime_state("recording", paused=False, pid=4242)
+        with patch.object(backend, "_process_alive", return_value=False):
+            self.assertFalse(backend.is_recording())
+        self.assertTrue(Path(backend.STATE_FILE).exists())
+        self.assertTrue(backend._completed_recording_available())
+
+    def test_inject_text_checks_keyboard_commands(self):
+        calls = []
+
+        def fake_run(args, **kwargs):
+            calls.append((args, kwargs))
+            return subprocess.CompletedProcess(args=args, returncode=0)
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "must-not-leak"}), patch(
+            "subprocess.run", side_effect=fake_run
+        ), patch.object(backend.time, "sleep"):
+            self.assertTrue(backend._inject_text("hello", auto_submit=True))
+
+        self.assertEqual(
+            [call[0] for call in calls],
+            [
+                ["/usr/bin/wl-copy", "--sensitive"],
+                ["/usr/bin/wtype", "-s", "40", "-d", "1", "--", "hello"],
+                ["/usr/bin/wtype", "-k", "Return"],
+            ],
+        )
+        self.assertEqual(calls[0][1]["input"], "hello")
+        self.assertEqual(calls[1][0][-1], "hello")
+        for _args, kwargs in calls:
+            self.assertNotIn("GEMINI_API_KEY", kwargs["env"])
+
+        def wtype_failure(args, **kwargs):
+            code = 1 if args[0] == "/usr/bin/wtype" else 0
+            return subprocess.CompletedProcess(args=args, returncode=code)
+
+        with patch("subprocess.run", side_effect=wtype_failure):
+            self.assertFalse(backend._inject_text("hello"))
+
+    def test_inject_text_preserves_full_character_set_in_long_text(self):
+        long_text = (
+            "No more takes for the: The word replacement table has been cleaned, and the "
+            "code now actively blocks replacing everyday English words even if accidentally "
+            "added in the future. Clear, unclipped audio: Microphone volume is normalized to 100%, "
+            "removing the harsh digital saturation that was confusing the acoustic model."
+        )
+        self.assertGreater(len(long_text), 100)
+        # Verify characters previously dropped by stdin 100-char chunking are present
+        for ch in ["u", "g", "z", "C", "E"]:
+            self.assertIn(ch, long_text)
+
+        calls = []
+
+        def fake_run(args, **kwargs):
+            calls.append((args, kwargs))
+            return subprocess.CompletedProcess(args=args, returncode=0)
+
+        with patch("subprocess.run", side_effect=fake_run):
+            self.assertTrue(backend._inject_text(long_text, auto_submit=False))
+
+        wtype_call = next(c for c in calls if c[0][0] == "/usr/bin/wtype")
+        self.assertIn("-s", wtype_call[0])
+        self.assertIn("-d", wtype_call[0])
+        self.assertIn("--", wtype_call[0])
+        self.assertEqual(wtype_call[0][-1], long_text)
+
+    def test_start_recording_is_private_and_single_instance(self):
+        process = SimpleNamespace(pid=4242, returncode=None, poll=lambda: None)
+        with patch.object(
+            backend, "_is_recorder_process", side_effect=lambda pid: pid == 4242
+        ), patch.object(backend, "_process_start_ticks", return_value=1234), patch.object(
+            backend, "pill_ipc"
+        ), patch.object(backend.time, "sleep"), patch(
+            "subprocess.Popen", return_value=process
+        ) as popen:
+            self.assertTrue(backend.start_recording())
+            self.assertFalse(backend.start_recording())
+
+        self.assertEqual(popen.call_count, 1)
+        command = popen.call_args.args[0]
+        self.assertEqual(command[0], "/usr/bin/ffmpeg")
+        self.assertEqual(
+            command[command.index("-f") : command.index("-f") + 4],
+            ["-f", "pulse", "-i", "default"],
+        )
+        self.assertEqual(command[command.index("-t") + 1], str(backend.MAX_RECORDING_SECONDS))
+        self.assertEqual(command[command.index("-fs") + 1], str(backend.MAX_AUDIO_BYTES))
+        self.assertNotIn(data_path := json.loads(Path(backend.STATE_FILE).read_text())["audio_path"], command)
+        self.assertTrue(Path(data_path).is_file())
+        self.assertEqual(command[-4:-1], ["-f", "wav", "-y"])
+        self.assertTrue(command[-1].startswith("/proc/self/fd/"))
+        self.assertEqual(tuple(popen.call_args.kwargs["pass_fds"]), (int(command[-1].rsplit("/", 1)[1]),))
+        self.assertEqual(popen.call_args.kwargs["umask"], 0o077)
+        self.assertNotIn("GEMINI_API_KEY", popen.call_args.kwargs["env"])
+        self.assertEqual(file_mode(backend.PID_FILE), 0o600)
+        data = json.loads(Path(backend.STATE_FILE).read_text())
+        self.assertEqual(data["pid"], 4242)
+        self.assertEqual(data["start_ticks"], 1234)
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg required")
+    def test_held_recording_fd_produces_decodable_wav(self):
+        target, _capture_dir, capture_fd = backend._create_exclusive_capture_target()
+        try:
+            result = subprocess.run(
+                [
+                    "ffmpeg", "-loglevel", "error", "-f", "lavfi",
+                    "-i", "sine=frequency=440:duration=0.05",
+                    "-ar", "16000", "-ac", "1", "-f", "wav", "-y",
+                    f"/proc/self/fd/{capture_fd}",
+                ],
+                pass_fds=(capture_fd,), capture_output=True,
+            )
+        finally:
+            os.close(capture_fd)
+        self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "stream=codec_name", "-of", "json", target],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(probe.returncode, 0, probe.stderr)
+        self.assertEqual(json.loads(probe.stdout)["streams"][0]["codec_name"], "pcm_s16le")
+        import wave
+        with wave.open(target, "rb") as wav:
+            self.assertEqual(wav.getframerate(), 16000)
+            self.assertEqual(wav.getnchannels(), 1)
+            self.assertGreater(wav.getnframes(), 0)
+            self.assertLess(wav.getnframes(), 16000)
+
+    def test_audio_test_uses_the_held_capture_inode(self):
+        def fake_run(command, **kwargs):
+            inherited_fd = kwargs["pass_fds"][0]
+            self.assertEqual(command[-1], f"/proc/self/fd/{inherited_fd}")
+            self.assertEqual(command[-2], "-y")
+            os.write(inherited_fd, b"R" * 1200)
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with patch.object(backend.shutil, "which", return_value="/usr/bin/ffmpeg"), patch.object(
+            backend, "_run_captured", side_effect=fake_run
+        ):
+            self.assertTrue(backend.run_audio_test()["ok"])
+
+    def test_start_recording_rejects_low_free_space_before_spawning(self):
+        usage = SimpleNamespace(free=backend.MAX_AUDIO_BYTES)
+        with patch.object(backend, "is_recording", return_value=False), patch.object(
+            backend.shutil, "disk_usage", return_value=usage
+        ), patch("subprocess.Popen") as popen, patch.object(backend, "pill_ipc") as ipc:
+            self.assertFalse(backend.start_recording())
+        popen.assert_not_called()
+        ipc.assert_any_call("setStatus", "Storage Full")
+
+    def test_qml_action_and_status_contracts(self):
+        bar = (REPO_ROOT / "BarWidget.qml").read_text()
+        pill = (REPO_ROOT / "Pill.qml").read_text()
+        service = (REPO_ROOT / "Service.qml").read_text()
+        settings = (REPO_ROOT / "SettingsView.qml").read_text()
+
+        transcribe_button = bar[bar.index('text: "Transcribe"') :]
+        self.assertIn('onClicked: root.closeAfterAction("stop")', transcribe_button[:500])
+        self.assertIn('root.stateMode = "status"', pill)
+        self.assertIn('if (root.stateMode === "status") return root.statusText', pill)
+        self.assertIn('function refreshModel(): string', pill)
+        self.assertIn('return geminiHandler.refreshModel()', pill)
+        self.assertNotIn('function setModel(modelId: string)', pill)
+        self.assertIn('pill_ipc("refreshModel")', (REPO_ROOT / "scripts" / "gemini-dictate.py").read_text())
+        self.assertIn('root.selectedModel = root.sanitizedModelId(modelData.id)', pill)
+        self.assertIn('if (!loadModelProcess.running && !saveModelProcess.running)', pill)
+        self.assertIn('if (menuOpen) root.refreshStatus()', bar)
+        self.assertIn("property var actionQueue", service)
+        self.assertIn('return "queued"', service)
+        self.assertIn('command: [root.flowctlPath, "qml", "migrate-hotkeys"]', service)
+        self.assertIn("property var settingWriteQueue", settings)
+        self.assertIn("root.settingWriteQueue.push(command)", settings)
+        self.assertIn('command: [root.flowctlPath, "qml", "remove-hotkeys"]', settings)
+        for source in [bar, pill, service, settings]:
+            self.assertIn('root.flowctlPath, "qml"', source)
+        for source in [bar, pill, settings, (REPO_ROOT / "scripts" / "gemini-dictate.py").read_text()]:
+            self.assertIn("gemini-3.8-flash", source)
+            self.assertNotIn("gemini-3.7-flash", source)
+
+    def test_qml_flowctl_caps_producer_output(self):
+        noisy = [
+            sys.executable, "-c",
+            "import sys; sys.stdout.buffer.write(b'x'*100000); "
+            "sys.stderr.buffer.write(b'y'*100000)",
+        ]
+        self.assertIsNone(backend._run_qml_command(noisy))
+        bounded = backend._run_qml_command(
+            [sys.executable, "-c", "print('{\\\"ok\\\":true}')"]
+        )
+        self.assertEqual(bounded, b'{"ok":true}\n')
+
+        for _ in range(20):
+            self.assertEqual(
+                backend._run_qml_command([sys.executable, "-c", "print('ok')"]),
+                b"ok\n",
+            )
+
+        result = subprocess.run(
+            [str(REPO_ROOT / "scripts" / "flowctl"), "qml", "status"],
+            env=self.child_env, capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr.decode())
+        self.assertLessEqual(len(result.stdout), backend.MAX_QML_OUTPUT_BYTES)
+        self.assertEqual(result.stderr, b"")
+        self.assertIn("recording", json.loads(result.stdout))
+        model = subprocess.run(
+            [str(REPO_ROOT / "scripts" / "flowctl"), "qml", "model"],
+            env=self.child_env, capture_output=True, text=True,
+        )
+        self.assertEqual(model.returncode, 0, model.stderr)
+        self.assertEqual(model.stdout.strip(), backend.DEFAULT_MODEL_ID)
+
+    def test_qml_gateway_deadlines_cover_legitimate_actions(self):
+        seen = []
+
+        def capture(command, timeout):
+            seen.append((command[-1], timeout))
+            return b""
+
+        with patch.object(backend, "_run_qml_command", side_effect=capture):
+            for action in ("stop", "apply-hotkeys", "migrate-hotkeys", "status"):
+                self.assertTrue(backend._qml_gateway([action]))
+        self.assertEqual(dict(seen), {
+            "stop": 125,
+            "apply-hotkeys": 20,
+            "migrate-hotkeys": 20,
+            "status": 2,
+        })
+
+    def test_release_version_is_synchronised(self):
+        manifest = json.loads((REPO_ROOT / "manifest.json").read_text())
+        settings = (REPO_ROOT / "SettingsView.qml").read_text()
+        changelog = (REPO_ROOT / "CHANGELOG.md").read_text()
+        security = (REPO_ROOT / "SECURITY.md").read_text()
+
+        self.assertEqual(manifest["version"], "0.4.0")
+        self.assertIn("Omarchy Flow 0.4.0", settings)
+        self.assertIn("## [0.4.0] - 2026-08-30", changelog)
+        self.assertIn("| 0.4.x", security)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

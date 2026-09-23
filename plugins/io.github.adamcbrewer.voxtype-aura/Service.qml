@@ -9,16 +9,35 @@ import qs.Commons
 Item {
   id: root
 
-  property string state: "idle"
+  property string state: "idle" // "idle", "recording", "transcribing", "success", "paused", "status"
+  property string stateSource: "" // "ipc" or "voxtype"
   property int animationFrame: 0
   property var audioSamples: []
+  property string customStatus: ""
 
-  readonly property bool active: state === "recording" || state === "transcribing" || state === "success"
+  readonly property bool active: state === "recording" || state === "transcribing" || state === "success" || state === "paused" || state === "status"
   readonly property color successColor: Qt.hsla(0.33, Math.max(0.35, Color.accent.hslSaturation), Color.accent.hslLightness, 1)
-  readonly property color stateColor: state === "recording" ? Color.urgent
-    : state === "success" ? successColor : Color.accent
-  readonly property string label: state === "recording" ? "LISTENING"
-    : state === "success" ? "TRANSCRIBED" : "TRANSCRIBING"
+  readonly property color stateColor: {
+    if (state === "recording") return Color.urgent
+    if (state === "success") return successColor
+    if (state === "paused") return Color.warning || "#F59E0B"
+    if (state === "status") return Color.warning || "#F59E0B"
+    return Color.accent
+  }
+  readonly property string stateIcon: {
+    if (state === "success") return "\uf00c"
+    if (state === "paused") return "\uf04c"
+    if (state === "status") return "\uf071"
+    return "\uf130"
+  }
+  readonly property string label: {
+    if (state === "recording") return "LISTENING"
+    if (state === "transcribing") return "TRANSCRIBING"
+    if (state === "success") return "TRANSCRIBED"
+    if (state === "paused") return "PAUSED"
+    if (state === "status") return root.customStatus ? root.customStatus.toUpperCase() : "STATUS"
+    return ""
+  }
   readonly property string focusedScreenName: Hyprland.focusedMonitor
     ? String(Hyprland.focusedMonitor.name || "") : ""
   readonly property var activeScreen: {
@@ -29,20 +48,22 @@ Item {
   }
 
   function update(raw) {
+    if (root.stateSource === "ipc" && root.active) return
     try {
       var data = JSON.parse(String(raw || "{}"))
       var nextState = String(data.alt || data.class || "idle")
       if (nextState === "recording" || nextState === "transcribing") {
+        root.stateSource = "voxtype"
         if (nextState === "recording" && state !== "recording") audioSamples = []
         if (nextState === "transcribing" && state !== "transcribing") animationFrame = 0
         state = nextState
       } else if (state === "transcribing") {
         state = "success"
-      } else if (state !== "success") {
+      } else if (state !== "success" && state !== "status" && state !== "paused") {
         state = "idle"
       }
     } catch (error) {
-      state = "idle"
+      if (root.stateSource !== "ipc") state = "idle"
     }
   }
 
@@ -60,7 +81,7 @@ Item {
   }
 
   function barHeight(index) {
-    if (state === "success") return 5
+    if (state === "success" || state === "paused" || state === "status") return 5
 
     if (state === "recording" && audioSamples.length) {
       var sampleIndex = Math.min(audioSamples.length - 1,
@@ -68,9 +89,89 @@ Item {
       return 5 + Math.min(1, audioSamples[sampleIndex] * 20) * 16
     }
 
+    if (state === "recording") {
+      var phase = (animationFrame * 0.25) + (index * 0.75)
+      var wave = (Math.sin(phase) + 1.0) * 0.5
+      return 5 + wave * 16
+    }
+
     var distance = Math.abs(index - (animationFrame % 15))
     distance = Math.min(distance, 15 - distance)
     return 5 + Math.max(0, 16 - distance * 5)
+  }
+
+  IpcHandler {
+    id: auraIpc
+    target: "io.github.adamcbrewer.voxtype-aura"
+
+    function setListening(): string {
+      root.stateSource = "ipc"
+      root.state = "recording"
+      root.audioSamples = []
+      root.customStatus = ""
+      return "ok"
+    }
+
+    function setPaused(): string {
+      root.stateSource = "ipc"
+      root.state = "paused"
+      return "ok"
+    }
+
+    function setResumed(): string {
+      root.stateSource = "ipc"
+      root.state = "recording"
+      return "ok"
+    }
+
+    function setTranscribing(text: string): string {
+      root.stateSource = "ipc"
+      root.animationFrame = 0
+      root.state = "transcribing"
+      root.customStatus = ""
+      return "ok"
+    }
+
+    function setDone(): string {
+      root.stateSource = "ipc"
+      root.state = "success"
+      successTimer.restart()
+      return "ok"
+    }
+
+    function setStatus(text: string): string {
+      root.stateSource = "ipc"
+      var s = String(text || "").trim()
+      if (s === "Done") {
+        root.state = "success"
+        successTimer.restart()
+      } else if (s.length > 0) {
+        root.customStatus = s
+        root.state = "status"
+        statusTimeout.restart()
+      } else {
+        root.state = "idle"
+      }
+      return "ok"
+    }
+
+    function hide(): string {
+      root.state = "idle"
+      root.stateSource = ""
+      return "ok"
+    }
+  }
+
+  IpcHandler {
+    target: "voxtype-aura"
+
+    function setListening(): string { return auraIpc.setListening() }
+    function setPaused(): string { return auraIpc.setPaused() }
+    function setResumed(): string { return auraIpc.setResumed() }
+    function setTranscribing(text: string): string { return auraIpc.setTranscribing(text) }
+    function setDone(): string { return auraIpc.setDone() }
+    function setStatus(text: string): string { return auraIpc.setStatus(text) }
+    function hide(): string { return auraIpc.hide() }
   }
 
   Process {
@@ -82,7 +183,9 @@ Item {
       onRead: function(data) { root.update(data) }
     }
     onExited: function() {
-      root.state = "idle"
+      if (root.stateSource !== "ipc") {
+        root.state = "idle"
+      }
       statusRetry.restart()
     }
   }
@@ -116,16 +219,30 @@ Item {
   }
 
   Timer {
-    interval: 80
+    interval: 60
     repeat: true
-    running: root.state === "transcribing"
+    running: root.state === "transcribing" || (root.state === "recording" && root.audioSamples.length === 0)
     onTriggered: root.animationFrame = (root.animationFrame + 1) % 120
   }
 
   Timer {
+    id: successTimer
     interval: 1300
     running: root.state === "success"
-    onTriggered: root.state = "idle"
+    onTriggered: {
+      root.state = "idle"
+      root.stateSource = ""
+    }
+  }
+
+  Timer {
+    id: statusTimeout
+    interval: 1800
+    running: root.state === "status"
+    onTriggered: {
+      root.state = "idle"
+      root.stateSource = ""
+    }
   }
 
   PanelWindow {
@@ -133,7 +250,7 @@ Item {
 
     screen: root.activeScreen
     visible: root.active && root.activeScreen !== null
-    implicitWidth: 320
+    implicitWidth: 340
     implicitHeight: 76
     anchors.top: true
     margins.top: Style.gapsOut
@@ -148,7 +265,7 @@ Item {
       id: glowSource
 
       visible: false
-      width: 292
+      width: 312
       height: 50
       anchors.centerIn: parent
       radius: Math.min(height / 2, Style.cornerRadius)
@@ -168,7 +285,7 @@ Item {
     }
 
     Rectangle {
-      width: 292
+      width: 312
       height: 50
       anchors.centerIn: parent
       radius: Math.min(height / 2, Style.cornerRadius)
@@ -180,14 +297,14 @@ Item {
         anchors.fill: parent
         anchors.leftMargin: 18
         anchors.rightMargin: 18
-        spacing: 18
+        spacing: 16
 
         Text {
           width: 24
           height: parent.height
           verticalAlignment: Text.AlignVCenter
           horizontalAlignment: Text.AlignHCenter
-          text: root.state === "success" ? "\uf00c" : "\uf130"
+          text: root.stateIcon
           color: root.stateColor
           font.family: Style.font.family
           font.pixelSize: 20
@@ -223,7 +340,7 @@ Item {
         }
 
         Text {
-          width: 116
+          width: 136
           height: parent.height
           verticalAlignment: Text.AlignVCenter
           horizontalAlignment: Text.AlignRight
@@ -233,6 +350,7 @@ Item {
           font.pixelSize: Style.font.caption
           font.weight: Font.Medium
           font.letterSpacing: 1.2
+          elide: Text.ElideRight
           renderType: Text.NativeRendering
         }
       }

@@ -9,10 +9,10 @@ bluez
 bluez-tools
 bluez-utils
 bolt
-brave-origin-nightly-bin
 brightnessctl
 btop
 btrfs-progs
+calf
 chntpw
 clang
 cups
@@ -21,6 +21,7 @@ cups-pk-helper
 ddcutil
 dosfstools
 dotnet-runtime
+easyeffects
 efibootmgr
 espeak-ng
 evince
@@ -32,7 +33,6 @@ fcitx5
 fcitx5-gtk
 fcitx5-qt
 fd
-fetch-git
 ffmpegthumbnailer
 flatpak
 fprintd
@@ -75,7 +75,6 @@ kdenlive
 kernel-modules-hook
 lazygit
 less
-libfprint-fpc1022
 libpulse
 libvips
 libyaml
@@ -85,12 +84,12 @@ linux-firmware
 linux-omarchy
 linux-omarchy-headers
 llvm
+lsp-plugins-lv2
 lua51
 luarocks
 man-db
 mariadb-libs
 meson
-meteobar-bin
 mise-bin
 mkinitcpio
 mpv
@@ -126,7 +125,6 @@ proton-vpn-cli
 proton-vpn-gtk-app
 python-gobject
 python-poetry-core
-qdirstat
 qemu-user-static-binfmt
 qrencode
 qt6-imageformats
@@ -142,6 +140,7 @@ speech-dispatcher
 spotifyd
 starship
 sudo
+sunshine
 sushi
 system-config-printer
 tensaku
