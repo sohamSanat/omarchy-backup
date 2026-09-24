@@ -5,7 +5,7 @@
 // input: 
 // output: CrinEar Daybreak
 function parseActivePreset(text) {
-  if (!text) return "";
+  if (!text) return null;
   var lines = String(text).split("\n");
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].trim();
@@ -14,7 +14,7 @@ function parseActivePreset(text) {
       return match[1].trim();
     }
   }
-  return "";
+  return null;
 }
 
 // Parse output of `easyeffects -b 3`
@@ -26,8 +26,9 @@ function parseBypass(text) {
   return val === "1";
 }
 
-// Parse preset filenames from find/ls
-// Strips .json and places Stock preset first
+// Parse output from `easyeffects --presets` or a find/ls file list.
+// Accept both the CLI's numbered format and plain filenames, then place the
+// stock preset first and sort the remaining presets alphabetically.
 function parsePresetList(output) {
   if (!output) return [];
   var lines = String(output).split("\n");
@@ -35,6 +36,11 @@ function parsePresetList(output) {
   for (var i = 0; i < lines.length; i++) {
     var name = lines[i].trim();
     if (!name) continue;
+    if (/^(?:Output|Input) presets:$/i.test(name) || /^No (?:input|output) presets\.$/i.test(name)) {
+      continue;
+    }
+    var numbered = name.match(/^\d+\s+(.*)$/);
+    if (numbered) name = numbered[1].trim();
     if (name.slice(-5) === ".json") {
       name = name.slice(0, -5);
     }
@@ -45,8 +51,8 @@ function parsePresetList(output) {
 
   // Sort with Stock first, then alphabetically
   list.sort(function(a, b) {
-    var isStockA = a.toLowerCase().indexOf("stock") !== -1;
-    var isStockB = b.toLowerCase().indexOf("stock") !== -1;
+    var isStockA = isStockPreset(a);
+    var isStockB = isStockPreset(b);
     if (isStockA && !isStockB) return -1;
     if (!isStockA && isStockB) return 1;
     return a.localeCompare(b);
@@ -54,3 +60,19 @@ function parsePresetList(output) {
 
   return list;
 }
+
+// Check if a preset name is the protected stock baseline preset
+function isStockPreset(name) {
+  if (!name) return false;
+  return String(name).toLowerCase().indexOf("stock") !== -1;
+}
+
+// Find stock preset from the list
+function findStockPreset(presets) {
+  if (!presets || !presets.length) return "";
+  for (var i = 0; i < presets.length; i++) {
+    if (isStockPreset(presets[i])) return presets[i];
+  }
+  return "";
+}
+

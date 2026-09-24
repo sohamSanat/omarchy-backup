@@ -1,0 +1,18 @@
+{
+  "output": {
+    "blocklist": [],
+    "equalizer": {
+      "bypass": true,
+      "input-gain": 0,
+      "output-gain": 0,
+      "mode": "IIR",
+      "num-bands": 0,
+      "split-channels": false,
+      "left": {},
+      "right": {}
+    },
+    "plugins_order": [
+      "equalizer"
+    ]
+  }
+}

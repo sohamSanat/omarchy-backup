@@ -253,6 +253,26 @@ if [[ -d "${SCRIPT_DIR}/configs/omarchy-flow" ]]; then
   fi
   echo "  [OK] Restored Omarchy Flow configurations: ~/.config/omarchy-flow/"
 fi
+if [[ -d "${SCRIPT_DIR}/configs/easyeffects" ]]; then
+  echo "  -> Restoring EasyEffects configuration, EQ presets, and device autoload profiles..."
+  if [[ -d "${SCRIPT_DIR}/configs/easyeffects/db" ]]; then
+    mkdir -p "${USER_HOME}/.config/easyeffects/db"
+    cp -a "${SCRIPT_DIR}/configs/easyeffects/db/." "${USER_HOME}/.config/easyeffects/db/"
+  fi
+  if [[ -d "${SCRIPT_DIR}/configs/easyeffects/output" ]]; then
+    mkdir -p "${USER_HOME}/.local/share/easyeffects/output"
+    cp -a "${SCRIPT_DIR}/configs/easyeffects/output/." "${USER_HOME}/.local/share/easyeffects/output/"
+  fi
+  if [[ -d "${SCRIPT_DIR}/configs/easyeffects/autoload" ]]; then
+    mkdir -p "${USER_HOME}/.local/share/easyeffects/autoload"
+    cp -a "${SCRIPT_DIR}/configs/easyeffects/autoload/." "${USER_HOME}/.local/share/easyeffects/autoload/"
+  fi
+  echo "  [OK] Restored EasyEffects configuration, presets, and autoload profiles"
+fi
+if [[ -f "${SCRIPT_DIR}/configs/autostart/easyeffects.desktop" ]]; then
+  mkdir -p "${USER_HOME}/.config/autostart"
+  cp -a "${SCRIPT_DIR}/configs/autostart/easyeffects.desktop" "${USER_HOME}/.config/autostart/"
+fi
 if [[ -f "${SCRIPT_DIR}/configs/brave/policies/managed/omarchy-ntp.json" ]]; then
   echo "  -> Restoring Brave Origin managed policies..."
   if [[ -w "/etc/brave/policies/managed" ]]; then
@@ -537,6 +557,9 @@ done
 find "${USER_HOME}/.config/omarchy/plugins" -type d -name scripts -exec chmod +x {}/* + 2>/dev/null || true
 if [[ -f "${USER_HOME}/.config/omarchy/plugins/tiertek.scratchpad-deck/bin/scratchpad-deck" ]]; then
   chmod +x "${USER_HOME}/.config/omarchy/plugins/tiertek.scratchpad-deck/bin/scratchpad-deck"
+fi
+if [[ -f "${USER_HOME}/.config/omarchy/plugins/soham.easyeffects/purge-preset.sh" ]]; then
+  chmod +x "${USER_HOME}/.config/omarchy/plugins/soham.easyeffects/purge-preset.sh"
 fi
 
 # Install node dependencies for plugins if needed (e.g. whatsapp daemon)

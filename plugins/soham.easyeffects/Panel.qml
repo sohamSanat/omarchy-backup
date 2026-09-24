@@ -11,11 +11,12 @@ Panel {
   ipcTarget: "soham.easyeffects"
 
   readonly property string home: Quickshell.env("HOME") || "/home/soham"
-  readonly property string presetDir: home + "/.local/share/easyeffects/output"
+  readonly property string pluginDir: home + "/.config/omarchy/plugins/soham.easyeffects"
 
   property var presets: []
   property string activePreset: ""
   property bool bypassed: false
+  property string presetToPurge: ""
 
   function refresh() {
     if (!statusProc.running) statusProc.running = true
@@ -24,14 +25,20 @@ Panel {
   }
 
   function setPreset(name) {
-    if (!name) return
-    root.activePreset = name
+    if (!name || setPresetProc.running) return
     setPresetProc.command = ["easyeffects", "-l", name]
     setPresetProc.running = true
   }
 
+  function purgePreset(name) {
+    if (!name) return
+    if (Model.isStockPreset(name)) return
+    purgeProc.command = [root.pluginDir + "/purge-preset.sh", name]
+    purgeProc.running = true
+  }
+
   function toggleBypass() {
-    root.bypassed = !root.bypassed
+    if (toggleBypassProc.running) return
     toggleBypassProc.running = true
   }
 
@@ -77,8 +84,8 @@ Panel {
       waitForEnd: true
       onStreamFinished: {
         var parsed = Model.parseActivePreset(text)
-        if (parsed) {
-          root.activePreset = parsed
+        if (parsed !== null) {
+          root.activePreset = parsed || Model.findStockPreset(root.presets)
         }
       }
     }
@@ -97,13 +104,16 @@ Panel {
 
   Process {
     id: presetsProc
-    command: ["find", root.presetDir, "-maxdepth", "1", "-name", "*.json", "-printf", "%f\n"]
+    command: ["easyeffects", "--presets"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
         var list = Model.parsePresetList(text)
         if (list && list.length > 0) {
           root.presets = list
+          if (!root.activePreset) {
+            root.activePreset = Model.findStockPreset(list)
+          }
         }
       }
     }
@@ -119,6 +129,13 @@ Panel {
   Process {
     id: toggleBypassProc
     command: ["easyeffects", "--bypass-toggle"]
+    onExited: {
+      root.refresh()
+    }
+  }
+
+  Process {
+    id: purgeProc
     onExited: {
       root.refresh()
     }
@@ -159,13 +176,28 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(340))
+    contentWidth: panel.fittedContentWidth(Style.space(360))
     contentHeight: panel.fittedContentHeight(contentColumn.implicitHeight)
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      onCloseRequested: root.close()
+      onCloseRequested: {
+        if (purgeConfirm.opened) {
+          root.presetToPurge = ""
+        } else {
+          root.close()
+        }
+      }
+
+      Keys.onPressed: function(event) {
+        if (purgeConfirm.opened) {
+          if (purgeConfirm.handleKey(event)) {
+            event.accepted = true
+            return
+          }
+        }
+      }
 
       Column {
         id: contentColumn
@@ -228,82 +260,119 @@ Panel {
         }
 
         // Scrollable Preset items list (constrained height for 40+ presets)
-        Flickable {
-          id: presetFlick
+        Item {
+          id: scrollContainer
           width: parent.width
           height: Math.min(presetColumn.implicitHeight, Style.space(260))
-          contentWidth: width
-          contentHeight: presetColumn.implicitHeight
-          clip: true
-          boundsBehavior: Flickable.StopAtBounds
-          flickableDirection: Flickable.VerticalFlick
-          interactive: contentHeight > height
 
-          // Native scroll bar indicator
+          Flickable {
+            id: presetFlick
+            anchors.fill: parent
+            contentWidth: width
+            contentHeight: presetColumn.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.VerticalFlick
+            interactive: contentHeight > height
+
+            WheelHandler {
+              target: presetFlick
+              onWheel: function(event) {
+                if (event.angleDelta.y === 0) return
+                var step = Style.space(40)
+                var delta = event.angleDelta.y > 0 ? -step : step
+                presetFlick.contentY = Math.max(0, Math.min(presetFlick.contentHeight - presetFlick.height, presetFlick.contentY + delta))
+              }
+            }
+
+            Column {
+              id: presetColumn
+              width: presetFlick.width - (presetFlick.contentHeight > presetFlick.height ? Style.space(8) : 0)
+              spacing: Style.space(4)
+
+              Repeater {
+                model: root.presets
+
+                Item {
+                  required property var modelData
+                  required property int index
+
+                  readonly property bool isStock: Model.isStockPreset(modelData)
+                  width: parent.width
+                  implicitHeight: presetBtn.implicitHeight
+                  height: implicitHeight
+
+                  Row {
+                    anchors.fill: parent
+                    spacing: Style.space(4)
+
+                    Button {
+                      id: presetBtn
+                      width: isStock ? parent.width : (parent.width - purgeBtn.width - parent.spacing)
+                      text: String(modelData)
+                      iconText: (root.activePreset === modelData) ? "✓" : " "
+                      iconSize: Style.font.bodySmall
+                      fontSize: Style.font.bodySmall
+                      foreground: (root.activePreset === modelData)
+                        ? Color.accent
+                        : (root.bar ? root.bar.foreground : Color.foreground)
+                      fontFamily: root.bar ? root.bar.fontFamily : ""
+                      horizontalPadding: Style.space(10)
+                      verticalPadding: Style.space(6)
+                      bordered: true
+                      active: root.activePreset === modelData
+
+                      onClicked: {
+                        root.setPreset(modelData)
+                      }
+                    }
+
+                    Button {
+                      id: purgeBtn
+                      visible: !isStock
+                      width: Style.space(32)
+                      iconText: "󰆴"
+                      iconSize: Style.font.bodySmall
+                      fontSize: Style.font.bodySmall
+                      foreground: Color.urgent
+                      fontFamily: root.bar ? root.bar.fontFamily : ""
+                      horizontalPadding: 0
+                      verticalPadding: Style.space(6)
+                      bordered: true
+                      active: false
+                      tooltipText: "Purge preset from system"
+
+                      onClicked: {
+                        root.presetToPurge = String(modelData)
+                      }
+                    }
+                  }
+                }
+              }
+
+              Text {
+                visible: root.presets.length === 0
+                text: "No presets found in EasyEffects output directory."
+                color: root.bar ? root.bar.foreground : Color.foreground
+                opacity: 0.6
+                font.family: root.bar ? root.bar.fontFamily : ""
+                font.pixelSize: Style.font.caption
+              }
+            }
+          }
+
+          // Native scroll bar indicator (floating above flickable)
           Rectangle {
             id: scrollIndicator
             visible: presetFlick.contentHeight > presetFlick.height
-            anchors.right: presetFlick.right
-            anchors.top: presetFlick.top
-            anchors.topMargin: presetFlick.visibleArea.yPosition * presetFlick.height
+            anchors.right: parent.right
+            y: presetFlick.visibleArea.yPosition * scrollContainer.height
             width: Style.space(3)
-            height: Math.max(Style.space(16), presetFlick.visibleArea.heightRatio * presetFlick.height)
+            height: Math.max(Style.space(16), presetFlick.visibleArea.heightRatio * scrollContainer.height)
             radius: width / 2
             color: root.bar ? root.bar.foreground : Color.foreground
             opacity: 0.35
             z: 10
-          }
-
-          WheelHandler {
-            target: presetFlick
-            onWheel: function(event) {
-              if (event.angleDelta.y === 0) return
-              var step = Style.space(40)
-              var delta = event.angleDelta.y > 0 ? -step : step
-              presetFlick.contentY = Math.max(0, Math.min(presetFlick.contentHeight - presetFlick.height, presetFlick.contentY + delta))
-            }
-          }
-
-          Column {
-            id: presetColumn
-            width: presetFlick.width - (presetFlick.contentHeight > presetFlick.height ? Style.space(8) : 0)
-            spacing: Style.space(4)
-
-            Repeater {
-              model: root.presets
-
-              Button {
-                required property var modelData
-                required property int index
-
-                width: parent.width
-                text: String(modelData)
-                iconText: (root.activePreset === modelData) ? "✓" : " "
-                iconSize: Style.font.bodySmall
-                fontSize: Style.font.bodySmall
-                foreground: (root.activePreset === modelData)
-                  ? Color.accent
-                  : (root.bar ? root.bar.foreground : Color.foreground)
-                fontFamily: root.bar ? root.bar.fontFamily : ""
-                horizontalPadding: Style.space(10)
-                verticalPadding: Style.space(6)
-                bordered: true
-                active: root.activePreset === modelData
-
-                onClicked: {
-                  root.setPreset(modelData)
-                }
-              }
-            }
-
-            Text {
-              visible: root.presets.length === 0
-              text: "No presets found in EasyEffects output directory."
-              color: root.bar ? root.bar.foreground : Color.foreground
-              opacity: 0.6
-              font.family: root.bar ? root.bar.fontFamily : ""
-              font.pixelSize: Style.font.caption
-            }
           }
         }
 
@@ -323,6 +392,27 @@ Panel {
           verticalPadding: Style.space(6)
           bordered: false
           onClicked: root.openEasyEffects()
+        }
+      }
+
+      ConfirmDialog {
+        id: purgeConfirm
+        anchors.fill: parent
+        opened: root.presetToPurge !== ""
+        z: 30
+        message: "Purge preset '" + root.presetToPurge + "' and all associated AutoEQ files from the system?"
+        confirmText: "Purge"
+        cancelText: "Cancel"
+        background: Color.popups.background
+        foreground: Color.popups.text
+        fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+        onCanceled: {
+          root.presetToPurge = ""
+        }
+        onConfirmed: {
+          var target = root.presetToPurge
+          root.presetToPurge = ""
+          root.purgePreset(target)
         }
       }
     }

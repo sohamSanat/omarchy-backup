@@ -1,0 +1,16 @@
+[Presets]
+lastLoadedOutputPreset=CrinEar Daybreak
+
+[StreamInputs]
+inputDevice=alsa_input.usb-KTMicro_CDS.KT_USB_Audio_2020-02-20-0000-0000-0000-00.mono-fallback
+visiblePage=pluginsPage
+
+[StreamOutputs]
+mostUsedPresets=CrinEar Daybreak,CrinEar Nightfall
+outputDevice=alsa_output.usb-KTMicro_CDS.KT_USB_Audio_2020-02-20-0000-0000-0000-00.analog-stereo
+plugins=equalizer#0
+usedPresets=CrinEar Daybreak:3,CrinEar Nightfall:1
+
+[Window]
+height=756
+width=631
