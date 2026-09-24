@@ -31,6 +31,9 @@
           "id": "omarchy.workspaces"
         },
         {
+          "id": "nav-guide"
+        },
+        {
           "id": "soham.pocket-left",
           "members": "io.github.weedwhitesandwine.obsiduous, soham.easyeffects, soham.agents, io.github.enovara.teach-voxtype, tiertek.scratchpad-deck"
         },

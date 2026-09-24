@@ -202,6 +202,13 @@
       "M omarchy/Panel.qml"
     ]
   },
+  "nav-guide": {
+    "remote": "https://github.com/infinitegithub/omarchy-nav-guide.git",
+    "commit": "91ecd553988c0755abfca5ab34cbc43d2e2f5fc9",
+    "has_local_changes": false,
+    "dirty_files": [],
+    "description": "Super+K Alternative: Enhanced keybindings teacher and context-aware shortcuts window"
+  },
   "nguyenn.clipboard": {
     "remote": "https://github.com/htrnguyen-labs/omarchy-clipboard.git",
     "commit": "046e94437a652e837f257eca2ae4314d5df3754a",

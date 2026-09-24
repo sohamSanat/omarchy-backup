@@ -124,3 +124,11 @@ o.bind("SUPER + ALT + P", "Flow: Pause / resume", "omarchy-shell io.github.ef-co
 hl.unbind("SUPER + ALT + C")
 o.bind("SUPER + ALT + C", "Flow: Cancel recording", "omarchy-shell io.github.ef-code.omarchy-flow.service cancel")
 -- <<< omarchy-flow managed hotkeys <<<
+
+-- [nav-guide-keybind]
+-- Enhanced Super+K window for Omarchy
+hl.unbind("SUPER + K")
+o.bind("SUPER + K", "Super+K Alternative", "omarchy-shell nav-guide toggle")
+-- Preserve the classic keybindings menu on a dedicated fallback shortcut
+o.bind("SUPER + SHIFT + K", "Classic Keybindings Menu", "omarchy-menu-keybindings")
+-- [/nav-guide-keybind]

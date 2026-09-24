@@ -554,10 +554,7 @@ for plugin_path in "${SCRIPT_DIR}/plugins"/*; do
 done
 
 # Ensure all plugin helper scripts are executable
-find "${USER_HOME}/.config/omarchy/plugins" -type d -name scripts -exec chmod +x {}/* + 2>/dev/null || true
-if [[ -f "${USER_HOME}/.config/omarchy/plugins/tiertek.scratchpad-deck/bin/scratchpad-deck" ]]; then
-  chmod +x "${USER_HOME}/.config/omarchy/plugins/tiertek.scratchpad-deck/bin/scratchpad-deck"
-fi
+find "${USER_HOME}/.config/omarchy/plugins" -type d \( -name scripts -o -name bin \) -exec chmod +x {}/* + 2>/dev/null || true
 if [[ -f "${USER_HOME}/.config/omarchy/plugins/soham.easyeffects/purge-preset.sh" ]]; then
   chmod +x "${USER_HOME}/.config/omarchy/plugins/soham.easyeffects/purge-preset.sh"
 fi
