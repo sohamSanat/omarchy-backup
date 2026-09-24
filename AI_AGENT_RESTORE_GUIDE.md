@@ -87,11 +87,12 @@ This repository contains the full snapshot of user customizations:
 - **`nguyenn.clipboard`**: Clipboard history plugin with custom "Clear attachments" feature and patch.
 - **`reidenxerx.tile-blueprints`**: Dynamic layout blueprint manager bound to `Super + Alt + L`.
 - **`io.github.ellion369.omagent`**: Personal AI Assistant with 3-lane multi-intent router (Flash chat, Web search, Herdr coding execution), Nothing Phone PWA intercom bridge, and Quickshell glass HUD overlay. Refactored to `ui_concepts/v1` architecture:
+  - Adaptive execution policy (`omagent_core/execution_policy.py`) sizing work envelopes: `needle` (8 tool calls, 10 min), `standard` (24 tool calls, 45 min), and `sword` (64 tool calls, 4 agents, 90 min).
   - Generates 3 structurally unique concept candidates differing across ≥3 design axes (IA, composition, typography, interaction, motion, asset strategy).
   - Adaptive alignment replaces rigid 6-question interviews; asks only unresolved high-impact contract fields.
   - Deterministic visual QA (`omagent_core/visual_qa.py`) with multi-viewport render manifests (desktop, tablet, mobile) and local perceptual hashing.
-  - Quality engine (`omagent_core/quality/`) strictly gates completion on independent visual review receipts.
-  - Backed by 132 automated unit and integration tests.
+  - Quality engine (`omagent_core/quality/`) strictly gates completion on independent visual review receipts, with bounded 2-pass repair loops.
+  - Backed by 137 automated unit and integration tests.
 - **`reomarchy.workspace-switcher`**: Visual workspace switcher with hold-Super activation, live screencopy previews, active window titles, corner marks, bottom navigation HUD (`← →`, `↑ ↓`, `1-9`, `↵`, `esc`), and type-to-filter search (includes custom patch).
 - **`kenny.nightlight`**: Night light color temperature bar control widget.
 - **`mryll.printbar`**: Printer hardware status and G2060 maintenance panel (includes custom patch).

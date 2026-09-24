@@ -26,12 +26,17 @@ Branch: `main`
   - Directs parallel specialist crewmates across 2x2 Herdr tiling panes (`firstmate subagent spawn/prompt/list/close`) bound to Compound Engineering skill workflows.
   - Grants every subagent on-demand autonomy to invoke any of the 33 Compound Engineering skills (`firstmate skills`, `firstmate skill-read`).
 - **`ui_concepts/v1` Architecture & Quality Engine (`omagent_core/quality/`)**:
+  - **Adaptive Execution Policy (`omagent_core/execution_policy.py`)**: Sizing tier dynamically matches task scope:
+    - `needle`: Single-agent, single-provider path (budget: 8 tool calls, 10 min) for narrow local fixes without subagent overhead.
+    - `standard`: Focused implementation path (budget: 24 tool calls, 45 min) with targeted verification.
+    - `sword`: Full multi-agent swarm & verification path (budget: 64 tool calls, 4 agents, 90 min) for architecture, security, migrations, and release-scale work.
+    - UI tasks always receive at least the `standard` rendered-design policy.
   - **Structured Design Contracts & 3-Concept Selection**: Generates 3 structurally unique concept candidates differing across ≥3 independent axes (information architecture, composition, typography, interaction signature, motion policy, asset strategy).
   - **Adaptive Alignment Protocol**: Replaces rigid 6-question interviews with dynamic gap analysis. Asks only for unresolved high-impact contract fields; comprehensive briefs proceed directly to concept selection.
   - **Deterministic Multi-Viewport Visual QA (`omagent_core/visual_qa.py`)**: Local perceptual fingerprinting across desktop (1440x900), tablet (768x1024), and mobile (375x812). Detects near-duplicates and template convergence.
-  - **Independent Visual Review Receipts (`omagent_core/quality/review.py`)**: Quality engine strictly gates completion on independent visual review receipts, preventing self-approval and allowing up to 2 deterministic same-run repair cycles.
+  - **Independent Visual Review Receipts & Bounded Repairs (`omagent_core/quality/`)**: Quality engine strictly gates completion on independent visual review receipts, preventing self-approval and orchestrating up to 2 bounded same-run repair passes.
   - **Execution Backend Containment**: Controller reserves all workspace, tab, pane, and agent identities upfront; Herdr and Firstmate act as pure execution backends; `omagent-screenshot` enforces `--workspace` confinement and `--allow-host` whitelisting.
-  - **132 Automated Unit & Integration Tests**: Comprehensive network-free deterministic validation test suite (`python3 -m unittest discover -s tests -p 'test_*.py'`).
+  - **137 Automated Unit & Integration Tests**: Comprehensive network-free deterministic validation test suite (`python3 -m unittest discover -s tests -p 'test_*.py'`).
 - **Supreme Prompt Primacy Law & Anti-Hijacking Protection**:
   - The user's prompt is 100% sacred truth defining domain, entity name, and features. Reference images donate strictly abstract aesthetic DNA, eliminating reference hijacking.
 - **Legacy Compatibility Layer (`omagent_core/legacy_migration.py`)**:

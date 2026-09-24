@@ -38,6 +38,8 @@ Reference boundary, fidelity, novelty, and independent review
 
 Every new concept-first UI run uses the Impeccable-led UI/UX skill bundle. `impeccable` is the primary design director; `web-design-engineer`, `ui-design`, `visual-critique`, `design-systems`, `color-system`, `layout-grid`, `interaction-design`, `state-machine-ux`, `form-design`, `loading-states`, `accessibility-audit`, `animate`, `review-animations`, `apple-design`, `find-animation-opportunities`, `ce-ui-optimize`, and `ce-test-browser` are supporting skills. The bundle is recorded in the run-scoped context and injected into the implementation, component, motion, and reviewer missions.
 
+Agentic coding uses an adaptive execution policy. `needle` is a single-provider, single-agent path with an eight-tool-call and ten-minute budget for narrow local edits. `standard` is the focused implementation path. `sword` is the full multi-agent, review, and verification path for architecture, security, migration, reliability, and release-scale work. UI work always receives at least the standard rendered-design policy.
+
 SQLite remains authoritative. The legacy session JSON and Grill-Me sidecar are compatibility projections only. The run-scoped `UiRunContext` carries the request, candidates, selected direction, reference policy, viewports, evidence generation, artifact revision, typed render evidence, reports, and repair history. QML projects that context and sends same-run intent; it does not own completion state.
 
 ## 2. Prompt primacy and reference policy

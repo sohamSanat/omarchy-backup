@@ -78,6 +78,16 @@ class QualityEngineTests(unittest.TestCase):
         self.assertFalse(engine.review_receipt(generic))
         self.assertEqual(engine.report().state, "blocked")
 
+    def test_small_policy_can_deliver_on_deterministic_checks_without_review(self):
+        engine = QualityEngine(
+            TaskContract(request="Fix a typo", profile="coding", acceptance_criteria=["focused check passes"]),
+            require_review=False,
+        )
+        engine.begin_execution()
+        self.assertTrue(engine.verify(self.checks()))
+        self.assertTrue(engine.deliver())
+        self.assertEqual(engine.report().state, "completed")
+
     def test_completed_requires_verification_and_independent_review(self):
         engine = self.make_engine()
         engine.begin_execution()

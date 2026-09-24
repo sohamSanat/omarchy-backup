@@ -62,6 +62,7 @@ class QualityEngine:
         sink: EvidenceSink | None = None,
         repair_limit: int = 2,
         deliverable: bool = True,
+        require_review: bool = True,
     ) -> None:
         contract.validate()
         self.profile = get_profile(contract.profile)
@@ -71,6 +72,7 @@ class QualityEngine:
         self.sink = sink
         self.repair_limit = repair_limit
         self.deliverable = deliverable
+        self.require_review = require_review
         self.state = QualityState.PLANNED
         self.checks: dict[str, CheckResult] = {}
         self.review_findings: list[ReviewFinding] = []
@@ -245,8 +247,11 @@ class QualityEngine:
         return True
 
     def deliver(self) -> bool:
-        if self.state is not QualityState.REVIEWING or not self._review_complete:
+        if self.require_review and (self.state is not QualityState.REVIEWING or not self._review_complete):
             self.notes.append("delivery requires a completed independent review")
+            return False
+        if not self.require_review and self.state not in {QualityState.VERIFYING, QualityState.REVIEWING}:
+            self.notes.append("delivery requires completed deterministic checks")
             return False
         failed = [item.name for item in self.checks.values() if item.blocking and not item.passed]
         unresolved = self._unresolved_review_findings()

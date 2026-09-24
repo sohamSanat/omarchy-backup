@@ -84,7 +84,7 @@
     "commit": "02334843acc5ef6df87e7f0ceb4d453a56ce2682",
     "has_local_changes": true,
     "patch": "meta/patches/io.github.ellion369.omagent.patch",
-    "note": "Refactored to ui_concepts/v1 with adaptive alignment, independent visual review receipts, deterministic multi-viewport visual QA, and quality engine gating"
+    "note": "Refactored to ui_concepts/v1 with adaptive execution policy (needle/standard/sword), adaptive alignment, independent visual review receipts, deterministic multi-viewport visual QA, bounded repair loop, and quality engine gating"
   },
   "io.github.enovara.teach-voxtype": {
     "remote": "https://github.com/Enovara/omarchy-teach-voxtype.git",

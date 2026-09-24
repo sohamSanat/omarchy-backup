@@ -42,6 +42,7 @@ from omagent_core.ui_context import context_from_contract
 from omagent_core.ui_evidence import UiEvidenceResult
 from omagent_core.ui_flow import parse_concept_selection, selected_context
 from omagent_core.ui_skill_bundle import impeccable_ui_bundle
+from omagent_core.execution_policy import assess_execution_policy
 from omagent_core.ui_brief import (
     DesignContract,
     build_design_contract,
@@ -5068,6 +5069,7 @@ def record_lane_quality(
     repair_runner=None,
     ui_contract: dict | None = None,
     ui_evidence: UiEvidenceResult | None = None,
+    require_review: bool = True,
 ) -> str:
     if run_id:
         store = _get_session_store()
@@ -5093,7 +5095,7 @@ def record_lane_quality(
         profile=profile,
         acceptance_criteria=[f"{profile} profile quality checks"],
     )
-    engine = QualityEngine(contract, sink=_QualityEvidenceSink(run_id))
+    engine = QualityEngine(contract, sink=_QualityEvidenceSink(run_id), require_review=require_review)
     engine.begin_execution()
     if run_id:
         try:
@@ -5227,9 +5229,12 @@ def record_lane_quality(
         else:
             engine.deliver()
     elif verified:
-        # The current lane has no independent reviewer. Block honestly instead
-        # of self-certifying the provider's own completion claim.
-        engine.review([], available=False)
+        if not require_review:
+            engine.deliver()
+        else:
+            # The current lane has no independent reviewer. Block honestly instead
+            # of self-certifying the provider's own completion claim.
+            engine.review([], available=False)
     report = engine.report()
     safe_report = redact_data(report.__dict__)
     if run_id:
@@ -6480,9 +6485,80 @@ def run_firstmate_bridge(
     return 0
 
 
+def _run_needle_coding(
+    request: str,
+    config: dict,
+    session_id: str,
+    *,
+    cwd: Path,
+    provider: str,
+    model: str,
+    run_id: str,
+    policy,
+) -> int:
+    """Run one bounded provider pass for a narrow local coding edit."""
+    directive = policy.prompt_directive()
+    prompt = f"{directive}\n[Task]\n{request}\n\nUse one agent, one focused edit, and one relevant verification command. Do not create subagents."
+    if provider == "opencode":
+        command = ["opencode", "run"]
+        if AUTO_APPROVE:
+            command.append("--auto")
+        command.extend(["-m", model, prompt])
+    elif provider == "cline":
+        command = ["cline"]
+        if AUTO_APPROVE:
+            command.extend(["--auto-approve", "true"])
+        command.extend(["--timeout", "0", "--retries", "15", "--compaction", "basic", "-m", model, prompt])
+    else:
+        command = ["agy", "--model", model]
+        if AUTO_APPROVE:
+            command.append("--dangerously-skip-permissions")
+        command.extend(["-i", prompt])
+    emit("text", text=f"• **Execution policy: needle** — one provider, {policy.max_tool_calls} tool-call budget, focused verification only\n")
+    try:
+        result = subprocess.run(
+            command,
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=policy.max_minutes * 60,
+        )
+    except subprocess.TimeoutExpired:
+        _mark_setup_failed(run_id)
+        emit("error", text="Needle execution exceeded its 10-minute budget without a safe completion signal")
+        emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+        return 1
+    full_text = (result.stdout or "") + ("\n" + result.stderr if result.stderr else "")
+    if result.returncode != 0:
+        _mark_setup_failed(run_id)
+        emit("error", text=clip(full_text or "provider execution failed", 1200))
+        emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+        return 1
+    history = list(load_session_history(session_id))
+    history.append({"role": "user", "parts": [{"text": request}]})
+    save_session_history(session_id, history, full_text or "Needle execution completed.")
+    evidence = ["implementation: single-agent needle execution"]
+    evidence.extend(run_declared_verification(cwd, config, "coding"))
+    quality_state = record_lane_quality(
+        "coding",
+        request,
+        full_text,
+        evidence=evidence,
+        run_id=run_id,
+        require_review=False,
+    )
+    emit("done", ok=True, code=0, stopped=False, terminal_state=quality_state)
+    return 0
+
+
 def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | None = None, *, harness: str = "", model: str = "", is_coding_task: bool = False, run_id: str = "", ui_contract: dict | None = None) -> int:
     task_prompt = clean_prefix(request)
     is_normal_coding = is_coding_task or is_normal_coding_request(task_prompt)
+    execution_policy = assess_execution_policy(
+        task_prompt,
+        is_ui=ui_contract is not None,
+        is_coding=is_normal_coding,
+    )
     if ui_contract is not None:
         ui_set = None
         clear_session_ui_set(session_id)
@@ -6741,6 +6817,18 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
         else:
             ws_label = f"{ws_prefix}: {primary_skill} - {short_title} [{run_id[:12]}]"
 
+    if not is_subsequent_turn and execution_policy.mode == "needle":
+        return _run_needle_coding(
+            task_prompt,
+            config,
+            session_id,
+            cwd=cwd,
+            provider=fb_provider,
+            model=chosen_model,
+            run_id=run_id,
+            policy=execution_policy,
+        )
+
     # Resume command connects the user straight into Herdr
     resume_cmd = ["omarchy-launch-terminal", "herdr"]
 
@@ -6756,6 +6844,7 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
     )
 
     if is_subsequent_turn:
+        emit("text", text=f"• **Execution policy**: `{execution_policy.mode}` — {execution_policy.reason}\n")
         # Subsequent turns route through Firstmate as the fleet manager
         emit("text", text=f"• **Relaying to Firstmate**: Passing modification request to fleet supervisor (`{fm_task_id}`)\n")
         emit("text", text=f"• **Firstmate Steering**: Instructing crewmate in Herdr workspace `{ws_label}`\n")
@@ -6765,6 +6854,7 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
             for _bullet in quota_decision["bullets"]:
                 emit("text", text=f"• {_bullet}\n")
 
+        emit("text", text=f"• **Execution policy**: `{execution_policy.mode}` — {execution_policy.reason}\n")
         emit("text", text=f"• **Engaging** Compound Engineering skill: `{primary_skill}`\n")
         if is_normal_coding:
             emit("text", text="• **Task Classification**: Normal Coding Task (Python / Java / C# / CLI / Backend / Algorithm)\n")
@@ -7661,6 +7751,7 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
         )
 
     ce_directive = (
+        f"{execution_policy.prompt_directive()}\n"
         f"[Omagent Compound Engineering Systemic Engine]\n"
         f"Active Methodology: {primary_skill} ({skill_desc})\n"
         f"Auxiliary Compound Tooling: {', '.join(aux_skills)}\n\n"

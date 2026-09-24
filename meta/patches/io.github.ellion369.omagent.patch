@@ -77,10 +77,10 @@ index 57e82bd..698d5de 100644
 +.worktrees/
 diff --git c/ARCHITECTURE_UI_UX.md w/ARCHITECTURE_UI_UX.md
 new file mode 100644
-index 0000000..6aa976f
+index 0000000..063681c
 --- /dev/null
 +++ w/ARCHITECTURE_UI_UX.md
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,120 @@
 +# UI/UX Agentic Architecture & Multi-Subagent Fleet Orchestration
 +
 +> **Current system specification.** UI direction is prompt-first and concept-led. The router no longer treats a fixed UI set, a reference-image archetype, or a fixed six-question Grill-Me round as the design contract.
@@ -120,6 +120,8 @@ index 0000000..6aa976f
 +```
 +
 +Every new concept-first UI run uses the Impeccable-led UI/UX skill bundle. `impeccable` is the primary design director; `web-design-engineer`, `ui-design`, `visual-critique`, `design-systems`, `color-system`, `layout-grid`, `interaction-design`, `state-machine-ux`, `form-design`, `loading-states`, `accessibility-audit`, `animate`, `review-animations`, `apple-design`, `find-animation-opportunities`, `ce-ui-optimize`, and `ce-test-browser` are supporting skills. The bundle is recorded in the run-scoped context and injected into the implementation, component, motion, and reviewer missions.
++
++Agentic coding uses an adaptive execution policy. `needle` is a single-provider, single-agent path with an eight-tool-call and ten-minute budget for narrow local edits. `standard` is the focused implementation path. `sword` is the full multi-agent, review, and verification path for architecture, security, migration, reliability, and release-scale work. UI work always receives at least the standard rendered-design policy.
 +
 +SQLite remains authoritative. The legacy session JSON and Grill-Me sidecar are compatibility projections only. The run-scoped `UiRunContext` carries the request, candidates, selected direction, reference policy, viewports, evidence generation, artifact revision, typed render evidence, reports, and repair history. QML projects that context and sends same-run intent; it does not own completion state.
 +
@@ -3531,10 +3533,10 @@ index 0000000..319bbf3
 +}
 diff --git c/docs/operations.md w/docs/operations.md
 new file mode 100644
-index 0000000..0fc710c
+index 0000000..e7d577f
 --- /dev/null
 +++ w/docs/operations.md
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,63 @@
 +# Operations
 +
 +## State
@@ -3548,6 +3550,8 @@ index 0000000..0fc710c
 +QML sends session snapshots through `omagent-route --import-session-file`. The router stores the snapshot in SQLite and writes only compatibility projections for the existing overlay. SQLite is the source of truth; JSON files are recovery and compatibility data.
 +
 +Each owned coding run also has a run manifest in SQLite. It records the workspace, Herdr workspace, panes, Firstmate tasks, provider session, and their ownership state. New workspace, pane, and task receipts are persisted before the next external side effect. Stop and delete commands use this manifest; legacy fleet JSON is imported only as a compatibility input. An active or detached run cannot be deleted, and late evidence is stored without changing a terminal state.
++
++Agentic coding uses adaptive execution sizing. Small local edits use the `needle` path: one provider, no subagents, at most eight tool calls, and a ten-minute execution budget, followed by focused deterministic verification. Moderate work uses `standard`; architecture, security, migration, reliability, and release-scale work uses the full `sword` fleet with independent review. UI work never uses the `needle` shortcut because rendered design review is required.
 +
 +UI concept cards, the selected concept, reference evidence, frozen design contract, and the authoritative `UiRunContext` are recorded as run events. The legacy Grill-Me JSON file is only a compatibility projection. A reference cache is valid only for the same content fingerprint and analyzer version; changing an image or analyzer invalidates the old evidence. UI render, interaction, and accessibility evidence is a typed run-owned payload bound to the current artifact revision and evidence generation. Provider text markers are not evidence. A fake adapter is allowed in deterministic tests but cannot complete a live run. Rendered evidence is compared locally against the contract and recorded comparison population. If Pillow, the browser/accessibility adapter, or another required local comparison capability is unavailable, the run is blocked or incomplete rather than treated as novel.
 +
@@ -5450,7 +5454,7 @@ index 0000000..490aa13
 +6. Document its authentication, cost, and failure behavior.
 diff --git c/docs/quality-engine.md w/docs/quality-engine.md
 new file mode 100644
-index 0000000..1f35b28
+index 0000000..97b68d4
 --- /dev/null
 +++ w/docs/quality-engine.md
 @@ -0,0 +1,64 @@
@@ -5494,7 +5498,7 @@ index 0000000..1f35b28
 +- `coding`: task contract, implementation, verification, and independent review.
 +- `ui`: subject fidelity, frozen design contract, reference boundary, reference fidelity, concept novelty, rendered evidence, interaction quality, accessibility, and independent visual review. UI work starts with three structurally distinct concepts; a selected concept is frozen before implementation. Reference images are fingerprinted, run-scoped evidence with separate borrowable and forbidden attributes. A style-only reference is the default; exact recreation is an explicit mode. UI render, interaction, and accessibility evidence must arrive as a typed, run-bound evidence payload. Provider prose and literal pass markers are not sufficient. Visual comparison is deterministic and provider-free; unavailable comparison, browser/accessibility capability, or render evidence blocks completion.
 +
-+The default repair limit is two complete repair-and-reverification attempts. The limit is recorded in the run report.
++Coding execution also uses an adaptive policy. `needle` is allowed only for narrow local edits and can deliver from focused deterministic checks without an independent reviewer. `standard` and `sword` keep the independent review requirement. UI always uses the standard or larger policy and requires rendered visual review.
 +
 +Every UI run also records the Impeccable-led skill bundle. The implementation, component, motion, and reviewer roles receive the same bundle; the reviewer must use `visual-critique`, `accessibility-audit`, and `impeccable` against rendered evidence. A skill name in a provider prompt is not evidence that the skill ran. The run remains incomplete or blocked when the required rendered design review is absent.
 +
@@ -7817,7 +7821,7 @@ index 0000000..74b5073
 +  "scored_at": "2026-09-09"
 +}
 diff --git c/omagent-route w/omagent-route
-index 8ff0dcc..4274ab4 100755
+index 8ff0dcc..0577187 100755
 --- c/omagent-route
 +++ w/omagent-route
 @@ -1,43 +1,4306 @@
@@ -12136,7 +12140,7 @@ index 8ff0dcc..4274ab4 100755
  
  
  def clip(text: str, limit: int, *, collapse: bool = False) -> str:
-@@ -45,524 +4308,4611 @@ def clip(text: str, limit: int, *, collapse: bool = False) -> str:
+@@ -45,524 +4308,4701 @@ def clip(text: str, limit: int, *, collapse: bool = False) -> str:
      return text if len(text) <= limit else text[: limit - 1] + "…"
  
  
@@ -13308,6 +13312,7 @@ index 8ff0dcc..4274ab4 100755
 +    repair_runner=None,
 +    ui_contract: dict | None = None,
 +    ui_evidence: UiEvidenceResult | None = None,
++    require_review: bool = True,
 +) -> str:
 +    if run_id:
 +        store = _get_session_store()
@@ -13333,7 +13338,7 @@ index 8ff0dcc..4274ab4 100755
 +        profile=profile,
 +        acceptance_criteria=[f"{profile} profile quality checks"],
 +    )
-+    engine = QualityEngine(contract, sink=_QualityEvidenceSink(run_id))
++    engine = QualityEngine(contract, sink=_QualityEvidenceSink(run_id), require_review=require_review)
 +    engine.begin_execution()
 +    if run_id:
 +        try:
@@ -13467,9 +13472,12 @@ index 8ff0dcc..4274ab4 100755
 +        else:
 +            engine.deliver()
 +    elif verified:
-+        # The current lane has no independent reviewer. Block honestly instead
-+        # of self-certifying the provider's own completion claim.
-+        engine.review([], available=False)
++        if not require_review:
++            engine.deliver()
++        else:
++            # The current lane has no independent reviewer. Block honestly instead
++            # of self-certifying the provider's own completion claim.
++            engine.review([], available=False)
 +    report = engine.report()
 +    safe_report = redact_data(report.__dict__)
 +    if run_id:
@@ -14720,9 +14728,80 @@ index 8ff0dcc..4274ab4 100755
 +    return 0
 +
 +
++def _run_needle_coding(
++    request: str,
++    config: dict,
++    session_id: str,
++    *,
++    cwd: Path,
++    provider: str,
++    model: str,
++    run_id: str,
++    policy,
++) -> int:
++    """Run one bounded provider pass for a narrow local coding edit."""
++    directive = policy.prompt_directive()
++    prompt = f"{directive}\n[Task]\n{request}\n\nUse one agent, one focused edit, and one relevant verification command. Do not create subagents."
++    if provider == "opencode":
++        command = ["opencode", "run"]
++        if AUTO_APPROVE:
++            command.append("--auto")
++        command.extend(["-m", model, prompt])
++    elif provider == "cline":
++        command = ["cline"]
++        if AUTO_APPROVE:
++            command.extend(["--auto-approve", "true"])
++        command.extend(["--timeout", "0", "--retries", "15", "--compaction", "basic", "-m", model, prompt])
++    else:
++        command = ["agy", "--model", model]
++        if AUTO_APPROVE:
++            command.append("--dangerously-skip-permissions")
++        command.extend(["-i", prompt])
++    emit("text", text=f"• **Execution policy: needle** — one provider, {policy.max_tool_calls} tool-call budget, focused verification only\n")
++    try:
++        result = subprocess.run(
++            command,
++            cwd=str(cwd),
++            capture_output=True,
++            text=True,
++            timeout=policy.max_minutes * 60,
++        )
++    except subprocess.TimeoutExpired:
++        _mark_setup_failed(run_id)
++        emit("error", text="Needle execution exceeded its 10-minute budget without a safe completion signal")
++        emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
++        return 1
++    full_text = (result.stdout or "") + ("\n" + result.stderr if result.stderr else "")
++    if result.returncode != 0:
++        _mark_setup_failed(run_id)
++        emit("error", text=clip(full_text or "provider execution failed", 1200))
++        emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
++        return 1
++    history = list(load_session_history(session_id))
++    history.append({"role": "user", "parts": [{"text": request}]})
++    save_session_history(session_id, history, full_text or "Needle execution completed.")
++    evidence = ["implementation: single-agent needle execution"]
++    evidence.extend(run_declared_verification(cwd, config, "coding"))
++    quality_state = record_lane_quality(
++        "coding",
++        request,
++        full_text,
++        evidence=evidence,
++        run_id=run_id,
++        require_review=False,
++    )
++    emit("done", ok=True, code=0, stopped=False, terminal_state=quality_state)
++    return 0
++
++
 +def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | None = None, *, harness: str = "", model: str = "", is_coding_task: bool = False, run_id: str = "", ui_contract: dict | None = None) -> int:
 +    task_prompt = clean_prefix(request)
 +    is_normal_coding = is_coding_task or is_normal_coding_request(task_prompt)
++    execution_policy = assess_execution_policy(
++        task_prompt,
++        is_ui=ui_contract is not None,
++        is_coding=is_normal_coding,
++    )
 +    if ui_contract is not None:
 +        ui_set = None
 +        clear_session_ui_set(session_id)
@@ -14986,6 +15065,18 @@ index 8ff0dcc..4274ab4 100755
 +        else:
 +            ws_label = f"{ws_prefix}: {primary_skill} - {short_title} [{run_id[:12]}]"
 +
++    if not is_subsequent_turn and execution_policy.mode == "needle":
++        return _run_needle_coding(
++            task_prompt,
++            config,
++            session_id,
++            cwd=cwd,
++            provider=fb_provider,
++            model=chosen_model,
++            run_id=run_id,
++            policy=execution_policy,
++        )
++
 +    # Resume command connects the user straight into Herdr
 +    resume_cmd = ["omarchy-launch-terminal", "herdr"]
 +
@@ -15001,6 +15092,7 @@ index 8ff0dcc..4274ab4 100755
 +    )
 +
 +    if is_subsequent_turn:
++        emit("text", text=f"• **Execution policy**: `{execution_policy.mode}` — {execution_policy.reason}\n")
 +        # Subsequent turns route through Firstmate as the fleet manager
 +        emit("text", text=f"• **Relaying to Firstmate**: Passing modification request to fleet supervisor (`{fm_task_id}`)\n")
 +        emit("text", text=f"• **Firstmate Steering**: Instructing crewmate in Herdr workspace `{ws_label}`\n")
@@ -15010,6 +15102,7 @@ index 8ff0dcc..4274ab4 100755
 +            for _bullet in quota_decision["bullets"]:
 +                emit("text", text=f"• {_bullet}\n")
 +
++        emit("text", text=f"• **Execution policy**: `{execution_policy.mode}` — {execution_policy.reason}\n")
 +        emit("text", text=f"• **Engaging** Compound Engineering skill: `{primary_skill}`\n")
 +        if is_normal_coding:
 +            emit("text", text="• **Task Classification**: Normal Coding Task (Python / Java / C# / CLI / Backend / Algorithm)\n")
@@ -15952,6 +16045,7 @@ index 8ff0dcc..4274ab4 100755
 +        )
 +
 +    ce_directive = (
++        f"{execution_policy.prompt_directive()}\n"
 +        f"[Omagent Compound Engineering Systemic Engine]\n"
 +        f"Active Methodology: {primary_skill} ({skill_desc})\n"
 +        f"Auxiliary Compound Tooling: {', '.join(aux_skills)}\n\n"
@@ -17209,7 +17303,7 @@ index 8ff0dcc..4274ab4 100755
      if len(raw_request) > MAX_REQUEST_CHARS:
          emit("error", text=f"Requests are limited to {MAX_REQUEST_CHARS} characters")
          emit("done", ok=False, code=1, stopped=False)
-@@ -573,14 +8923,265 @@ def route_request(raw_request: str, *, agent: str = "", session: str = "",
+@@ -573,14 +9013,265 @@ def route_request(raw_request: str, *, agent: str = "", session: str = "",
          emit("error", text="Request is empty")
          emit("done", ok=False, code=1, stopped=False)
          return 1
@@ -17478,7 +17572,7 @@ index 8ff0dcc..4274ab4 100755
      while arguments and arguments[0].startswith("--"):
          option = arguments.pop(0)
          if option == "--":
-@@ -589,17 +9190,35 @@ def main() -> int:
+@@ -589,17 +9280,35 @@ def main() -> int:
              agent = arguments.pop(0)
          elif option == "--session" and arguments:
              session = arguments.pop(0)
@@ -18011,10 +18105,10 @@ index 0000000..3a603fe
 +    return target_value
 diff --git c/omagent_core/execution_policy.py w/omagent_core/execution_policy.py
 new file mode 100644
-index 0000000..2a53fb1
+index 0000000..314b1e2
 --- /dev/null
 +++ w/omagent_core/execution_policy.py
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,171 @@
 +"""Adaptive execution sizing for agentic coding tasks.
 +
 +The policy chooses the smallest safe execution envelope. It does not remove
@@ -18038,15 +18132,23 @@ index 0000000..2a53fb1
 +    "performance", "protocol", "cross-platform", "integration", "deployment", "release",
 +    "breaking change", "distributed", "production incident", "security vulnerability",
 +)
++_SCOPE_TERMS = (
++    "across the codebase", "across the project", "system-wide", "end-to-end", "rewrite",
++    "redesign", "replace the", "from scratch", "whole system", "all modules", "every module",
++    "multiple services", "production incident", "breaking change",
++)
 +_STANDARD_TERMS = (
 +    "bug", "error", "test", "feature", "endpoint", "api", "parser", "validation", "state",
-+    "workflow", "component", "page", "interface", "accessibility", "responsive",
++    "workflow", "component", "page", "interface", "accessibility", "responsive", "implement",
++    "function", "class", "module", "database query",
 +)
 +_SIMPLE_ACTIONS = re.compile(
-+    r"\b(typo|rename|comment|docstring|readme|format|lint|small|quick|minor|one[- ]line|"
-+    r"single[- ]file|add a test|update a test|fix a typo|change the label)\b",
++    r"\b(typo|rename|comment|docstring|readme|documentation|docs|format|formatting|lint|"
++    r"small|quick|minor|one[- ]line|single[- ]file|add a test|update a test|fix a typo|"
++    r"change the label|rename a variable|update a comment)\b",
 +    re.IGNORECASE,
 +)
++_MODE_OVERRIDE = re.compile(r"^/(needle|standard|sword)\b", re.IGNORECASE)
 +
 +
 +@dataclass(frozen=True)
@@ -18059,6 +18161,8 @@ index 0000000..2a53fb1
 +    use_fleet: bool
 +    require_independent_review: bool
 +    skill_directive: str
++    complexity_score: int = 0
++    signals: tuple[str, ...] = ()
 +
 +    def prompt_directive(self) -> str:
 +        return f"""[OMAGENT ADAPTIVE EXECUTION POLICY: {self.mode.upper()}]
@@ -18076,58 +18180,106 @@ index 0000000..2a53fb1
 +"""
 +
 +
-+def assess_execution_policy(request: str, *, is_ui: bool = False, is_coding: bool = False) -> ExecutionPolicy:
-+    text = " ".join(request.split())
-+    lower = text.lower()
-+    if is_ui:
++def _policy(mode: str, reason: str, *, score: int, signals: tuple[str, ...], is_ui: bool = False) -> ExecutionPolicy:
++    if mode == ExecutionMode.NEEDLE:
 +        return ExecutionPolicy(
-+            mode=ExecutionMode.STANDARD,
-+            reason="UI work requires a rendered design pass and visual critique.",
-+            max_tool_calls=28,
-+            max_agents=4,
-+            max_minutes=35,
-+            use_fleet=True,
-+            require_independent_review=True,
-+            skill_directive="Use the Impeccable-led UI/UX bundle and rendered browser evidence.",
-+        )
-+    sword_hits = [term for term in _SWORD_TERMS if term in lower]
-+    if sword_hits:
-+        return ExecutionPolicy(
-+            mode=ExecutionMode.SWORD,
-+            reason="The request contains architecture, security, migration, reliability, or release-scale risk.",
-+            max_tool_calls=64,
-+            max_agents=4,
-+            max_minutes=90,
-+            use_fleet=True,
-+            require_independent_review=True,
-+            skill_directive="Use the full engineering, test, review, and verification envelope.",
-+        )
-+    simple = is_coding and len(text) <= 280 and _SIMPLE_ACTIONS.search(lower)
-+    if simple:
-+        return ExecutionPolicy(
-+            mode=ExecutionMode.NEEDLE,
-+            reason="The request is narrow, local, and has no detected architecture or lifecycle risk.",
++            mode=mode,
++            reason=reason,
 +            max_tool_calls=8,
 +            max_agents=1,
 +            max_minutes=10,
 +            use_fleet=False,
 +            require_independent_review=False,
 +            skill_directive="Use one focused edit, one relevant test, and a short report. Do not use subagents or broad skills.",
++            complexity_score=score,
++            signals=signals,
 +        )
-+    standard_hits = [term for term in _STANDARD_TERMS if term in lower]
++    if mode == ExecutionMode.SWORD:
++        return ExecutionPolicy(
++            mode=mode,
++            reason=reason,
++            max_tool_calls=64,
++            max_agents=4,
++            max_minutes=90,
++            use_fleet=True,
++            require_independent_review=True,
++            skill_directive="Use the full engineering, test, review, and verification envelope.",
++            complexity_score=score,
++            signals=signals,
++        )
++    return ExecutionPolicy(
++        mode=mode,
++        reason=reason,
++        max_tool_calls=28 if is_ui else 24,
++        max_agents=4,
++        max_minutes=35 if is_ui else 45,
++        use_fleet=True,
++        require_independent_review=True,
++        skill_directive="Use the Impeccable-led UI/UX bundle and rendered browser evidence." if is_ui else "Use focused implementation and verification; escalate only if evidence shows wider risk.",
++        complexity_score=score,
++        signals=signals,
++    )
++
++
++def assess_execution_policy(request: str, *, is_ui: bool = False, is_coding: bool = False) -> ExecutionPolicy:
++    """Classify a request from its observable scope and risk signals."""
++    text = " ".join(request.split())
++    lower = text.lower()
++    override = _MODE_OVERRIDE.match(lower)
++    if override and not is_ui:
++        requested = override.group(1).lower()
++        return _policy(
++            requested,
++            f"The request explicitly selected the {requested} execution mode.",
++            score=0,
++            signals=(f"explicit:{requested}",),
++        )
++    sword_hits = tuple(term for term in _SWORD_TERMS if term in lower)
++    scope_hits = tuple(term for term in _SCOPE_TERMS if term in lower)
++    standard_hits = tuple(term for term in _STANDARD_TERMS if term in lower)
++    simple_hit = bool(_SIMPLE_ACTIONS.search(lower))
++    signals = tuple(
++        list(("sword:" + term for term in sword_hits))
++        + list(("scope:" + term for term in scope_hits))
++        + list(("standard:" + term for term in standard_hits))
++        + (list(("narrow",)) if simple_hit else [])
++    )
++    score = len(sword_hits) * 3 + len(scope_hits) * 2 + len(standard_hits)
++    if is_ui:
++        if sword_hits or scope_hits:
++            return _policy(
++                ExecutionMode.SWORD,
++                "UI work has architecture, migration, security, or system-wide scope.",
++                score=score,
++                signals=signals,
++                is_ui=True,
++            )
++        return _policy(
++            ExecutionMode.STANDARD,
++            "UI work requires a rendered design pass and visual critique.",
++            score=score,
++            signals=signals or ("ui-rendered-work",),
++            is_ui=True,
++        )
++    if sword_hits or scope_hits or score >= 4:
++        return _policy(
++            ExecutionMode.SWORD,
++            "The request has architecture, security, migration, reliability, or system-wide risk.",
++            score=score,
++            signals=signals,
++        )
++    if is_coding and len(text) <= 320 and simple_hit and not sword_hits and not scope_hits and not standard_hits:
++        return _policy(
++            ExecutionMode.NEEDLE,
++            "The request is narrow, local, and has no detected architecture or lifecycle risk.",
++            score=score,
++            signals=signals,
++        )
 +    reason = "The request changes behavior or has moderate implementation scope."
 +    if standard_hits:
 +        reason = "The request changes behavior and needs focused implementation plus verification."
-+    return ExecutionPolicy(
-+        mode=ExecutionMode.STANDARD,
-+        reason=reason,
-+        max_tool_calls=24,
-+        max_agents=2,
-+        max_minutes=30,
-+        use_fleet=False,
-+        require_independent_review=True,
-+        skill_directive="Use focused implementation and verification; escalate only if evidence shows wider risk.",
-+    )
++    return _policy(ExecutionMode.STANDARD, reason, score=score, signals=signals)
++
 diff --git c/omagent_core/identity.py w/omagent_core/identity.py
 new file mode 100644
 index 0000000..8f05f05
@@ -19111,10 +19263,10 @@ index 0000000..89c8b92
 +    return asdict(contract)
 diff --git c/omagent_core/quality/engine.py w/omagent_core/quality/engine.py
 new file mode 100644
-index 0000000..1762493
+index 0000000..d84188a
 --- /dev/null
 +++ w/omagent_core/quality/engine.py
-@@ -0,0 +1,280 @@
+@@ -0,0 +1,284 @@
 +"""Evidence-first quality lifecycle with bounded repair.
 +
 +The engine is deliberately independent of a provider or UI. It accepts a
@@ -19189,6 +19341,7 @@ index 0000000..1762493
 +        self.sink = sink
 +        self.repair_limit = repair_limit
 +        self.deliverable = deliverable
++        self.require_review = require_review
 +        self.state = QualityState.PLANNED
 +        self.checks: dict[str, CheckResult] = {}
 +        self.review_findings: list[ReviewFinding] = []
@@ -19363,8 +19516,11 @@ index 0000000..1762493
 +        return True
 +
 +    def deliver(self) -> bool:
-+        if self.state is not QualityState.REVIEWING or not self._review_complete:
++        if self.require_review and (self.state is not QualityState.REVIEWING or not self._review_complete):
 +            self.notes.append("delivery requires a completed independent review")
++            return False
++        if not self.require_review and self.state not in {QualityState.VERIFYING, QualityState.REVIEWING}:
++            self.notes.append("delivery requires completed deterministic checks")
 +            return False
 +        failed = [item.name for item in self.checks.values() if item.blocking and not item.passed]
 +        unresolved = self._unresolved_review_findings()
@@ -23977,10 +24133,10 @@ index 0000000..68e36c0
 +    unittest.main()
 diff --git c/tests/unit/test_quality_engine.py w/tests/unit/test_quality_engine.py
 new file mode 100644
-index 0000000..3b2a968
+index 0000000..7ba8e89
 --- /dev/null
 +++ w/tests/unit/test_quality_engine.py
-@@ -0,0 +1,143 @@
+@@ -0,0 +1,153 @@
 +from __future__ import annotations
 +
 +import unittest
@@ -24060,6 +24216,16 @@ index 0000000..3b2a968
 +        )
 +        self.assertFalse(engine.review_receipt(generic))
 +        self.assertEqual(engine.report().state, "blocked")
++
++    def test_small_policy_can_deliver_on_deterministic_checks_without_review(self):
++        engine = QualityEngine(
++            TaskContract(request="Fix a typo", profile="coding", acceptance_criteria=["focused check passes"]),
++            require_review=False,
++        )
++        engine.begin_execution()
++        self.assertTrue(engine.verify(self.checks()))
++        self.assertTrue(engine.deliver())
++        self.assertEqual(engine.report().state, "completed")
 +
 +    def test_completed_requires_verification_and_independent_review(self):
 +        engine = self.make_engine()
