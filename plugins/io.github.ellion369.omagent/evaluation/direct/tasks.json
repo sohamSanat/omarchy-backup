@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "profile": "direct",
+  "tasks": [
+    {"id": "direct-001", "prompt": "Summarize the supplied context in three bullets.", "fixture": "fixtures/direct-001.json", "rubric": ["instruction_coverage", "context_use", "clarity", "uncertainty"]},
+    {"id": "direct-002", "prompt": "Answer a question using only the supplied facts.", "fixture": "fixtures/direct-002.json", "rubric": ["instruction_coverage", "context_use", "uncertainty"]}
+  ]
+}

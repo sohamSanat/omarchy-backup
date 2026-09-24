@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "profile": "coding",
+  "tasks": [
+    {"id": "coding-001", "prompt": "Fix a parser bug and add a regression test.", "fixture": "fixtures/coding-001.json", "rubric": ["task_contract", "implementation", "verification", "review"]},
+    {"id": "coding-002", "prompt": "Continue an existing run without creating a new worktree.", "fixture": "fixtures/coding-002.json", "rubric": ["task_contract", "continuity", "verification", "review"]}
+  ]
+}

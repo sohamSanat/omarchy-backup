@@ -1,0 +1,1 @@
+{"brief":"Build a second product page for the same support product family, reusing only the explicitly shared brand tokens.","viewports":["1440x900","768x1024","375x812"],"expected":"Novelty comparison excludes intentional same-family reuse while still rejecting an unrelated template match."}

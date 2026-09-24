@@ -1,0 +1,131 @@
+{
+  "captured_at": "2026-09-24T09:56:29.356273+00:00",
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "999d1ae747be90da1a80429d7a8537864d646ffb99a36a06bc72b783ef98b4cc"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "3d6f613a4edca991447d3554d11f2a098f24c04a131bfccd18eb6f2c7d001d10"
+    },
+    {
+      "path": ".worktrees/coding-python-script-parse-logs/.github/workflows/ci.yml",
+      "sha256": "999d1ae747be90da1a80429d7a8537864d646ffb99a36a06bc72b783ef98b4cc"
+    },
+    {
+      "path": ".worktrees/coding-python-script-parse-logs/.gitignore",
+      "sha256": "b8d0bea9ef9f39ccb593611a5e2537c39fb93f86db6265680fa85b3dba4f3833"
+    },
+    {
+      "path": ".worktrees/coding-python-script-parse-logs/LICENSE",
+      "sha256": "45e08c94a75b478324e46c2e2b19ceca761f802276eeb7c042169ce58b1ac46f"
+    },
+    {
+      "path": ".worktrees/coding-python-script-parse-logs/Omagent.qml",
+      "sha256": "2420ae3321b809f6d468e44c9e2864011fde738a056232aee97eaf19cf5880a8"
+    },
+    {
+      "path": ".worktrees/coding-python-script-parse-logs/README.md",
+      "sha256": "d4c42b42a449f4f580326d5b9b192e2d450f72c0c084ed6e9df4edc7e3bf9851"
+    },
+    {
+      "path": ".worktrees/coding-python-script-parse-logs/bindings.lua.install",
+      "sha256": "8640486ee1e5bd78a0d3ed49665b3e4b134204fc8493b5fe3f0ffe45165f1382"
+    },
+    {
+      "path": ".worktrees/coding-python-script-parse-logs/layerrule.lua.install",
+      "sha256": "97b8d61835690fe3179612e2bae43e6178178a2a089a95d8cc510ec144ff301d"
+    },
+    {
+      "path": ".worktrees/coding-python-script-parse-logs/manifest.json",
+      "sha256": "32e4fbc258b7d501c61f1011b3892764bd9ae9d793e7ad6e668b837456e701e2"
+    },
+    {
+      "path": ".worktrees/coding-python-script-parse-logs/omagent-route",
+      "sha256": "c5c64325d05f9e009f852039ae5f9bf530ebd1e6628cff15d347c72b7b5cbdbe"
+    },
+    {
+      "path": ".worktrees/coding-python-script-parse-logs/omarchy-logo.svg",
+      "sha256": "18fe0c61fe9ccbaf2a52823f1bfa3dbd97e355f4feb7757450ca4a112f49acad"
+    },
+    {
+      "path": ".worktrees/coding-python-script-parse-logs/preview.jpg",
+      "sha256": "1a99cccff09115faef800a5417c1a5fce9d2fdedd86a59ebde1aff83fb675bef"
+    },
+    {
+      "path": ".worktrees/coding-python-script-parse-logs/screenshot.png",
+      "sha256": "bdbf0371aef9e49d9eaca8b91f1030df5e604ebbd13b22730fa89459f6e2d14c"
+    },
+    {
+      "path": "ARCHITECTURE_UI_UX.md",
+      "sha256": "76a92fad1b54693bcb72bca170373ef7ba95758959992108c142413149cdbd46"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "45e08c94a75b478324e46c2e2b19ceca761f802276eeb7c042169ce58b1ac46f"
+    },
+    {
+      "path": "Omagent.qml",
+      "sha256": "f6a68321e0de3d1a103eafc6abe0b5159a067f8168ac0099bfebbde762d3fb03"
+    },
+    {
+      "path": "README.md",
+      "sha256": "ca853d7dd784b655994f90b8ffd1a540367f852e9fb2541bfaa4055954bcd862"
+    },
+    {
+      "path": "bindings.lua.install",
+      "sha256": "8640486ee1e5bd78a0d3ed49665b3e4b134204fc8493b5fe3f0ffe45165f1382"
+    },
+    {
+      "path": "docs/plans/2026-09-07-1915-feature-nothing-phone-voice-fleet-controller-plan.md",
+      "sha256": "ff12513cbd231d437002ea97225b3c01dfb09926ec9f0ed96735574b903f2ba2"
+    },
+    {
+      "path": "docs/plans/2026-09-24-1459-refactor-omagent-quality-reliability-plan.md",
+      "sha256": "a5a74843d9ad582978b5d4f2b24de91974eb0a8156ce1d0bb3bd0e15fe5d94ad"
+    },
+    {
+      "path": "evaluation/capture_baseline.py",
+      "sha256": "b593aeb6494f622a5e20f8e6df275df1ac3a2d4d22c54079bfa5e9aa1fea1a49"
+    },
+    {
+      "path": "harness_pool.py",
+      "sha256": "6ce59b9c42c56fc965f5bac348dd2bc37d0f92b212d64fc480a2bf914f88d5fb"
+    },
+    {
+      "path": "layerrule.lua.install",
+      "sha256": "97b8d61835690fe3179612e2bae43e6178178a2a089a95d8cc510ec144ff301d"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "32e4fbc258b7d501c61f1011b3892764bd9ae9d793e7ad6e668b837456e701e2"
+    },
+    {
+      "path": "model_pool.json",
+      "sha256": "da3bfc784b4968eb64d447aef9389952880abd810222e416583170892403c1d6"
+    },
+    {
+      "path": "omagent-route",
+      "sha256": "1eeb0fec9fd4bd877a028bba1cc789b33fa7bd729b1e0c423b49261fdbe2dd48"
+    },
+    {
+      "path": "omarchy-logo.svg",
+      "sha256": "18fe0c61fe9ccbaf2a52823f1bfa3dbd97e355f4feb7757450ca4a112f49acad"
+    },
+    {
+      "path": "preview.jpg",
+      "sha256": "1a99cccff09115faef800a5417c1a5fce9d2fdedd86a59ebde1aff83fb675bef"
+    },
+    {
+      "path": "screenshot.png",
+      "sha256": "bdbf0371aef9e49d9eaca8b91f1030df5e604ebbd13b22730fa89459f6e2d14c"
+    },
+    {
+      "path": "tests/test_harness_pool.py",
+      "sha256": "dbf8cbdec340f2bae66b23d4ef01f923467abe95bba4ac8f80e0c9af8f7b8dbd"
+    }
+  ],
+  "root": ".",
+  "schema_version": 1
+}

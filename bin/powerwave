@@ -1,0 +1,52 @@
+#!/bin/bash
+# powerwave: CLI helper to inspect and trigger the Omarchy PowerWave plugin.
+
+source /home/soham/.local/lib/omarchy-theme.sh 2>/dev/null || true
+
+cmd="${1:-status}"
+
+case "$cmd" in
+  trigger)
+    echo -e "${COLOR_CYAN}${COLOR_BOLD}⚡ Triggering PowerWave charging animation...${COLOR_RESET}"
+    res=$(quickshell ipc -p /usr/share/omarchy/shell call x692137x.powerwave trigger 2>/dev/null)
+    if [[ "$res" == "triggered" ]]; then
+      echo -e "  ${COLOR_GREEN}✔ Animation played successfully.${COLOR_RESET}"
+    else
+      echo -e "  ${COLOR_RED}✘ Failed to trigger animation via Quickshell IPC. Is the shell running?${COLOR_RESET}"
+      exit 1
+    fi
+    ;;
+
+  status)
+    echo -e "${COLOR_BLUE}${COLOR_BOLD}⚡ PowerWave Plugin Status${COLOR_RESET}"
+    state=$(quickshell ipc -p /usr/share/omarchy/shell call x692137x.powerwave status 2>/dev/null || echo "offline")
+    
+    if [[ "$state" == "charging" ]]; then
+      echo -e "  ${COLOR_MUTED}State:${COLOR_RESET}     ${COLOR_GREEN}${COLOR_BOLD}Charging / AC Connected${COLOR_RESET}"
+    elif [[ "$state" == "discharging" ]]; then
+      echo -e "  ${COLOR_MUTED}State:${COLOR_RESET}     ${COLOR_YELLOW}${COLOR_BOLD}On Battery / Discharging${COLOR_RESET}"
+    else
+      echo -e "  ${COLOR_MUTED}State:${COLOR_RESET}     ${COLOR_RED}${COLOR_BOLD}Offline / Quickshell not responding${COLOR_RESET}"
+    fi
+
+    # Monitor PID
+    mon_pid=$(pgrep -f "scripts/power-monitor.py" | head -n 1)
+    if [[ -n "$mon_pid" ]]; then
+      echo -e "  ${COLOR_MUTED}Monitor:${COLOR_RESET}   ${COLOR_GREEN}Running (PID $mon_pid)${COLOR_RESET}"
+    else
+      echo -e "  ${COLOR_MUTED}Monitor:${COLOR_RESET}   ${COLOR_RED}Not running${COLOR_RESET}"
+    fi
+
+    # Layer mapping check
+    if hyprctl layers 2>/dev/null | grep -q "namespace: powerwave"; then
+      echo -e "  ${COLOR_MUTED}Layer:${COLOR_RESET}     ${COLOR_GREEN}Mapped on Overlay (Level 3)${COLOR_RESET}"
+    else
+      echo -e "  ${COLOR_MUTED}Layer:${COLOR_RESET}     ${COLOR_YELLOW}Not currently mapped${COLOR_RESET}"
+    fi
+    ;;
+
+  *)
+    echo -e "${COLOR_HEAD}Usage:${COLOR_RESET} powerwave [trigger | status]"
+    exit 1
+    ;;
+esac

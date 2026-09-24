@@ -1,0 +1,1 @@
+{"repository":"fixture-repo","request":"Fix a parser bug and add a regression test.","verification":["focused regression test","syntax check"],"expected":"A scoped fix with recorded test evidence and an independent review result."}

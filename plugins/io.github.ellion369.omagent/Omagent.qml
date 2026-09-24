@@ -15,54 +15,36 @@ Item {
   property string dictationState: "idle"
 
   property string runState: "idle"
+  property string activeRunId: ""
+  property string qualityState: "unknown"
+  property var qualityReport: ({})
   property string activeMode: "regular" // "regular" | "internet" | "agentic"
   property string activeHarness: "agy" // "agy" | "opencode" | "cline"
   property string activeModel: "claude-opus-4-6-thinking"
+  property bool autoProvider: true
   property bool showingModelMenu: false
-  property bool autoMode: false
+  property bool autoMode: true
   property string attachedImagePath: ""
+  property var uiConceptOptions: []
+  property string uiConceptStatus: ""
   property string agenticTrack: "ui" // "ui" | "coding"
 
-  readonly property var harnessCatalog: ({
-    "agy": {
-      "name": "AGY",
-      "fullName": "Antigravity CLI (Base Default)",
-      "icon": "󰲋",
-      "defaultModel": "claude-opus-4-6-thinking",
-      "models": [
-        { "id": "claude-opus-4-6-thinking", "name": "Claude Opus 4.6", "badge": "Highest Reasoning", "isFree": false },
-        { "id": "gemini-3.1-pro-high", "name": "Gemini 3.1 Pro (High)", "badge": "Deep Thinking", "isFree": false },
-        { "id": "gemini-3.8-flash-high", "name": "Gemini 3.8 Flash (High)", "badge": "Fast Reasoning", "isFree": false },
-        { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "badge": "Thinking", "isFree": false }
-      ]
-    },
-    "opencode": {
-      "name": "OpenCode",
-      "fullName": "OpenCode Engine",
-      "icon": "󰘳",
-      "defaultModel": "opencode/nemotron-3.5-lightning-free",
-      "models": [
-        { "id": "opencode/nemotron-3.5-lightning-free", "name": "Nemotron 3.5 Lightning", "badge": "Free", "isFree": true },
-        { "id": "opencode/nemotron-3-ultra-free", "name": "Nemotron 3 Ultra", "badge": "Free", "isFree": true },
-        { "id": "opencode/big-pickle", "name": "Big Pickle", "badge": "Free", "isFree": true },
-        { "id": "opencode/mimo-v2.5-free", "name": "MiMo v2.5", "badge": "Free", "isFree": true },
-        { "id": "opencode/ling-3.0-flash-fin-free", "name": "Ling 3.0 Flash Fin", "badge": "Free", "isFree": true },
-        { "id": "opencode/muse-spark-1.3-contributor-free", "name": "Muse Spark 1.3", "badge": "Free", "isFree": true },
-        { "id": "opencode/muse-spark-1.2-contributor-free", "name": "Muse Spark 1.2", "badge": "Free", "isFree": true }
-      ]
-    },
-    "cline": {
-      "name": "Cline",
-      "fullName": "Cline Autonomous Agent",
-      "icon": "󰚩",
-      "defaultModel": "z-ai/glm-5.3-flash",
-      "models": [
-        { "id": "z-ai/glm-5.3-flash", "name": "GLM 5.3 Flash", "badge": "Free", "isFree": true },
-        { "id": "deepseek/deepseek-v4-flash", "name": "DeepSeek V4 Flash", "badge": "Free", "isFree": true },
-        { "id": "cline-free/muse-spark-1.3-contributor", "name": "Muse Spark 1.3", "badge": "Free", "isFree": true }
-      ]
+  // The runtime catalog is loaded from config/harnesses.json so the router and
+  // overlay cannot drift into separate provider/model definitions.
+  property var harnessCatalog: ({})
+
+  function applyHarnessCatalog(raw) {
+    if (!raw || !raw.harnesses) return
+    var next = {}
+    for (var i = 0; i < raw.harnesses.length; i++) {
+      var harness = raw.harnesses[i]
+      if (harness && harness.id) next[harness.id] = harness
     }
-  })
+    root.harnessCatalog = next
+    if (root.activeHarness && next[root.activeHarness]) {
+      root.activeModel = next[root.activeHarness].defaultModel
+    }
+  }
 
   function setMode(mode) {
     if (mode === "regular" || mode === "internet" || mode === "agentic") {
@@ -89,6 +71,7 @@ Item {
   function setHarness(harness) {
     if (root.activeHarness === harness) return
     root.activeHarness = harness
+    root.autoProvider = false
     var hData = root.harnessCatalog[harness]
     if (hData) {
       root.activeModel = hData.defaultModel
@@ -99,6 +82,7 @@ Item {
 
   function setModel(modelId) {
     root.activeModel = modelId
+    root.autoProvider = false
     root.showingModelMenu = false
     root.save()
   }
@@ -222,6 +206,7 @@ Item {
 
   readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/omagent"
   readonly property string statePath: root.stateDir + "/last.json"
+  readonly property string handoffDir: root.stateDir + "/handoff"
 
   readonly property bool busy: runner.running || root.runState === "running"
   readonly property bool stoppable: runner.running || root.runState === "running" || root.runState === "detached"
@@ -287,6 +272,7 @@ Item {
       "resumeLabel": root.resumeLabel,
       "resumeArgv": root.resumeArgv,
       "runState": root.runState,
+      "activeRunId": root.activeRunId,
       "runPid": root.runPid,
       "dragX": root.dragX,
       "dragY": root.dragY,
@@ -296,8 +282,13 @@ Item {
       "elapsedMs": root.elapsedMs,
       "activeMode": root.activeMode,
       "agenticTrack": root.agenticTrack,
+      "uiConceptOptions": root.uiConceptOptions,
+      "uiConceptStatus": root.uiConceptStatus,
+      "qualityReport": root.qualityReport,
       "activeHarness": root.activeHarness,
-      "activeModel": root.activeModel
+      "activeModel": root.activeModel,
+      "autoProvider": root.autoProvider,
+      "autoMode": root.autoMode
     }
   }
 
@@ -305,10 +296,15 @@ Item {
     if (!root.restored) return
     var snap = root.snapshot()
     var raw = JSON.stringify(snap, null, 2) + "\n"
-    stateFile.setText(raw)
-    if (root.sessionId !== "" && entries.count > 0) {
-      sessionSaveFile.setText(raw)
+    var handoffName = root.sessionId !== "" ? String(root.sessionId) : "last"
+    if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(handoffName)) {
+      root.pushRow("error", "Unsafe session ID; snapshot was not saved")
+      return
     }
+    handoffFile.path = root.handoffDir + "/" + handoffName + ".json"
+    handoffFile.setText(raw)
+    sessionImporter.command = [root.routerPath, "--import-session-file", handoffFile.path]
+    sessionImporter.running = true
   }
 
   function restore(raw) {
@@ -351,12 +347,18 @@ Item {
     root.sawCost = !!data.sawCost
     root.elapsedMs = Number(data.elapsedMs) || 0
     root.runPid = Number(data.runPid) || 0
+    root.activeRunId = String(data.activeRunId || "")
     root.sawAgent = root.agentName !== ""
     root.followTail = true
     if (data.activeMode) root.activeMode = String(data.activeMode)
     if (data.agenticTrack) root.agenticTrack = String(data.agenticTrack)
+    root.uiConceptOptions = data.uiConceptOptions || []
+    root.uiConceptStatus = String(data.uiConceptStatus || "")
+    root.qualityReport = data.qualityReport || ({})
     if (data.activeHarness) root.activeHarness = String(data.activeHarness)
     if (data.activeModel) root.activeModel = String(data.activeModel)
+    root.autoProvider = data.autoProvider === undefined ? false : !!data.autoProvider
+    if (data.autoMode !== undefined) root.autoMode = !!data.autoMode
 
     if ((String(data.runState) === "running" || String(data.runState) === "detached") && root.runPid > 0) {
       root.runState = "interrupted"
@@ -477,6 +479,13 @@ Item {
     list.contentY = Math.max(0, list.contentHeight - list.height)
   }
 
+  function chooseUiConcept(id) {
+    if (!id) return
+    prompt.text = String(id)
+    root.uiConceptStatus = "Selected " + String(id)
+    root.submit()
+  }
+
   function submit() {
     var request = prompt.text.trim()
     if (!request) return
@@ -502,17 +511,19 @@ Item {
     var argv = [root.routerPath]
     if (root.activeMode) argv.push("--mode", root.activeMode)
     if (root.activeMode === "agentic") {
-      if (root.activeHarness) argv.push("--harness", root.activeHarness)
-      if (root.activeModel) argv.push("--model", root.activeModel)
+      if (!root.autoProvider && root.activeHarness) argv.push("--harness", root.activeHarness)
+      if (!root.autoProvider && root.activeModel) argv.push("--model", root.activeModel)
       if (root.agenticTrack) argv.push("--track", root.agenticTrack)
       if (attachedImg) argv.push("--image", attachedImg)
     }
     if (root.autoMode) argv.push("--auto")
+    else argv.push("--no-auto")
     if (root.hasSession) argv = argv.concat(["--agent", root.agentName, "--session", root.sessionId])
     argv.push("--", request)
     runner.command = argv
     runner.running = true
     root.attachedImagePath = ""
+    root.uiConceptOptions = []
     prompt.text = ""
   }
 
@@ -524,6 +535,12 @@ Item {
       root.pushRow("error", "Unreadable router output: " + String(line).substring(0, 120))
       root.sawError = true
       return
+    }
+    if (event.run_id) root.activeRunId = String(event.run_id)
+    if (event.data && event.data.fields) {
+      var projectionKind = event.data.kind || "evidence"
+      event = event.data.fields
+      event.kind = projectionKind
     }
     var kind = event.kind
     if (kind === "agent") {
@@ -544,7 +561,17 @@ Item {
       }
     } else if (kind === "done") {
       root.markElapsed()
-      root.runState = event.stopped ? "stopped" : (event.ok ? "done" : "failed")
+      var terminalState = String(event.terminal_state || (event.ok ? "acknowledged" : "failed"))
+      root.qualityState = terminalState
+      root.runState = event.stopped ? "stopped" : (terminalState === "completed" ? "done" : terminalState)
+    } else if (kind === "ui_concepts") {
+      root.uiConceptOptions = event.options || []
+      root.uiConceptStatus = String(event.status || "Choose one direction before implementation.")
+      root.pushRow("status", root.uiConceptStatus)
+    } else if (kind === "quality") {
+      root.qualityState = String(event.state || "unknown")
+      root.qualityReport = event.report || ({})
+      root.pushRow("status", "Quality gate: " + root.qualityState)
     } else if (kind === "error") {
       root.sawError = true
       root.pushRow("error", event.text)
@@ -598,24 +625,41 @@ Item {
       if (row.rowKind === "text" || row.rowKind === "error")
         return row.rowText.substring(0, 140)
     }
-    return root.runState === "failed" ? "Request failed" : "Request finished"
+    if (root.runState === "failed") return "Request failed"
+    if (root.runState === "blocked") return "Request blocked by quality gate"
+    if (root.runState === "incomplete") return "Request incomplete"
+    return "Request finished"
   }
 
   onRunStateChanged: if (root.followTail) Qt.callLater(root.scrollToEnd)
 
-  function stopRun() {
-    if (root.runState === "detached") {
-      if (root.runPid > 0)
-        Quickshell.execDetached(["sh", "-c", "kill -TERM -- -" + root.runPid + " 2>/dev/null"])
-      root.pushRow("status", "Stopped")
+  function finishStop(raw) {
+    var result = null
+    try { result = JSON.parse(String(raw).trim().split("\n").pop()) } catch (error) {}
+    if (result && result.ok === true) {
+      if (runner.running) runner.running = false
       root.runState = "stopped"
       root.runPid = 0
-      root.save()
+      root.pushRow("status", "Stopped and cleaned up")
+    } else {
+      root.runState = "blocked"
+      root.pushRow("error", "Stop cleanup failed: " + (result && result.error ? result.error : "unknown cleanup error"))
+    }
+    root.expectedStop = false
+    root.save()
+  }
+
+  function stopRun() {
+    if (root.runState !== "running" && root.runState !== "detached" && root.runState !== "blocked") return
+    if (root.sessionId === "") {
+      root.pushRow("error", "Cannot stop before a session is established")
       return
     }
-    if (root.runState !== "running") return
     root.expectedStop = true
-    runner.running = false
+    var stopArgs = [root.routerPath, "--stop-session", root.sessionId]
+    if (root.activeRunId !== "") stopArgs.push("--run-id", root.activeRunId)
+    stopSession.command = stopArgs
+    stopSession.running = true
   }
 
   function detachToBackground() {
@@ -662,7 +706,7 @@ Item {
   }
 
   function newSession() {
-    if (runner.running) {
+    if (runner.running || root.runState === "detached") {
       root.pendingNewSession = true
       root.pendingExpand = false
       root.stopRun()
@@ -670,19 +714,20 @@ Item {
     }
     root.stopRun()
     if (root.sessionId !== "" && entries.count > 0) {
-      sessionSaveFile.setText(JSON.stringify(root.snapshot(), null, 2) + "\n")
+      root.save()
     }
     entries.clear()
     root.agentName = ""
     root.agentLabel = ""
     root.sessionId = ""
+    root.activeRunId = ""
+    root.uiConceptOptions = []
     root.agentCwd = ""
     root.resumeLabel = "Expand"
     root.resumeArgv = []
     root.sawAgent = false
     root.sawError = false
     root.runState = "idle"
-    root.autoMode = false
     root.followTail = true
     root.priorTokens = 0
     root.priorCost = 0
@@ -876,7 +921,33 @@ Item {
     onTriggered: root.save()
   }
 
-  Component.onCompleted: Quickshell.execDetached(["mkdir", "-p", root.stateDir + "/sessions"])
+  Component.onCompleted: Quickshell.execDetached(["mkdir", "-p", root.stateDir + "/sessions", root.handoffDir])
+
+  FileView {
+    id: handoffFile
+    atomicWrites: true
+    printErrors: false
+  }
+
+  Process {
+    id: sessionImporter
+    onExited: function(exitCode) {
+      if (exitCode !== 0) console.warn("Omagent: session projection import failed", exitCode)
+    }
+  }
+
+  FileView {
+    id: harnessCatalogFile
+    path: root.pluginDir + "/config/harnesses.json"
+    printErrors: false
+    onLoaded: {
+      try {
+        root.applyHarnessCatalog(JSON.parse(text()))
+      } catch (error) {
+        console.warn("Omagent: invalid harness catalog", error)
+      }
+    }
+  }
 
   FileView {
     id: stateFile
@@ -885,13 +956,6 @@ Item {
     printErrors: false
     onLoaded: root.restore(text())
     onLoadFailed: root.restored = true
-  }
-
-  FileView {
-    id: sessionSaveFile
-    path: root.sessionId !== "" ? (root.stateDir + "/sessions/" + root.sessionId + ".json") : ""
-    atomicWrites: true
-    printErrors: false
   }
 
   Process {
@@ -939,6 +1003,20 @@ Item {
       root.runState = exitCode === 0 ? "detached" : "interrupted"
       if (exitCode !== 0) root.runPid = 0
       root.save()
+    }
+  }
+
+  Process {
+    id: stopSession
+    stdout: StdioCollector {
+      id: stopCollector
+      waitForEnd: true
+      onStreamFinished: root.finishStop(stopCollector.text)
+    }
+    stderr: SplitParser {
+      onRead: function(line) {
+        if (String(line).trim() !== "") console.warn("Omagent: stop cleanup error", line)
+      }
     }
   }
 
@@ -1038,7 +1116,9 @@ Item {
       id: pill
 
       width: panel.surfaceWidth
-      height: (root.activeMode === "agentic") ? Style.space(202) : Style.space(114)
+      height: (root.activeMode === "agentic")
+        ? (root.uiConceptOptions.length > 0 ? Style.space(286) : Style.space(202))
+        : Style.space(114)
       x: Math.round((panel.width - width) / 2) + panel.clampX(root.dragX)
       y: panel.pillTop + panel.clampY(root.dragY)
       radius: Style.space(22)
@@ -1548,6 +1628,84 @@ Item {
           height: 1
           color: Color.menu.border
           opacity: 0.16
+        }
+
+        // UI concept comparison row. The router remains authoritative; this is
+        // only a keyboard- and pointer-accessible projection of its event.
+        Item {
+          id: uiConceptChooser
+          visible: root.uiConceptOptions.length > 0
+          width: parent.width
+          height: visible ? Style.space(66) : 0
+
+          Text {
+            id: uiConceptStatus
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.right: parent.right
+            text: root.uiConceptStatus
+            color: Color.menu.text
+            opacity: 0.78
+            font.family: Style.font.menuFamily
+            font.pixelSize: Style.font.caption
+            elide: Text.ElideRight
+          }
+
+          Row {
+            id: uiConceptRow
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: Style.space(1)
+            spacing: Style.space(5)
+
+            Repeater {
+              model: root.uiConceptOptions
+              delegate: Rectangle {
+                width: Math.max(Style.space(96), (uiConceptRow.width - Style.space(10)) / 3)
+                height: Style.space(36)
+                radius: Style.space(8)
+                color: conceptMouse.containsMouse
+                  ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.18)
+                  : Qt.rgba(Color.menu.text.r, Color.menu.text.g, Color.menu.text.b, 0.06)
+                border.color: conceptMouse.containsMouse ? Color.accent : Color.menu.border
+                border.width: 1
+                focus: true
+                Keys.onReturnPressed: function(event) {
+                  root.chooseUiConcept(String(modelData.id || ""))
+                  event.accepted = true
+                }
+                Keys.onEnterPressed: function(event) {
+                  root.chooseUiConcept(String(modelData.id || ""))
+                  event.accepted = true
+                }
+                Accessible.role: Accessible.Button
+                Accessible.name: "Choose UI concept " + (modelData.title || modelData.id)
+                Accessible.description: modelData.thesis || "Compare this design direction before implementation."
+
+                Text {
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.leftMargin: Style.space(7)
+                  anchors.rightMargin: Style.space(7)
+                  text: (modelData.id || "concept") + " · " + (modelData.title || "direction")
+                  color: Color.menu.text
+                  font.family: Style.font.menuFamily
+                  font.pixelSize: Style.font.caption
+                  elide: Text.ElideRight
+                }
+
+                MouseArea {
+                  id: conceptMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.chooseUiConcept(String(modelData.id || ""))
+                }
+              }
+            }
+          }
         }
 
         // Bottom Row: Mode Selector Segments & Status Description
@@ -2509,9 +2667,11 @@ Item {
                 : (root.runState === "detached" ? "In background (Ctrl+E to view)"
                 : (root.runState === "interrupted" ? "Ended while away"
                 : (root.runState === "failed" ? "Failed"
+                : (root.runState === "blocked" ? "Blocked by quality gate"
+                : (root.runState === "incomplete" ? "Incomplete"
                 : (root.runState === "stopped" ? "Stopped"
-                : (root.runState === "done" ? "Done" : "")))))
-              color: root.runState === "failed" ? Color.urgent : Color.muted
+                : (root.runState === "done" ? "Done" : "")))))))
+              color: (root.runState === "failed" || root.runState === "blocked" || root.runState === "incomplete") ? Color.urgent : Color.muted
               font.family: Style.font.menuFamily
               font.pixelSize: Style.font.bodySmall
             }
@@ -3364,4 +3524,3 @@ Item {
   }
 }
 }
-

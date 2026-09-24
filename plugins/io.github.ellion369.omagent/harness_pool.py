@@ -27,9 +27,12 @@ import json
 import os
 import re
 import shlex
+import signal
 import subprocess
 import sys
+import tempfile
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 HOME = Path.home()
@@ -58,7 +61,7 @@ DEFAULT_CONFIG = {
         "unknown_policy": "trust-agy",
     },
     "quota_force_state": None,            # "exhausted" | "healthy" (testing only)
-    "tiebreak_order": ["kilo", "opencode", "cline"],
+    "tiebreak_order": ["opencode", "cline"],
     "allow_unscored_fallback": True,      # use unscored models if no scored one is available
     "pool_refresh": {
         "enabled": True,
@@ -82,6 +85,75 @@ DEFAULT_CONFIG = {
 def dprint(msg: str) -> None:
     if DEBUG:
         print(f"[harness_pool] {msg}", file=sys.stderr)
+
+
+@contextmanager
+def _isolated_probe_workspace():
+    """Give health probes a disposable HOME, XDG state, and workspace.
+
+    Probe authentication is intentionally not inherited from the host. A
+    provider that needs credentials must fail closed here and be verified in a
+    separately authorized smoke test instead of silently reading user state.
+    """
+    with tempfile.TemporaryDirectory(prefix="omagent-probe-") as directory:
+        root = Path(directory)
+        home = root / "home"
+        workspace = root / "workspace"
+        temporary = root / "tmp"
+        for path in (home, workspace, temporary):
+            path.mkdir(parents=True, exist_ok=True)
+        env = {
+            key: os.environ[key]
+            for key in ("LANG", "LC_ALL", "TERM", "SHELL", "PATH", "USER", "LOGNAME")
+            if key in os.environ
+        }
+        original_bin = HOME / ".local" / "bin"
+        env["PATH"] = f"{original_bin}:{env.get('PATH', '')}"
+        env.update({
+            "HOME": str(home),
+            "XDG_CONFIG_HOME": str(home / ".config"),
+            "XDG_DATA_HOME": str(home / ".local" / "share"),
+            "XDG_STATE_HOME": str(home / ".local" / "state"),
+            "XDG_CACHE_HOME": str(home / ".cache"),
+            "TMPDIR": str(temporary),
+            "OMAGENT_PROBE": "1",
+        })
+        yield env, home, workspace
+
+
+def _run_probe_command(
+    command: list[str],
+    *,
+    timeout: int,
+    cwd: Path,
+    env: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        cwd=cwd,
+        env=env,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            process.communicate(timeout=1)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.communicate()
+        raise
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
 def load_config(override: dict | None = None) -> dict:
@@ -111,7 +183,12 @@ def load_config(override: dict | None = None) -> dict:
 # =====================================================================
 
 
-def _fetch_agy_quota(refresh_credentials: bool = False) -> dict:
+def _fetch_agy_quota(
+    refresh_credentials: bool = False,
+    *,
+    env: dict[str, str] | None = None,
+    cwd: Path | None = None,
+) -> dict:
     """Probes quota-axi for agy's 5h (kind=session) and weekly usage percentages.
 
     quota-axi window schema (from its agy provider source):
@@ -124,7 +201,10 @@ def _fetch_agy_quota(refresh_credentials: bool = False) -> dict:
     if not refresh_credentials:
         cmd.append("--no-credential-refresh")
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+        if env is not None and cwd is not None:
+            res = _run_probe_command(cmd, timeout=25, cwd=cwd, env=env)
+        else:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=25, env=env, cwd=cwd)
         data = json.loads(res.stdout)
         providers = data.get("providers") or []
         if not providers:
@@ -196,10 +276,8 @@ def check_agy_quota(config: dict | None = None, force: bool = False) -> dict:
             dprint(f"cache read error: {e}")
 
     trigger = float(qc.get("trigger_usage_pct", 95))
-    probe = _fetch_agy_quota(refresh_credentials=False)
-    if not probe.get("ok"):
-        dprint(f"first probe failed: {probe.get('error')}; retrying with credential refresh")
-        probe = _fetch_agy_quota(refresh_credentials=True)
+    with _isolated_probe_workspace() as (probe_env, _probe_home, probe_workspace):
+        probe = _fetch_agy_quota(refresh_credentials=False, env=probe_env, cwd=probe_workspace)
 
     if probe.get("ok"):
         hourly = probe.get("hourly_used_pct")
@@ -357,62 +435,89 @@ def _probe_model(provider: str, mid: str, chat_timeout: int, tool_timeout: int,
     Stage 2 (tool use): can it actually ACT agentically — write a file via
     its own file tools? Chat-only ability is useless for Lane 3 coding runs.
 
-    Returns (chat_ok, tool_ok, detail).
+    The probe gets a disposable HOME, XDG directories, temporary directory,
+    and workspace. Host credentials and mutable provider state are not passed
+    into this operation, so an unauthorized provider fails closed.
     """
-    tool_file = f"/tmp/omagent_tooluse_{os.getpid()}_{int(time.time())}.txt"
-    tool_task = (
-        f"Use your file editing tools to create the file {tool_file} containing "
-        f"exactly the text TOOLUSE_OK. Do not just print it — actually write the file."
-    )
     if provider == "kilo":
         chat_cmd = ["kilo", "run", "-m", mid, "Reply with exactly: PROBE_OK"]
-        tool_cmd = ["kilo", "run", "-m", mid, tool_task]
+        tool_cmd_base = ["kilo", "run", "-m", mid]
     elif provider == "opencode":
         chat_cmd = ["opencode", "run", "-m", mid, "Reply with exactly: PROBE_OK"]
-        tool_cmd = ["opencode", "run", "-m", mid, tool_task]
+        tool_cmd_base = ["opencode", "run", "-m", mid]
     elif provider == "cline":
         chat_cmd = ["cline", "--auto-approve", "true", "Reply with exactly: PROBE_OK"]
-        tool_cmd = ["cline", "--auto-approve", "true", tool_task]
+        tool_cmd_base = ["cline", "--auto-approve", "true"]
     else:
         return False, False, f"unsupported provider: {provider}"
 
-    try:
-        res = subprocess.run(chat_cmd, capture_output=True, text=True, timeout=chat_timeout, cwd="/tmp")
-        out = (res.stdout or "") + (res.stderr or "")
-        chat_ok = "PROBE_OK" in out
-        if not chat_ok:
-            return False, False, f"chat probe failed: {out.strip()[:120] or 'no output'}"
-    except subprocess.TimeoutExpired:
-        return False, False, "chat probe timed out"
-    except Exception as e:
-        return False, False, f"chat probe error: {e}"
-
-    if not require_tool_use:
-        return True, False, "chat verified (tool-use check disabled)"
-
-    try:
-        subprocess.run(tool_cmd, capture_output=True, text=True, timeout=tool_timeout, cwd="/tmp")
-        tool_ok = False
-        try:
-            tool_ok = "TOOLUSE_OK" in Path(tool_file).read_text(encoding="utf-8", errors="ignore")
-        except Exception:
-            tool_ok = False
-        return True, tool_ok, (
-            "chat + agentic tool-use verified"
-            if tool_ok else "chat OK but model failed the agentic tool-use test"
+    with _isolated_probe_workspace() as (env, _home, workspace):
+        tool_file = workspace / f"tooluse-{os.getpid()}-{int(time.time())}.txt"
+        tool_task = (
+            f"Use your file editing tools to create the file {tool_file} containing "
+            f"exactly the text TOOLUSE_OK. Do not just print it — actually write the file."
         )
-    except subprocess.TimeoutExpired:
-        return True, False, "chat OK but tool-use probe timed out"
-    except Exception as e:
-        return True, False, f"chat OK; tool-use probe error: {e}"
-    finally:
+        tool_cmd = tool_cmd_base + [tool_task]
         try:
-            os.unlink(tool_file)
-        except Exception:
-            pass
+            res = _run_probe_command(chat_cmd, timeout=chat_timeout, cwd=workspace, env=env)
+            out = (res.stdout or "") + (res.stderr or "")
+            chat_ok = "PROBE_OK" in out
+            if not chat_ok:
+                return False, False, f"chat probe failed: {out.strip()[:120] or 'no output'}"
+        except subprocess.TimeoutExpired:
+            return False, False, "chat probe timed out"
+        except Exception as e:
+            return False, False, f"chat probe error: {e}"
+
+        if not require_tool_use:
+            return True, False, "chat verified (tool-use check disabled)"
+
+        try:
+            _run_probe_command(tool_cmd, timeout=tool_timeout, cwd=workspace, env=env)
+            try:
+                tool_ok = "TOOLUSE_OK" in tool_file.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                tool_ok = False
+            return True, tool_ok, (
+                "chat + agentic tool-use verified"
+                if tool_ok else "chat OK but model failed the agentic tool-use test"
+            )
+        except subprocess.TimeoutExpired:
+            return True, False, "chat OK but tool-use probe timed out"
+        except Exception as e:
+            return True, False, f"chat OK; tool-use probe error: {e}"
 
 
-def _verify_and_rank(winner: dict, candidates: list[dict], config: dict) -> tuple[dict, str | None]:
+def _probe_model_with_retries(
+    provider: str,
+    mid: str,
+    chat_timeout: int,
+    tool_timeout: int,
+    require_tool_use: bool,
+    *,
+    attempts: int = 2,
+    deadline: float | None = None,
+) -> tuple[bool, bool, str]:
+    """Probe a model with a small, deterministic retry budget."""
+    bounded_attempts = max(1, min(int(attempts), 3))
+    result = (False, False, "probe did not run")
+    for _ in range(bounded_attempts):
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False, False, "probe budget exhausted"
+            remaining_seconds = max(1, int(remaining))
+            chat_budget = min(chat_timeout, remaining_seconds)
+            tool_budget = min(tool_timeout, max(1, remaining_seconds - chat_budget)) if require_tool_use else tool_timeout
+        else:
+            chat_budget, tool_budget = chat_timeout, tool_timeout
+        result = _probe_model(provider, mid, chat_budget, tool_budget, require_tool_use)
+        if result[0] and (result[1] or not require_tool_use):
+            return result
+    return result
+
+
+def _verify_and_rank(winner: dict, candidates: list[dict], config: dict) -> tuple[dict | None, str | None]:
     """Pre-switch ritual step 2: verify the pick live BEFORE committing.
 
     Walks the ENTIRE ranked pool (probe_top_n=0) until a model passes both
@@ -427,21 +532,9 @@ def _verify_and_rank(winner: dict, candidates: list[dict], config: dict) -> tupl
     chat_timeout = int(pr.get("probe_timeout_s", 120))
     tool_timeout = int(ver.get("tool_use_timeout_s", 240))
     require_tool = bool(ver.get("require_tool_use", True))
-    verified_ttl = int(pr.get("probe_verified_ttl_s", 1800))
     total_budget = float(pr.get("probe_total_budget_s", 3600))
     top_n = int(pr.get("probe_top_n", 0))
     now = time.time()
-
-    # Fast path: this exact model was recently verified under the SAME rules
-    try:
-        if MODEL_PROBE_CACHE.is_file():
-            c = json.loads(MODEL_PROBE_CACHE.read_text(encoding="utf-8"))
-            if (c.get("model") == winner.get("id")
-                    and now - c.get("verified_at", 0) < verified_ttl
-                    and (c.get("tool_use") or not require_tool)):
-                return winner, None  # sticky continuation, already proven
-    except Exception:
-        pass
 
     fail_ttl = int(ver.get("probe_fail_ttl_s", 900))
     ranked = [winner] + [m for m in candidates if m.get("id") != winner.get("id")]
@@ -450,9 +543,10 @@ def _verify_and_rank(winner: dict, candidates: list[dict], config: dict) -> tupl
 
     failures_map = _load_probe_failures()
     started = time.time()
+    deadline = time.monotonic() + total_budget
     failures: list[str] = []
     for m in ranked:
-        if time.time() - started > total_budget:
+        if time.monotonic() >= deadline:
             failures.append("ritual probe budget exhausted")
             break
         provider, mid = m.get("provider"), m.get("id")
@@ -462,34 +556,27 @@ def _verify_and_rank(winner: dict, candidates: list[dict], config: dict) -> tupl
             failures.append(f"{mid}: skipped (failed {age_m}m ago: {str(prev_fail.get('detail', '?'))[:60]})")
             dprint(f"verify skipped {mid} (recent failure)")
             continue
-        chat_ok, tool_ok, detail = _probe_model(provider, mid, chat_timeout, tool_timeout, require_tool)
+        chat_ok, tool_ok, detail = _probe_model_with_retries(
+            provider,
+            mid,
+            chat_timeout,
+            tool_timeout,
+            require_tool,
+            attempts=int(ver.get("probe_attempts", 2)),
+            deadline=deadline,
+        )
         if chat_ok and (tool_ok or not require_tool):
             failures_map.pop(mid, None)  # recovered: forget the failure
-            _save_probe_failures(failures_map)
-            try:
-                STATE_DIR.mkdir(parents=True, exist_ok=True)
-                MODEL_PROBE_CACHE.write_text(json.dumps({
-                    "model": mid, "provider": provider, "verified_at": time.time(),
-                    "tool_use": tool_ok, "detail": detail,
-                }, indent=2), "utf-8")
-            except Exception:
-                pass
-            _annotate_pool_model(mid, last_verified_at=time.time(), last_verification=detail)
             if mid == winner.get("id"):
                 return winner, f"Verified live before switching: `{mid}` — {detail}"
-            # Promoted past a dead top pick: record what failed, on the loser.
-            if winner.get("id"):
-                _annotate_pool_model(winner["id"], last_probe_failed_at=time.time(),
-                                     last_probe_detail="; ".join(failures) or "verification failed")
             return m, (f"Top-ranked model failed verification ({'; '.join(failures) or 'probe failed'}) — "
                        f"promoted `{mid}` (verified: {detail})")
         failures.append(f"{mid}: {detail}")
         failures_map[mid] = {"failed_at": time.time(), "detail": detail}
-        _save_probe_failures(failures_map)
         dprint(f"verify rejected {mid}: {detail}")
 
-    return winner, ("**Live verification failed for every ranked free model — "
-                    f"keeping ranked order ({'; '.join(failures[-2:])})**")
+    return None, ("**Live verification failed for every ranked free model — "
+                   f"fallback dispatch blocked ({'; '.join(failures[-2:])})**")
 
 
 def _audit_decision(decision: dict, config: dict, t_start: float, extra: dict | None = None) -> None:
@@ -574,7 +661,12 @@ def _which(binary: str) -> str | None:
     return None
 
 
-def _has_cli_credentials(binary: str, auth_file: Path) -> bool:
+def _has_cli_credentials(
+    binary: str,
+    auth_file: Path,
+    env: dict[str, str] | None = None,
+    cwd: Path | None = None,
+) -> bool:
     if auth_file.is_file():
         try:
             data = json.loads(auth_file.read_text(encoding="utf-8"))
@@ -583,24 +675,19 @@ def _has_cli_credentials(binary: str, auth_file: Path) -> bool:
         except Exception:
             pass
     try:
-        res = subprocess.run([binary, "auth", "list"], capture_output=True, text=True, timeout=15)
+        if env is not None and cwd is not None:
+            res = _run_probe_command([binary, "auth", "list"], timeout=15, cwd=cwd, env=env)
+        else:
+            res = subprocess.run([binary, "auth", "list"], capture_output=True, text=True, timeout=15, env=env, cwd=cwd)
         return "0 credentials" not in res.stdout
     except Exception:
         return False
 
 
-def _cline_available() -> dict:
-    """Empirically probes cline's own gateway balance (cached 30 min)."""
-    now = time.time()
-    try:
-        if CLINE_PROBE_CACHE.is_file():
-            cached = json.loads(CLINE_PROBE_CACHE.read_text(encoding="utf-8"))
-            if now - cached.get("probed_at", 0) < 1800:
-                return cached["result"]
-    except Exception:
-        pass
-
-    providers_file = HOME / ".cline/data/settings/providers.json"
+def _cline_available(env: dict[str, str] | None = None, workspace: Path | None = None) -> dict:
+    """Probe Cline inside the caller's disposable state, if supplied."""
+    probe_home = Path(env.get("HOME", str(HOME))) if env else HOME
+    providers_file = probe_home / ".cline/data/settings/providers.json"
     saved_model = None
     result = {"available": False, "reason": "cline not installed"}
     try:
@@ -612,10 +699,11 @@ def _cline_available() -> dict:
             if not has_auth:
                 result = {"available": False, "reason": "cline not authenticated (run `cline auth cline`)"}
             else:
-                probe = subprocess.run(
-                    ["cline", "--auto-approve", "true", "-c", "/tmp", "Reply with exactly: PROBE_OK"],
-                    capture_output=True, text=True, timeout=90,
-                )
+                command = ["cline", "--auto-approve", "true", "-c", str(providers_file.parent.parent.parent), "Reply with exactly: PROBE_OK"]
+                if env is not None and workspace is not None:
+                    probe = _run_probe_command(command, timeout=90, cwd=workspace, env=env)
+                else:
+                    probe = subprocess.run(command, capture_output=True, text=True, timeout=90, env=env, cwd=workspace)
                 out = (probe.stdout or "") + (probe.stderr or "")
                 if "Insufficient balance" in out:
                     result = {"available": False, "reason": "cline gateway balance exhausted ($0.00)"}
@@ -636,46 +724,50 @@ def _cline_available() -> dict:
     except Exception as e:
         result = {"available": False, "reason": f"cline probe error: {e}"}
 
-    try:
-        STATE_DIR.mkdir(parents=True, exist_ok=True)
-        CLINE_PROBE_CACHE.write_text(json.dumps({"probed_at": now, "result": result}, indent=2), "utf-8")
-    except Exception:
-        pass
     return result
 
 
-def probe_providers() -> dict:
-    out = {}
-    kilo_auth = HOME / ".local/share/kilo/auth.json"
-    oc_auth = HOME / ".local/share/opencode/auth.json"
-    out["kilo"] = {
-        "binary": bool(_which("kilo")),
-        "free_tier": True,
-        "account_authed": _has_cli_credentials("kilo", kilo_auth) if _which("kilo") else False,
-    }
-    out["opencode"] = {
-        "binary": bool(_which("opencode")),
-        "free_tier": True,
-        "account_authed": _has_cli_credentials("opencode", oc_auth) if _which("opencode") else False,
-    }
-    out["cline"] = dict(_cline_available(), binary=bool(_which("cline")))
-    out["agy"] = {"binary": bool(_which("agy"))}
-    return out
+def probe_providers(providers: set[str] | None = None) -> dict:
+    wanted = providers or {"kilo", "opencode", "cline", "agy"}
+    with _isolated_probe_workspace() as (env, probe_home, workspace):
+        out = {}
+        if "kilo" in wanted:
+            kilo_binary = _which("kilo")
+            kilo_auth = probe_home / ".local/share/kilo/auth.json"
+            out["kilo"] = {
+                "binary": bool(kilo_binary),
+                "free_tier": True,
+                "account_authed": _has_cli_credentials("kilo", kilo_auth, env, workspace) if kilo_binary else False,
+            }
+        if "opencode" in wanted:
+            opencode_binary = _which("opencode")
+            oc_auth = probe_home / ".local/share/opencode/auth.json"
+            out["opencode"] = {
+                "binary": bool(opencode_binary),
+                "free_tier": True,
+                "account_authed": _has_cli_credentials("opencode", oc_auth, env, workspace) if opencode_binary else False,
+            }
+        if "cline" in wanted:
+            cline_binary = _which("cline")
+            out["cline"] = dict(_cline_available(env, workspace), binary=bool(cline_binary))
+        if "agy" in wanted:
+            out["agy"] = {"binary": bool(_which("agy"))}
+        return out
 
 
 def provider_available(provider: str, model: dict, probes: dict | None = None) -> bool:
+    if provider not in {"opencode", "cline"}:
+        return False
     probes = probes or probe_providers()
     p = probes.get(provider, {})
     if not p.get("binary"):
         return False
-    if provider in ("kilo", "opencode"):
+    if provider == "opencode":
         # Free gateway tier needs no account; account-tier models need auth.
         if model.get("auth") == "none":
             return True
         return bool(p.get("account_authed"))
-    if provider == "cline":
-        return bool(p.get("available"))
-    return False
+    return bool(p.get("available"))
 
 
 # =====================================================================
@@ -796,47 +888,28 @@ def select_harness(config: dict | None = None, quota: dict | None = None) -> dic
 
     # Rank the free pool: strict score order, provenance-tagged.
     pool = load_pool()
-    tiebreak = config.get("tiebreak_order", ["kilo", "opencode", "cline"])
-    probes = probe_providers()
-
-    # ---- Pre-switch ritual: re-enumerate the pool right before switching ----
-    # Fresh failover transition → always refresh (+prune). Sticky continuation →
-    # refresh only when the pool data is older than pool_refresh.max_age_s.
-    pr_cfg = config.get("pool_refresh", {})
-    sticky_prev = sticky.get("mode") == "fallback"
-    if pr_cfg.get("enabled", True):
-        fresh_transition = (not sticky_prev) and bool(pr_cfg.get("on_failover", True))
-        if fresh_transition or _pool_is_stale(pool, config):
-            try:
-                r = refresh_pool()
-                pool = load_pool()
-                n_add, n_prune = len(r.get("added", [])), len(r.get("pruned", []))
-                if n_add or n_prune:
-                    bullets.append(
-                        f"Pool re-scanned before switching: {n_add} new free model(s), {n_prune} removed"
-                    )
-                # Best-effort research hints for brand-new free models (hints
-                # only — never auto-scored; selection stays deliberate).
-                new_added = r.get("added") or []
-                if new_added and ver_cfg.get("research_new_models", True):
-                    max_r = int(ver_cfg.get("research_max_new", 3))
-                    hints = []
-                    for mid in new_added[:max_r]:
-                        hint = _research_model_hint(mid)
-                        if hint:
-                            hints.append(f"`{mid}`: {clip(str(hint), 140)}")
-                    if hints:
-                        bullets.append("Research hints for new models (scores pending): " + " ;; ".join(hints[:2]))
-            except Exception as e:
-                dprint(f"pre-switch pool refresh failed: {e}")
-
-    candidates = [m for m in pool.get("models", [])
-                  if m.get("free") and m.get("provider") not in (None, "agy")
-                  and m.get("status") != "gone"
-                  and provider_available(m["provider"], m, probes)]
+    tiebreak = [provider for provider in (config.get("tiebreak_order") or ["opencode", "cline"]) if provider in {"opencode", "cline"}]
+    if not tiebreak:
+        tiebreak = ["opencode", "cline"]
+    # Provider selection is read-only. Pool refresh and research are explicit
+    # maintenance operations, never implicit side effects of routing a task.
+    pool_candidates = [
+        model for model in pool.get("models", [])
+        if model.get("free") and model.get("provider") in {"opencode", "cline"}
+        and model.get("status") != "gone"
+    ]
+    if not pool_candidates:
+        bullets.append("**No supported fallback model is present in the catalog**")
+        decision = {"use_agy": True, "provider": "agy", "model": agy_model,
+                    "reason": "no supported fallback model available (agy kept as last resort)",
+                    "quota": quota, "bullets": bullets, "remedy": True}
+        _audit_decision(decision, config, t_start, {"remedy": True})
+        return decision
+    probes = probe_providers({model["provider"] for model in pool_candidates})
+    candidates = [model for model in pool_candidates if provider_available(model["provider"], model, probes)]
 
     if not candidates:
-        bullets.append("**No fallback provider available — run `kilo auth` / `opencode auth login` / `cline auth cline`**")
+        bullets.append("**No supported fallback provider available — run `opencode auth login` or `cline auth cline`**")
         decision = {"use_agy": True, "provider": "agy", "model": agy_model,
                     "reason": "no fallback provider available (agy kept as last resort)",
                     "quota": quota, "bullets": bullets, "remedy": True}
@@ -873,9 +946,23 @@ def select_harness(config: dict | None = None, quota: dict | None = None) -> dic
     pre_verify_id = winner.get("id")
     verified_ok = True
     promoted = False
+    pr_cfg = config.get("pool_refresh", {})
     if pr_cfg.get("enabled", True):
         try:
             winner, verify_note = _verify_and_rank(winner, candidates, config)
+            if winner is None:
+                bullets.append(verify_note or "**Live verification failed for every ranked free model**")
+                decision = {
+                    "use_agy": True,
+                    "provider": "agy",
+                    "model": agy_model,
+                    "reason": "all fallback models failed live verification",
+                    "quota": quota,
+                    "bullets": bullets,
+                    "remedy": True,
+                }
+                _audit_decision(decision, config, t_start, {"remedy": True})
+                return decision
             promoted = winner.get("id") != pre_verify_id
             if verify_note:
                 bullets.append(verify_note)
@@ -949,23 +1036,26 @@ def ensure_herdr_running() -> bool:
     return False
 
 
-def build_launch_cmd(provider: str, model: str, prompt: str) -> str:
+def build_launch_cmd(provider: str, model: str, prompt: str, *, auto_approve: bool = True) -> str:
     """Builds the shell command sent into the Herdr pane for the chosen harness."""
     q = shlex.quote
     if provider == "agy":
-        return f"agy --model {q(model)} --dangerously-skip-permissions -i {q(prompt)}\n"
+        approval = " --dangerously-skip-permissions" if auto_approve else ""
+        return f"agy --model {q(model)}{approval} -i {q(prompt)}\n"
     if provider == "opencode":
-        return f"opencode run --auto -m {q(model)} {q(prompt)}\n"
+        approval = " --auto" if auto_approve else ""
+        return f"opencode run{approval} -m {q(model)} {q(prompt)}\n"
     if provider == "kilo":
-        return f"kilo run -m {q(model)} {q(prompt)}\n"
+        raise ValueError("unsupported provider: kilo has no router adapter")
     if provider == "cline":
         thinking_flag = "--thinking medium " if "muse-spark" in (model or "") else ""
         model_flag = f"-m {q(model)} " if model else ""
+        approval = " --auto-approve true" if auto_approve else ""
         # --timeout 0: disable the tool-call timeout (free-tier models are slower and large
         #   file writes can exceed the default cline timeout causing session abandonment)
         # --retries 15: more tolerance for transient errors before giving up (default is 6)
         # --compaction basic: keep context lean without slow recursive LLM summarization on flash models
-        return f"cline --auto-approve true --timeout 0 --retries 15 --compaction basic {thinking_flag}{model_flag}{q(prompt)}\n"
+        return f"cline{approval} --timeout 0 --retries 15 --compaction basic {thinking_flag}{model_flag}{q(prompt)}\n"
     raise ValueError(f"unknown provider: {provider}")
 
 
@@ -1163,8 +1253,8 @@ def _send_pane_nudge(provider: str, pane_id: str) -> bool:
     except Exception:
         pass
 
-    if provider in ("kilo", "opencode"):
-        nudge_cmd = f"{provider} run --auto -c 'continue'\n" if is_shell_prompt else "continue\n"
+    if provider == "opencode":
+        nudge_cmd = "opencode run --auto -c 'continue'\n" if is_shell_prompt else "continue\n"
     elif provider == "agy":
         nudge_cmd = "agy --continue\n" if is_shell_prompt else "continue\n"
     elif provider == "cline":
@@ -1195,6 +1285,8 @@ def switch_provider_model(provider: str, cfg: dict, exclude_model: str | None = 
     skipped here — the goal is a working lane right now. Returns None when
     nothing verifiable remains on this provider (the task stays put).
     """
+    if provider not in {"opencode", "cline"}:
+        return None
     ver = cfg.get("verification") or {}
     chat_timeout = int(ver.get("probe_chat_timeout_s", 90))
     pool = load_pool()
@@ -1214,7 +1306,7 @@ def switch_provider_model(provider: str, cfg: dict, exclude_model: str | None = 
             continue
         candidates.append(m)
 
-    tiebreak = cfg.get("tiebreak_order") or ["kilo", "opencode", "cline"]
+    tiebreak = [item for item in (cfg.get("tiebreak_order") or ["opencode", "cline"]) if item in {"opencode", "cline"}] or ["opencode", "cline"]
     order = tiebreak.index(provider) if provider in tiebreak else 0
 
     def rank_key(m):

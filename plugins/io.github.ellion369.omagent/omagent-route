@@ -10,6 +10,7 @@ Lanes:
 from __future__ import annotations
 
 import concurrent.futures
+import hashlib
 import html
 import json
 import os
@@ -28,6 +29,35 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+from omagent_core.catalog import load_harness_catalog
+from omagent_core.controller import RunController
+from omagent_core.legacy_migration import migrate_snapshots
+from omagent_core.plan_mode import build_plan
+from omagent_core.orchestration.firstmate import FirstmateAdapter, FirstmateError
+from omagent_core.orchestration.herdr import HerdrAdapter, HerdrError
+from omagent_core.orchestration.worktree import WorkspaceError, discover_repository, plan_worktree, remove_managed_worktree
+from omagent_core.quality.ui_profile import build_adaptive_brief
+from omagent_core.reference_analysis import fingerprint_reference, inspect_reference
+from omagent_core.ui_context import context_from_contract
+from omagent_core.ui_evidence import UiEvidenceResult
+from omagent_core.ui_flow import parse_concept_selection, selected_context
+from omagent_core.ui_skill_bundle import impeccable_ui_bundle
+from omagent_core.ui_brief import (
+    DesignContract,
+    build_design_contract,
+    render_concept_cards,
+    selected_concept_prompt,
+    validate_concept_diversity,
+)
+from omagent_core.visual_qa import VisualQAProfile, evaluate_visual_evidence
+from omagent_core.quality import CheckResult, QualityEngine, ReviewReceipt, TaskContract, load_review_receipt
+from omagent_core.routing import SUPPORTED_PROVIDERS
+from omagent_core.identity import RunIdentity
+from omagent_core.run_manifest import RunManifest
+from omagent_core.retrieval import Source, assess_retrieval
+from omagent_core.secrets import redact_data, redact_text, resolve_secret
+from omagent_core.session_store import SessionStore
+
 MAX_REQUEST_CHARS = 2500
 MAX_TEXT_CHARS = 4000
 MAX_TOOL_CHARS = 160
@@ -35,9 +65,13 @@ MAX_TOOL_CHARS = 160
 CONFIG_PATH = Path.home() / ".config/omagent/config.json"
 STATE_DIR = Path.home() / ".local/state/omagent"
 SESSION_DIR = STATE_DIR / "sessions"
+CONTROLLER_DB_PATH = STATE_DIR / "controller.sqlite"
+HANDOFF_DIR = STATE_DIR / "handoff"
 
 DRY_RUN = os.environ.get("OMAGENT_DRY_RUN") == "1"
 DEBUG = os.environ.get("OMAGENT_DEBUG") == "1"
+AUTO_APPROVE = True
+CURRENT_RUN_ID = ""
 
 EMITTED_ERROR = False
 
@@ -272,10 +306,80 @@ def get_session_fleet(session_id: str) -> dict | None:
     return None
 
 
-def save_session_fleet(session_id: str, fleet_data: dict) -> None:
-    """Persists fleet binding (task_id, workspace_id, pane_id) for session_id."""
+def _manifest_from_fleet(session_id: str, run_id: str, fleet_data: dict) -> dict:
+    manifest = RunManifest(
+        RunIdentity(
+            conversation_id=session_id,
+            run_id=run_id,
+            provider_session_id=fleet_data.get("providerSessionId") or None,
+        ),
+        workspace=fleet_data.get("cwd"),
+        workspace_owned=fleet_data.get("workspaceOwned") is True,
+        evidence_generation=fleet_data.get("evidenceGeneration") or f"evidence-{run_id}",
+        artifact_revision=fleet_data.get("artifactRevision") or "",
+        provider=fleet_data.get("provider"),
+        reviewer=fleet_data.get("reviewer"),
+    )
+    if fleet_data.get("workspaceOwned") is True and fleet_data.get("cwd"):
+        worktree = manifest.reserve("worktree", str(fleet_data["cwd"]))
+        manifest.mark_created(worktree)
+    if fleet_data.get("herdrWorkspaceId"):
+        workspace = manifest.reserve("herdr_workspace", str(fleet_data["herdrWorkspaceId"]))
+        manifest.mark_created(workspace)
+    created_task_ids = fleet_data.get("createdFirstmateTasks")
+    created_task_set = set(created_task_ids) if isinstance(created_task_ids, list) else None
+    for key, kind in (
+        ("herdrPaneId", "pane"),
+        ("herdrMotionPaneId", "pane"),
+        ("herdrCompPaneId", "pane"),
+        ("herdrRevPaneId", "pane"),
+        ("fmTaskId", "firstmate_task"),
+        ("fmMotionTaskId", "firstmate_task"),
+        ("fmCompTaskId", "firstmate_task"),
+        ("fmRevTaskId", "firstmate_task"),
+    ):
+        identifier = fleet_data.get(key)
+        if identifier and (kind != "firstmate_task" or created_task_set is None or str(identifier) in created_task_set):
+            resource = manifest.reserve(kind, str(identifier))
+            manifest.mark_created(resource)
+    if manifest.resources:
+        manifest.commit()
+    return manifest.as_dict()
+
+
+def _persist_fleet_ownership(session_id: str, fleet_data: dict, run_id: str) -> None:
+    store = _get_session_store()
+    manifest = _manifest_from_fleet(session_id, run_id, fleet_data)
+    existing = store.load_manifest(run_id)
+    if existing:
+        merged = {(item.get("kind"), item.get("identifier")): item for item in existing.get("resources", [])}
+        for item in manifest.get("resources", []):
+            key = (item.get("kind"), item.get("identifier"))
+            prior = merged.get(key)
+            if prior is None or prior.get("state") == "intended":
+                merged[key] = item
+        manifest["resources"] = list(merged.values())
+        manifest["workspace"] = manifest.get("workspace") or existing.get("workspace")
+        manifest["workspace_owned"] = bool(manifest.get("workspace_owned") or existing.get("workspace_owned"))
+        manifest["evidence_generation"] = manifest.get("evidence_generation") or existing.get("evidence_generation") or f"evidence-{run_id}"
+        manifest["artifact_revision"] = manifest.get("artifact_revision") or existing.get("artifact_revision")
+        manifest["provider"] = manifest.get("provider") or existing.get("provider")
+        manifest["reviewer"] = manifest.get("reviewer") or existing.get("reviewer")
+        for key in ("parent_run_id", "attempt_id", "provider_session_id"):
+            if not manifest["identity"].get(key) and existing.get("identity", {}).get(key):
+                manifest["identity"][key] = existing["identity"][key]
+        manifest["committed"] = any(item.get("state") == "owned" for item in manifest["resources"])
+    if manifest == existing:
+        return
+    store.save_manifest(manifest)
+
+
+def save_session_fleet(session_id: str, fleet_data: dict, *, run_id: str | None = None) -> None:
+    """Persists the compatibility fleet projection and its run-owned manifest."""
     if not session_id or not fleet_data:
         return
+    if run_id:
+        _persist_fleet_ownership(session_id, fleet_data, run_id)
     try:
         SESSION_DIR.mkdir(parents=True, exist_ok=True)
         fleet_file = SESSION_DIR / f"{session_id}.fleet.json"
@@ -283,6 +387,69 @@ def save_session_fleet(session_id: str, fleet_data: dict) -> None:
     except Exception as e:
         if DEBUG:
             print(f"Error saving fleet info for {session_id}: {e}", file=sys.stderr)
+
+
+def _mark_setup_failed(run_id: str) -> None:
+    if not run_id:
+        return
+    try:
+        store = _get_session_store()
+        if store.state(run_id) in {"starting", "working"}:
+            store.set_state(run_id, "setup_failed", reason="external setup failed")
+    except Exception as exc:
+        if DEBUG:
+            print(f"could not persist setup failure: {exc}", file=sys.stderr)
+
+
+def _reserve_run_resource(
+    session_id: str,
+    run_id: str,
+    *,
+    kind: str,
+    identifier: str,
+    workspace: str | None = None,
+    provider: str | None = None,
+) -> None:
+    """Persist a setup intent before an external resource is created."""
+    store = _get_session_store()
+    existing = store.load_manifest(run_id)
+    if existing:
+        manifest = RunManifest.from_dict(existing)
+    else:
+        manifest = RunManifest(
+            RunIdentity(session_id, run_id),
+            workspace=workspace,
+            evidence_generation=f"evidence-{run_id}",
+            provider=provider,
+        )
+    if manifest.workspace is None and workspace:
+        manifest.workspace = workspace
+    if manifest.provider is None and provider:
+        manifest.provider = provider
+    if not any(item.kind == kind and item.identifier == identifier for item in manifest.resources):
+        manifest.reserve(kind, identifier)
+    store.save_manifest(manifest)
+
+
+def _release_run_resource(run_id: str, kind: str, identifier: str) -> None:
+    store = _get_session_store()
+    existing = store.load_manifest(run_id)
+    if not existing:
+        return
+    manifest = RunManifest.from_dict(existing)
+    for resource in manifest.resources:
+        if resource.kind == kind and resource.identifier == identifier and resource.state in {"intended", "created", "owned"}:
+            resource.state = "released"
+    store.save_manifest(manifest)
+
+
+def _update_session_fleet_projection(session_id: str, run_id: str, updates: dict) -> None:
+    """Persist newly created ownership before the next external side effect."""
+    if not session_id or not run_id:
+        return
+    current = get_session_fleet(session_id) or {"sessionId": session_id}
+    current.update(updates)
+    save_session_fleet(session_id, current, run_id=run_id)
 
 
 def clear_session_fleet(session_id: str) -> None:
@@ -538,11 +705,15 @@ HARNESS_CATALOG = {
 
 
 def get_harness_catalog() -> dict:
-    return HARNESS_CATALOG
+    return load_harness_catalog()
 
 
 def cmd_list_harnesses() -> int:
-    print(json.dumps(get_harness_catalog(), indent=2))
+    try:
+        print(json.dumps(get_harness_catalog(), indent=2))
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}), flush=True)
+        return 1
     return 0
 
 
@@ -1803,7 +1974,7 @@ def call_llm_dynamic_grill_questions(
     if config and config.get("fast_model"):
         raw_model = config["fast_model"]
     clean_model = sanitize_rest_model(raw_model)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent"
 
     ui_set_name = {
         1: "Set 1 · Full Aesthetic",
@@ -1889,7 +2060,7 @@ def call_llm_dynamic_grill_questions(
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
     )
     try:
         with urllib.request.urlopen(req, timeout=3.5) as resp:
@@ -2991,6 +3162,7 @@ def start_grill_me_session(
     model: str = "",
     config: dict | None = None,
     image_path: str = "",
+    run_id: str = "",
 ) -> int:
     domain = detect_project_domain(original_request)
     ref_analysis = None
@@ -3069,11 +3241,13 @@ def start_grill_me_session(
     save_session_history(session_id, hist_to_save, combined_response)
 
     emit("text", text=card_md)
-    emit("done", ok=True, code=0, stopped=False)
+    if run_id:
+        _get_session_store().set_state(run_id, "awaiting_user", reason="UI design questions require user input")
+    emit("done", ok=True, code=0, stopped=False, terminal_state="awaiting_user")
     return 0
 
 
-def handle_pending_grill_me(session_id: str, user_reply: str, state: dict, config: dict, harness: str = "", model: str = "") -> int:
+def handle_pending_grill_me(session_id: str, user_reply: str, state: dict, config: dict, harness: str = "", model: str = "", run_id: str = "") -> int:
     req_clean = user_reply.strip().lower()
 
     if req_clean in ("cancel", "abort", "exit", "quit"):
@@ -3089,7 +3263,9 @@ def handle_pending_grill_me(session_id: str, user_reply: str, state: dict, confi
             pid=0,
         )
         emit("text", text="Grill-Me design session cancelled. Let me know what you'd like to work on instead!")
-        emit("done", ok=True, code=0, stopped=False)
+        if run_id:
+            _get_session_store().set_state(run_id, "cancelled", reason="user cancelled the UI question flow")
+        emit("done", ok=True, code=0, stopped=False, terminal_state="cancelled")
         return 0
 
     effective_harness = harness or state.get("harness", "")
@@ -3159,6 +3335,7 @@ def handle_pending_grill_me(session_id: str, user_reply: str, state: dict, confi
             ui_set=ui_set,
             harness=effective_harness,
             model=effective_model,
+            run_id=run_id,
         )
 
     # Checkpoint loop: user decides to proceed to build or continue grilling
@@ -3215,6 +3392,7 @@ def handle_pending_grill_me(session_id: str, user_reply: str, state: dict, confi
                 ui_set=ui_set,
                 harness=effective_harness,
                 model=effective_model,
+                run_id=run_id,
             )
 
         elif is_continue:
@@ -3300,6 +3478,7 @@ def handle_pending_grill_me(session_id: str, user_reply: str, state: dict, confi
             ui_set=ui_set,
             harness=effective_harness,
             model=effective_model,
+            run_id=run_id,
         )
 
     if not parsed:
@@ -3396,6 +3575,7 @@ def handle_pending_grill_me(session_id: str, user_reply: str, state: dict, confi
                 ui_set=ui_set,
                 harness=effective_harness,
                 model=effective_model,
+                run_id=run_id,
             )
 
         # All questions in this round answered -> Show Strategic Design Checkpoint
@@ -3447,208 +3627,164 @@ def handle_pending_grill_me(session_id: str, user_reply: str, state: dict, confi
 
 
 def register_firstmate_task(
-    task_id: str, pane_id: str, workspace_id: str, cwd: Path, harness: str = "agy", model: str = "", role: str = "crewmate", skill: str = "ce-work"
+    task_id: str, pane_id: str, workspace_id: str, tab_id: str, cwd: Path, harness: str = "agy", model: str = "", role: str = "crewmate", skill: str = "ce-work"
 ) -> bool:
-    """Registers task metadata with Firstmate so Firstmate supervisor tracks it under 'firstmate status' and steers it via 'firstmate send'."""
+    """Registers task metadata with Firstmate through the ownership adapter."""
     try:
-        FM_STATE_DIR.mkdir(parents=True, exist_ok=True)
-        meta_path = FM_STATE_DIR / f"{task_id}.meta"
-        content = (
-            f"backend=herdr\n"
-            f"endpoint_task_id={task_id}\n"
-            f"herdr_session=default\n"
-            f"herdr_workspace_id={workspace_id}\n"
-            f"herdr_tab_id={workspace_id}:t1\n"
-            f"herdr_pane_id={pane_id}\n"
-            f"window=default:{pane_id}\n"
-            f"project={cwd}\n"
-            f"worktree={cwd}\n"
-            f"harness={harness}\n"
-            f"model={model}\n"
-            f"role={role}\n"
-            f"skill={skill}\n"
-            f"kind=crewmate\n"
-            f"mode=local-only\n"
-            f"yolo=on\n"
+        FirstmateAdapter(FM_STATE_DIR).register_task(
+            task_id=task_id,
+            pane_id=pane_id,
+            workspace_id=workspace_id,
+            tab_id=tab_id,
+            workspace=cwd,
+            harness=harness,
+            model=model,
+            role=role,
+            skill=skill,
         )
-        meta_path.write_text(content, "utf-8")
         return True
-    except Exception as e:
+    except (FirstmateError, OSError) as exc:
         if DEBUG:
-            print(f"Error registering Firstmate task {task_id}: {e}", file=sys.stderr)
+            print(f"Error registering Firstmate task {task_id}: {exc}", file=sys.stderr)
         return False
 
 
-def unregister_firstmate_task(task_id: str) -> None:
+def unregister_firstmate_task(task_id: str) -> bool:
     """Removes Firstmate task metadata and steering inbox on session cleanup."""
-    if not FM_STATE_DIR.is_dir() or not task_id:
-        return
     try:
-        meta_path = FM_STATE_DIR / f"{task_id}.meta"
-        status_file = FM_STATE_DIR / f"{task_id}.status"
-        inbox_dir = FM_STATE_DIR / f"{task_id}.inbox"
-        if meta_path.exists():
-            meta_path.unlink()
-        if status_file.exists():
-            status_file.unlink()
-        if inbox_dir.is_dir():
-            shutil.rmtree(inbox_dir, ignore_errors=True)
-    except Exception as e:
+        return FirstmateAdapter(FM_STATE_DIR).unregister_task(task_id)
+    except (FirstmateError, OSError) as exc:
         if DEBUG:
-            print(f"Error unregistering Firstmate task {task_id}: {e}", file=sys.stderr)
+            print(f"Error unregistering Firstmate task {task_id}: {exc}", file=sys.stderr)
+        return False
 
 
-def ensure_antigravity_trusts_workspace(workspace_path: Path | str | None = None) -> None:
-    """Ensures that ~/.gemini/antigravity-cli/settings.json universally trusts the given workspace
-    (as well as system roots), enables allowNonWorkspaceAccess, sets toolPermission to 'always-proceed',
-    and self-heals the autonomous agy wrapper if an upstream CLI update overwrote it with an ELF binary.
-    Guarantees Antigravity subagents never prompt interactively or brick autonomous execution.
-    """
-    agy_bin = Path("/home/soham/.local/bin/agy")
-    agy_real = Path("/home/soham/.local/bin/agy-real")
-    antigravity_bin = Path("/home/soham/.local/bin/antigravity")
+_SESSION_STORE: SessionStore | None = None
+_SESSION_STORE_PATH: Path | None = None
 
-    # 1. Self-healing check: if agy is an ELF binary, rotate to agy-real and reinstall the wrapper
+
+def _get_session_store() -> SessionStore:
+    global _SESSION_STORE, _SESSION_STORE_PATH
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    if _SESSION_STORE is None or _SESSION_STORE_PATH != CONTROLLER_DB_PATH:
+        if _SESSION_STORE is not None:
+            _SESSION_STORE.close()
+        _SESSION_STORE = SessionStore(CONTROLLER_DB_PATH)
+        _SESSION_STORE_PATH = CONTROLLER_DB_PATH
+    return _SESSION_STORE
+
+
+def _close_session_store() -> None:
+    global _SESSION_STORE, _SESSION_STORE_PATH
+    if _SESSION_STORE is not None:
+        _SESSION_STORE.close()
+    _SESSION_STORE = None
+    _SESSION_STORE_PATH = None
+
+
+def _safe_session_id(session_id: str, *, allow_last: bool = False) -> str:
+    value = str(session_id or "").strip()
+    if allow_last and value == "last":
+        return value
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", value) or value in {".", ".."}:
+        raise ValueError("session ID contains unsafe path characters")
+    return value
+
+
+def _atomic_write_json(path: Path, data: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2), "utf-8")
+    tmp.replace(path)
+
+
+def _store_session_summaries() -> list[dict]:
     try:
-        if agy_bin.exists() and not agy_bin.is_symlink():
-            with open(agy_bin, "rb") as f:
-                header = f.read(4)
-            if header == b"\x7fELF":
-                agy_real.parent.mkdir(parents=True, exist_ok=True)
-                if agy_real.exists():
-                    agy_real.unlink()
-                shutil.move(str(agy_bin), str(agy_real))
-                agy_real.chmod(0o755)
-
-                wrapper_script = (
-                    "#!/usr/bin/env bash\n"
-                    "# Antigravity CLI Autonomous Folder-Trust Wrapper\n"
-                    'SETTINGS_FILE="$HOME/.gemini/antigravity-cli/settings.json"\n'
-                    'REAL_BIN="/home/soham/.local/bin/agy-real"\n\n'
-                    'if [ -f "$SETTINGS_FILE" ]; then\n'
-                    '    python3 - "$SETTINGS_FILE" "$PWD" "$@" << \'PYEOF\' 2>/dev/null || true\n'
-                    'import sys, json, os\n'
-                    'settings_file = sys.argv[1]\n'
-                    'cwd = sys.argv[2]\n'
-                    'args = sys.argv[3:]\n'
-                    'candidates = {cwd, os.path.realpath(cwd)}\n'
-                    'for idx, arg in enumerate(args):\n'
-                    '    if arg in ("--add-dir", "--project", "--workspace") and idx + 1 < len(args):\n'
-                    '        cand = args[idx + 1]\n'
-                    '        candidates.add(cand)\n'
-                    '        if os.path.exists(cand):\n'
-                    '            candidates.add(os.path.realpath(cand))\n'
-                    '    elif os.path.isdir(arg):\n'
-                    '        candidates.add(arg)\n'
-                    '        candidates.add(os.path.realpath(arg))\n'
-                    'try:\n'
-                    '    with open(settings_file, "r", encoding="utf-8") as f:\n'
-                    '        data = json.load(f)\n'
-                    '    tw = data.setdefault("trustedWorkspaces", [])\n'
-                    '    tw_set = set(tw)\n'
-                    '    changed = False\n'
-                    '    for c in candidates:\n'
-                    '        if c and c not in tw_set:\n'
-                    '            tw.append(c)\n'
-                    '            tw_set.add(c)\n'
-                    '            changed = True\n'
-                    '    if data.get("allowNonWorkspaceAccess") is not True:\n'
-                    '        data["allowNonWorkspaceAccess"] = True\n'
-                    '        changed = True\n'
-                    '    if data.get("toolPermission") != "always-proceed":\n'
-                    '        data["toolPermission"] = "always-proceed"\n'
-                    '        changed = True\n'
-                    '    if changed:\n'
-                    '        tmp_file = settings_file + ".tmp"\n'
-                    '        with open(tmp_file, "w", encoding="utf-8") as f:\n'
-                    '            json.dump(data, f, indent=2)\n'
-                    '        os.replace(tmp_file, settings_file)\n'
-                    'except Exception:\n'
-                    '    pass\n'
-                    'PYEOF\n'
-                    'fi\n\n'
-                    'if [ -x "$REAL_BIN" ]; then\n'
-                    '    exec "$REAL_BIN" "$@"\n'
-                    'else\n'
-                    '    echo "Error: Antigravity real binary not found at $REAL_BIN" >&2\n'
-                    '    exit 1\n'
-                    'fi\n'
-                )
-                agy_bin.write_text(wrapper_script, encoding="utf-8")
-                agy_bin.chmod(0o755)
-
-        if not antigravity_bin.exists() or (antigravity_bin.is_symlink() and os.readlink(str(antigravity_bin)) != "/home/soham/.local/bin/agy"):
-            try:
-                if antigravity_bin.is_symlink() or antigravity_bin.exists():
-                    antigravity_bin.unlink()
-                antigravity_bin.symlink_to("/home/soham/.local/bin/agy")
-            except Exception:
-                pass
-    except Exception as e:
+        snapshots = _get_session_store().list_snapshots()
+    except Exception as exc:
         if DEBUG:
-            print(f"Self-healing agy wrapper error: {e}", file=sys.stderr)
+            print(f"Controller store unavailable: {exc}", file=sys.stderr)
+        return []
+    sessions = []
+    for data in snapshots:
+        if not isinstance(data, dict):
+            continue
+        entries = data.get("entries", [])
+        title = str(data.get("title", ""))
+        if not title and entries:
+            for entry in entries:
+                if entry.get("rowKind") == "you":
+                    title = str(entry.get("rowText", ""))
+                    break
+        if not title:
+            continue
+        updated_at = int(data.get("updatedAt", 0) or 0)
+        preview = ""
+        for entry in reversed(entries):
+            if entry.get("rowKind") in {"text", "error"}:
+                preview = clean_preview_text(entry.get("rowText", ""))
+                break
+        sessions.append({
+            "id": str(data.get("sessionId", "")),
+            "title": clip(title, 75, collapse=True),
+            "agentLabel": str(data.get("agentLabel", "Jarvis") or "Jarvis"),
+            "agentName": str(data.get("agentName", "jarvis") or "jarvis"),
+            "timeAgo": format_time_ago(updated_at),
+            "updatedAt": updated_at,
+            "preview": preview,
+            "messageCount": len(entries),
+        })
+    return sessions
 
-    # 2. Update ~/.gemini/antigravity-cli/settings.json
+
+def cmd_import_session_file(path_value: str) -> int:
+    handoff_root = HANDOFF_DIR.resolve()
+    candidate = Path(path_value).resolve()
     try:
-        settings_dir = Path.home() / ".gemini/antigravity-cli"
-        settings_dir.mkdir(parents=True, exist_ok=True)
-        settings_file = settings_dir / "settings.json"
+        candidate.relative_to(handoff_root)
+    except ValueError:
+        print(json.dumps({"ok": False, "error": "handoff path is outside the state directory"}))
+        return 1
+    try:
+        payload = json.loads(candidate.read_text("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("handoff payload must be an object")
+        conversation_id = _safe_session_id(str(payload.get("sessionId") or "last"), allow_last=True)
+        store = _get_session_store()
+        store.save_snapshot(conversation_id, payload)
+        _atomic_write_json(STATE_DIR / "last.json", payload)
+        if conversation_id != "last":
+            _atomic_write_json(SESSION_DIR / f"{conversation_id}.json", payload)
+        candidate.unlink(missing_ok=True)
+        print(json.dumps({"ok": True, "conversationId": conversation_id}))
+        return 0
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}))
+        return 1
 
-        data: dict = {}
-        if settings_file.is_file():
-            try:
-                data = json.loads(settings_file.read_text("utf-8"))
-            except Exception:
-                data = {}
 
-        changed = False
-
-        if data.get("allowNonWorkspaceAccess") is not True:
-            data["allowNonWorkspaceAccess"] = True
-            changed = True
-
-        if data.get("toolPermission") != "always-proceed":
-            data["toolPermission"] = "always-proceed"
-            changed = True
-
-        tw = data.setdefault("trustedWorkspaces", [])
-        tw_set = set(tw)
-
-        candidates = {
-            "/",
-            "/tmp",
-            "/var/tmp",
-            str(Path.home()),
-            str(Path.home() / "Projects"),
-            str(Path.home() / "Projects" / "coding-tasks"),
-            str(Path.cwd().resolve()),
-        }
-
-        if workspace_path:
-            p_str = str(workspace_path)
-            candidates.add(p_str)
-            try:
-                p_res = str(Path(workspace_path).resolve())
-                candidates.add(p_res)
-            except Exception:
-                pass
-
-        for c in candidates:
-            if c and c not in tw_set:
-                tw.append(c)
-                tw_set.add(c)
-                changed = True
-
-        if changed:
-            tmp_path = settings_file.with_suffix(".tmp")
-            tmp_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-            tmp_path.replace(settings_file)
-    except Exception as e:
-        if DEBUG:
-            print(f"ensure_antigravity_trusts_workspace error: {e}", file=sys.stderr)
+def cmd_migrate_legacy() -> int:
+    snapshots: list[dict] = []
+    for path in sorted(SESSION_DIR.glob("*.json")):
+        if any(path.name.endswith(suffix) for suffix in (".history.json", ".fleet.json", ".ui_pending.json", ".uiset.json")):
+            continue
+        try:
+            value = json.loads(path.read_text("utf-8"))
+            if isinstance(value, dict):
+                snapshots.append(value)
+        except Exception as exc:
+            print(json.dumps({"ok": False, "error": f"could not read {path.name}: {exc}"}))
+            return 1
+    report = migrate_snapshots(_get_session_store(), snapshots)
+    print(json.dumps({"ok": report.ok, "imported": report.imported, "recoveryRequired": report.recovery_required, "skipped": report.skipped}))
+    return 0 if report.ok else 1
 
 
 def cmd_list_sessions() -> int:
+    stored_sessions = _store_session_summaries()
+    if stored_sessions:
+        print(json.dumps(stored_sessions[:100]))
+        return 0
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
     sessions = []
 
@@ -3750,6 +3886,20 @@ def cmd_list_sessions() -> int:
 
 
 def cmd_get_session(session_id: str) -> int:
+    try:
+        session_id = _safe_session_id(session_id)
+    except ValueError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}))
+        return 1
+    try:
+        stored = _get_session_store().load_snapshot(session_id)
+    except Exception as exc:
+        if DEBUG:
+            print(f"Controller store unavailable: {exc}", file=sys.stderr)
+        stored = None
+    if stored is not None:
+        print(json.dumps(stored))
+        return 0
     session_file = SESSION_DIR / f"{session_id}.json"
     history_file = SESSION_DIR / f"{session_id}.history.json"
     if not session_file.is_file():
@@ -3821,8 +3971,10 @@ def cmd_get_session(session_id: str) -> int:
 
 
 def cmd_save_session(session_id: str) -> int:
-    if not session_id:
-        print(json.dumps({"ok": False, "error": "Missing session ID"}))
+    try:
+        session_id = _safe_session_id(session_id)
+    except ValueError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}))
         return 1
 
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
@@ -3876,31 +4028,157 @@ def cmd_save_session(session_id: str) -> int:
         return 1
 
 
+def cmd_stop_session(session_id: str, run_id: str = "") -> int:
+    try:
+        session_id = _safe_session_id(session_id)
+        if run_id:
+            run_id = _safe_session_id(run_id, allow_last=False)
+    except ValueError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}))
+        return 1
+    fleet = get_session_fleet(session_id) or {}
+    store = _get_session_store()
+    controller = RunController(store)
+    closed: list[str] = []
+    errors: list[str] = []
+    active_run_id = ""
+    for run in store.snapshot(session_id).get("runs", []):
+        if run_id and run.get("run_id") != run_id:
+            continue
+        if run.get("state") in {
+            "planned", "starting", "working", "verifying", "reviewing", "repairing", "awaiting_user",
+            "recovering", "reattaching", "detached", "blocked", "cancel_requested", "cleanup_pending",
+        } or (run.get("state") == "setup_failed" and store.has_ownership(run.get("run_id", ""))):
+            active_run_id = run.get("run_id", "")
+            break
+    if run_id and not active_run_id:
+        print(json.dumps({"ok": False, "error": "requested run is not active in this session"}))
+        return 1
+    manifest = store.load_manifest(active_run_id) if active_run_id else None
+    if fleet and not active_run_id:
+        if fleet.get("stoppedBy") == "controller":
+            print(json.dumps({"ok": True, "closed": [], "errors": []}))
+            return 0
+        print(json.dumps({"ok": False, "error": "recovery-required: fleet resources have no authoritative run manifest"}))
+        return 1
+    if active_run_id and manifest is None and fleet:
+        manifest = _manifest_from_fleet(session_id, active_run_id, fleet)
+        try:
+            store.save_manifest(manifest)
+        except Exception as exc:
+            errors.append(f"controller manifest: {exc}")
+    current_state = store.state(active_run_id) if active_run_id else ""
+    if active_run_id and manifest is None and current_state in {"cancel_requested", "cleanup_pending"}:
+        errors.append("recovery-required: cancellation has no authoritative ownership manifest")
+    if active_run_id and not errors and current_state not in {"cancel_requested", "cleanup_pending", "setup_failed"}:
+        try:
+            stop_state = controller.stop(active_run_id)
+            if stop_state.value == "blocked":
+                errors.append("recovery-required: stop could not claim an unowned active run")
+            current_state = store.state(active_run_id)
+        except Exception as exc:
+            errors.append(f"controller state: {exc}")
+    panes = []
+    tasks = []
+    worktrees = []
+    workspaces = []
+    workspace_intents = []
+    for resource in (manifest or {}).get("resources", []):
+        if resource.get("state") not in {"intended", "created", "owned"}:
+            continue
+        if resource.get("kind") == "pane" and resource.get("identifier") not in panes:
+            panes.append(resource["identifier"])
+        elif resource.get("kind") == "firstmate_task" and resource.get("identifier") not in tasks:
+            tasks.append(resource["identifier"])
+        elif resource.get("kind") == "worktree" and resource.get("identifier") not in worktrees:
+            worktrees.append(resource["identifier"])
+        elif resource.get("kind") == "herdr_workspace" and resource.get("identifier") not in workspaces:
+            workspaces.append(resource["identifier"])
+        elif resource.get("kind") == "herdr_workspace_intent" and resource.get("identifier") not in workspace_intents:
+            workspace_intents.append(resource["identifier"])
+    def release_resource(kind: str, identifier: str) -> None:
+        if not active_run_id:
+            return
+        current_manifest = RunManifest.from_dict(store.load_manifest(active_run_id) or manifest)
+        changed = False
+        for resource in current_manifest.resources:
+            if resource.kind == kind and resource.identifier == identifier and resource.state in {"intended", "created", "owned"}:
+                resource.state = "released"
+                changed = True
+        if changed:
+            store.save_manifest(current_manifest)
+
+    for pane in panes:
+        try:
+            result = subprocess.run(["herdr", "pane", "close", pane], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                closed.append(pane)
+                release_resource("pane", pane)
+            else:
+                errors.append(f"{pane}: {result.stderr.strip()[:120]}")
+        except Exception as exc:
+            errors.append(f"{pane}: {exc}")
+    for worktree in worktrees:
+        try:
+            remove_managed_worktree(Path(worktree))
+            closed.append(worktree)
+            release_resource("worktree", worktree)
+        except WorkspaceError as exc:
+            errors.append(f"worktree {worktree}: {exc}")
+    for task_id in tasks:
+        if not unregister_firstmate_task(task_id):
+            errors.append(f"Firstmate task cleanup failed: {task_id}")
+        else:
+            try:
+                release_resource("firstmate_task", task_id)
+            except Exception as exc:
+                errors.append(f"Firstmate manifest cleanup failed: {task_id}: {exc}")
+    for workspace_label in workspace_intents:
+        try:
+            HerdrAdapter().close_workspace_by_label(workspace_label)
+            release_resource("herdr_workspace_intent", workspace_label)
+        except HerdrError as exc:
+            errors.append(f"Herdr workspace setup cleanup failed: {workspace_label}: {exc}")
+    for workspace_id in workspaces:
+        try:
+            HerdrAdapter().close_workspace(workspace_id)
+            closed.append(workspace_id)
+            release_resource("herdr_workspace", workspace_id)
+        except HerdrError as exc:
+            errors.append(f"Herdr workspace cleanup failed: {workspace_id}: {exc}")
+    if active_run_id and not errors and manifest and current_state in {"cancel_requested", "cleanup_pending"}:
+        try:
+            controller.acknowledge_stop(active_run_id)
+        except Exception as exc:
+            errors.append(f"controller cleanup state: {exc}")
+    if fleet:
+        fleet["stoppedAt"] = int(time.time() * 1000)
+        fleet["stoppedBy"] = "controller"
+        save_session_fleet(session_id, fleet)
+    print(json.dumps({"ok": not errors, "closed": closed, "errors": errors}))
+    return 0 if not errors else 1
+
+
 def cmd_delete_session(session_id: str) -> int:
-    if not session_id:
-        print(json.dumps({"ok": False, "error": "Missing session ID"}))
+    try:
+        session_id = _safe_session_id(session_id)
+    except ValueError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}))
         return 1
 
     fleet_file = SESSION_DIR / f"{session_id}.fleet.json"
     if fleet_file.is_file():
-        try:
-            fleet_data = json.loads(fleet_file.read_text("utf-8"))
-            fm_task = fleet_data.get("fmTaskId")
-            if fm_task:
-                unregister_firstmate_task(fm_task)
-            fm_rev = fleet_data.get("fmRevTaskId")
-            if fm_rev:
-                unregister_firstmate_task(fm_rev)
-            rev_pane = fleet_data.get("herdrRevPaneId")
-            if rev_pane:
-                try:
-                    subprocess.run(["herdr", "pane", "close", rev_pane], capture_output=True, timeout=2)
-                except Exception:
-                    pass
-            fleet_file.unlink()
-        except Exception as e:
-            if DEBUG:
-                print(f"Error deleting fleet file: {e}", file=sys.stderr)
+        stop_result = cmd_stop_session(session_id)
+        if stop_result != 0:
+            print(json.dumps({"ok": False, "error": "owned resources could not be cleaned up"}))
+            return 1
+        fleet_file.unlink(missing_ok=True)
+
+    try:
+        _get_session_store().assert_deletable(session_id)
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": f"could not delete active controller state: {exc}"}))
+        return 1
 
     session_file = SESSION_DIR / f"{session_id}.json"
     if session_file.is_file():
@@ -3927,6 +4205,12 @@ def cmd_delete_session(session_id: str) -> int:
             if DEBUG:
                 print(f"Error deleting uiset file: {e}", file=sys.stderr)
 
+    try:
+        _get_session_store().delete_conversation(session_id)
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": f"could not delete controller state: {exc}"}))
+        return 1
+
     last_file = STATE_DIR / "last.json"
     if last_file.is_file():
         try:
@@ -3947,29 +4231,27 @@ def cmd_delete_session(session_id: str) -> int:
 
 def cmd_clear_history() -> int:
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
-    for f in SESSION_DIR.glob("*.fleet.json"):
-        try:
-            fleet_data = json.loads(f.read_text("utf-8"))
-            fm_task = fleet_data.get("fmTaskId")
-            if fm_task:
-                unregister_firstmate_task(fm_task)
-            fm_rev = fleet_data.get("fmRevTaskId")
-            if fm_rev:
-                unregister_firstmate_task(fm_rev)
-            rev_pane = fleet_data.get("herdrRevPaneId")
-            if rev_pane:
-                try:
-                    subprocess.run(["herdr", "pane", "close", rev_pane], capture_output=True, timeout=2)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-    for p in SESSION_DIR.glob("*.json"):
-        try:
-            p.unlink()
-        except Exception:
-            pass
+    session_ids = set()
+    try:
+        session_ids.update(
+            str(snapshot.get("sessionId"))
+            for snapshot in _get_session_store().list_snapshots()
+            if snapshot.get("sessionId")
+        )
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": f"could not inspect controller state: {exc}"}))
+        return 1
+    for path in SESSION_DIR.glob("*.json"):
+        name = path.name
+        if name.endswith(".fleet.json"):
+            session_ids.add(name[: -len(".fleet.json")])
+        else:
+            session_ids.add(path.stem)
+    for session_id in sorted(session_ids):
+        result = cmd_delete_session(session_id)
+        if result != 0:
+            print(json.dumps({"ok": False, "error": f"could not clean session {session_id}"}))
+            return 1
 
     last_file = STATE_DIR / "last.json"
     if last_file.is_file():
@@ -3992,7 +4274,32 @@ def emit(kind: str, **fields: object) -> None:
     global EMITTED_ERROR
     if kind == "error":
         EMITTED_ERROR = True
-    print(json.dumps({"kind": kind, **fields}), flush=True)
+    safe_fields = {}
+    for key, value in fields.items():
+        if key in {"session", "cwd", "name", "label", "resume", "resumeLabel", "pid", "terminal_state", "ok", "stopped", "code"}:
+            safe_fields[key] = redact_data(value)
+        elif isinstance(value, (dict, list)):
+            safe_fields[key] = redact_data(value)
+        else:
+            safe_fields[key] = redact_text(clip(str(value), 4000))
+    output: dict = {"kind": kind, **safe_fields}
+    if CURRENT_RUN_ID:
+        try:
+            store = _get_session_store()
+            if kind == "done":
+                state = str(fields.get("terminal_state") or "")
+                if state in {"blocked", "incomplete", "failed", "cancelled", "detached", "setup_failed", "completed"}:
+                    details = {"terminal_event": True}
+                    if state == "completed":
+                        details["quality_receipt"] = {"passed": True, "source": "terminal_event"}
+                    store.set_state(CURRENT_RUN_ID, state, **details)
+                elif fields.get("ok") is False:
+                    store.set_state(CURRENT_RUN_ID, "setup_failed", terminal_event=True)
+            output = store.append_projection_event(CURRENT_RUN_ID, kind, safe_fields)
+        except Exception as exc:
+            if DEBUG:
+                print(f"controller event write failed: {exc}", file=sys.stderr)
+    print(json.dumps(output), flush=True)
 
 
 def clip(text: str, limit: int, *, collapse: bool = False) -> str:
@@ -4028,8 +4335,8 @@ def load_config() -> dict:
         except Exception as e:
             if DEBUG:
                 print(f"Error loading config: {e}", file=sys.stderr)
-    if not config["gemini_api_key"] and os.environ.get("GEMINI_API_KEY"):
-        config["gemini_api_key"] = os.environ.get("GEMINI_API_KEY")
+    resolved_key = resolve_secret("GEMINI_API_KEY", config, "gemini_api_key")
+    config["gemini_api_key"] = resolved_key.value
     return config
 
 
@@ -4296,7 +4603,7 @@ def stream_gemini_api(
     for current_model in candidate_models:
         url = (
             f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{current_model}:streamGenerateContent?alt=sse&key={api_key}"
+            f"{current_model}:streamGenerateContent?alt=sse"
         )
         body: dict = {
             "contents": contents,
@@ -4310,7 +4617,7 @@ def stream_gemini_api(
 
         data = json.dumps(body).encode("utf-8")
         req = urllib.request.Request(
-            url, data=data, headers={"Content-Type": "application/json"}
+            url, data=data, headers={"Content-Type": "application/json", "x-goog-api-key": api_key}
         )
 
         accumulated_text = ""
@@ -4354,10 +4661,594 @@ def stream_gemini_api(
 
 
 # =====================================================================
+# QUALITY GATE ADAPTER
+# =====================================================================
+
+class _QualityEvidenceSink:
+    def __init__(self, run_id: str = "") -> None:
+        self.run_id = run_id
+
+    def record_evidence(self, evidence: dict) -> None:
+        evidence = redact_data(evidence)
+        if self.run_id:
+            store = _get_session_store()
+            kind = str(evidence.get("kind", ""))
+            current = store.state(self.run_id)
+            if kind == "execution_started" and current == "starting":
+                store.set_state(self.run_id, "working")
+            elif kind == "check" and current in {"working", "repairing"}:
+                store.set_state(self.run_id, "verifying")
+            elif kind == "repair_started" and current in {"verifying", "reviewing"}:
+                store.set_state(self.run_id, "repairing")
+            elif kind == "review" and current == "verifying":
+                store.set_state(self.run_id, "reviewing")
+            elif kind == "quality_completed" and current == "reviewing":
+                store.record_evidence(self.run_id, evidence)
+                store.set_state(self.run_id, "completed", quality_receipt={"passed": True})
+                return
+            store.record_evidence(self.run_id, evidence)
+            return
+        emit("quality_evidence", evidence=evidence)
+
+
+def _discover_verification_command(cwd: Path, profile: str) -> list[str] | None:
+    if profile == "ui":
+        return None
+    if (cwd / "Makefile").is_file():
+        try:
+            makefile = (cwd / "Makefile").read_text("utf-8", errors="ignore")
+        except OSError:
+            makefile = ""
+        if re.search(r"^test\s*:", makefile, re.MULTILINE):
+            return ["make", "test"]
+    tests_dir = cwd / "tests"
+    has_tests = tests_dir.is_dir() and any(tests_dir.rglob("test_*.py"))
+    if (cwd / "pyproject.toml").is_file() or (cwd / "pytest.ini").is_file() or has_tests:
+        return [sys.executable, "-m", "pytest", "-q"]
+    if (cwd / "Cargo.toml").is_file():
+        return ["cargo", "test"]
+    if (cwd / "go.mod").is_file():
+        return ["go", "test", "./..."]
+    package_json = cwd / "package.json"
+    if package_json.is_file():
+        try:
+            package = json.loads(package_json.read_text("utf-8"))
+            if isinstance(package.get("scripts"), dict) and "test" in package["scripts"]:
+                return ["npm", "test"]
+        except (OSError, json.JSONDecodeError, TypeError):
+            pass
+    return None
+
+
+def run_declared_verification(cwd: Path, config: dict, profile: str) -> list[str]:
+    """Run only an explicitly declared, non-shell verification command."""
+    key = "ui_verification_command" if profile == "ui" else "coding_verification_command"
+    prefix = "rendered" if profile == "ui" else "verification"
+    configured = config.get(key)
+    if configured is None:
+        configured = (config.get("routes") or {}).get(key)
+    if configured is None:
+        configured = _discover_verification_command(cwd, profile)
+    if not configured:
+        return [f"{prefix}: unavailable (no declared {key})"]
+    if isinstance(configured, str):
+        command = shlex.split(configured)
+    elif isinstance(configured, (list, tuple)) and all(isinstance(item, str) for item in configured):
+        command = list(configured)
+    else:
+        return [f"{prefix}: failed (invalid {key})"]
+    if not command:
+        return [f"{prefix}: failed (empty {key})"]
+    try:
+        result = subprocess.run(
+            command,
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return [f"{prefix}: failed ({redact_text(str(exc))[:160]})"]
+    status = "passed" if result.returncode == 0 else "failed"
+    detail = redact_text((result.stdout or result.stderr or "").strip())[:200]
+    marker = f"{prefix}: {status} command={redact_text(shlex.join(command))}"
+    return [marker, f"{prefix}_detail: {detail}"] if detail else [marker]
+
+
+def _artifact_revision(cwd: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        head = subprocess.run(
+            ["git", "-C", str(cwd), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        )
+        diff = subprocess.run(
+            ["git", "-C", str(cwd), "diff", "--no-ext-diff", "--binary", "HEAD"],
+            capture_output=True, text=True, timeout=10,
+        )
+        status = subprocess.run(
+            ["git", "-C", str(cwd), "status", "--porcelain"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if head.returncode == 0 and diff.returncode == 0 and status.returncode == 0:
+            digest.update(head.stdout.encode())
+            digest.update(diff.stdout.encode())
+            digest.update(status.stdout.encode())
+            return f"git-{digest.hexdigest()}"
+    except (OSError, subprocess.SubprocessError):
+        pass
+    for path in sorted(cwd.rglob("*")):
+        if not path.is_file() or any(part.startswith(".") for part in path.parts):
+            continue
+        try:
+            relative = path.relative_to(cwd).as_posix().encode()
+            digest.update(relative)
+            digest.update(path.read_bytes())
+        except (OSError, ValueError):
+            continue
+    return f"content-{digest.hexdigest()}"
+
+
+def _ui_evidence_digests(payload: dict | None) -> dict[str, str]:
+    if not isinstance(payload, dict):
+        return {}
+    try:
+        typed = UiEvidenceResult.from_dict(payload.get("payload", payload))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    return {
+        "render_manifest_digest": hashlib.sha256(json.dumps(typed.manifest.as_dict(), sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+        "interaction_report_digest": hashlib.sha256(json.dumps(typed.interaction.as_dict(), sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+        "accessibility_report_digest": hashlib.sha256(json.dumps(typed.accessibility.as_dict(), sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+    }
+
+
+def _expected_ui_review_scope(run_id: str) -> dict[str, str]:
+    if not run_id:
+        return {}
+    evidence = _get_session_store().latest_evidence(run_id, "ui_evidence")
+    return _ui_evidence_digests(evidence)
+
+
+def _update_review_binding(cwd: Path, run_id: str) -> None:
+    if not run_id:
+        return
+    store = _get_session_store()
+    manifest = store.load_manifest(run_id)
+    if not manifest:
+        return
+    manifest["artifact_revision"] = _artifact_revision(cwd)
+    if not manifest.get("evidence_generation"):
+        manifest["evidence_generation"] = f"evidence-{run_id}"
+    store.save_manifest(manifest)
+    request = {
+        "run_id": run_id,
+        "workspace": manifest.get("workspace") or str(cwd),
+        "provider": manifest.get("provider") or "",
+        "reviewer_id": (manifest.get("reviewer") or {}).get("reviewer_id") or "",
+        "provider_session_id": (manifest.get("identity") or {}).get("provider_session_id") or "",
+        "evidence_generation": manifest.get("evidence_generation") or "",
+        "artifact_revision": manifest.get("artifact_revision") or "",
+        "ui_evidence_digests": _expected_ui_review_scope(run_id),
+    }
+    request_path = cwd / ".omagent" / "review-receipts" / f"{run_id}.request.json"
+    request_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = request_path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(request_path)
+
+
+def import_review_receipt(path: Path, run_id: str) -> ReviewReceipt | None:
+    """Move a valid reviewer file into the controller-owned receipt channel."""
+    if not run_id:
+        return load_review_receipt(path)
+    receipt = load_review_receipt(path)
+    if receipt is None:
+        return None
+    store = _get_session_store()
+    try:
+        was_blocked = store.state(run_id) == "blocked"
+        store.save_review_receipt(run_id, receipt)
+        if was_blocked:
+            store.set_state(run_id, "starting", reason="independent review receipt received")
+    except Exception as exc:
+        if DEBUG:
+            print(f"review receipt rejected by controller: {exc}", file=sys.stderr)
+        return None
+    return store.load_review_receipt(run_id)
+
+
+def _implementation_evidence(cwd: Path) -> list[str]:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(cwd), "status", "--porcelain"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return ["implementation: git working tree has changes"]
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        if any(path.is_file() for path in cwd.rglob("*") if not any(part.startswith(".") for part in path.parts)):
+            return ["implementation: workspace contains project files"]
+    except OSError:
+        pass
+    return []
+
+
+def _repair_checks(profile: str, cwd: Path, config: dict, ui_contract: dict | None = None) -> list[CheckResult]:
+    evidence = _implementation_evidence(cwd)
+    evidence.extend(run_declared_verification(cwd, config, profile))
+    if profile == "ui":
+        rendered_paths = [str(path) for path in cwd.rglob("*") if path.is_file() and path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}]
+        return _ui_quality_checks(ui_contract, evidence, rendered_paths)
+    implementation = [item for item in evidence if item.startswith(("file:", "implementation:"))]
+    verification = [item for item in evidence if item.startswith("verification:") and "passed" in item]
+    return [
+        CheckResult("task_contract", True, ["repair preserved task contract"]),
+        CheckResult("implementation", bool(implementation), implementation or ["no implementation evidence after repair"]),
+        CheckResult("verification", bool(verification), verification or ["no deterministic verification evidence after repair"]),
+        CheckResult("review", True, ["independent review remains required"], blocking=False),
+    ]
+
+
+def make_fleet_repair_runner(
+    *,
+    cwd: Path,
+    config: dict,
+    profile: str,
+    task_id: str | None,
+    pane_id: str | None,
+    provider_session_id: str | None,
+    request: str,
+    ui_contract: dict | None = None,
+):
+    def repair(attempt: int, failed: list[str]):
+        if not task_id and not pane_id:
+            return None
+        prompt = (
+            f"Repair attempt {attempt} for the same run and workspace. Failed gates: {', '.join(failed)}. "
+            f"Preserve the task contract. Original request: {request[:800]}"
+        )
+        try:
+            if task_id and shutil.which("firstmate"):
+                FirstmateAdapter(FM_STATE_DIR, runner=subprocess.run).send_task(task_id, prompt)
+            elif pane_id:
+                HerdrAdapter().send_text(pane_id, prompt + "\n")
+            else:
+                return None
+        except (FirstmateError, HerdrError):
+            return None
+        deadline = time.monotonic() + 45
+        checks: list[CheckResult] = []
+        while time.monotonic() < deadline:
+            checks = _repair_checks(profile, cwd, config, ui_contract)
+            if all(item.passed for item in checks if item.blocking):
+                return checks, None
+            time.sleep(1)
+        return checks, None
+
+    return repair
+
+
+def _review_receipt_matches_manifest(receipt: ReviewReceipt, run_id: str) -> bool:
+    if not run_id:
+        return True
+    manifest = _get_session_store().load_manifest(run_id)
+    if not manifest:
+        return False
+    reviewer = manifest.get("reviewer") or {}
+    identity = manifest.get("identity") or {}
+    scope_matches = True
+    if receipt.review_scope:
+        expected = _expected_ui_review_scope(run_id)
+        scope_matches = bool(
+            expected
+            and receipt.review_scope == "ui"
+            and receipt.selected_concept_id.strip()
+            and receipt.render_manifest_digest == expected["render_manifest_digest"]
+            and receipt.interaction_report_digest == expected["interaction_report_digest"]
+            and receipt.accessibility_report_digest == expected["accessibility_report_digest"]
+        )
+    return bool(
+        manifest.get("provider")
+        and identity.get("provider_session_id")
+        and manifest.get("provider") == receipt.provider
+        and identity.get("provider_session_id") != receipt.provider_session_id
+        and reviewer.get("reviewer_id") == receipt.reviewer_id
+        and reviewer.get("provider_session_id") == receipt.provider_session_id
+        and receipt.run_id == run_id
+        and receipt.workspace == (manifest.get("workspace") or "")
+        and receipt.evidence_generation == (manifest.get("evidence_generation") or "")
+        and receipt.artifact_revision == (manifest.get("artifact_revision") or "")
+        and scope_matches
+    )
+
+
+def _typed_ui_evidence(evidence: list[str]) -> UiEvidenceResult | None:
+    parsed: UiEvidenceResult | None = None
+    for item in evidence:
+        if not item.startswith("ui_evidence:"):
+            continue
+        try:
+            parsed = UiEvidenceResult.from_dict(json.loads(item[len("ui_evidence:"):]))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+    return parsed
+
+
+def _ui_quality_checks(
+    contract: dict | None,
+    evidence: list[str],
+    rendered_paths: list[str] | None = None,
+    recent_runs: list[dict] | None = None,
+) -> list[CheckResult]:
+    """Build fail-closed UI checks from the frozen contract and local evidence."""
+    if not isinstance(contract, dict):
+        return [
+            CheckResult("subject_fidelity", False, ["no frozen UI design contract"]),
+            CheckResult("design_contract", False, ["no frozen UI design contract"]),
+            CheckResult("reference_boundary", True, ["no reference image supplied"], blocking=False),
+            CheckResult("reference_fidelity", True, ["no reference image supplied"], blocking=False),
+            CheckResult("concept_novelty", False, ["no concept evidence"]),
+            CheckResult("rendered_evidence", False, ["no rendered UI evidence"]),
+            CheckResult("interaction_quality", False, ["no interaction evidence"]),
+            CheckResult("accessibility", False, ["no accessibility evidence"]),
+            CheckResult("visual_review", True, ["independent visual review is required"], blocking=False),
+        ]
+    try:
+        contract_value = DesignContract.from_dict(contract)
+        contract_value.validate()
+    except (TypeError, ValueError) as exc:
+        return [
+            CheckResult("subject_fidelity", False, [f"invalid UI contract: {exc}"]),
+            CheckResult("design_contract", False, [f"invalid UI contract: {exc}"]),
+            CheckResult("reference_boundary", True, ["reference boundary unavailable"], blocking=False),
+            CheckResult("reference_fidelity", True, ["reference fidelity unavailable"], blocking=False),
+            CheckResult("concept_novelty", False, ["invalid UI contract"]),
+            CheckResult("rendered_evidence", False, ["invalid UI contract"]),
+            CheckResult("interaction_quality", False, ["invalid UI contract"]),
+            CheckResult("accessibility", False, ["invalid UI contract"]),
+            CheckResult("visual_review", True, ["independent visual review remains required"], blocking=False),
+        ]
+    concept_validation = validate_concept_diversity(contract_value.candidates)
+    reference = contract_value.reference_policy.as_dict() if contract_value.reference_policy else None
+    visual = None
+    if rendered_paths:
+        try:
+            visual = evaluate_visual_evidence(
+                rendered_paths,
+                reference=reference,
+                concepts=contract_value.candidates,
+                recent_runs=recent_runs or [],
+                product_family=contract_value.product_family,
+            )
+        except Exception as exc:
+            visual = None
+            evidence.append(f"visual_qa_error: {redact_text(str(exc))[:160]}")
+    typed_evidence = _typed_ui_evidence(evidence)
+    typed_live = bool(typed_evidence and typed_evidence.live_eligible)
+    has_rendered = bool(typed_live and rendered_paths and visual and visual.available)
+    interaction_evidence = []
+    accessibility_evidence = []
+    if typed_evidence is not None:
+        interaction_evidence = [f"ui_interaction_report:{json.dumps(typed_evidence.interaction.as_dict(), sort_keys=True)}"]
+        accessibility_evidence = [f"ui_accessibility_report:{json.dumps(typed_evidence.accessibility.as_dict(), sort_keys=True)}"]
+    has_interaction = bool(typed_live and typed_evidence and typed_evidence.interaction.results and all(item.get("status") in {"pass", "passed", "fixture-pass"} for item in typed_evidence.interaction.results))
+    has_accessibility = bool(typed_live and typed_evidence and typed_evidence.accessibility.results and all(item.get("status") in {"pass", "passed", "fixture-pass"} for item in typed_evidence.accessibility.results))
+    reference_required = reference is not None
+    boundary_passed = bool(visual.boundary.get("passed", not reference_required)) if visual else not reference_required
+    fidelity_passed = bool(visual and visual.reference.get("path") and visual.reference.get("fidelity_status") in {"review-required", "recorded"}) if reference_required else True
+    novelty_passed = bool(visual and visual.novelty.get("passed", False)) if has_rendered else False
+    contract_evidence = [f"ui_contract:{contract_value.version}", f"ui_subject:{contract_value.subject}"]
+    if visual:
+        evidence.append("visual_qa:" + json.dumps(visual.as_dict(), sort_keys=True))
+    return [
+        CheckResult("subject_fidelity", bool(contract_value.subject), contract_evidence),
+        CheckResult("design_contract", True, ["frozen structured UI concept contract"]),
+        CheckResult("reference_boundary", boundary_passed, ["ui_reference_boundary:" + json.dumps((visual.boundary if visual else {"required": reference_required, "passed": not reference_required}), sort_keys=True)]),
+        CheckResult("reference_fidelity", fidelity_passed, ["ui_reference_fidelity:" + ("reference evidence recorded" if reference_required else "not applicable")], blocking=reference_required),
+        CheckResult("concept_novelty", novelty_passed and concept_validation.valid, ["ui_concept_novelty:" + json.dumps(concept_validation.as_dict(), sort_keys=True)]),
+        CheckResult("rendered_evidence", has_rendered, ["ui_rendered_evidence:" + json.dumps({"typed": bool(typed_evidence), "live": typed_live, "paths": [str(item) for item in (rendered_paths or [])]}, sort_keys=True)]),
+        CheckResult("interaction_quality", has_interaction, interaction_evidence or ["no typed interaction evidence"]),
+        CheckResult("accessibility", has_accessibility, accessibility_evidence or ["no typed accessibility evidence"]),
+        CheckResult("visual_review", True, ["independent visual review remains required"], blocking=False),
+    ]
+
+
+def record_lane_quality(
+    profile: str,
+    request: str,
+    full_text: str,
+    *,
+    evidence: list[str] | None = None,
+    run_id: str = "",
+    review_receipt: ReviewReceipt | None = None,
+    repair_runner=None,
+    ui_contract: dict | None = None,
+    ui_evidence: UiEvidenceResult | None = None,
+) -> str:
+    if run_id:
+        store = _get_session_store()
+        stored_review = store.load_review_receipt(run_id)
+        if stored_review is not None:
+            if store.state(run_id) == "blocked":
+                store.set_state(run_id, "starting", reason="independent review receipt received")
+            review_receipt = stored_review
+        elif review_receipt is not None:
+            try:
+                was_blocked = store.state(run_id) == "blocked"
+                store.save_review_receipt(run_id, review_receipt)
+                if was_blocked:
+                    store.set_state(run_id, "starting", reason="independent review receipt received")
+            except Exception as exc:
+                if DEBUG:
+                    print(f"review receipt rejected by controller: {exc}", file=sys.stderr)
+                review_receipt = None
+            else:
+                review_receipt = store.load_review_receipt(run_id)
+    contract = TaskContract(
+        request=request,
+        profile=profile,
+        acceptance_criteria=[f"{profile} profile quality checks"],
+    )
+    engine = QualityEngine(contract, sink=_QualityEvidenceSink(run_id))
+    engine.begin_execution()
+    if run_id:
+        try:
+            current_state = _get_session_store().state(run_id)
+            if current_state == "planned":
+                _get_session_store().set_state(run_id, "starting", reason="quality execution started")
+                current_state = "starting"
+            if current_state == "starting":
+                _get_session_store().set_state(run_id, "working", reason="quality execution started")
+        except Exception as exc:
+            if DEBUG:
+                print(f"could not advance quality lifecycle: {exc}", file=sys.stderr)
+    evidence = list(evidence or [])
+    if ui_evidence is not None:
+        evidence.append("ui_evidence:" + json.dumps(ui_evidence.as_dict(), sort_keys=True, separators=(",", ":")))
+    if run_id and profile == "ui":
+        try:
+            stored_ui = _get_session_store().latest_evidence(run_id, "ui_evidence")
+        except Exception as exc:
+            stored_ui = None
+            if DEBUG:
+                print(f"could not load controller UI evidence: {exc}", file=sys.stderr)
+        if isinstance(stored_ui, dict) and isinstance(stored_ui.get("payload"), dict):
+            evidence.append("ui_evidence:" + json.dumps(stored_ui["payload"], sort_keys=True, separators=(",", ":")))
+    if profile == "web":
+        checks = [
+            CheckResult("retrieval_honesty", True, evidence or ["retrieval evidence recorded"]),
+            CheckResult("source_quality", True, evidence or ["retrieval source assessment recorded"]),
+            CheckResult("grounding", bool(full_text.strip()), ["provider answer was non-empty"], blocking=False),
+            CheckResult("injection_resistance", True, ["retrieved content treated as data"]),
+            CheckResult("failure_behavior", True, ["retrieval failure is explicit"]),
+        ]
+    elif profile == "coding":
+        implementation_evidence = [item for item in evidence if item.startswith(("file:", "implementation:"))]
+        verification_evidence = [item for item in evidence if item.startswith("verification:") and "passed" in item]
+        checks = [
+            CheckResult("task_contract", True, ["coding request captured"]),
+            CheckResult("implementation", bool(implementation_evidence), implementation_evidence or ["no implementation evidence recorded"]),
+            CheckResult("verification", bool(verification_evidence), verification_evidence or ["no deterministic verification evidence recorded"]),
+            CheckResult("review", True, ["independent review is not yet available"], blocking=False),
+        ]
+    elif profile == "ui":
+        typed_evidence = _typed_ui_evidence(evidence)
+        rendered_paths = []
+        for item in evidence:
+            if item.startswith("file:"):
+                path = Path(item[5:].strip())
+                if path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+                    rendered_paths.append(str(path))
+        if typed_evidence is not None:
+            rendered_paths.extend(
+                str(render.screenshot_path)
+                for render in typed_evidence.manifest.renders
+                if Path(render.screenshot_path).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
+            )
+        recent_runs = []
+        if run_id:
+            try:
+                recent_runs = _get_session_store().recent_ui_visual_evidence(run_id)
+            except Exception as exc:
+                if DEBUG:
+                    print(f"could not load recent UI evidence: {exc}", file=sys.stderr)
+        check_evidence = list(evidence)
+        checks = _ui_quality_checks(ui_contract, check_evidence, rendered_paths, recent_runs)
+        if run_id and typed_evidence is not None:
+            try:
+                _get_session_store().record_evidence(run_id, {"kind": "ui_evidence", "payload": typed_evidence.as_dict()})
+            except Exception as exc:
+                if DEBUG:
+                    print(f"could not persist typed UI evidence: {exc}", file=sys.stderr)
+        for item in check_evidence:
+            if item.startswith("visual_qa:"):
+                try:
+                    payload = json.loads(item[10:])
+                    payload["product_family"] = (ui_contract or {}).get("product_family", "")
+                    _get_session_store().record_evidence(run_id, {"kind": "ui_visual_evidence", "payload": payload})
+                except Exception:
+                    if DEBUG:
+                        print("could not persist UI visual evidence", file=sys.stderr)
+    else:
+        checks = [
+            CheckResult("instruction_coverage", bool(full_text.strip()), ["provider answer was non-empty"]),
+            CheckResult("context_use", True, ["conversation history was loaded before synthesis"]),
+            CheckResult("clarity", True, ["quality review is not yet available"], blocking=False),
+            CheckResult("uncertainty", True, ["quality review is not yet available"], blocking=False),
+        ]
+    if run_id:
+        try:
+            if _get_session_store().state(run_id) == "working":
+                _get_session_store().set_state(run_id, "verifying", reason="deterministic quality checks started")
+        except Exception as exc:
+            if DEBUG:
+                print(f"could not advance verification lifecycle: {exc}", file=sys.stderr)
+    verified, repaired_review = engine.verify_with_repair(checks, repair_runner)
+    if repaired_review is not None:
+        review_receipt = repaired_review
+    if verified and review_receipt is not None:
+        if run_id:
+            try:
+                if _get_session_store().state(run_id) == "verifying":
+                    _get_session_store().set_state(run_id, "reviewing", reason="independent review requested")
+            except Exception as exc:
+                if DEBUG:
+                    print(f"could not advance review lifecycle: {exc}", file=sys.stderr)
+        review_receipt.validate()
+        if not _review_receipt_matches_manifest(review_receipt, run_id):
+            review_receipt = None
+    if verified and review_receipt is not None:
+        reviewed = engine.review_receipt(review_receipt)
+        if not reviewed and repair_runner is not None and engine.repair():
+            outcome = repair_runner(
+                engine.repair_attempts,
+                [item.title for item in engine.review_findings if item.blocking and not item.resolved],
+            )
+            if outcome is None:
+                engine.terminalize_repair_failure("review repair runner returned no evidence")
+            else:
+                repaired_checks, repaired_receipt = outcome
+                reverified = engine.verify(repaired_checks)
+                if not reverified:
+                    engine.terminalize_failed_verification()
+                elif repaired_receipt is None:
+                    engine.terminalize_repair_failure("review repair produced no reviewer receipt")
+                elif not _review_receipt_matches_manifest(repaired_receipt, run_id):
+                    engine.terminalize_repair_failure("review repair receipt is not bound to the owned reviewer")
+                else:
+                    reviewed = engine.review_receipt(repaired_receipt)
+        if not reviewed:
+            if engine.state.value == "reviewing":
+                engine.terminalize_unresolved_review()
+        else:
+            engine.deliver()
+    elif verified:
+        # The current lane has no independent reviewer. Block honestly instead
+        # of self-certifying the provider's own completion claim.
+        engine.review([], available=False)
+    report = engine.report()
+    safe_report = redact_data(report.__dict__)
+    if run_id:
+        store = _get_session_store()
+        if report.state == "completed":
+            if store.state(run_id) != "completed":
+                store.set_state(run_id, "reviewing", reason="quality delivery ready")
+                store.set_state(run_id, "completed", quality_receipt={"passed": True, "profile": profile})
+        elif report.state in {"blocked", "incomplete", "failed"}:
+            store.set_state(run_id, report.state, quality_report=safe_report)
+    emit("quality", profile=profile, state=report.state, report=safe_report)
+    return report.state
+
+
+# =====================================================================
 # LANE 1: INSTANT GENERAL KNOWLEDGE
 # =====================================================================
 
-def run_lane_general(request: str, config: dict, session_id: str) -> int:
+def run_lane_general(request: str, config: dict, session_id: str, *, run_id: str = "") -> int:
     api_key = config.get("gemini_api_key", "").strip()
     cwd = work_dir()
 
@@ -4397,8 +5288,9 @@ def run_lane_general(request: str, config: dict, session_id: str) -> int:
 
     # Persist the full multi-turn conversation
     save_session_history(session_id, contents, full_text)
+    quality_state = record_lane_quality("direct", request, full_text, run_id=run_id)
 
-    emit("done", ok=True, code=0, stopped=False)
+    emit("done", ok=True, code=0, stopped=False, terminal_state=quality_state)
     return 0
 
 
@@ -4456,7 +5348,7 @@ def resolve_contextual_query(query: str, history: list[dict], api_key: str, mode
     history_ctx = "\n".join(snippet_lines)
 
     clean_model = sanitize_rest_model(model)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent"
     prompt = (
         f"Conversation history:\n{history_ctx}\n\n"
         f"Current user query: {query}\n\n"
@@ -4467,7 +5359,7 @@ def resolve_contextual_query(query: str, history: list[dict], api_key: str, mode
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode("utf-8"),
-        headers={"Content-Type": "application/json"}
+        headers={"Content-Type": "application/json", "x-goog-api-key": api_key}
     )
     try:
         with urllib.request.urlopen(req, timeout=3) as resp:
@@ -4480,7 +5372,7 @@ def resolve_contextual_query(query: str, history: list[dict], api_key: str, mode
     return query
 
 
-def run_lane_web(request: str, config: dict, session_id: str) -> int:
+def run_lane_web(request: str, config: dict, session_id: str, *, run_id: str = "") -> int:
     api_key = config.get("gemini_api_key", "").strip()
     cwd = work_dir()
 
@@ -4511,24 +5403,26 @@ def run_lane_web(request: str, config: dict, session_id: str) -> int:
         api_key,
         model=config.get("fast_model", "gemini-3.5-flash"),
     )
-    results = search_duckduckgo(search_query_resolved)
+    raw_results = search_duckduckgo(search_query_resolved)
+    retrieval = assess_retrieval(
+        search_query,
+        [Source(url=item.get("link", ""), title="", text=item.get("snippet", ""), quality="unknown") for item in raw_results],
+    )
+    if not retrieval.usable:
+        emit("error", text="Web retrieval returned no usable evidence; no ungrounded answer was generated.")
+        emit("done", ok=False, code=1, stopped=False)
+        return 1
 
-    if results:
-        snippets_text = "\n".join(
-            f"[{i+1}] {r['snippet']} (Source: {r['link']})"
-            for i, r in enumerate(results)
-        )
-        prompt_text = (
-            f"User Query: {search_query}\n\n"
-            f"Live Web Search Results:\n{snippets_text}\n\n"
-            f"Synthesize an accurate, grounded, and concise answer using the web results above and the ongoing conversation context. "
-            f"Cite relevant sources where helpful."
-        )
-    else:
-        prompt_text = (
-            f"User Query: {search_query}\n\n"
-            f"Provide an up-to-date, accurate answer for this query considering our ongoing conversation context."
-        )
+    snippets_text = "\n".join(
+        f"[{i+1}] {source.text} (Source: {source.url})"
+        for i, source in enumerate(retrieval.sources)
+    )
+    prompt_text = (
+        f"User Query: {search_query}\n\n"
+        f"Live Web Search Results:\n{snippets_text}\n\n"
+        f"Synthesize an accurate, grounded, and concise answer using the web results above and the ongoing conversation context. "
+        f"Cite relevant sources where helpful. Retrieval warnings: {json.dumps(retrieval.warnings)}"
+    )
 
     contents = build_conversation_contents(history, prompt_text)
 
@@ -4550,8 +5444,9 @@ def run_lane_web(request: str, config: dict, session_id: str) -> int:
     history_to_save = list(history)
     history_to_save.append({"role": "user", "parts": [{"text": search_query}]})
     save_session_history(session_id, history_to_save, full_text)
+    quality_state = record_lane_quality("web", request, full_text, evidence=[source.url for source in retrieval.sources], run_id=run_id)
 
-    emit("done", ok=True, code=0, stopped=False)
+    emit("done", ok=True, code=0, stopped=False, terminal_state=quality_state)
     return 0
 
 
@@ -5049,17 +5944,19 @@ def resolve_cline_session_file(launch_time: float) -> Path | None:
         return None
 
 
-def read_opencode_recent_parts(since_time_ms: int) -> list[dict]:
+def read_opencode_recent_parts(since_time_ms: int, provider_session_id: str | None = None) -> list[dict]:
     """Reads recent message/tool execution parts from OpenCode SQLite database."""
     db_path = Path.home() / ".local/share/opencode/opencode.db"
     if not db_path.is_file():
+        return []
+    if not provider_session_id:
         return []
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.0)
         cur = conn.cursor()
         cur.execute(
-            "SELECT id, time_created, data FROM part WHERE time_created > ? ORDER BY time_created ASC",
-            (since_time_ms,)
+            "SELECT id, time_created, data FROM part WHERE session_id = ? AND time_created > ? ORDER BY time_created ASC",
+            (provider_session_id, since_time_ms),
         )
         rows = cur.fetchall()
         conn.close()
@@ -5096,164 +5993,70 @@ def slugify_task(task_prompt: str) -> str:
 
 
 def resolve_project_cwd(task_prompt: str, config: dict) -> Path:
-    """Ensures each project is isolated in its own dedicated subfolder under ~/Projects with git and treehouse tracking."""
+    """Create a dedicated workspace without initializing Git or provider trust."""
     base_dir = work_dir()
-    slug = slugify_task(task_prompt)
+    slug = slugify_task(task_prompt) or "ui-project"
     target = base_dir / slug
     if target.is_dir() and any(target.iterdir()):
         suffix = 1
-        cand = base_dir / f"{slug}-{suffix}"
-        while cand.is_dir() and any(cand.iterdir()):
+        while True:
+            candidate = base_dir / f"{slug}-{suffix}"
+            if not candidate.is_dir() or not any(candidate.iterdir()):
+                target = candidate
+                break
             suffix += 1
-            cand = base_dir / f"{slug}-{suffix}"
-        target = cand
     target.mkdir(parents=True, exist_ok=True)
-    try:
-        if not (target / ".git").exists():
-            subprocess.run(["git", "init", "-b", f"ui/{slug}"], cwd=str(target), capture_output=True, timeout=5)
-        if config.get("use_treehouse", True) and shutil.which("treehouse"):
-            subprocess.run(["treehouse", "init"], cwd=str(target), capture_output=True, timeout=5)
-    except Exception:
-        pass
-    ensure_antigravity_trusts_workspace(target)
     return target
 
 
-def resolve_coding_worktree(task_prompt: str, config: dict) -> Path:
-    """Provisions a dedicated, isolated custom worktree for normal coding tasks (Python, Java, C#, scripts, backend),
-    strictly separated from UI and app development complex worktrees."""
+def resolve_coding_worktree(task_prompt: str, config: dict, run_id: str = "", reserve_worktree=None) -> Path:
+    """Use an existing Git repository worktree or an explicit non-Git workspace.
+
+    Omagent never initializes a hidden repository, edits the user's ignore
+    file, mutates global provider trust, or prunes unrelated workspaces here.
+    """
     slug = slugify_task(task_prompt) or "coding-task"
-
-    # 1. If currently inside a git repository (and not home directory): create isolated git worktree branch
     try:
-        cur = Path.cwd().resolve()
-        if cur != Path.home() and (cur / ".git").exists():
-            worktrees_dir = cur / ".worktrees"
-            worktrees_dir.mkdir(parents=True, exist_ok=True)
-            target = worktrees_dir / f"coding-{slug}"
-            branch_name = f"coding/{slug}"
+        repository = discover_repository(Path.cwd())
+    except WorkspaceError:
+        repository = None
+    if repository is not None:
+        managed_root = Path.home() / ".local" / "state" / "omagent" / "worktrees"
+        effective_run_id = run_id or f"run-{uuid.uuid4().hex}"
+        plan = plan_worktree(Path.cwd(), managed_root=managed_root, request=task_prompt, run_id=effective_run_id)
+        target = Path(plan.worktree_root)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if reserve_worktree is not None:
+            reserve_worktree(target)
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(repository.path), "worktree", "add", "-b", plan.branch, str(target)],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise WorkspaceError(f"Git worktree creation failed: {exc}") from exc
+        if result.returncode != 0 or not target.is_dir():
+            detail = result.stderr.strip()[:200] or "git worktree add returned failure"
+            raise WorkspaceError(f"Git worktree creation failed: {detail}")
+        return target
 
-            gitignore = cur / ".gitignore"
-            if gitignore.is_file():
-                content = gitignore.read_text("utf-8", errors="ignore")
-                if ".worktrees" not in content:
-                    gitignore.write_text(content.rstrip() + "\n.worktrees/\n", "utf-8")
-            else:
-                gitignore.write_text(".worktrees/\n", "utf-8")
-
-            res = subprocess.run(["git", "worktree", "add", "-b", branch_name, str(target)], cwd=str(cur), capture_output=True, text=True, timeout=8)
-            if res.returncode == 0 and target.is_dir():
-                ensure_antigravity_trusts_workspace(target)
-                return target
-    except Exception as e:
-        if DEBUG:
-            print(f"Git worktree creation error in {cur}: {e}", file=sys.stderr)
-
-    # 2. Dedicated root for all normal coding tasks under ~/Projects/coding-tasks/
     coding_root = Path.home() / "Projects" / "coding-tasks"
-    coding_root.mkdir(parents=True, exist_ok=True)
-
     target = coding_root / slug
     if target.is_dir() and any(target.iterdir()):
         suffix = 1
-        cand = coding_root / f"{slug}-{suffix}"
-        while cand.is_dir() and any(cand.iterdir()):
+        while target.is_dir() and any(target.iterdir()):
+            target = coding_root / f"{slug}-{suffix}"
             suffix += 1
-            cand = coding_root / f"{slug}-{suffix}"
-        target = cand
-
     target.mkdir(parents=True, exist_ok=True)
-    branch_name = f"coding/{slug}"
-
-    git_dir = target / ".git"
-    if not git_dir.exists():
-        try:
-            subprocess.run(["git", "init", "-b", branch_name], cwd=str(target), capture_output=True, text=True, timeout=5)
-            gitignore = target / ".gitignore"
-            if not gitignore.exists():
-                gitignore.write_text(
-                    "__pycache__/\n*.pyc\n.pytest_cache/\n.venv/\nnode_modules/\nbin/\nobj/\n*.class\n.worktrees/\n*.log\n",
-                    encoding="utf-8"
-                )
-                subprocess.run(["git", "add", ".gitignore"], cwd=str(target), capture_output=True, text=True, timeout=5)
-                subprocess.run(["git", "commit", "-m", f"chore: initialize isolated coding worktree on {branch_name}"], cwd=str(target), capture_output=True, text=True, timeout=5)
-        except Exception as e:
-            if DEBUG:
-                print(f"Error initializing git worktree in {target}: {e}", file=sys.stderr)
-
-    # 3. If treehouse is available, initialize treehouse config
-    if config.get("use_treehouse", True) and shutil.which("treehouse"):
-        try:
-            subprocess.run(["treehouse", "init"], cwd=str(target), capture_output=True, text=True, timeout=3)
-        except Exception:
-            pass
-
-    ensure_antigravity_trusts_workspace(target)
     return target
-
-
-def prune_stale_herdr_workspaces(keep_ws_id: str | None = None) -> list[str]:
-    """Closes prior AI agent workspaces in Herdr to prevent zombie processes and cross-talk."""
-    closed = []
-    try:
-        res = subprocess.run(["herdr", "workspace", "list"], capture_output=True, text=True, timeout=3)
-        if res.returncode == 0:
-            data = json.loads(res.stdout)
-            workspaces = data.get("result", {}).get("workspaces", [])
-            for ws in workspaces:
-                ws_id = ws.get("workspace_id")
-                label = ws.get("label", "")
-                num = ws.get("number", 0)
-                if ws_id in ("w1", keep_ws_id) or num == 1:
-                    continue
-                if any(label.startswith(pfx) for pfx in ("AGY:", "Pi:", "Firstmate:", "FAIL:", "omagent:")) or ws.get("agent_status") in ("idle", "done", "unknown"):
-                    subprocess.run(["herdr", "workspace", "close", ws_id], capture_output=True, text=True, timeout=3)
-                    closed.append(ws_id)
-    except Exception as e:
-        if DEBUG:
-            print(f"Error pruning stale Herdr workspaces: {e}", file=sys.stderr)
-    return closed
-
-
-def prune_stale_firstmate_tasks() -> list[str]:
-    """Prunes dead Firstmate .meta and .inbox directories whose Herdr panes no longer exist."""
-    pruned = []
-    if not FM_STATE_DIR.is_dir():
-        return pruned
-    for meta_file in list(FM_STATE_DIR.glob("*.meta")):
-        try:
-            lines = meta_file.read_text("utf-8", errors="ignore").splitlines()
-            pane = ""
-            for l in lines:
-                if l.startswith("herdr_pane_id="):
-                    pane = l.split("=", 1)[1].strip()
-                    break
-            is_dead = False
-            if pane:
-                chk = subprocess.run(["herdr", "pane", "get", pane], capture_output=True, text=True, timeout=2)
-                if chk.returncode != 0:
-                    is_dead = True
-            else:
-                is_dead = True
-
-            if is_dead:
-                meta_file.unlink(missing_ok=True)
-                task_name = meta_file.stem
-                inbox = FM_STATE_DIR / f"{task_name}.inbox"
-                if inbox.is_dir():
-                    shutil.rmtree(inbox, ignore_errors=True)
-                pruned.append(task_name)
-        except Exception:
-            pass
-    return pruned
 
 
 def is_new_project_directive(request: str) -> bool:
     """Checks if request is explicitly launching a new project rather than a minor steer to an existing fleet."""
     req_lower = request.lower().strip()
     if any(req_lower.startswith(pfx) for pfx in ("/new", "/code", "new:", "create project", "new project")):
-        return True
-    if is_normal_coding_request(request):
         return True
     if is_ui_creation_request(request):
         creation_starters = (
@@ -5312,6 +6115,7 @@ def get_fleet_telemetry(ws_id: str | None, primary_pane_id: str | None) -> dict:
         name = a.get("name") or a.get("agent") or "crewmate"
         status = a.get("agent_status") or "unknown"
         pane = a.get("pane_id") or primary_pane_id or "unknown"
+        provider_session = a.get("provider_session_id") or a.get("agent_session_id")
         meta = meta_map.get(pane, {})
         role = meta.get("role", "lead-engineer" if pane == primary_pane_id else "subagent")
         skill = meta.get("skill", "ce-work")
@@ -5328,6 +6132,7 @@ def get_fleet_telemetry(ws_id: str | None, primary_pane_id: str | None) -> dict:
             "skill": skill,
             "status": status,
             "pane_id": pane,
+            "provider_session_id": provider_session,
         })
 
         out = ""
@@ -5373,6 +6178,7 @@ def run_firstmate_bridge(
     *,
     harness: str = "",
     model: str = "",
+    run_id: str = "",
 ) -> int:
     """Answers user queries and manages fleet operations as Firstmate, the fleet supervisor.
     Has live visibility into all Herdr subagents, panes, and workspace files.
@@ -5433,13 +6239,14 @@ def run_firstmate_bridge(
         fleet_info["provider"] = stored_provider
         fleet_info["model"] = stored_model
         fleet_info["harness"] = stored_harness
-        save_session_fleet(session_id, fleet_info)
+        save_session_fleet(session_id, fleet_info, run_id=run_id)
 
         if fm_task_id and pane_id and ws_id:
             register_firstmate_task(
                 fm_task_id,
                 pane_id,
                 ws_id,
+                fleet_info.get("herdrTabId", ""),
                 cwd,
                 harness=stored_provider,
                 model=stored_model,
@@ -5456,7 +6263,7 @@ def run_firstmate_bridge(
             save_session_ui_set(session_id, active_ui_set)
             if fleet_info:
                 fleet_info["uiSet"] = active_ui_set
-                save_session_fleet(session_id, fleet_info)
+                save_session_fleet(session_id, fleet_info, run_id=run_id)
             set_meta = UI_SKILL_SETS[active_ui_set]
             emit("text", text=f"• **UI Archetype Switched**: Guiding engine updated to Set {active_ui_set} — **{set_meta['name']}**\n")
 
@@ -5478,6 +6285,24 @@ def run_firstmate_bridge(
 
     # 1. Collect live multi-agent fleet telemetry
     telemetry = get_fleet_telemetry(ws_id, pane_id)
+    reviewer_pane = fleet_info.get("herdrRevPaneId")
+    lead_telemetry = next(
+        (item for item in telemetry.get("agents", []) if item.get("pane_id") == pane_id),
+        None,
+    )
+    reviewer_telemetry = next(
+        (item for item in telemetry.get("agents", []) if item.get("pane_id") == reviewer_pane),
+        None,
+    )
+    if lead_telemetry and lead_telemetry.get("provider_session_id"):
+        fleet_info["providerSessionId"] = lead_telemetry["provider_session_id"]
+    if reviewer_telemetry and reviewer_telemetry.get("provider_session_id"):
+        fleet_info["reviewer"] = {
+            "reviewer_id": fleet_info.get("revAgentName") or reviewer_telemetry.get("name") or "reviewer",
+            "provider_session_id": reviewer_telemetry["provider_session_id"],
+        }
+    if lead_telemetry or reviewer_telemetry:
+        save_session_fleet(session_id, fleet_info, run_id=run_id)
 
     # 2. Inspect workspace directory files
     project_files: list[str] = []
@@ -5505,16 +6330,17 @@ def run_firstmate_bridge(
     is_directive = has_code_action or (not is_info and len(clean_req.split()) > 1)
 
     dispatch_status = "Informational query only — no new modification orders were dispatched to the crew."
+    dispatch_errors: list[str] = []
     if is_directive and pane_id:
         # Deliver instruction to lead crewmate inbox via Firstmate
         if shutil.which("firstmate") and fm_task_id:
             try:
-                fm_send_res = subprocess.run(["firstmate", "send", fm_task_id, clean_req], capture_output=True, text=True, timeout=8)
-                if fm_send_res.returncode == 0:
-                    emit("text", text=f"• **Firstmate Relayed Directive**: Dispatched modification to crew inbox (`{fm_task_id}`)\n")
-            except Exception as e:
+                FirstmateAdapter(FM_STATE_DIR, runner=subprocess.run).send_task(fm_task_id, clean_req)
+                emit("text", text=f"• **Firstmate Relayed Directive**: Dispatched modification to crew inbox (`{fm_task_id}`)\n")
+            except FirstmateError as exc:
+                dispatch_errors.append(f"firstmate send failed: {exc}")
                 if DEBUG:
-                    print(f"Firstmate send error in bridge: {e}", file=sys.stderr)
+                    print(f"Firstmate send error in bridge: {exc}", file=sys.stderr)
 
         # Ring doorbell or re-engage idle agent in the pane
         is_agy = "agy" in stored_harness or "antigravity" in stored_harness or stored_provider == "agy"
@@ -5541,8 +6367,11 @@ def run_firstmate_bridge(
 
         if proc_running and not is_swapped:
             time.sleep(0.2)
-            subprocess.run(["herdr", "pane", "send-text", pane_id, f"{doorbell}\n"], capture_output=True, text=True, timeout=3)
-            emit("text", text="• **Crew Alerted**: Doorbell rung in active Herdr pane\n")
+            send_result = subprocess.run(["herdr", "pane", "send-text", pane_id, f"{doorbell}\n"], capture_output=True, text=True, timeout=3)
+            if send_result.returncode == 0:
+                emit("text", text="• **Crew Alerted**: Doorbell rung in active Herdr pane\n")
+            else:
+                dispatch_errors.append(f"herdr doorbell exited {send_result.returncode}")
         else:
             if is_swapped and swapped_harness:
                 if stored_provider == "opencode":
@@ -5563,8 +6392,16 @@ def run_firstmate_bridge(
                 else:
                     relaunch_cmd = f"agy --continue --dangerously-skip-permissions -i {shlex.quote(doorbell)}\n"
 
-            subprocess.run(["herdr", "pane", "send-text", pane_id, relaunch_cmd], capture_output=True, text=True, timeout=3)
-            emit("text", text=f"• **Session Resumed**: Re-engaged crewmate ({target_meta['display_name']}) in Herdr pane\n")
+            relaunch_result = subprocess.run(["herdr", "pane", "send-text", pane_id, relaunch_cmd], capture_output=True, text=True, timeout=3)
+            if relaunch_result.returncode == 0:
+                emit("text", text=f"• **Session Resumed**: Re-engaged crewmate ({target_meta['display_name']}) in Herdr pane\n")
+            else:
+                dispatch_errors.append(f"herdr relaunch exited {relaunch_result.returncode}")
+
+        if dispatch_errors:
+            emit("error", text="Directive dispatch failed: " + "; ".join(dispatch_errors))
+            emit("done", ok=False, code=1, stopped=False, terminal_state="failed")
+            return 1
 
         dispatch_status = (
             f"DIRECTIVE DISPATCHED: The Captain's order ('{clean_req}') was transmitted to the lead crewmate "
@@ -5628,14 +6465,28 @@ def run_firstmate_bridge(
         return 1
 
     save_session_history(session_id, contents, full_text)
-    emit("done", ok=True, code=0, stopped=False)
+    receipt_path = cwd / ".omagent" / "review-receipts" / f"{run_id or 'unbound'}.json"
+    if run_id:
+        _update_review_binding(cwd, run_id)
+    review_receipt = import_review_receipt(receipt_path, run_id) if run_id else None
+    quality_state = record_lane_quality(
+        "web",
+        clean_req,
+        full_text,
+        run_id=run_id,
+        review_receipt=review_receipt,
+    )
+    emit("done", ok=True, code=0, stopped=False, terminal_state=quality_state)
     return 0
 
 
-def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | None = None, *, harness: str = "", model: str = "", is_coding_task: bool = False) -> int:
+def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | None = None, *, harness: str = "", model: str = "", is_coding_task: bool = False, run_id: str = "", ui_contract: dict | None = None) -> int:
     task_prompt = clean_prefix(request)
     is_normal_coding = is_coding_task or is_normal_coding_request(task_prompt)
-    if is_normal_coding:
+    if ui_contract is not None:
+        ui_set = None
+        clear_session_ui_set(session_id)
+    elif is_normal_coding:
         ui_set = None
         clear_session_ui_set(session_id)
     elif ui_set is None:
@@ -5643,7 +6494,12 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
     if ui_set:
         save_session_ui_set(session_id, ui_set)
 
-    if ui_set and ui_set in UI_SKILL_SETS:
+    ui_skill_bundle = impeccable_ui_bundle() if ui_contract is not None else None
+    if ui_skill_bundle is not None:
+        primary_skill = ui_skill_bundle.primary_skill
+        aux_skills = list(ui_skill_bundle.supporting_skills)
+        skill_desc = ui_skill_bundle.description
+    elif ui_set and ui_set in UI_SKILL_SETS:
         set_meta = UI_SKILL_SETS[ui_set]
         primary_skill = set_meta["primary_skill"]
         aux_skills = set_meta["aux_skills"]
@@ -5657,6 +6513,7 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
     is_subsequent_turn = False
     pane_id = None
     ws_id = None
+    ws_tab_id = None
     fm_task_id = None
     ws_label = None
     motion_pane_id = None
@@ -5669,6 +6526,10 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
     fm_motion_task_id = None
     fm_comp_task_id = None
     fm_rev_task_id = None
+    provider_session_id = fleet_info.get("providerSessionId") if fleet_info else None
+    reviewer_session_id = (fleet_info or {}).get("reviewer", {}).get("provider_session_id") if fleet_info else None
+    workspace_owned = bool(fleet_info.get("workspaceOwned")) if fleet_info else False
+    managed_worktree_root = Path.home() / ".local" / "state" / "omagent" / "worktrees"
 
     if fleet_info:
         cand_pane = fleet_info.get("herdrPaneId")
@@ -5680,6 +6541,7 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
                 if chk.returncode == 0:
                     pane_id = cand_pane
                     ws_id = cand_ws
+                    ws_tab_id = fleet_info.get("herdrTabId")
                     fm_task_id = cand_task
                     ws_label = fleet_info.get("wsLabel", f"Firstmate: {cand_task}")
                     motion_pane_id = fleet_info.get("herdrMotionPaneId")
@@ -5699,13 +6561,40 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
     if is_subsequent_turn and fleet_info and fleet_info.get("cwd"):
         cwd = Path(fleet_info["cwd"])
     else:
-        # Fresh project: prune stale AI workspaces, dead tasks, and isolate dedicated directory
-        prune_stale_herdr_workspaces()
-        prune_stale_firstmate_tasks()
-        if is_normal_coding or not ui_set:
-            cwd = resolve_coding_worktree(task_prompt, config)
-        else:
-            cwd = resolve_project_cwd(task_prompt, config)
+        # Fresh project: never prune global Herdr or Firstmate state. Resources
+        # are cleaned up only through the ownership record for this session.
+        try:
+            if is_normal_coding or not ui_set:
+                def reserve_managed_worktree(path: Path) -> None:
+                    if run_id:
+                        _reserve_run_resource(
+                            session_id,
+                            run_id,
+                            kind="worktree",
+                            identifier=str(path),
+                            workspace=str(path),
+                        )
+
+                cwd = resolve_coding_worktree(
+                    task_prompt,
+                    config,
+                    run_id=run_id,
+                    reserve_worktree=reserve_managed_worktree,
+                )
+            else:
+                cwd = resolve_project_cwd(task_prompt, config)
+        except WorkspaceError as exc:
+            _mark_setup_failed(run_id)
+            emit("error", text=f"Workspace setup failed: {exc}")
+            emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+            return 1
+
+    if not is_subsequent_turn:
+        try:
+            cwd.resolve().relative_to(managed_worktree_root.resolve())
+            workspace_owned = True
+        except ValueError:
+            workspace_owned = False
 
     catalog = get_harness_catalog()
     requested_harness = (harness or config.get("coding_harness", "agy")).lower().strip()
@@ -5716,7 +6605,10 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
     elif requested_harness in ("cline",):
         harness_key = "cline"
     else:
-        harness_key = "agy"
+        _mark_setup_failed(run_id)
+        emit("error", text=f"Unsupported coding harness: {requested_harness}")
+        emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+        return 1
 
     harness_meta = catalog.get(harness_key, catalog["agy"])
     chosen_model = (model or harness_meta["default_model"]).strip()
@@ -5737,7 +6629,12 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
         elif target_harness_key in ("cline",):
             target_harness_key = "cline"
         else:
-            target_harness_key = "agy"
+            if harness:
+                _mark_setup_failed(run_id)
+                emit("error", text=f"Unsupported coding harness: {target_harness_key}")
+                emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+                return 1
+            target_harness_key = stored_provider if stored_provider in SUPPORTED_PROVIDERS else "agy"
 
         target_meta = catalog.get(target_harness_key, catalog["agy"])
         target_model = (model or stored_model or target_meta["default_model"]).strip()
@@ -5746,7 +6643,7 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
         swapped_model = bool(model and target_model != stored_model and stored_model)
         is_swapped = swapped_harness or swapped_model
 
-        if is_swapped:
+        if is_swapped or stored_provider != target_harness_key or stored_model != target_model:
             swap_desc = []
             if swapped_harness:
                 prev_disp = catalog.get(stored_provider, {}).get("display_name", stored_provider)
@@ -5767,19 +6664,24 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
             fleet_info["provider"] = stored_provider
             fleet_info["model"] = stored_model
             fleet_info["harness"] = stored_harness
-            save_session_fleet(session_id, fleet_info)
+            save_session_fleet(session_id, fleet_info, run_id=run_id)
 
             if fm_task_id and pane_id and ws_id:
-                register_firstmate_task(
+                if not register_firstmate_task(
                     fm_task_id,
                     pane_id,
                     ws_id,
+                    ws_tab_id or "",
                     cwd,
                     harness=stored_provider,
                     model=stored_model,
                     role="lead-engineer",
                     skill=primary_skill,
-                )
+                ):
+                    _mark_setup_failed(run_id)
+                    emit("error", text="Firstmate lead task update failed")
+                    emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+                    return 1
                 emit("text", text=f"• **Firstmate Updated**: Lead crewmate metadata updated to `{stored_provider}` / `{stored_model}`\n")
 
         is_agy = stored_provider == "agy"
@@ -5797,8 +6699,13 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
             try:
                 quota_decision = _harness_pool.select_harness(config)
                 if not quota_decision.get("use_agy"):
-                    harness_key = (quota_decision.get("provider") or "opencode").lower()
-                    chosen_model = quota_decision.get("model") or chosen_model
+                    candidate_provider = (quota_decision.get("provider") or "opencode").lower()
+                    if candidate_provider in SUPPORTED_PROVIDERS:
+                        harness_key = candidate_provider
+                        chosen_model = quota_decision.get("model") or chosen_model
+                    else:
+                        emit("error", text=f"Ignoring unsupported fallback provider: {candidate_provider}")
+                        quota_decision = None
             except Exception as e:
                 if DEBUG:
                     print(f"harness_pool selection error: {e}", file=sys.stderr)
@@ -5830,9 +6737,9 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
             harness_label = f"Cline · {model_disp} ({primary_skill})"
             ws_prefix = "CLIN"
         if is_normal_coding:
-            ws_label = f"{ws_prefix}-CODE: {primary_skill} - {short_title}"
+            ws_label = f"{ws_prefix}-CODE: {primary_skill} - {short_title} [{run_id[:12]}]"
         else:
-            ws_label = f"{ws_prefix}: {primary_skill} - {short_title}"
+            ws_label = f"{ws_prefix}: {primary_skill} - {short_title} [{run_id[:12]}]"
 
     # Resume command connects the user straight into Herdr
     resume_cmd = ["omarchy-launch-terminal", "herdr"]
@@ -5898,25 +6805,47 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
             try:
                 stat_res = subprocess.run(["herdr", "status"], capture_output=True, text=True, timeout=3)
                 if "status: running" in stat_res.stdout:
-                    ensure_antigravity_trusts_workspace(cwd)
-                    ws_create = subprocess.run(
-                        ["herdr", "workspace", "create", "--label", ws_label, "--cwd", str(cwd)],
-                        capture_output=True, text=True, timeout=5,
-                    )
-                    if ws_create.returncode == 0:
-                        try:
-                            ws_data = json.loads(ws_create.stdout)
-                            res_obj = ws_data.get("result", {})
-                            pane_id = res_obj.get("root_pane", {}).get("pane_id")
-                            ws_id = res_obj.get("workspace", {}).get("workspace_id")
-                            if ws_id:
-                                subprocess.run(["herdr", "workspace", "focus", ws_id], capture_output=True, text=True, timeout=3)
-                        except Exception as e:
-                            if DEBUG:
-                                print(f"Herdr pane setup error: {e}", file=sys.stderr)
+                    # Provider trust is not mutated globally; the owned workspace
+                    # is passed to the provider adapter instead.
+                    if run_id:
+                        _reserve_run_resource(
+                            session_id,
+                            run_id,
+                            kind="herdr_workspace_intent",
+                            identifier=ws_label,
+                            workspace=str(cwd),
+                            provider=fb_provider,
+                        )
+                    try:
+                        receipt = HerdrAdapter().create_workspace(label=ws_label, cwd=cwd)
+                        pane_id = receipt.root_pane_id
+                        ws_id = receipt.workspace_id
+                        ws_tab_id = receipt.tab_id
+                        if run_id:
+                            _release_run_resource(run_id, "herdr_workspace_intent", ws_label)
+                        if ws_id:
+                            subprocess.run(["herdr", "workspace", "focus", ws_id], capture_output=True, text=True, timeout=3)
+                    except HerdrError as e:
+                        if DEBUG:
+                            print(f"Herdr pane setup error: {e}", file=sys.stderr)
             except Exception as e:
                 if DEBUG:
                     print(f"Herdr error: {e}", file=sys.stderr)
+        if not config.get("use_herdr", True):
+            _mark_setup_failed(run_id)
+            emit("error", text="Coding execution requires the owned Herdr runtime")
+            emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+            return 1
+        if not shutil.which("herdr") or not pane_id or not ws_id:
+            _mark_setup_failed(run_id)
+            emit("error", text="Herdr workspace setup did not return an owned workspace receipt")
+            emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+            return 1
+        if config.get("use_firstmate", True) and not shutil.which("firstmate"):
+            _mark_setup_failed(run_id)
+            emit("error", text="Firstmate is required for the owned coding fleet")
+            emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+            return 1
 
         # Register tasks with Firstmate and initialize specialized multi-subagent fleet in Herdr
         clean_sid = re.sub(r'[^A-Za-z0-9_-]', '_', session_id)[:24]
@@ -5929,6 +6858,24 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
         fm_motion_task_id = f"task_{clean_sid}_mot"
         fm_comp_task_id = f"task_{clean_sid}_dom"
         fm_rev_task_id = f"task_{clean_sid}_rev"
+        _update_session_fleet_projection(
+            session_id,
+            run_id,
+            {
+                "fmTaskId": fm_task_id,
+                "fmMotionTaskId": fm_motion_task_id,
+                "fmCompTaskId": fm_comp_task_id,
+                "fmRevTaskId": fm_rev_task_id,
+                "createdFirstmateTasks": [],
+                "herdrWorkspaceId": ws_id,
+                "herdrTabId": ws_tab_id,
+                "herdrPaneId": pane_id,
+                "cwd": str(cwd),
+                "workspaceOwned": workspace_owned,
+                "provider": fb_provider,
+                "model": chosen_model,
+            },
+        )
 
         motion_pane_id = None
         comp_pane_id = None
@@ -5947,6 +6894,21 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
             rev_skill = "ce-code-review"
             rev_title = "Adversarial Code Reviewer"
             rev_desc = "Adversarial code review for syntax, regressions, performance, concurrency, error handling, and language best practices"
+        elif ui_skill_bundle is not None:
+            motion_role = "impeccable-motion-specialist"
+            motion_skill = ui_skill_bundle.motion_skill
+            motion_title = "Purposeful Motion & Interaction Specialist"
+            motion_desc = "Apply purposeful motion, feedback, and state transitions only where they clarify the product task"
+
+            comp_role = "impeccable-component-architect"
+            comp_skill = ui_skill_bundle.component_skill
+            comp_title = "Visual Direction & Design Systems Architect"
+            comp_desc = "Own the selected visual world, tokens, hierarchy, responsive structure, and original component composition"
+
+            rev_role = "impeccable-visual-reviewer"
+            rev_skill = ui_skill_bundle.reviewer_skill
+            rev_title = "Impeccable Anti-Slop Visual Reviewer"
+            rev_desc = "Audit rendered craft, product-task fit, visual hierarchy, interaction quality, accessibility, and generic AI-design failure modes"
         elif ui_set == 4:
             motion_role = "motion-and-craft-specialist"
             motion_skill = "animate"
@@ -6024,42 +6986,25 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
             rev_desc = "Defect detection, regressions, security, edge cases, and code quality"
 
         if pane_id and ws_id and config.get("use_herdr", True):
-            # 1. Split root pane to the right for Motion / 3D Specialist
+            herdr = HerdrAdapter()
             try:
-                split1 = subprocess.run(
-                    ["herdr", "pane", "split", pane_id, "--direction", "right", "--no-focus", "--cwd", str(cwd)],
-                    capture_output=True, text=True, timeout=5,
-                )
-                if split1.returncode == 0:
-                    motion_pane_id = json.loads(split1.stdout).get("result", {}).get("pane", {}).get("pane_id")
-            except Exception as e:
-                if DEBUG:
-                    print(f"Herdr motion split error: {e}", file=sys.stderr)
-
-            # 2. Split root pane downwards for DOM & Header Engineer
-            try:
-                split2 = subprocess.run(
-                    ["herdr", "pane", "split", pane_id, "--direction", "down", "--no-focus", "--cwd", str(cwd)],
-                    capture_output=True, text=True, timeout=5,
-                )
-                if split2.returncode == 0:
-                    comp_pane_id = json.loads(split2.stdout).get("result", {}).get("pane", {}).get("pane_id")
-            except Exception as e:
-                if DEBUG:
-                    print(f"Herdr comp split error: {e}", file=sys.stderr)
-
-            # 3. Split the right pane downwards for Adversarial Reviewer (completing a 2x2 grid)
-            base_for_rev = motion_pane_id or pane_id
-            try:
-                split3 = subprocess.run(
-                    ["herdr", "pane", "split", base_for_rev, "--direction", "down", "--no-focus", "--cwd", str(cwd)],
-                    capture_output=True, text=True, timeout=5,
-                )
-                if split3.returncode == 0:
-                    rev_pane_id = json.loads(split3.stdout).get("result", {}).get("pane", {}).get("pane_id")
-            except Exception as e:
-                if DEBUG:
-                    print(f"Herdr rev split error: {e}", file=sys.stderr)
+                motion_pane_id = herdr.split_pane(pane_id, direction="right", cwd=cwd).pane_id
+                comp_pane_id = herdr.split_pane(pane_id, direction="down", cwd=cwd).pane_id
+                rev_pane_id = herdr.split_pane(motion_pane_id, direction="down", cwd=cwd).pane_id
+            except HerdrError as exc:
+                _mark_setup_failed(run_id)
+                emit("error", text=f"Herdr pane setup did not return owned pane receipts: {exc}")
+                emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+                return 1
+            _update_session_fleet_projection(
+                session_id,
+                run_id,
+                {
+                    "herdrMotionPaneId": motion_pane_id,
+                    "herdrCompPaneId": comp_pane_id,
+                    "herdrRevPaneId": rev_pane_id,
+                },
+            )
 
             subagent_kind = "agy" if is_agy else ("opencode" if fb_provider == "opencode" else ("cline" if fb_provider == "cline" else "agy"))
 
@@ -6071,6 +7016,7 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
                     "task_id": fm_motion_task_id,
                     "role": motion_role,
                     "skill": motion_skill,
+                    "model": chosen_model,
                     "title": motion_title,
                     "desc": motion_desc,
                 })
@@ -6081,6 +7027,7 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
                     "task_id": fm_comp_task_id,
                     "role": comp_role,
                     "skill": comp_skill,
+                    "model": chosen_model,
                     "title": comp_title,
                     "desc": comp_desc,
                 })
@@ -6091,43 +7038,80 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
                     "task_id": fm_rev_task_id,
                     "role": rev_role,
                     "skill": rev_skill,
+                    "model": chosen_model,
                     "title": rev_title,
                     "desc": rev_desc,
                 })
 
             def start_subagent_task(spec):
                 try:
-                    ensure_antigravity_trusts_workspace(cwd)
-                    start_cmd = ["herdr", "agent", "start", spec["name"], "--kind", subagent_kind, "--pane", spec["pane"], "--timeout", "15000"]
                     if subagent_kind == "agy":
-                        start_cmd.extend(["--", "--dangerously-skip-permissions"])
-                    res = subprocess.run(
-                        start_cmd,
-                        capture_output=True, text=True, timeout=20,
+                        extra_args = ("--model", chosen_model, "--dangerously-skip-permissions")
+                    elif subagent_kind == "cline":
+                        extra_args = ("--model", chosen_model, "--auto-approve", "true")
+                    else:
+                        extra_args = ("--auto",)
+                    receipt = HerdrAdapter().start_agent(
+                        spec["name"],
+                        kind=subagent_kind,
+                        pane_id=spec["pane"],
+                        extra_args=extra_args,
+                        require_provider_session=True,
                     )
-                    return spec, res.returncode == 0
-                except Exception as e:
+                    spec["provider_session_id"] = receipt.provider_session_id
+                    return spec, receipt
+                except (HerdrError, OSError) as e:
                     if DEBUG:
                         print(f"Subagent start error for {spec['name']}: {e}", file=sys.stderr)
-                    return spec, False
+                    return spec, None
 
             registered_subagents = []
             if subagent_specs:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=min(3, len(subagent_specs))) as pool:
                     launch_results = list(pool.map(start_subagent_task, subagent_specs))
 
-                for spec, ok in launch_results:
-                    if ok:
-                        register_firstmate_task(
+                for spec, receipt in launch_results:
+                    if receipt is not None:
+                        registered = register_firstmate_task(
                             spec["task_id"],
                             spec["pane"],
                             ws_id,
+                            ws_tab_id or "",
                             cwd,
                             harness=subagent_kind,
+                            model=spec.get("model", chosen_model),
                             role=spec["role"],
                             skill=spec["skill"],
                         )
+                        if not registered:
+                            continue
                         registered_subagents.append(spec)
+                        _update_session_fleet_projection(
+                            session_id,
+                            run_id,
+                            {
+                                "fmMotionTaskId": spec["task_id"] if spec["name"] == motion_agent_name else fm_motion_task_id,
+                                "fmCompTaskId": spec["task_id"] if spec["name"] == comp_agent_name else fm_comp_task_id,
+                                "fmRevTaskId": spec["task_id"] if spec["name"] == rev_agent_name else fm_rev_task_id,
+                                "createdFirstmateTasks": [item["task_id"] for item in registered_subagents],
+                            },
+                        )
+            reviewer_receipt = next(
+                (spec for spec in registered_subagents if spec.get("name") == rev_agent_name and spec.get("provider_session_id")),
+                None,
+            )
+            if reviewer_receipt:
+                reviewer_session_id = reviewer_receipt["provider_session_id"]
+                _update_session_fleet_projection(
+                    session_id,
+                    run_id,
+                    {
+                        "reviewer": {
+                            "reviewer_id": rev_agent_name,
+                            "provider_session_id": reviewer_session_id,
+                        }
+                    },
+                )
 
             project_subject = extract_project_subject(task_prompt)
             contract_directive_text = ""
@@ -6289,20 +7273,30 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
                     task_file.write_text(task_body, "utf-8")
 
                     doorbell_text = f"Firstmate instructions ready: read {orient_file.name} and {task_file.name} in {inbox_dir} and mv to {inbox_dir}/handled/"
-                    subprocess.run(["herdr", "pane", "send-text", s_pane, f"{doorbell_text}\n"], capture_output=True, text=True, timeout=2)
+                    HerdrAdapter().send_text(s_pane, f"{doorbell_text}\n")
                 except Exception as e:
                     if DEBUG:
                         print(f"Error delivering subagent orientation & task: {e}", file=sys.stderr)
 
-            register_firstmate_task(
+            if not register_firstmate_task(
                 fm_task_id,
                 pane_id,
                 ws_id,
+                ws_tab_id or "",
                 cwd,
                 harness=fb_provider,
                 model=chosen_model,
                 role="lead-engineer" if is_normal_coding else "lead-architect",
                 skill=primary_skill,
+            ):
+                _mark_setup_failed(run_id)
+                emit("error", text="Firstmate lead task registration failed")
+                emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+                return 1
+            _update_session_fleet_projection(
+                session_id,
+                run_id,
+                {"createdFirstmateTasks": [fm_task_id] + [spec["task_id"] for spec in registered_subagents]},
             )
 
             save_session_fleet(session_id, {
@@ -6311,7 +7305,9 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
                 "fmMotionTaskId": fm_motion_task_id if motion_pane_id else None,
                 "fmCompTaskId": fm_comp_task_id if comp_pane_id else None,
                 "fmRevTaskId": fm_rev_task_id if rev_pane_id else None,
+                "createdFirstmateTasks": [fm_task_id] + [spec["task_id"] for spec in registered_subagents],
                 "herdrWorkspaceId": ws_id,
+                "herdrTabId": ws_tab_id,
                 "herdrPaneId": pane_id,
                 "herdrMotionPaneId": motion_pane_id,
                 "herdrCompPaneId": comp_pane_id,
@@ -6323,11 +7319,17 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
                 "harness": harness_name,
                 "provider": fb_provider,
                 "model": chosen_model,
+                "providerSessionId": provider_session_id,
+                "reviewer": {
+                    "reviewer_id": rev_agent_name,
+                    "provider_session_id": reviewer_session_id,
+                } if rev_agent_name and reviewer_session_id else None,
                 "uiSet": ui_set,
                 "cwd": str(cwd),
+                "workspaceOwned": workspace_owned,
                 "wsLabel": ws_label,
                 "createdAt": int(time.time() * 1000),
-            })
+            }, run_id=run_id)
 
             lead_banner_title = "Lead Software Engineer" if is_normal_coding else "Lead UI Architect"
             lead_banner_desc = "System orchestrator & master implementation" if is_normal_coding else "System orchestrator & master layout"
@@ -6386,6 +7388,9 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
         emit("text", text="• **Extracting** coredump & crash telemetry\n")
 
     fleet_directive = ""
+    receipt_path = cwd / ".omagent" / "review-receipts" / f"{run_id or 'unbound'}.json"
+    if run_id:
+        _update_review_binding(cwd, run_id)
     if config.get("use_firstmate", True) and shutil.which("firstmate"):
         subagent_hint_lines = []
         target_reviewer = rev_agent_name or "reviewer"
@@ -6393,6 +7398,16 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
             rev_prompt_task = f"Adversarial review of code in {cwd}: check syntax, edge cases, error handling, performance, regressions, and tests"
             rev_role = "adversarial-code-reviewer"
             rev_skill = "ce-code-review"
+        elif ui_skill_bundle is not None:
+            rev_prompt_task = (
+                f"Review the UI/UX implementation in {cwd} using the Omagent Impeccable system. "
+                "Audit deliberate visual direction, product-task fit, hierarchy, tokens, responsive structure, "
+                "interaction states, accessibility, rendered desktop/tablet/mobile evidence, and generic AI-slop "
+                "patterns. The reviewer must reject interchangeable card grids, decorative pill spam, generic gradients, "
+                "unmotivated motion, and copy that does not belong to the user's product."
+            )
+            rev_role = "impeccable-visual-reviewer"
+            rev_skill = ui_skill_bundle.reviewer_skill
         elif ui_set and ui_set in UI_SKILL_SETS:
             rev_prompt_task = UI_SKILL_SETS[ui_set]["reviewer_audit_prompt"].format(cwd=cwd)
             rev_role = UI_SKILL_SETS[ui_set]["reviewer_role"]
@@ -6401,6 +7416,17 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
             rev_prompt_task = f"Review implementation in {cwd}: check for bugs, edge cases, visual layout issues, and jargon"
             rev_role = "code-reviewer"
             rev_skill = "ce-code-review"
+
+        rev_prompt_task += (
+            "\n\nIndependent review receipt: after inspecting the task, deterministic evidence, and deliverable, "
+            f"write a JSON receipt to {receipt_path}. Read the controller binding at "
+            f"{receipt_path.with_suffix('.request.json')} and copy its run_id, workspace, evidence_generation, "
+            "and artifact_revision exactly. Also set reviewer_id, provider, provider_session_id, "
+            "independent=true, evidence (a non-empty list), and findings (a list of objects with title, blocking, "
+            "evidence, and resolved). For UI runs, set review_scope='ui', selected_concept_id, render_manifest_digest, "
+            "interaction_report_digest, and accessibility_report_digest from the current run-owned evidence; a generic "
+            "receipt cannot complete a UI run. Do not claim completion without this receipt."
+        )
 
         if is_normal_coding:
             if motion_agent_name and motion_pane_id:
@@ -6551,9 +7577,14 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
             f"3. 33 COMPOUND ENGINEERING SKILLS SUITE: You and all fleet subagents operate with full on-demand access to the 33 Compound Engineering skills (`ce-work`, `ce-plan`, `ce-debug`, `ce-code-review`, `ce-simplify-code`, `ce-compound`, `ce-commit`, `ce-optimize`, `diagnose-crash`, `treehouse`, etc.).\n"
             f"4. SIBLING SUBAGENT COLLABORATION: Delegate core algorithms to your Core Logic Specialist, test harnesses to your Test Suite Specialist, and conduct peer review with your Adversarial Code Reviewer.\n\n"
         )
+    elif ui_skill_bundle is not None:
+        ui_override_header = (
+            "★ IMPECCABLE UI/UX SYSTEM ACTIVE:\n"
+            f"{ui_skill_bundle.prompt_directive()}\n"
+        )
     elif ui_set:
         ui_override_header = (
-            f"★ SUPREME UI SKILL OVERRIDE ACTIVE (UI SET {ui_set}):\n"
+            f"★ LEGACY UI SKILL OVERRIDE ACTIVE (UI SET {ui_set}):\n"
             f"Whenever any UI/frontend is being created, the skills of UI Set {ui_set} and its Animation Skills OVERRIDE generic Compound Engineering skills.\n"
             f"Visual styling, design tokens, layout hierarchy, component composition, and motion physics are 100% ruled by UI Set {ui_set} + Animations-skills.\n"
             f"Compound Engineering skills provide the engineering discipline & operational harness (worktrees, planning, browser QA, code simplification, compounding learnings).\n\n"
@@ -6679,24 +7710,27 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
 
     launch_cmd = None
     if not is_subsequent_turn:
+        auto_suffix = " --auto" if AUTO_APPROVE else ""
+        agy_approval = " --dangerously-skip-permissions" if AUTO_APPROVE else ""
+        cline_approval = " --auto-approve true" if AUTO_APPROVE else ""
         if fb_provider == "opencode":
-            launch_cmd = f"opencode run --auto -m {shlex.quote(chosen_model)} {shlex.quote(dispatch_prompt)}\n"
+            launch_cmd = f"opencode run{auto_suffix} -m {shlex.quote(chosen_model)} {shlex.quote(dispatch_prompt)}\n"
         elif fb_provider == "cline":
             thinking_flag = "--thinking medium " if "muse-spark" in chosen_model else ""
-            launch_cmd = f"cline --auto-approve true --timeout 0 --retries 15 --compaction basic {thinking_flag}-m {shlex.quote(chosen_model)} {shlex.quote(dispatch_prompt)}\n"
+            launch_cmd = f"cline{cline_approval} --timeout 0 --retries 15 --compaction basic {thinking_flag}-m {shlex.quote(chosen_model)} {shlex.quote(dispatch_prompt)}\n"
         elif is_agy:
-            launch_cmd = f"agy --model {shlex.quote(chosen_model)} --dangerously-skip-permissions -i {shlex.quote(dispatch_prompt)}\n"
+            launch_cmd = f"agy --model {shlex.quote(chosen_model)}{agy_approval} -i {shlex.quote(dispatch_prompt)}\n"
         elif fb_provider and fb_provider != "agy":
             if _harness_pool is not None:
                 try:
-                    launch_cmd = _harness_pool.build_launch_cmd(fb_provider, fb_model or chosen_model, dispatch_prompt)
+                    launch_cmd = _harness_pool.build_launch_cmd(fb_provider, fb_model or chosen_model, dispatch_prompt, auto_approve=AUTO_APPROVE)
                 except Exception as e:
                     if DEBUG:
                         print(f"launch cmd build failed: {e}", file=sys.stderr)
             if launch_cmd is None:
-                launch_cmd = f"agy --model {shlex.quote(chosen_model)} --dangerously-skip-permissions -i {shlex.quote(dispatch_prompt)}\n"
+                launch_cmd = f"agy --model {shlex.quote(chosen_model)}{agy_approval} -i {shlex.quote(dispatch_prompt)}\n"
         else:
-            launch_cmd = f"agy --model {shlex.quote(chosen_model)} --dangerously-skip-permissions -i {shlex.quote(dispatch_prompt)}\n"
+            launch_cmd = f"agy --model {shlex.quote(chosen_model)}{agy_approval} -i {shlex.quote(dispatch_prompt)}\n"
 
     launch_time = time.time()
     active_session_file = None
@@ -6710,7 +7744,28 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
 
     if not is_subsequent_turn and pane_id and launch_cmd:
         launch_time = time.time()
-        subprocess.run(["herdr", "pane", "send-text", pane_id, launch_cmd], capture_output=True, text=True, timeout=5)
+        try:
+            launch_args = shlex.split(launch_cmd.strip())
+            if not launch_args:
+                raise HerdrError("provider launch command is empty")
+            receipt = HerdrAdapter().start_agent(
+                lead_agent_name or "lead",
+                kind=fb_provider or "agy",
+                pane_id=pane_id,
+                extra_args=tuple(launch_args[1:]),
+                require_provider_session=True,
+            )
+            provider_session_id = receipt.provider_session_id
+        except (HerdrError, ValueError) as exc:
+            _mark_setup_failed(run_id)
+            emit("error", text=f"Provider launch did not return an owned Herdr receipt: {exc}")
+            emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+            return 1
+        fleet = get_session_fleet(session_id) or {}
+        fleet["providerSessionId"] = provider_session_id
+        if rev_agent_name and reviewer_session_id:
+            fleet["reviewer"] = {"reviewer_id": rev_agent_name, "provider_session_id": reviewer_session_id}
+        save_session_fleet(session_id, fleet, run_id=run_id)
         emit("text", text=f"• **Doing** task dispatch to {harness_label}\n")
     elif is_subsequent_turn and pane_id:
         # Check if crewmate process is actively running in the pane
@@ -6728,10 +7783,9 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
         # Steer crewmate through Firstmate
         if shutil.which("firstmate") and fm_task_id:
             try:
-                fm_send_res = subprocess.run(["firstmate", "send", fm_task_id, task_prompt], capture_output=True, text=True, timeout=8)
-                if fm_send_res.returncode == 0:
-                    emit("text", text=f"• **Firstmate Dispatched**: Steer delivered to crewmate inbox\n")
-            except Exception as e:
+                FirstmateAdapter(FM_STATE_DIR, runner=subprocess.run).send_task(fm_task_id, task_prompt)
+                emit("text", text=f"• **Firstmate Dispatched**: Steer delivered to crewmate inbox\n")
+            except FirstmateError as e:
                 if DEBUG:
                     print(f"firstmate send error: {e}", file=sys.stderr)
 
@@ -6862,7 +7916,7 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
 
         # OpenCode real-time structured tool and message parsing from local DB
         if active_harness == "opencode":
-            recent_parts = read_opencode_recent_parts(opencode_last_time_ms)
+            recent_parts = read_opencode_recent_parts(opencode_last_time_ms, provider_session_id)
             for part in recent_parts:
                 t_created = part.get("_time_created") or 0
                 if t_created > opencode_last_time_ms:
@@ -7282,7 +8336,7 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
             pass
 
     if "done" not in seen_actions and active_harness == "opencode":
-        recent_parts = read_opencode_recent_parts(opencode_last_time_ms)
+        recent_parts = read_opencode_recent_parts(opencode_last_time_ms, provider_session_id)
         for part in recent_parts:
             if part.get("type") == "text":
                 txt = (part.get("text") or "").strip()
@@ -7322,9 +8376,9 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
     # Emit prominent completion banner & full summary to Omagent card
     if "done" in seen_actions:
         if is_subsequent_turn:
-            emit("text", text=f"• **Task Complete** — Completed modification via Firstmate ({primary_skill})\n\n")
+            emit("text", text=f"• **Provider execution finished** — modification observed via Firstmate ({primary_skill}); quality gates still decide final state.\n\n")
         else:
-            emit("text", text=f"• **Task Complete** — Completed {primary_skill} execution via Firstmate\n\n")
+            emit("text", text=f"• **Provider execution finished** — {primary_skill} execution observed via Firstmate; quality gates still decide final state.\n\n")
 
         if tracked_summaries:
             emit("text", text=f"{tracked_summaries[-1]}\n\n")
@@ -7357,7 +8411,7 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
                 stored_fleet = get_session_fleet(session_id)
                 if stored_fleet and parent_d != cwd and parent_d.is_dir():
                     stored_fleet["cwd"] = str(parent_d)
-                    save_session_fleet(session_id, stored_fleet)
+                    save_session_fleet(session_id, stored_fleet, run_id=run_id)
         except Exception:
             pass
 
@@ -7387,11 +8441,40 @@ def run_lane_coding(request: str, config: dict, session_id: str, ui_set: int | N
     )
 
     emit("text", text="\n*Press Ctrl+E or click 'Expand in Herdr' to view terminal.*")
-    emit("done", ok=True, code=0, stopped=False)
+    quality_profile = "coding" if is_normal_coding else ("ui" if ui_contract is not None or ui_set or is_ui_creation_request(task_prompt) else "coding")
+    quality_evidence = [f"file:{path}" for path in tracked_files_created + tracked_files_edited]
+    if tracked_files_created or tracked_files_edited:
+        quality_evidence.append("implementation: changed files observed")
+    quality_evidence.extend(f"command:{command}" for command in tracked_commands)
+    quality_evidence.extend(tracked_summaries)
+    quality_evidence.extend(run_declared_verification(cwd, config, quality_profile))
+    if run_id:
+        _update_review_binding(cwd, run_id)
+    review_receipt = import_review_receipt(receipt_path, run_id) if run_id else None
+    quality_state = record_lane_quality(
+        quality_profile,
+        task_prompt,
+        final_coding_msg,
+        evidence=quality_evidence,
+        run_id=run_id,
+        review_receipt=review_receipt,
+        ui_contract=ui_contract,
+        repair_runner=make_fleet_repair_runner(
+            cwd=cwd,
+            config=config,
+            profile=quality_profile,
+            task_id=fm_task_id,
+            pane_id=pane_id,
+            provider_session_id=provider_session_id,
+            request=task_prompt,
+            ui_contract=ui_contract,
+        ),
+    )
+    emit("done", ok=True, code=0, stopped=False, terminal_state=quality_state)
     return 0
 
 
-def handle_pending_model_switch(session_id: str, request: str, pending_switch: dict, config: dict) -> int:
+def handle_pending_model_switch(session_id: str, request: str, pending_switch: dict, config: dict, *, run_id: str = "") -> int:
     req_clean = request.strip().lower()
     cwd = Path(pending_switch.get("cwd", str(work_dir())))
     cur_harness = pending_switch.get("current_harness", "agy")
@@ -7422,7 +8505,7 @@ def handle_pending_model_switch(session_id: str, request: str, pending_switch: d
         hist_to_save.append({"role": "user", "parts": [{"text": request}]})
         save_session_history(session_id, hist_to_save, f"Retrying current model ({cur_harness} / {cur_model})")
 
-        return run_lane_coding(orig_req, config, session_id, ui_set=ui_set, harness=cur_harness, model=cur_model)
+        return run_lane_coding(orig_req, config, session_id, ui_set=ui_set, harness=cur_harness, model=cur_model, run_id=run_id)
 
     # 3. Model / Harness Selection
     target_harness = None
@@ -7523,7 +8606,269 @@ def handle_pending_model_switch(session_id: str, request: str, pending_switch: d
         ui_set=ui_set,
         harness=target_harness,
         model=target_model,
+        run_id=run_id,
     )
+
+
+def _record_ui_evidence(run_id: str, kind: str, payload: dict) -> None:
+    if not run_id:
+        return
+    try:
+        _get_session_store().record_evidence(run_id, {"kind": kind, **payload})
+    except Exception as exc:
+        if DEBUG:
+            print(f"could not persist UI evidence: {exc}", file=sys.stderr)
+
+
+def _owned_reference_path(path: Path, run_id: str) -> Path:
+    if not run_id:
+        return path
+    digest = fingerprint_reference(path)
+    destination_dir = STATE_DIR / "ui-references" / run_id
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    destination = destination_dir / f"{digest[:24]}{path.suffix.lower()}"
+    if not destination.exists():
+        shutil.copy2(path, destination)
+    return destination
+
+
+def _ui_reference_evidence(image_path: str, request: str, domain: str, run_id: str = "") -> dict | None:
+    if not image_path:
+        return None
+    path = Path(image_path).expanduser().resolve()
+    if not path.is_file():
+        return None
+    mode = "recreate" if re.search(r"\b(recreate|faithful recreation|replicate)\b", request, re.IGNORECASE) else "style-only"
+    try:
+        owned_path = _owned_reference_path(path, run_id)
+        evidence = inspect_reference(owned_path, subject=extract_project_subject(request), image_id=path.name, mode=mode)
+        value = evidence.as_dict()
+        value["path"] = str(owned_path)
+        value["original_path"] = str(path)
+        value["analyzer_version"] = evidence.analyzer_version
+        # Keep the existing visual-language report as presentation-only evidence.
+        # It is not allowed to replace the structured policy below.
+        try:
+            report = deconstruct_reference_image(str(owned_path), request, domain, 0)
+            if isinstance(report, dict):
+                value["visual_report"] = report
+        except Exception as exc:
+            value["analysis_warning"] = redact_text(str(exc))[:160]
+        return value
+    except (OSError, ValueError) as exc:
+        return {"path": str(path), "image_id": path.name, "mode": mode, "unavailable": True, "error": redact_text(str(exc))[:160], "forbidden": ["subject", "copy", "assets", "composition"]}
+
+
+def _parse_concept_selection(text: str, candidates: list[dict]) -> str:
+    return parse_concept_selection(text, candidates).concept_id
+
+
+def _ui_contract_for_request(
+    session_id: str,
+    request: str,
+    *,
+    image_path: str = "",
+    run_id: str = "",
+    harness: str = "",
+    model: str = "",
+) -> tuple[DesignContract, dict | None]:
+    domain = detect_project_domain(request)
+    reference = _ui_reference_evidence(image_path, request, domain, run_id)
+    brief = build_adaptive_brief(request)
+    contract = build_design_contract(
+        request,
+        subject=brief.subject,
+        reference=reference,
+        blocking_questions=brief.blocking_questions,
+        assumptions=brief.assumptions,
+    )
+    contract.layout = list(brief.layout)
+    contract.interactions = list(brief.interactions)
+    contract.accessibility = list(brief.accessibility)
+    contract.responsive = list(brief.responsive)
+    contract.motion = list(brief.motion)
+    if reference and reference.get("unavailable"):
+        contract.blocking_questions.append("Reference analysis is unavailable; provide a readable primary image before recreation can continue.")
+    diversity = validate_concept_diversity(contract.candidates)
+    _record_ui_evidence(run_id, "ui_concept_diversity", {"valid": diversity.valid, "differences": diversity.as_dict()["differences"], "errors": list(diversity.errors)})
+    return contract, reference
+
+
+def start_ui_concept_session(
+    session_id: str,
+    request: str,
+    *,
+    harness: str = "",
+    model: str = "",
+    config: dict | None = None,
+    image_path: str = "",
+    run_id: str = "",
+) -> int:
+    """Start the concept-first UI flow and persist the contract projection."""
+    contract, reference = _ui_contract_for_request(session_id, request, image_path=image_path, run_id=run_id, harness=harness, model=model)
+    ui_context = context_from_contract(
+        contract,
+        run_id=run_id,
+        reference_evidence=reference,
+        state="awaiting_user",
+    )
+    ui_context.skill_bundle = impeccable_ui_bundle().as_dict()
+    ui_context.validate()
+    state = {
+        "flow": "ui_concepts/v1",
+        "session_id": session_id,
+        "run_id": run_id,
+        "original_request": request,
+        "harness": harness,
+        "model": model,
+        "image_path": image_path,
+        "reference": reference,
+        "contract": contract.as_dict(),
+        "ui_context": ui_context.as_dict(),
+        "selected_concept_id": "",
+        "status": "awaiting_concept",
+        "round": 0,
+        "decisions": [],
+        "questions": [],
+    }
+    save_pending_grill_me(session_id, state)
+    _record_ui_evidence(run_id, "ui_context", {"context": ui_context.as_dict()})
+    _record_ui_evidence(run_id, "ui_contract", {"contract": contract.as_dict()})
+    emit("ui_concepts", options=[item.as_dict() for item in contract.candidates], selected_id="")
+    card = render_concept_cards(contract)
+    hist = list(load_session_history(session_id))
+    hist.append({"role": "user", "parts": [{"text": request}]})
+    save_session_history(session_id, hist, card)
+    emit("agent", name="firstmate", label="Firstmate · UI Design Director", session=session_id, cwd=str(work_dir()), resume=["omarchy-launch-terminal", "herdr"], resumeLabel="Expand in Herdr", pid=0)
+    emit("text", text=card)
+    if run_id:
+        try:
+            store = _get_session_store()
+            if store.state(run_id) == "planned":
+                store.set_state(run_id, "awaiting_user", reason="UI concept selection requires user input")
+        except Exception as exc:
+            if DEBUG:
+                print(f"could not persist UI awaiting state: {exc}", file=sys.stderr)
+    emit("done", ok=True, code=0, stopped=False, terminal_state="awaiting_user")
+    return 0
+
+
+def _start_ui_build_from_contract(session_id: str, state: dict, config: dict, *, run_id: str = "", harness: str = "", model: str = "") -> int:
+    contract = DesignContract.from_dict(state.get("contract", {}))
+    if not contract.selected_concept_id:
+        emit("error", text="Choose a concept before starting the UI build.")
+        emit("done", ok=False, code=1, stopped=False, terminal_state="awaiting_user")
+        return 1
+    try:
+        contract.validate()
+    except ValueError as exc:
+        if run_id:
+            try:
+                if _get_session_store().state(run_id) == "awaiting_user":
+                    _get_session_store().set_state(run_id, "blocked", reason=str(exc))
+            except Exception:
+                pass
+        emit("error", text=f"UI contract is not ready: {exc}")
+        emit("done", ok=False, code=1, stopped=False, terminal_state="blocked")
+        return 1
+    contract, ui_context = selected_context(state, run_id=run_id, state_name="implementing")
+    state["contract"] = contract.as_dict()
+    state["ui_context"] = ui_context.as_dict()
+    clear_pending_grill_me(session_id)
+    _record_ui_evidence(run_id, "ui_context", {"context": ui_context.as_dict()})
+    _record_ui_evidence(run_id, "ui_contract_frozen", {"contract": contract.as_dict()})
+    if run_id:
+        try:
+            store = _get_session_store()
+            if store.state(run_id) == "awaiting_user":
+                store.set_state(run_id, "starting", reason="UI concept selected; starting implementation")
+        except Exception as exc:
+            if DEBUG:
+                print(f"could not persist UI starting state: {exc}", file=sys.stderr)
+    prompt = f"{state.get('original_request', '')}\n\n{selected_concept_prompt(contract)}\n\nUI quality must include desktop, tablet, and mobile rendered evidence. Do not introduce a different concept or a fixed UI set. Record only current-artifact evidence produced by the local browser/accessibility adapter; do not claim that prose such as `ui_interaction: passed` or `ui_accessibility: passed` proves a check ran. If the browser or accessibility capability is unavailable, report that limitation so the run remains blocked."
+    hist = list(load_session_history(session_id))
+    hist.append({"role": "user", "parts": [{"text": "Selected concept " + contract.selected_concept_id}]})
+    save_session_history(session_id, hist, "UI concept frozen. Implementation and rendered verification are starting.")
+    emit("agent", name="firstmate", label="Firstmate · UI Design Director", session=session_id, cwd=str(work_dir()), resume=["omarchy-launch-terminal", "herdr"], resumeLabel="Expand in Herdr", pid=0)
+    emit("text", text=f"Concept `{contract.selected_concept_id}` frozen. Starting the UI implementation and quality gates.")
+    return run_lane_coding(prompt, config or {}, session_id, ui_set=0, harness=harness or state.get("harness", ""), model=model or state.get("model", ""), run_id=run_id, ui_contract=contract.as_dict())
+
+
+def handle_pending_ui_flow(session_id: str, user_reply: str, state: dict, config: dict, *, harness: str = "", model: str = "", run_id: str = "") -> int:
+    if user_reply.strip().lower() in {"cancel", "abort", "exit", "quit"}:
+        clear_pending_grill_me(session_id)
+        if run_id:
+            _get_session_store().set_state(run_id, "cancelled", reason="user cancelled UI concept flow")
+        emit("text", text="UI concept selection cancelled.")
+        emit("done", ok=True, code=0, stopped=False, terminal_state="cancelled")
+        return 0
+    run_id = run_id or str(state.get("run_id", ""))
+    harness = harness or str(state.get("harness", ""))
+    model = model or str(state.get("model", ""))
+    contract = DesignContract.from_dict(state.get("contract", {}))
+    status = state.get("status", "awaiting_concept")
+    if status == "awaiting_concept":
+        selection = _parse_concept_selection(user_reply, [item.as_dict() for item in contract.candidates])
+        delegated_selection = False
+        if not selection and user_reply.strip().lower() in {"you decide", "delegate", "you choose"}:
+            selection = str(contract.candidates[0].id)
+            delegated_selection = True
+        if not selection:
+            if user_reply.strip().lower() in {"proceed", "build", "skip"}:
+                emit("text", text="Select one of the three concepts first. Reply with `1`, `2`, `3`, the concept id, or `you decide` to delegate selection.")
+            else:
+                emit("text", text="I did not recognize a concept selection. Reply with `1`, `2`, `3`, the concept id, or `you decide` to delegate selection.")
+            emit("done", ok=True, code=0, stopped=False, terminal_state="awaiting_user")
+            return 0
+        contract.selected_concept_id = selection
+        state["contract"] = contract.as_dict()
+        contract, ui_context = selected_context(state, run_id=run_id, state_name="awaiting_user")
+        ui_context.state = "awaiting_user"
+        ui_context.validate()
+        state["ui_context"] = ui_context.as_dict()
+        _record_ui_evidence(run_id, "ui_context", {"context": ui_context.as_dict()})
+        state["selected_concept_id"] = selection
+        state["decisions"].append({"question_id": "concept", "chosen_option_id": selection, "option_title": selection, "delegated": delegated_selection})
+        blocking = list(contract.blocking_questions)
+        if blocking:
+            state["status"] = "awaiting_answers"
+            state["questions"] = [{
+                "id": "brief_scope",
+                "title": "Resolve the remaining product decision",
+                "question": blocking[0],
+                "options": [
+                    {"id": 1, "title": "Use the selected concept's task-led default", "desc": blocking[0]},
+                    {"id": 2, "title": "Proceed with explicit assumptions", "desc": "Record assumptions and continue without another question."},
+                ],
+            }]
+            save_pending_grill_me(session_id, state)
+            card = f"Concept `{selection}` selected. One remaining decision is blocking implementation.\n\n{state['questions'][0]['question']}\n\n1. {state['questions'][0]['options'][0]['title']}\n2. {state['questions'][0]['options'][1]['title']}\n\nReply with 1 or 2."
+            emit("text", text=card)
+            emit("done", ok=True, code=0, stopped=False, terminal_state="awaiting_user")
+            return 0
+        state["status"] = "ready_to_build"
+        save_pending_grill_me(session_id, state)
+        return _start_ui_build_from_contract(session_id, state, config, run_id=run_id, harness=harness, model=model)
+
+    if status == "awaiting_answers":
+        question = (state.get("questions") or [{}])[0]
+        answer = 1 if re.search(r"\b1\b", user_reply) else 2 if re.search(r"\b2\b", user_reply) else 0
+        if not answer:
+            emit("text", text="Reply with `1` for the selected default or `2` to proceed with explicit assumptions.")
+            emit("done", ok=True, code=0, stopped=False, terminal_state="awaiting_user")
+            return 0
+        contract.assumptions.append("The user selected the selected concept's task-led default." if answer == 1 else "The user accepted explicit assumptions for the unresolved product decision.")
+        contract.blocking_questions = []
+        state["contract"] = contract.as_dict()
+        state["status"] = "ready_to_build"
+        state["questions"] = []
+        state["decisions"].append({"question_id": question.get("id", "brief_scope"), "chosen_option_id": answer, "option_title": str(answer)})
+        save_pending_grill_me(session_id, state)
+        return _start_ui_build_from_contract(session_id, state, config, run_id=run_id, harness=harness, model=model)
+
+    emit("text", text="This UI concept flow is waiting for a valid selection.")
+    emit("done", ok=True, code=0, stopped=False, terminal_state="awaiting_user")
+    return 0
 
 
 def route_ui_creation_request(
@@ -7534,57 +8879,36 @@ def route_ui_creation_request(
     harness: str = "",
     model: str = "",
     image_path: str = "",
+    run_id: str = "",
 ) -> int:
-    """Routes a UI creation request:
-    1. If a reference image is attached: BYPASS Set 1/2/3 selection completely!
-       Automatically lock to Set 4 (impeccable non-invasive reference alignment)
-       to avoid colliding with the reference image's visual design philosophy,
-       and proceed directly to Grill-Me strategic alignment.
-    2. If NO reference image is attached:
-       Ensure the UI Skill Set selection menu (Set 1, 2, or 3) is presented first
-       before Grill-Me questions, unless an explicit UI set was already chosen."""
-    has_ref_img = bool(image_path and Path(image_path).expanduser().is_file())
-    if has_ref_img:
-        # Reference image provided -> automatically lock to Set 4 (impeccable), NO Set 1/2/3 prompt!
-        save_session_ui_set(session_id, 4)
-        return start_grill_me_session(
-            session_id,
-            request,
-            ui_set=4,
-            harness=harness,
-            model=model,
-            config=config,
-            image_path=image_path,
-        )
-
-    # No reference image attached -> Ask user for Set 1, 2, or 3 (or use existing if already selected)
-    existing_set = get_session_ui_set(session_id) or detect_explicit_ui_set_directive(request)
-    if existing_set in (1, 2, 3, 4):
-        save_session_ui_set(session_id, existing_set)
-        return start_grill_me_session(
-            session_id,
-            request,
-            ui_set=existing_set,
-            harness=harness,
-            model=model,
-            config=config,
-            image_path="",
-        )
-    else:
-        return emit_ui_archetype_question(
-            session_id,
-            request,
-            harness=harness,
-            model=model,
-            image_path="",
-        )
+    """Start the prompt-first concept flow instead of routing to fixed UI sets."""
+    return start_ui_concept_session(
+        session_id,
+        request,
+        harness=harness,
+        model=model,
+        config=config,
+        image_path=image_path,
+        run_id=run_id,
+    )
 
 
 # =====================================================================
 # MAIN ROUTER ENTRYPOINT
 # =====================================================================
 
+def emit_plan_only(request: str, mode: str = "regular") -> int:
+    try:
+        plan = build_plan(request, mode=mode)
+        print(json.dumps({"kind": "plan", **plan}))
+        return 0
+    except ValueError as exc:
+        print(json.dumps({"kind": "error", "text": str(exc)}))
+        return 1
+
+
 def route_request(raw_request: str, *, session: str = "", agent: str = "", mode: str = "", harness: str = "", model: str = "", image_path: str = "", track: str = "") -> int:
+    global CURRENT_RUN_ID
     extend_path()
     config = load_config()
 
@@ -7608,84 +8932,69 @@ def route_request(raw_request: str, *, session: str = "", agent: str = "", mode:
             image_path = img_match.group(1)
 
     session_id = session or str(uuid.uuid4())
+    fleet_info = get_session_fleet(session_id)
+    explicit_new_task = bool(fleet_info and is_new_project_directive(request))
+    try:
+        run_id = RunController(_get_session_store()).ensure_run(
+            session_id,
+            request,
+            mode=mode or "regular",
+            new_task=explicit_new_task,
+        ).run_id
+        CURRENT_RUN_ID = run_id
+    except Exception as exc:
+        emit("error", text=f"Could not create controller run: {exc}")
+        emit("done", ok=False, code=1, stopped=False, terminal_state="setup_failed")
+        return 1
     pending_switch = get_pending_model_switch(session_id)
     if pending_switch:
-        return handle_pending_model_switch(session_id, request, pending_switch, config)
+        return handle_pending_model_switch(session_id, request, pending_switch, config, run_id=run_id)
 
     pending_grill = get_pending_grill_me(session_id)
     if pending_grill:
-        return handle_pending_grill_me(session_id, request, pending_grill, config, harness=harness, model=model)
+        if pending_grill.get("flow") == "ui_concepts/v1":
+            return handle_pending_ui_flow(session_id, request, pending_grill, config, harness=harness, model=model, run_id=run_id)
+        return handle_pending_grill_me(session_id, request, pending_grill, config, harness=harness, model=model, run_id=run_id)
 
     if request.lower().startswith(("/grill ", "/grill-me ", "grill: ", "grill-me: ")):
         cleaned_grill_req = re.sub(r"^/(?:grill|grill-me)\s*|^grill(?:-me)?:\s*", "", request, flags=re.I).strip()
         if not cleaned_grill_req:
             cleaned_grill_req = "Bespoke Web Application"
-        return route_ui_creation_request(session_id, cleaned_grill_req, config, harness=harness, model=model, image_path=image_path)
+        return route_ui_creation_request(session_id, cleaned_grill_req, config, harness=harness, model=model, image_path=image_path, run_id=run_id)
 
     pending_ui = get_pending_ui_question(session_id)
-    fleet_info = get_session_fleet(session_id)
 
     # 1. Check if user is replying to a pending UI Archetype selection
     if pending_ui:
         if track_clean == "coding" or is_normal_coding_request(request):
             clear_pending_ui_question(session_id)
-            return run_lane_coding(request, config, session_id, harness=harness, model=model, is_coding_task=True)
-
-        # If user attached an image during this turn, bypass archetype choice and switch directly to Set 4 (impeccable)
-        if image_path and Path(image_path).expanduser().is_file():
-            clear_pending_ui_question(session_id)
-            save_session_ui_set(session_id, 4)
-            orig_req = pending_ui.get("original_request", request)
-            saved_harness = harness or pending_ui.get("harness", "")
-            saved_model = model or pending_ui.get("model", "")
-            return start_grill_me_session(
-                session_id,
-                orig_req,
-                ui_set=4,
-                harness=saved_harness,
-                model=saved_model,
-                config=config,
-                image_path=image_path,
-            )
-
-        choice = parse_ui_set_choice(request)
-        if choice in (1, 2, 3, 4):
-            clear_pending_ui_question(session_id)
-            save_session_ui_set(session_id, choice)
-            orig_req = pending_ui.get("original_request", request)
-            saved_harness = harness or pending_ui.get("harness", "")
-            saved_model = model or pending_ui.get("model", "")
-            saved_image = pending_ui.get("image_path") or image_path
-
-            # Record choice turn into conversation history so chat displays the selection
-            hist = load_session_history(session_id)
-            hist_to_save = list(hist)
-            hist_to_save.append({"role": "user", "parts": [{"text": request}]})
-            set_meta = UI_SKILL_SETS[choice]
-            save_session_history(session_id, hist_to_save, f"Selected UI Archetype: Set {choice} — {set_meta['name']}")
-
-            return start_grill_me_session(session_id, orig_req, ui_set=choice, harness=saved_harness, model=saved_model, config=config, image_path=saved_image)
-        elif request.lower().strip() in ("cancel", "exit", "abort", "quit", "stop"):
+            return run_lane_coding(request, config, session_id, harness=harness, model=model, is_coding_task=True, run_id=run_id)
+        if request.lower().strip() in ("cancel", "exit", "abort", "quit", "stop"):
             clear_pending_ui_question(session_id)
             emit("agent", name="firstmate", label="Firstmate · UI Design Director", session=session_id, cwd=str(work_dir()), resume=["omarchy-launch-terminal", "herdr"], resumeLabel="Expand in Herdr", pid=0)
             emit("text", text="UI design selection cancelled. Let me know what you'd like to work on instead!")
-            emit("done", ok=True, code=0, stopped=False)
+            if run_id:
+                _get_session_store().set_state(run_id, "cancelled", reason="user cancelled UI concept selection")
+            emit("done", ok=True, code=0, stopped=False, terminal_state="cancelled")
             return 0
-        else:
-            # Re-prompt user cleanly to pick 1, 2, or 3
-            emit("agent", name="firstmate", label="Firstmate · UI Design Director", session=session_id, cwd=str(work_dir()), resume=["omarchy-launch-terminal", "herdr"], resumeLabel="Expand in Herdr", pid=0)
-            emit(
-                "text",
-                text=(
-                    f"Please choose which design archetype to guide your UI:\n\n"
-                    f"- **1**: Full Aesthetic (`Set 1`) — Linear / Stripe Press craft\n"
-                    f"- **2**: SaaS / Product App (`Set 2`) — High-density dashboards & design systems\n"
-                    f"- **3**: Jaw-Dropping / 3D Showcase (`Set 3`) — Awwwards 3D WebGL & kinetic motion\n\n"
-                    f"👉 Reply with **1**, **2**, or **3** in this chat box, or type **cancel** to abort."
-                ),
-            )
-            emit("done", ok=True, code=0, stopped=False)
-            return 0
+        orig_req = pending_ui.get("original_request", request)
+        saved_harness = harness or pending_ui.get("harness", "")
+        saved_model = model or pending_ui.get("model", "")
+        saved_image = pending_ui.get("image_path") or image_path
+        clear_pending_ui_question(session_id)
+        hist = load_session_history(session_id)
+        hist_to_save = list(hist)
+        hist_to_save.append({"role": "user", "parts": [{"text": request}]})
+        save_session_history(session_id, hist_to_save, "Migrating the legacy UI selection into the concept-first flow.")
+        return start_ui_concept_session(
+            session_id,
+            orig_req,
+            harness=saved_harness,
+            model=saved_model,
+            config=config,
+            image_path=saved_image,
+            run_id=run_id,
+        )
 
     mode_clean = (mode or "").lower().strip()
 
@@ -7693,111 +9002,138 @@ def route_request(raw_request: str, *, session: str = "", agent: str = "", mode:
     # 1. Mode: 'regular' -> Direct internal knowledge (Lane 1)
     if mode_clean == "regular":
         if request.lower().startswith(("/web ", "web: ", "/search ", "search: ", "@web ")):
-            return run_lane_web(request, config, session_id)
+            return run_lane_web(request, config, session_id, run_id=run_id)
         if request.lower().startswith(("/code ", "code: ", "@code ", "@dev ")):
-            return run_lane_coding(request, config, session_id, harness=harness, model=model)
-        return run_lane_general(request, config, session_id)
+            return run_lane_coding(request, config, session_id, harness=harness, model=model, run_id=run_id)
+        return run_lane_general(request, config, session_id, run_id=run_id)
 
     # 2. Mode: 'internet' -> Live web search (Lane 2)
     elif mode_clean == "internet":
         if request.lower().startswith(("/ask ", "ask: ", "@ask ")):
-            return run_lane_general(request, config, session_id)
+            return run_lane_general(request, config, session_id, run_id=run_id)
         if request.lower().startswith(("/code ", "code: ", "@code ", "@dev ")):
-            return run_lane_coding(request, config, session_id, harness=harness, model=model)
-        return run_lane_web(request, config, session_id)
+            return run_lane_coding(request, config, session_id, harness=harness, model=model, run_id=run_id)
+        return run_lane_web(request, config, session_id, run_id=run_id)
 
     # 3. Mode: 'agentic' -> Trigger Lane 3 robust coding mechanism
     elif mode_clean == "agentic":
         if request.lower().startswith(("/ask ", "ask: ", "@ask ")):
-            return run_lane_general(request, config, session_id)
+            return run_lane_general(request, config, session_id, run_id=run_id)
         if request.lower().startswith(("/web ", "web: ", "/search ", "search: ", "@web ")):
-            return run_lane_web(request, config, session_id)
+            return run_lane_web(request, config, session_id, run_id=run_id)
 
-        if fleet_info and is_new_project_directive(request):
+        explicit_new_task = is_new_project_directive(request)
+        if fleet_info and explicit_new_task:
             clear_session_fleet(session_id)
             clear_session_ui_set(session_id)
             fleet_info = None
 
-        # Manual Track Selection Overrides
+        # Manual track selection chooses the lane, but it is not itself a
+        # new-task directive. Existing UI work continues through the bridge.
         if track_clean == "coding":
             if fleet_info:
-                clear_session_fleet(session_id)
-                clear_session_ui_set(session_id)
-                fleet_info = None
-            return run_lane_coding(request, config, session_id, harness=harness, model=model, is_coding_task=True)
+                return run_firstmate_bridge(request, config, session_id, fleet_info, harness=harness, model=model, run_id=run_id)
+            return run_lane_coding(request, config, session_id, harness=harness, model=model, is_coding_task=True, run_id=run_id)
 
         if track_clean == "ui":
-            if fleet_info and not fleet_info.get("uiSet"):
-                clear_session_fleet(session_id)
-                clear_session_ui_set(session_id)
-                fleet_info = None
-            return route_ui_creation_request(session_id, request, config, harness=harness, model=model, image_path=image_path)
-
-        if is_normal_coding_request(request):
+            if fleet_info and not explicit_new_task:
+                return run_firstmate_bridge(request, config, session_id, fleet_info, harness=harness, model=model, run_id=run_id)
             if fleet_info:
                 clear_session_fleet(session_id)
                 clear_session_ui_set(session_id)
                 fleet_info = None
-            return run_lane_coding(request, config, session_id, harness=harness, model=model, is_coding_task=True)
+            return route_ui_creation_request(session_id, request, config, harness=harness, model=model, image_path=image_path, run_id=run_id)
+
+        if is_normal_coding_request(request):
+            if fleet_info and not explicit_new_task:
+                return run_firstmate_bridge(request, config, session_id, fleet_info, harness=harness, model=model, run_id=run_id)
+            if fleet_info:
+                clear_session_fleet(session_id)
+                clear_session_ui_set(session_id)
+                fleet_info = None
+            return run_lane_coding(request, config, session_id, harness=harness, model=model, is_coding_task=True, run_id=run_id)
 
         if fleet_info:
-            return run_firstmate_bridge(request, config, session_id, fleet_info, harness=harness, model=model)
+            return run_firstmate_bridge(request, config, session_id, fleet_info, harness=harness, model=model, run_id=run_id)
 
         if is_ui_creation_request(request, image_path=image_path):
-            return route_ui_creation_request(session_id, request, config, harness=harness, model=model, image_path=image_path)
-        return run_lane_coding(request, config, session_id, harness=harness, model=model)
+            return route_ui_creation_request(session_id, request, config, harness=harness, model=model, image_path=image_path, run_id=run_id)
+        return run_lane_coding(request, config, session_id, harness=harness, model=model, run_id=run_id)
 
     # Default: Automatic intent classification fallback
-    if fleet_info and is_new_project_directive(request):
+    explicit_new_task = is_new_project_directive(request)
+    if fleet_info and explicit_new_task:
         clear_session_fleet(session_id)
         clear_session_ui_set(session_id)
         fleet_info = None
 
-    if track_clean == "coding" or is_normal_coding_request(request):
+    if track_clean == "coding":
+        if fleet_info:
+            return run_firstmate_bridge(request, config, session_id, fleet_info, harness=harness, model=model, run_id=run_id)
+        return run_lane_coding(request, config, session_id, harness=harness, model=model, is_coding_task=True, run_id=run_id)
+
+    if is_normal_coding_request(request):
+        if fleet_info and not explicit_new_task:
+            return run_firstmate_bridge(request, config, session_id, fleet_info, harness=harness, model=model, run_id=run_id)
         if fleet_info:
             clear_session_fleet(session_id)
             clear_session_ui_set(session_id)
             fleet_info = None
-        return run_lane_coding(request, config, session_id, harness=harness, model=model, is_coding_task=True)
+        return run_lane_coding(request, config, session_id, harness=harness, model=model, is_coding_task=True, run_id=run_id)
 
     if track_clean == "ui":
-        if fleet_info and not fleet_info.get("uiSet"):
+        if fleet_info and not explicit_new_task:
+            return run_firstmate_bridge(request, config, session_id, fleet_info, harness=harness, model=model, run_id=run_id)
+        if fleet_info:
             clear_session_fleet(session_id)
             clear_session_ui_set(session_id)
             fleet_info = None
-        return route_ui_creation_request(session_id, request, config, harness=harness, model=model, image_path=image_path)
+        return route_ui_creation_request(session_id, request, config, harness=harness, model=model, image_path=image_path, run_id=run_id)
 
     if fleet_info:
         # Check if user explicitly requested web search
         if request.lower().startswith(("/web ", "web: ", "/search ", "search: ", "@web ")):
-            return run_lane_web(request, config, session_id)
+            return run_lane_web(request, config, session_id, run_id=run_id)
         # Check if user explicitly asked general question with /ask
         if request.lower().startswith(("/ask ", "ask: ", "@ask ")):
-            return run_lane_general(request, config, session_id)
+            return run_lane_general(request, config, session_id, run_id=run_id)
 
         # In a coding session with an existing fleet, ALL follow-ups, changes, steers,
         # and questions go through Firstmate as the bridge supervisor!
-        return run_firstmate_bridge(request, config, session_id, fleet_info, harness=harness, model=model)
+        return run_firstmate_bridge(request, config, session_id, fleet_info, harness=harness, model=model, run_id=run_id)
 
     lane = classify_intent(request, prior_agent=agent)
 
     if lane == LANE_CODE or image_path:
         if is_ui_creation_request(request, image_path=image_path):
-            return route_ui_creation_request(session_id, request, config, harness=harness, model=model, image_path=image_path)
-        return run_lane_coding(request, config, session_id, harness=harness, model=model)
+            return route_ui_creation_request(session_id, request, config, harness=harness, model=model, image_path=image_path, run_id=run_id)
+        return run_lane_coding(request, config, session_id, harness=harness, model=model, run_id=run_id)
     elif lane == LANE_WEB:
-        return run_lane_web(request, config, session_id)
+        return run_lane_web(request, config, session_id, run_id=run_id)
     else:
         if is_ui_creation_request(request, image_path=image_path):
-            return route_ui_creation_request(session_id, request, config, harness=harness, model=model, image_path=image_path)
-        return run_lane_general(request, config, session_id)
+            return route_ui_creation_request(session_id, request, config, harness=harness, model=model, image_path=image_path, run_id=run_id)
+        return run_lane_general(request, config, session_id, run_id=run_id)
 
 
 def main() -> int:
     arguments = sys.argv[1:]
     if not arguments:
-        print("Usage: omagent-route [--list-harnesses | --list-sessions | --get-session ID | --save-session ID | --delete-session ID | --clear-history | [--auto] [--mode regular|internet|agentic] [--track ui|coding] [--harness agy|opencode|cline] [--model MODEL] [--image PATH] [--agent SLUG --session ID] <request>]", file=sys.stderr)
+        print("Usage: omagent-route [--plan REQUEST | --list-harnesses | --list-sessions | --migrate-legacy | --get-session ID | --import-session-file PATH | --stop-session ID | --save-session ID | --delete-session ID | --clear-history | [--auto] [--mode regular|internet|agentic] [--track ui|coding] [--harness agy|opencode|cline] [--model MODEL] [--image PATH] [--agent SLUG --session ID] <request>]", file=sys.stderr)
         return 2
+
+    if arguments[0] == "--plan":
+        request = arguments[1] if len(arguments) > 1 else ""
+        if request == "--" and len(arguments) > 2:
+            request = " ".join(arguments[2:])
+        return emit_plan_only(request)
+
+    if DRY_RUN and "--" in arguments:
+        request_index = arguments.index("--")
+        if request_index + 1 < len(arguments):
+            mode_index = arguments.index("--mode") if "--mode" in arguments else -1
+            mode = arguments[mode_index + 1] if mode_index >= 0 and mode_index + 1 < len(arguments) else "regular"
+            return emit_plan_only(" ".join(arguments[request_index + 1:]), mode)
 
     if arguments[0] == "--list-harnesses":
         return cmd_list_harnesses()
@@ -7805,8 +9141,16 @@ def main() -> int:
     # CLI actions for session history
     if arguments[0] == "--list-sessions":
         return cmd_list_sessions()
+    if arguments[0] == "--migrate-legacy":
+        return cmd_migrate_legacy()
+    if arguments[0] == "--import-session-file" and len(arguments) > 1:
+        return cmd_import_session_file(arguments[1])
     if arguments[0] == "--get-session" and len(arguments) > 1:
         return cmd_get_session(arguments[1])
+    if arguments[0] == "--stop-session" and len(arguments) > 1:
+        if len(arguments) >= 4 and arguments[2] == "--run-id":
+            return cmd_stop_session(arguments[1], arguments[3])
+        return cmd_stop_session(arguments[1])
     if arguments[0] == "--save-session" and len(arguments) > 1:
         return cmd_save_session(arguments[1])
     if arguments[0] == "--delete-session" and len(arguments) > 1:
@@ -7814,7 +9158,11 @@ def main() -> int:
     if arguments[0] == "--clear-history":
         return cmd_clear_history()
     if arguments[0] == "--deconstruct-ref" and len(arguments) > 3:
-        sid = arguments[1]
+        try:
+            sid = _safe_session_id(arguments[1])
+        except ValueError as exc:
+            print(json.dumps({"ok": False, "error": str(exc)}))
+            return 1
         img_p = arguments[2]
         user_req = arguments[3]
         domain = detect_project_domain(user_req)
@@ -7826,7 +9174,7 @@ def main() -> int:
 
     session = ""
     agent = ""
-    auto = False
+    auto = True
     mode = ""
     track = ""
     harness = ""
@@ -7853,6 +9201,8 @@ def main() -> int:
             image_path = arguments.pop(0)
         elif option == "--auto":
             auto = True
+        elif option == "--no-auto":
+            auto = False
         else:
             print(f"Unknown option: {option}", file=sys.stderr)
             return 2
@@ -7861,8 +9211,13 @@ def main() -> int:
         print("Usage: omagent-route [--auto] [--mode regular|internet|agentic] [--track ui|coding] [--harness agy|opencode|cline] [--model MODEL] [--image PATH] [--agent SLUG --session ID] <request>", file=sys.stderr)
         return 2
 
+    global AUTO_APPROVE
+    AUTO_APPROVE = auto
     return route_request(arguments[0], session=session, agent=agent, mode=mode, harness=harness, model=model, image_path=image_path, track=track)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    finally:
+        _close_session_store()

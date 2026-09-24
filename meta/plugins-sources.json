@@ -79,17 +79,12 @@
   },
   "io.github.ellion369.omagent": {
     "remote": "https://github.com/ellion369/Omarchy-Omagent.git",
-    "commit": "2979e9728b11ada6a29c9b315a2ac8e0a48380c4",
+    "base_upstream_commit": "2979e9728b11ada6a29c9b315a2ac8e0a48380c4",
+    "branch": "refactor/omagent-quality-reliability",
+    "commit": "02334843acc5ef6df87e7f0ceb4d453a56ce2682",
     "has_local_changes": true,
-    "dirty_files": [
-      "M Omagent.qml",
-      "M README.md",
-      "M omagent-route",
-      "?? docs/",
-      "?? harness_pool.py",
-      "?? model_pool.json",
-      "?? tests/"
-    ]
+    "patch": "meta/patches/io.github.ellion369.omagent.patch",
+    "note": "Refactored to ui_concepts/v1 with adaptive alignment, independent visual review receipts, deterministic multi-viewport visual QA, and quality engine gating"
   },
   "io.github.enovara.teach-voxtype": {
     "remote": "https://github.com/Enovara/omarchy-teach-voxtype.git",

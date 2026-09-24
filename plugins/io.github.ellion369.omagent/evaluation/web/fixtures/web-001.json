@@ -1,0 +1,1 @@
+{"query":"A current-information question","sources":[{"title":"Primary source","url":"https://example.test/primary","quality":"high","text":"A dated fact."}],"expected":"A grounded answer with citations and retrieval limits."}

@@ -15,40 +15,29 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Compile Python entry point
-        run: python -m py_compile omagent-route
-      - name: Validate manifest JSON
-        run: python -m json.tool manifest.json >/dev/null
+      - name: Compile Python entry points and quality harness
+        run: |
+          python -m py_compile omagent-route
+          python -m compileall -q harness_pool.py evaluation tests
+      - name: Validate manifest and benchmark fixtures
+        run: |
+          python -m json.tool manifest.json >/dev/null
+          python -m json.tool model_pool.json >/dev/null
+          python -m json.tool config/harnesses.json >/dev/null
+          python -m json.tool schemas/event.schema.json >/dev/null
+          python -m json.tool evaluation/direct/tasks.json >/dev/null
+          python -m json.tool evaluation/web/tasks.json >/dev/null
+          python -m json.tool evaluation/coding/tasks.json >/dev/null
+          python -m json.tool evaluation/ui/tasks.json >/dev/null
       - name: Check executable entry point
         run: test -x omagent-route
-      - name: Dry-run smoke test
-        env:
-          OMAGENT_DRY_RUN: "1"
+      - name: Parse QML when Qt tools are available
         run: |
-          # The router refuses to run without a default agent, so stand one up:
-          # the defaults file it reads, and something on PATH for `which`.
-          mkdir -p "$HOME/.config/omarchy/defaults" stub-bin
-          echo opencode >"$HOME/.config/omarchy/defaults/agent"
-          printf '#!/bin/sh\nexit 0\n' >stub-bin/opencode
-          chmod +x stub-bin/opencode
-          export PATH="$PWD/stub-bin:$PATH"
-          ./omagent-route -- "what is in this directory" | tee events.jsonl
-          ./omagent-route --auto -- "what is in this directory" | tee auto.jsonl
-          ./omagent-route -- --auto | tee literal.jsonl
-          python - <<'PY'
-          import json
-          for path, auto in (("events.jsonl", False), ("auto.jsonl", True)):
-              events = [json.loads(line) for line in open(path) if line.strip()]
-              kinds = [event["kind"] for event in events]
-              assert kinds[-1] == "done", kinds
-              assert events[-1]["ok"] is True, events[-1]
-              assert "agent" in kinds, kinds
-              argv = next(e["text"] for e in events if e["kind"] == "status")
-              assert ("--auto" in argv) is auto, (path, argv)
-          import shlex
-          events = [json.loads(line) for line in open("literal.jsonl") if line.strip()]
-          argv = shlex.split(next(e["text"] for e in events if e["kind"] == "status").removeprefix("Would run: "))
-          assert events[-1]["ok"] is True, events[-1]
-          assert "--auto" not in argv[:-1], argv
-          assert argv[-1].endswith("\n\n--auto"), argv
-          PY
+          if command -v qmllint >/dev/null 2>&1; then
+            qmllint Omagent.qml
+          else
+            echo "qmllint is not installed; QML parse gate skipped"
+          fi
+      - name: Run isolated characterization and quality-harness tests
+        run: |
+          python -m unittest discover -s tests -p 'test_*.py'

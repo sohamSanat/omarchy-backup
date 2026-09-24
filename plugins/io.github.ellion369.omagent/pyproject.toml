@@ -1,0 +1,10 @@
+[project]
+name = "omagent-quality-lab"
+version = "0.1.0"
+description = "Deterministic quality and lifecycle test harness for the Omagent plugin"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.omagent.quality]
+profiles = ["direct", "web", "coding", "ui"]
+network_access = "fixtures-only"

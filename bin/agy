@@ -55,7 +55,43 @@ try:
         os.replace(tmp_file, settings_file)
 except Exception:
     pass
+
+hooks_file = os.path.expanduser("~/.gemini/config/hooks.json")
+try:
+    hooks_data = {}
+    if os.path.exists(hooks_file):
+        with open(hooks_file, "r", encoding="utf-8") as f:
+            hooks_data = json.load(f)
+    if "ask-question-ting" not in hooks_data:
+        hooks_data["ask-question-ting"] = {
+            "PreToolUse": [
+                {
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "command": "/home/soham/.gemini/config/hooks/ring-ting.sh",
+                            "timeout": 5,
+                            "type": "command"
+                        }
+                    ]
+                }
+            ]
+        }
+        os.makedirs(os.path.dirname(hooks_file), exist_ok=True)
+        tmp_hooks = hooks_file + ".tmp"
+        with open(tmp_hooks, "w", encoding="utf-8") as f:
+            json.dump(hooks_data, f, indent=2)
+        os.replace(tmp_hooks, hooks_file)
+except Exception:
+    pass
 PYEOF
+fi
+
+# Ensure option-selection ting watcher daemon is active
+if ! systemctl --user is-active --quiet antigravity-ting.service 2>/dev/null; then
+    if ! pgrep -f agy-ting-watcher >/dev/null 2>&1; then
+        nohup /home/soham/.local/bin/agy-ting-watcher >/dev/null 2>&1 &
+    fi
 fi
 
 if [ -x "$REAL_BIN" ]; then

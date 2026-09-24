@@ -25,21 +25,17 @@ Branch: `main`
 - **Uncapped Multi-Agent Fleet Orchestration (`firstmate-subagent`)**:
   - Directs parallel specialist crewmates across 2x2 Herdr tiling panes (`firstmate subagent spawn/prompt/list/close`) bound to Compound Engineering skill workflows.
   - Grants every subagent on-demand autonomy to invoke any of the 33 Compound Engineering skills (`firstmate skills`, `firstmate skill-read`).
+- **`ui_concepts/v1` Architecture & Quality Engine (`omagent_core/quality/`)**:
+  - **Structured Design Contracts & 3-Concept Selection**: Generates 3 structurally unique concept candidates differing across ≥3 independent axes (information architecture, composition, typography, interaction signature, motion policy, asset strategy).
+  - **Adaptive Alignment Protocol**: Replaces rigid 6-question interviews with dynamic gap analysis. Asks only for unresolved high-impact contract fields; comprehensive briefs proceed directly to concept selection.
+  - **Deterministic Multi-Viewport Visual QA (`omagent_core/visual_qa.py`)**: Local perceptual fingerprinting across desktop (1440x900), tablet (768x1024), and mobile (375x812). Detects near-duplicates and template convergence.
+  - **Independent Visual Review Receipts (`omagent_core/quality/review.py`)**: Quality engine strictly gates completion on independent visual review receipts, preventing self-approval and allowing up to 2 deterministic same-run repair cycles.
+  - **Execution Backend Containment**: Controller reserves all workspace, tab, pane, and agent identities upfront; Herdr and Firstmate act as pure execution backends; `omagent-screenshot` enforces `--workspace` confinement and `--allow-host` whitelisting.
+  - **132 Automated Unit & Integration Tests**: Comprehensive network-free deterministic validation test suite (`python3 -m unittest discover -s tests -p 'test_*.py'`).
 - **Supreme Prompt Primacy Law & Anti-Hijacking Protection**:
-  - Eliminates "Reference Image Hijacking": the user's master prompt defines 100% of product domain, entity name, hero copy, navigation items, and features.
-  - Reference images act strictly as aesthetic style donors (chromatic chords, lighting, squircle radii, frosted glass, typography tension). Literal cloning of depicted companies or industries is strictly forbidden.
-- **Dynamic LLM & Algorithmic Grill-Me Strategic Alignment Protocol (`omagent-route`)**:
-  - Contextual 6-question design alignment before code generation: Clarifies reference essence, kinetic physics, header layout laws, atmospheric depth, typography, and contrast rhythms.
-  - Features dynamic LLM question generation (`call_llm_dynamic_grill_questions`) with deterministic algorithmic fallback, plus interactive QML cards with inline selection and one-click `proceed` support.
-- **Bifurcated UI Routing & Visual Reference Image Deconstruction**:
-  - **Track A (Reference Image Provided)**: Automatically locks to **Set 4 (Impeccable)**, completely bypassing archetype choices to prevent style collision; runs geometric and chromatic deconstruction and persists analysis to `solutions/reference_design_language.md` with prompt-primacy headers.
-  - **Track B (No Reference Image)**: Interactive UI Archetype Menu (Sets 1, 2, or 3).
-- **4 Exclusive UI Design Skill Sets (80 Total Skills in `agents/skills/`)**:
-  - **Set 1: Full Aesthetic** (Linear, Stripe Press, Braun minimalism, Swiss typography, Emil Kowalski spring animations).
-  - **Set 2: SaaS / Product App** (High-density tables, sticky headers, state machines, WCAG AA contrast).
-  - **Set 3: Jaw-Dropping / 3D Showcase** (Three.js WebGL worlds, GLSL shaders, Lenis virtual smooth scroll, GSAP choreography, anti-slop review).
-  - **Set 4: Impeccable Visual Reference Alignment** (`impeccable`: non-invasive reference fidelity, honors pinned aesthetics, zero archetype collision, out-of-distribution craft).
-  - **Supreme Precedence & Header Laws**: Rigid single-line navigation (`white-space: nowrap !important;`), centered vertical baselines, and mandatory post-UI animation pass.
+  - The user's prompt is 100% sacred truth defining domain, entity name, and features. Reference images donate strictly abstract aesthetic DNA, eliminating reference hijacking.
+- **Legacy Compatibility Layer (`omagent_core/legacy_migration.py`)**:
+  - Gracefully handles in-flight sessions and maintains backwards compatibility for legacy Sets 1–4 while routing all new requests through `ui_concepts/v1`.
 - **Voice Intercom & Voxtype IPC Hook (`omarchy-voxtype-hook`)**:
   - Intercepts voice transcription; directly injects speech into active Omagent HUD via Quickshell IPC, eliminating keystroke racing.
 - **Nothing Phone PWA & Voice Bridge (`omagent-mobile-bridge`)**:

@@ -1,0 +1,1 @@
+{"facts":["Only the supplied facts are authoritative."],"expected":"An answer grounded only in the supplied facts with explicit uncertainty when needed."}

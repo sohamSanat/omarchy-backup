@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "profile": "ui",
+  "tasks": [
+    {"id": "ui-001", "prompt": "Build a responsive product interface from a written brief.", "fixture": "fixtures/ui-001.json", "rubric": ["subject_fidelity", "design_contract", "rendered_evidence", "interaction_quality", "accessibility", "visual_review"]},
+    {"id": "ui-002", "prompt": "Use a reference image as visual evidence without copying its subject.", "fixture": "fixtures/ui-002.json", "rubric": ["subject_fidelity", "reference_boundary", "reference_fidelity", "rendered_evidence", "visual_review"]},
+    {"id": "ui-003", "prompt": "Generate three structurally distinct product concepts before implementation.", "fixture": "fixtures/ui-003.json", "rubric": ["design_contract", "concept_novelty", "subject_fidelity", "rendered_evidence"]},
+    {"id": "ui-004", "prompt": "Keep the requested product independent from a conflicting reference subject.", "fixture": "fixtures/ui-004.json", "rubric": ["subject_fidelity", "reference_boundary", "reference_fidelity", "concept_novelty", "visual_review"]},
+    {"id": "ui-005", "prompt": "Allow intentional product-family consistency without allowing unrelated template reuse.", "fixture": "fixtures/ui-005.json", "rubric": ["subject_fidelity", "concept_novelty", "rendered_evidence", "visual_review"]}
+  ]
+}

@@ -3,6 +3,9 @@
 ![Omagent command pill over dark winged-horse artwork](preview.jpg)
 
 Omagent 0.1.0 is an alpha plugin for [Omarchy](https://omarchy.org).
+
+> **Development branch:** This branch is migrating the live overlay to a modular controller with a shared quality engine. The authoritative session store is `~/.local/state/omagent/controller.sqlite`; JSON session files are compatibility projections. Auto-approval remains the default, while completion now requires quality evidence rather than a router process exiting successfully. See `docs/quality-engine.md`, `docs/operations.md`, and `docs/provider-adapters.md` for the current contract.
+
 The pill is a small input bar at the top of the screen.
 
 You write a request.
@@ -13,8 +16,9 @@ The answer shows in a card below the pill.
 
 NOTE: This release is an alpha. We did a full test of opencode on one machine.
 
-Omagent does not set an agent for you.
-You must set the default agent.
+Omagent can use the configured AGY, OpenCode, or Cline coding adapter.
+The direct and web lanes use the configured Gemini credential or environment variable.
+Provider commands are launched only after the router has selected a supported adapter.
 Omagent does not add a sandbox.
 
 ## Necessary items
@@ -23,7 +27,8 @@ You must have:
 
 - Omarchy 4 with the overlay `omarchy-shell`
 - Python 3.11 or a later version
-- A default agent (`omarchy default agent opencode`)
+- A configured coding provider: AGY, OpenCode, or Cline
+- `GEMINI_API_KEY` in the environment for direct and web lanes, or the legacy config key during migration
 - `wl-copy` from `wl-clipboard` for copying answers (included with Omarchy)
 
 The plugin uses Omarchy's agent, terminal, notification, and voice-status
@@ -97,7 +102,7 @@ The next Enter continues the same session.
 | `Enter` | Send the request |
 | `Shift+Tab` | Set auto-approve to ON or OFF for this session |
 | `Ctrl+E` | Open this session in the terminal of the agent |
-| `Ctrl+C` | Stop the agent |
+| `Ctrl+C` | Stop the owned provider and clean its recorded pane |
 | `Ctrl+N` | Start a new session and remove the card text |
 | `Ctrl+Y` | Copy the last answer |
 | `Escape` | Hide the overlay. The agent continues. |
@@ -109,21 +114,17 @@ A notification shows when the agent stops.
 
 If the directory `~/Work` exists, the agent starts there.
 If this directory does not exist, the agent starts in `$HOME`.
-A request must not have more than 2000 characters.
+A request must not have more than 2500 characters.
 
 ## Permissions
 
 The pill has two modes.
 The pill shows the mode.
 
-Ask is the default mode.
-Omagent does not change the permission rules of the agent.
-The pill cannot show a permission prompt.
-If the agent must ask, it does not do the action.
-
-Auto-approve starts when you press `Shift+Tab`.
-The agent gets its auto-approve flag.
-This flag is the same as the flag of `omarchy agent`:
+Auto-approve is enabled by default on this development branch.
+Omagent does not change the permission rules of the provider.
+The pill cannot show a provider permission prompt.
+The quality engine, not the approval mode, decides whether work is complete.
 
 - `opencode --auto`
 - `claude --permission-mode auto`
@@ -131,8 +132,8 @@ This flag is the same as the flag of `omarchy agent`:
 - `gemini --yolo`.
 
 The pill shows AUTO.
-A new session sets the mode to Ask.
-A restart of the shell sets the mode to Ask.
+Press `Shift+Tab` to turn auto-approval off for a session.
+A restart preserves the saved mode.
 `Ctrl+E` opens the terminal of the agent without the auto-approve flag.
 
 These two modes apply to the four streaming adapters below. Other agents
