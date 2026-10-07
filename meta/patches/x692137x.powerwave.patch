@@ -1,0 +1,1019 @@
+diff --git c/PowerWave.qml w/PowerWave.qml
+index c1fee82..ac9ff0c 100644
+--- c/PowerWave.qml
++++ w/PowerWave.qml
+@@ -1,12 +1,24 @@
+ import QtQuick
+ import QtQuick.Effects
+ import Quickshell
++import Quickshell.Io
++import Quickshell.Wayland
+ import Quickshell.Services.UPower
+ 
+ Item {
+     id: root
+ 
+-    property color waveColor: "#FFFFFF"
++    // Theme-adaptive wave color matching Omarchy theme accent
++    property color waveColor: {
++        if (typeof Color !== "undefined" && Color.accent) {
++            return Color.accent
++        }
++        return "#00E5FF"
++    }
++
++    function auraColor(alpha) {
++        return Qt.rgba(root.waveColor.r, root.waveColor.g, root.waveColor.b, alpha)
++    }
+ 
+     property int durationMs: 790
+ 
+@@ -22,33 +34,137 @@ Item {
+ 
+     property int cornerBloomSize: 84
+ 
+-    // Softer perimeter aura than v0.12.
++    // Softer perimeter aura
+     property int perimeterDepth: 36
+     property int perimeterBlurMax: 12
+ 
+     property bool initialized: false
+-    property bool previousOnBattery: UPower.onBattery
++    property bool isCharging: false
++    property real lastTriggerTime: 0
+     property int triggerSerial: 0
+ 
+-    Component.onCompleted: {
+-        previousOnBattery = UPower.onBattery
+-        initialized = true
+-        console.log("[PowerWave] v0.13 loaded, onBattery =", UPower.onBattery)
++    function triggerAnimation(source) {
++        var now = Date.now()
++        // Prevent rapid duplicate triggers within 1500ms
++        if (now - root.lastTriggerTime < 1500) {
++            console.log("[PowerWave] Debouncing trigger from", source)
++            return
++        }
++        root.lastTriggerTime = now
++        root.triggerSerial++
++        console.log("[PowerWave] Charging animation triggered! Source:", source, "Serial:", root.triggerSerial)
++    }
++
++    function onChargingStarted(source) {
++        if (!root.isCharging) {
++            root.isCharging = true
++            root.triggerAnimation(source)
++        }
++    }
++
++    function onChargingStopped(source) {
++        if (root.isCharging) {
++            root.isCharging = false
++            console.log("[PowerWave] Charging stopped (Source:", source, ")")
++        }
++    }
++
++    function forceTriggerAnimation() {
++        root.lastTriggerTime = Date.now()
++        root.triggerSerial++
++        console.log("[PowerWave] Force triggered via IPC! Serial:", root.triggerSerial)
++    }
++
++    // Real-time kernel uevent & sysfs monitor
++    Process {
++        id: powerMonitor
++        command: [
++            "python3", "-u",
++            Qt.resolvedUrl("scripts/power-monitor.py").toString().replace(/^file:\/\//, "")
++        ]
++        running: true
++        stdout: SplitParser {
++            splitMarker: "\n"
++            onRead: function(line) {
++                var text = line.trim()
++                if (text === "STATE:CHARGING") {
++                    root.isCharging = true
++                    root.initialized = true
++                    console.log("[PowerWave] Initial state: charging")
++                } else if (text === "STATE:DISCHARGING") {
++                    root.isCharging = false
++                    root.initialized = true
++                    console.log("[PowerWave] Initial state: discharging")
++                } else if (text === "CHARGING") {
++                    root.onChargingStarted("power-monitor")
++                } else if (text === "DISCHARGING") {
++                    root.onChargingStopped("power-monitor")
++                }
++            }
++        }
++        onExited: function(exitCode, exitStatus) {
++            console.log("[PowerWave] power-monitor exited, restarting...")
++            monitorRestartTimer.restart()
++        }
++    }
++
++    Timer {
++        id: monitorRestartTimer
++        interval: 1000
++        repeat: false
++        onTriggered: {
++            powerMonitor.running = true
++        }
++    }
++
++    // Redundant UPower connections
++    Connections {
++        target: UPower.displayDevice
++        function onStateChanged() {
++            if (!root.initialized) return
++            if (UPower.displayDevice.state === UPowerDeviceState.Charging) {
++                root.onChargingStarted("upower.displayDevice")
++            } else if (UPower.displayDevice.state === UPowerDeviceState.Discharging) {
++                root.onChargingStopped("upower.displayDevice")
++            }
++        }
+     }
+ 
+     Connections {
+         target: UPower
+-
+         function onOnBatteryChanged() {
+-            if (!root.initialized)
+-                return
+-
+-            if (root.previousOnBattery === true && UPower.onBattery === false) {
+-                root.triggerSerial++
+-                console.log("[PowerWave] AC connected, trigger =", root.triggerSerial)
++            if (!root.initialized) return
++            if (UPower.onBattery === false) {
++                root.onChargingStarted("upower.onBattery")
++            } else if (UPower.onBattery === true) {
++                root.onChargingStopped("upower.onBattery")
+             }
++        }
++    }
+ 
+-            root.previousOnBattery = UPower.onBattery
++    // Safety fallback timer: verifies state periodically
++    Timer {
++        interval: 2000
++        running: true
++        repeat: true
++        onTriggered: {
++            if (UPower.displayDevice && UPower.displayDevice.state === UPowerDeviceState.Charging) {
++                if (!root.isCharging) {
++                    root.onChargingStarted("timer-sync")
++                }
++            }
++        }
++    }
++
++    // IPC interface for testing and manual triggering
++    IpcHandler {
++        target: "x692137x.powerwave"
++        function trigger(): string {
++            root.forceTriggerAnimation()
++            return "triggered"
++        }
++        function status(): string {
++            return root.isCharging ? "charging" : "discharging"
+         }
+     }
+ 
+@@ -62,6 +178,10 @@ Item {
+                 required property var modelData
+                 screen: modelData
+ 
++                WlrLayershell.namespace: "powerwave"
++                WlrLayershell.layer: WlrLayer.Overlay
++                WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
++
+                 anchors {
+                     top: true
+                     bottom: true
+@@ -73,8 +193,8 @@ Item {
+                 exclusionMode: ExclusionMode.Ignore
+                 mask: Region {}
+ 
++                // Only visible when active so the layer surface unmaps when animation completes
+                 visible: active
+-                updatesEnabled: active
+ 
+                 property bool active: false
+                 property real progress: 0.0
+@@ -149,7 +269,6 @@ Item {
+                 }
+ 
+                 function frameEnvelope() {
+-                    // Gentle fade in, stable low-level aura, gentle fade out.
+                     if (progress < 0.12)
+                         return progress / 0.12
+ 
+@@ -174,339 +293,348 @@ Item {
+                     return Math.pow(1 - d / range, 1.65)
+                 }
+ 
+-                // ============================================================
+-                // SUBTLE BLURRED GRADIENT PERIMETER
+-                // ============================================================
+-
+-                Rectangle {
+-                    id: topAuraSource
+-                    anchors.top: parent.top
+-                    anchors.left: parent.left
+-                    anchors.right: parent.right
+-                    height: root.perimeterDepth
+-                    opacity: 0.26 * overlay.frameEnvelope()
+-
+-                    gradient: Gradient {
+-                        orientation: Gradient.Vertical
+-                        GradientStop { position: 0.00; color: "#88FFFFFF" }
+-                        GradientStop { position: 0.16; color: "#48FFFFFF" }
+-                        GradientStop { position: 0.42; color: "#1CFFFFFF" }
+-                        GradientStop { position: 0.72; color: "#08FFFFFF" }
+-                        GradientStop { position: 1.00; color: "#00FFFFFF" }
+-                    }
+-                }
+-
+-                MultiEffect {
+-                    source: topAuraSource
+-                    anchors.fill: topAuraSource
+-                    visible: overlay.active
+-                    opacity: 0.62 * overlay.frameEnvelope()
+-                    blurEnabled: true
+-                    blur: 0.58
+-                    blurMax: root.perimeterBlurMax
+-                    blurMultiplier: 1.0
+-                    autoPaddingEnabled: false
+-                }
+-
+-                Rectangle {
+-                    id: bottomAuraSource
+-                    anchors.bottom: parent.bottom
+-                    anchors.left: parent.left
+-                    anchors.right: parent.right
+-                    height: root.perimeterDepth
+-                    opacity: 0.26 * overlay.frameEnvelope()
+-
+-                    gradient: Gradient {
+-                        orientation: Gradient.Vertical
+-                        GradientStop { position: 0.00; color: "#00FFFFFF" }
+-                        GradientStop { position: 0.28; color: "#08FFFFFF" }
+-                        GradientStop { position: 0.58; color: "#1CFFFFFF" }
+-                        GradientStop { position: 0.84; color: "#48FFFFFF" }
+-                        GradientStop { position: 1.00; color: "#88FFFFFF" }
+-                    }
+-                }
+-
+-                MultiEffect {
+-                    source: bottomAuraSource
+-                    anchors.fill: bottomAuraSource
+-                    visible: overlay.active
+-                    opacity: 0.62 * overlay.frameEnvelope()
+-                    blurEnabled: true
+-                    blur: 0.58
+-                    blurMax: root.perimeterBlurMax
+-                    blurMultiplier: 1.0
+-                    autoPaddingEnabled: false
+-                }
+-
+-                Rectangle {
+-                    id: leftAuraSource
+-                    anchors.top: parent.top
+-                    anchors.bottom: parent.bottom
+-                    anchors.left: parent.left
+-                    width: root.perimeterDepth
+-                    opacity: 0.26 * overlay.frameEnvelope()
+-
+-                    gradient: Gradient {
+-                        orientation: Gradient.Horizontal
+-                        GradientStop { position: 0.00; color: "#88FFFFFF" }
+-                        GradientStop { position: 0.16; color: "#48FFFFFF" }
+-                        GradientStop { position: 0.42; color: "#1CFFFFFF" }
+-                        GradientStop { position: 0.72; color: "#08FFFFFF" }
+-                        GradientStop { position: 1.00; color: "#00FFFFFF" }
+-                    }
+-                }
+-
+-                MultiEffect {
+-                    source: leftAuraSource
+-                    anchors.fill: leftAuraSource
+-                    visible: overlay.active
+-                    opacity: 0.62 * overlay.frameEnvelope()
+-                    blurEnabled: true
+-                    blur: 0.58
+-                    blurMax: root.perimeterBlurMax
+-                    blurMultiplier: 1.0
+-                    autoPaddingEnabled: false
+-                }
+-
+-                Rectangle {
+-                    id: rightAuraSource
+-                    anchors.top: parent.top
+-                    anchors.bottom: parent.bottom
+-                    anchors.right: parent.right
+-                    width: root.perimeterDepth
+-                    opacity: 0.26 * overlay.frameEnvelope()
+-
+-                    gradient: Gradient {
+-                        orientation: Gradient.Horizontal
+-                        GradientStop { position: 0.00; color: "#00FFFFFF" }
+-                        GradientStop { position: 0.28; color: "#08FFFFFF" }
+-                        GradientStop { position: 0.58; color: "#1CFFFFFF" }
+-                        GradientStop { position: 0.84; color: "#48FFFFFF" }
+-                        GradientStop { position: 1.00; color: "#88FFFFFF" }
+-                    }
+-                }
+-
+-                MultiEffect {
+-                    source: rightAuraSource
+-                    anchors.fill: rightAuraSource
+-                    visible: overlay.active
+-                    opacity: 0.62 * overlay.frameEnvelope()
+-                    blurEnabled: true
+-                    blur: 0.58
+-                    blurMax: root.perimeterBlurMax
+-                    blurMultiplier: 1.0
+-                    autoPaddingEnabled: false
+-                }
+-
+-                component EnergyTrail: Item {
+-                    required property bool rightSide
+-                    required property int bodySize
+-                    required property real bodyOpacity
+-                    required property real headBias
+-
++                // Visual content container: only visible when active
++                Item {
++                    id: visualRoot
+                     anchors.fill: parent
++                    visible: overlay.active
++                    opacity: overlay.active ? 1.0 : 0.0
++
++                    // ============================================================
++                    // SUBTLE BLURRED GRADIENT PERIMETER (THEME-ADAPTIVE)
++                    // ============================================================
++
++                    Rectangle {
++                        id: topAuraSource
++                        anchors.top: parent.top
++                        anchors.left: parent.left
++                        anchors.right: parent.right
++                        height: root.perimeterDepth
++                        opacity: 0.26 * overlay.frameEnvelope()
++
++                        gradient: Gradient {
++                            orientation: Gradient.Vertical
++                            GradientStop { position: 0.00; color: root.auraColor(0.53) }
++                            GradientStop { position: 0.16; color: root.auraColor(0.28) }
++                            GradientStop { position: 0.42; color: root.auraColor(0.11) }
++                            GradientStop { position: 0.72; color: root.auraColor(0.03) }
++                            GradientStop { position: 1.00; color: root.auraColor(0.00) }
++                        }
++                    }
++
++                    MultiEffect {
++                        source: topAuraSource
++                        anchors.fill: topAuraSource
++                        visible: overlay.active
++                        opacity: 0.62 * overlay.frameEnvelope()
++                        blurEnabled: true
++                        blur: 0.58
++                        blurMax: root.perimeterBlurMax
++                        blurMultiplier: 1.0
++                        autoPaddingEnabled: false
++                    }
++
++                    Rectangle {
++                        id: bottomAuraSource
++                        anchors.bottom: parent.bottom
++                        anchors.left: parent.left
++                        anchors.right: parent.right
++                        height: root.perimeterDepth
++                        opacity: 0.26 * overlay.frameEnvelope()
++
++                        gradient: Gradient {
++                            orientation: Gradient.Vertical
++                            GradientStop { position: 0.00; color: root.auraColor(0.00) }
++                            GradientStop { position: 0.28; color: root.auraColor(0.03) }
++                            GradientStop { position: 0.58; color: root.auraColor(0.11) }
++                            GradientStop { position: 0.84; color: root.auraColor(0.28) }
++                            GradientStop { position: 1.00; color: root.auraColor(0.53) }
++                        }
++                    }
++
++                    MultiEffect {
++                        source: bottomAuraSource
++                        anchors.fill: bottomAuraSource
++                        visible: overlay.active
++                        opacity: 0.62 * overlay.frameEnvelope()
++                        blurEnabled: true
++                        blur: 0.58
++                        blurMax: root.perimeterBlurMax
++                        blurMultiplier: 1.0
++                        autoPaddingEnabled: false
++                    }
++
++                    Rectangle {
++                        id: leftAuraSource
++                        anchors.top: parent.top
++                        anchors.bottom: parent.bottom
++                        anchors.left: parent.left
++                        width: root.perimeterDepth
++                        opacity: 0.26 * overlay.frameEnvelope()
++
++                        gradient: Gradient {
++                            orientation: Gradient.Horizontal
++                            GradientStop { position: 0.00; color: root.auraColor(0.53) }
++                            GradientStop { position: 0.16; color: root.auraColor(0.28) }
++                            GradientStop { position: 0.42; color: root.auraColor(0.11) }
++                            GradientStop { position: 0.72; color: root.auraColor(0.03) }
++                            GradientStop { position: 1.00; color: root.auraColor(0.00) }
++                        }
++                    }
++
++                    MultiEffect {
++                        source: leftAuraSource
++                        anchors.fill: leftAuraSource
++                        visible: overlay.active
++                        opacity: 0.62 * overlay.frameEnvelope()
++                        blurEnabled: true
++                        blur: 0.58
++                        blurMax: root.perimeterBlurMax
++                        blurMultiplier: 1.0
++                        autoPaddingEnabled: false
++                    }
++
++                    Rectangle {
++                        id: rightAuraSource
++                        anchors.top: parent.top
++                        anchors.bottom: parent.bottom
++                        anchors.right: parent.right
++                        width: root.perimeterDepth
++                        opacity: 0.26 * overlay.frameEnvelope()
++
++                        gradient: Gradient {
++                            orientation: Gradient.Horizontal
++                            GradientStop { position: 0.00; color: root.auraColor(0.00) }
++                            GradientStop { position: 0.28; color: root.auraColor(0.03) }
++                            GradientStop { position: 0.58; color: root.auraColor(0.11) }
++                            GradientStop { position: 0.84; color: root.auraColor(0.28) }
++                            GradientStop { position: 1.00; color: root.auraColor(0.53) }
++                        }
++                    }
++
++                    MultiEffect {
++                        source: rightAuraSource
++                        anchors.fill: rightAuraSource
++                        visible: overlay.active
++                        opacity: 0.62 * overlay.frameEnvelope()
++                        blurEnabled: true
++                        blur: 0.58
++                        blurMax: root.perimeterBlurMax
++                        blurMultiplier: 1.0
++                        autoPaddingEnabled: false
++                    }
++
++                    component EnergyTrail: Item {
++                        required property bool rightSide
++                        required property int bodySize
++                        required property real bodyOpacity
++                        required property real headBias
++
++                        anchors.fill: parent
++
++                        Repeater {
++                            model: root.trailCount
++
++                            Rectangle {
++                                required property int index
++
++                                readonly property real d: overlay.distanceForTrail(index)
++                                readonly property real strength: overlay.trailStrength(index)
++                                readonly property point pos: rightSide
++                                    ? overlay.rightPoint(
++                                        overlay.clamp(d, 0, overlay.halfPathLength),
++                                        bodySize / 2
++                                      )
++                                    : overlay.leftPoint(
++                                        overlay.clamp(d, 0, overlay.halfPathLength),
++                                        bodySize / 2
++                                      )
++
++                                readonly property real nearHead:
++                                    Math.max(0, 1 - index / 8.0)
++
++                                width: Math.max(
++                                    root.coreSize,
++                                    bodySize * (0.70 + 0.20 * strength + headBias * nearHead)
++                                )
++                                height: width
++
++                                x: Math.round(pos.x - width / 2)
++                                y: Math.round(pos.y - height / 2)
++
++                                color: root.waveColor
++                                opacity: (
++                                    d >= 0 &&
++                                    d <= overlay.halfPathLength
++                                ) ? bodyOpacity * strength : 0
++
++                                antialiasing: false
++                            }
++                        }
++                    }
++
++                    EnergyTrail {
++                        rightSide: true
++                        bodySize: root.glowOuter
++                        bodyOpacity: 0.075
++                        headBias: 0.12
++                    }
++
++                    EnergyTrail {
++                        rightSide: false
++                        bodySize: root.glowOuter
++                        bodyOpacity: 0.075
++                        headBias: 0.12
++                    }
++
++                    EnergyTrail {
++                        rightSide: true
++                        bodySize: root.glowMid
++                        bodyOpacity: 0.16
++                        headBias: 0.10
++                    }
++
++                    EnergyTrail {
++                        rightSide: false
++                        bodySize: root.glowMid
++                        bodyOpacity: 0.16
++                        headBias: 0.10
++                    }
++
++                    EnergyTrail {
++                        rightSide: true
++                        bodySize: root.glowInner
++                        bodyOpacity: 0.34
++                        headBias: 0.08
++                    }
++
++                    EnergyTrail {
++                        rightSide: false
++                        bodySize: root.glowInner
++                        bodyOpacity: 0.34
++                        headBias: 0.08
++                    }
++
++                    EnergyTrail {
++                        rightSide: true
++                        bodySize: root.coreSize
++                        bodyOpacity: 1.0
++                        headBias: 0.0
++                    }
++
++                    EnergyTrail {
++                        rightSide: false
++                        bodySize: root.coreSize
++                        bodyOpacity: 1.0
++                        headBias: 0.0
++                    }
+ 
+                     Repeater {
+-                        model: root.trailCount
+-
++                        model: 4
+                         Rectangle {
+                             required property int index
+ 
+-                            readonly property real d: overlay.distanceForTrail(index)
+-                            readonly property real strength: overlay.trailStrength(index)
+-                            readonly property point pos: rightSide
+-                                ? overlay.rightPoint(
++                            readonly property real d:
++                                overlay.headDistance() - index * 5.2
++                            readonly property point pos:
++                                overlay.rightPoint(
+                                     overlay.clamp(d, 0, overlay.halfPathLength),
+-                                    bodySize / 2
+-                                  )
+-                                : overlay.leftPoint(
+-                                    overlay.clamp(d, 0, overlay.halfPathLength),
+-                                    bodySize / 2
+-                                  )
++                                    root.headSize / 2
++                                )
+ 
+-                            readonly property real nearHead:
+-                                Math.max(0, 1 - index / 8.0)
+-
+-                            width: Math.max(
+-                                root.coreSize,
+-                                bodySize * (0.70 + 0.20 * strength + headBias * nearHead)
+-                            )
++                            width: root.headSize - index * 3
+                             height: width
+-
+                             x: Math.round(pos.x - width / 2)
+                             y: Math.round(pos.y - height / 2)
+-
+                             color: root.waveColor
+-                            opacity: (
+-                                d >= 0 &&
+-                                d <= overlay.halfPathLength
+-                            ) ? bodyOpacity * strength : 0
+-
++                            opacity: d >= 0 && d <= overlay.halfPathLength
++                                ? 0.95 - index * 0.17
++                                : 0
+                             antialiasing: false
+                         }
+                     }
+-                }
+ 
+-                EnergyTrail {
+-                    rightSide: true
+-                    bodySize: root.glowOuter
+-                    bodyOpacity: 0.075
+-                    headBias: 0.12
+-                }
++                    Repeater {
++                        model: 4
++                        Rectangle {
++                            required property int index
+ 
+-                EnergyTrail {
+-                    rightSide: false
+-                    bodySize: root.glowOuter
+-                    bodyOpacity: 0.075
+-                    headBias: 0.12
+-                }
++                            readonly property real d:
++                                overlay.headDistance() - index * 5.2
++                            readonly property point pos:
++                                overlay.leftPoint(
++                                    overlay.clamp(d, 0, overlay.halfPathLength),
++                                    root.headSize / 2
++                                )
+ 
+-                EnergyTrail {
+-                    rightSide: true
+-                    bodySize: root.glowMid
+-                    bodyOpacity: 0.16
+-                    headBias: 0.10
+-                }
+-
+-                EnergyTrail {
+-                    rightSide: false
+-                    bodySize: root.glowMid
+-                    bodyOpacity: 0.16
+-                    headBias: 0.10
+-                }
+-
+-                EnergyTrail {
+-                    rightSide: true
+-                    bodySize: root.glowInner
+-                    bodyOpacity: 0.34
+-                    headBias: 0.08
+-                }
+-
+-                EnergyTrail {
+-                    rightSide: false
+-                    bodySize: root.glowInner
+-                    bodyOpacity: 0.34
+-                    headBias: 0.08
+-                }
+-
+-                EnergyTrail {
+-                    rightSide: true
+-                    bodySize: root.coreSize
+-                    bodyOpacity: 1.0
+-                    headBias: 0.0
+-                }
+-
+-                EnergyTrail {
+-                    rightSide: false
+-                    bodySize: root.coreSize
+-                    bodyOpacity: 1.0
+-                    headBias: 0.0
+-                }
+-
+-                Repeater {
+-                    model: 4
+-                    Rectangle {
+-                        required property int index
+-
+-                        readonly property real d:
+-                            overlay.headDistance() - index * 5.2
+-                        readonly property point pos:
+-                            overlay.rightPoint(
+-                                overlay.clamp(d, 0, overlay.halfPathLength),
+-                                root.headSize / 2
+-                            )
+-
+-                        width: root.headSize - index * 3
+-                        height: width
+-                        x: Math.round(pos.x - width / 2)
+-                        y: Math.round(pos.y - height / 2)
+-                        color: root.waveColor
+-                        opacity: d >= 0 && d <= overlay.halfPathLength
+-                            ? 0.95 - index * 0.17
+-                            : 0
+-                        antialiasing: false
++                            width: root.headSize - index * 3
++                            height: width
++                            x: Math.round(pos.x - width / 2)
++                            y: Math.round(pos.y - height / 2)
++                            color: root.waveColor
++                            opacity: d >= 0 && d <= overlay.halfPathLength
++                                ? 0.95 - index * 0.17
++                                : 0
++                            antialiasing: false
++                        }
+                     }
+-                }
+ 
+-                Repeater {
+-                    model: 4
++                    // Bottom-center injection pulse
+                     Rectangle {
+-                        required property int index
++                        readonly property real local:
++                            Math.min(1.0, overlay.progress / 0.085)
+ 
+-                        readonly property real d:
+-                            overlay.headDistance() - index * 5.2
+-                        readonly property point pos:
+-                            overlay.leftPoint(
+-                                overlay.clamp(d, 0, overlay.halfPathLength),
+-                                root.headSize / 2
+-                            )
++                        width: 110 + 150 * local
++                        height: 25 - 9 * local
++                        x: Math.round((overlay.width - width) / 2)
++                        y: overlay.height - height
+ 
+-                        width: root.headSize - index * 3
+-                        height: width
+-                        x: Math.round(pos.x - width / 2)
+-                        y: Math.round(pos.y - height / 2)
+                         color: root.waveColor
+-                        opacity: d >= 0 && d <= overlay.halfPathLength
+-                            ? 0.95 - index * 0.17
++                        opacity: overlay.progress < 0.085
++                            ? 0.58 * (1.0 - local)
+                             : 0
+-                        antialiasing: false
+                     }
+-                }
+ 
+-                // Bottom-center injection remains punchy.
+-                Rectangle {
+-                    readonly property real local:
+-                        Math.min(1.0, overlay.progress / 0.085)
++                    // Corner blooms
++                    Rectangle {
++                        readonly property real e: overlay.cornerEnvelope()
++                        width: root.cornerBloomSize
++                        height: root.cornerBloomSize
++                        x: 0
++                        y: overlay.height - height
++                        color: root.waveColor
++                        opacity: 0.11 * e
++                    }
+ 
+-                    width: 110 + 150 * local
+-                    height: 25 - 9 * local
+-                    x: Math.round((overlay.width - width) / 2)
+-                    y: overlay.height - height
++                    Rectangle {
++                        readonly property real e: overlay.cornerEnvelope()
++                        width: root.cornerBloomSize
++                        height: root.cornerBloomSize
++                        x: overlay.width - width
++                        y: overlay.height - height
++                        color: root.waveColor
++                        opacity: 0.11 * e
++                    }
+ 
+-                    color: root.waveColor
+-                    opacity: overlay.progress < 0.085
+-                        ? 0.58 * (1.0 - local)
+-                        : 0
+-                }
++                    // Top convergence bloom
++                    Rectangle {
++                        readonly property real local:
++                            overlay.progress < 0.955
++                            ? 0
++                            : (overlay.progress - 0.955) / 0.045
+ 
+-                // Corner blooms slightly softened too.
+-                Rectangle {
+-                    readonly property real e: overlay.cornerEnvelope()
+-                    width: root.cornerBloomSize
+-                    height: root.cornerBloomSize
+-                    x: 0
+-                    y: overlay.height - height
+-                    color: root.waveColor
+-                    opacity: 0.11 * e
+-                }
++                        width: 54 - 28 * local
++                        height: 18 - 7 * local
++                        x: Math.round((overlay.width - width) / 2)
++                        y: 0
+ 
+-                Rectangle {
+-                    readonly property real e: overlay.cornerEnvelope()
+-                    width: root.cornerBloomSize
+-                    height: root.cornerBloomSize
+-                    x: overlay.width - width
+-                    y: overlay.height - height
+-                    color: root.waveColor
+-                    opacity: 0.11 * e
+-                }
+-
+-                Rectangle {
+-                    readonly property real local:
+-                        overlay.progress < 0.955
+-                        ? 0
+-                        : (overlay.progress - 0.955) / 0.045
+-
+-                    width: 54 - 28 * local
+-                    height: 18 - 7 * local
+-                    x: Math.round((overlay.width - width) / 2)
+-                    y: 0
+-
+-                    color: root.waveColor
+-                    opacity: overlay.progress < 0.955
+-                        ? 0
+-                        : (local < 0.32
+-                            ? 0.95 * (local / 0.32)
+-                            : 0.95 * (1 - (local - 0.32) / 0.68))
++                        color: root.waveColor
++                        opacity: overlay.progress < 0.955
++                            ? 0
++                            : (local < 0.32
++                                ? 0.95 * (local / 0.32)
++                                : 0.95 * (1 - (local - 0.32) / 0.68))
++                    }
+                 }
+ 
+                 NumberAnimation {
+@@ -531,7 +659,7 @@ Item {
+                         waveAnimation.stop()
+                         overlay.progress = 0.0
+                         overlay.active = true
+-                        waveAnimation.start()
++                        waveAnimation.restart()
+                     }
+                 }
+             }
+diff --git c/scripts/power-monitor.py w/scripts/power-monitor.py
+new file mode 100755
+index 0000000..6b80d7e
+--- /dev/null
++++ w/scripts/power-monitor.py
+@@ -0,0 +1,142 @@
++#!/usr/bin/env python3
++"""
++Power supply monitor for Omarchy PowerWave plugin.
++Monitors kernel uevents via netlink socket and inspects /sys/class/power_supply
++to reliably detect AC / USB-PD power connection events in real time.
++"""
++
++import os
++import sys
++import glob
++import time
++import select
++import socket
++import signal
++
++def is_charging_active():
++    """
++    Check if the laptop is connected to external AC/USB-PD power or actively charging.
++    Returns True if:
++      - Any non-battery power supply (AC, USB, UCSI PD) is online (online == 1)
++      - Any battery reports status 'Charging'
++      - Any battery has positive current flow while not discharging
++    """
++    any_online_supply = False
++    any_battery_charging = False
++
++    for path in glob.glob("/sys/class/power_supply/*"):
++        type_file = os.path.join(path, "type")
++        online_file = os.path.join(path, "online")
++        status_file = os.path.join(path, "status")
++        current_file = os.path.join(path, "current_now")
++
++        dev_type = ""
++        if os.path.isfile(type_file):
++            try:
++                with open(type_file, "r") as f:
++                    dev_type = f.read().strip().lower()
++            except Exception:
++                pass
++
++        name = os.path.basename(path).lower()
++
++        # Check online attribute (standard for AC, USB, and UCSI power supplies)
++        if os.path.isfile(online_file):
++            try:
++                with open(online_file, "r") as f:
++                    val = f.read().strip()
++                    if val == "1":
++                        # If it is a battery, online indicates presence, not external power
++                        if dev_type != "battery" and not name.startswith("bat"):
++                            any_online_supply = True
++            except Exception:
++                pass
++
++        # Check battery status
++        if os.path.isfile(status_file):
++            try:
++                with open(status_file, "r") as f:
++                    status = f.read().strip().lower()
++                    if status == "charging":
++                        any_battery_charging = True
++            except Exception:
++                pass
++
++        # Check if battery current is positive and not discharging
++        if dev_type == "battery" and os.path.isfile(current_file):
++            try:
++                with open(current_file, "r") as f:
++                    curr = int(f.read().strip())
++                    if curr > 0 and not any_battery_charging:
++                        # Verify status isn't discharging
++                        if os.path.isfile(status_file):
++                            with open(status_file, "r") as sf:
++                                if sf.read().strip().lower() != "discharging":
++                                    any_battery_charging = True
++            except Exception:
++                pass
++
++    return any_online_supply or any_battery_charging
++
++def main():
++    # Ensure stdout is flushed immediately for line-by-line reading in QML
++    if hasattr(sys.stdout, "reconfigure"):
++        sys.stdout.reconfigure(line_buffering=True)
++
++    def handle_exit(signum, frame):
++        sys.exit(0)
++
++    signal.signal(signal.SIGTERM, handle_exit)
++    signal.signal(signal.SIGINT, handle_exit)
++
++    # Attempt to open Linux netlink socket for kernel kobject uevents
++    nl_sock = None
++    try:
++        # NETLINK_KOBJECT_UEVENT = 15
++        nl_sock = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, 15)
++        # Bind: pid 0 (let kernel choose), multicast group 1 (kernel uevents)
++        nl_sock.bind((0, 1))
++        nl_sock.setblocking(False)
++    except Exception as e:
++        sys.stderr.write(f"[power-monitor] Netlink socket unavailable: {e}. Using polling fallback.\n")
++        nl_sock = None
++
++    # Initial state determination
++    last_state = is_charging_active()
++    # Output initial state as baseline (so plugin doesn't trigger on fresh launch)
++    if last_state:
++        print("STATE:CHARGING", flush=True)
++    else:
++        print("STATE:DISCHARGING", flush=True)
++
++    # Event loop
++    while True:
++        try:
++            if nl_sock is not None:
++                # Wait for kernel netlink event or 0.5s safety timeout
++                r, _, _ = select.select([nl_sock], [], [], 0.5)
++                if r:
++                    # Drain netlink socket
++                    try:
++                        while True:
++                            data = nl_sock.recv(4096)
++                            if not data:
++                                break
++                    except (BlockingIOError, InterruptedError):
++                        pass
++            else:
++                time.sleep(0.5)
++
++            current_state = is_charging_active()
++            if current_state != last_state:
++                last_state = current_state
++                if current_state:
++                    print("CHARGING", flush=True)
++                else:
++                    print("DISCHARGING", flush=True)
++
++        except Exception as e:
++            time.sleep(0.5)
++
++if __name__ == "__main__":
++    main()

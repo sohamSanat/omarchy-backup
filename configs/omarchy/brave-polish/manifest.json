@@ -5,6 +5,9 @@
   "description": "Dynamically matches Brave-Origin NTP and YouTube/GitHub/Reddit to the active Omarchy system theme. Managed by omarchy-sync-brave. Dark Reader left untouched.",
   "author": "Omarchy",
   "homepage_url": "https://omarchy.org",
+  "chrome_url_overrides": {
+    "newtab": "ntp.html"
+  },
   "permissions": ["topSites"],
   "host_permissions": [],
   "background": {
@@ -20,7 +23,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["global.css", "theme.json"],
+      "resources": ["global.css", "theme.json", "ntp.css", "polish.css", "ntp.html"],
       "matches": ["*://*/*"]
     }
   ]

@@ -147,17 +147,19 @@ def main():
 
     while True:
         now = time.time()
-        if now - last_scan_time > 2.0:
+        if now - last_scan_time > 5.0:
             update_file_handles()
             last_scan_time = now
 
         had_data = False
         for filepath, (f, _) in list(file_handles.items()):
             try:
-                while True:
+                lines_read = 0
+                while lines_read < 50:
                     line = f.readline()
                     if not line:
                         break
+                    lines_read += 1
                     had_data = True
                     for trigger in TRIGGERS:
                         if trigger in line:
@@ -167,7 +169,9 @@ def main():
                 pass
 
         if not had_data:
-            time.sleep(0.04)
+            time.sleep(0.35)
+        else:
+            time.sleep(0.05)
 
 
 if __name__ == "__main__":

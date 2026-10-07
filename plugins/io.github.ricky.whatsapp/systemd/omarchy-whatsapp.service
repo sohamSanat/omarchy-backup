@@ -11,7 +11,7 @@ ExecStart=@PLUGIN_DIR@/bin/omarchy-whatsapp-daemon
 Restart=on-failure
 RestartSec=5
 # The bridge only needs the network, the state dir, and a notification bus.
-PrivateTmp=yes
+PrivateTmp=no
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes

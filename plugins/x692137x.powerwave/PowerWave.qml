@@ -1,12 +1,24 @@
 import QtQuick
 import QtQuick.Effects
 import Quickshell
+import Quickshell.Io
+import Quickshell.Wayland
 import Quickshell.Services.UPower
 
 Item {
     id: root
 
-    property color waveColor: "#FFFFFF"
+    // Theme-adaptive wave color matching Omarchy theme accent
+    property color waveColor: {
+        if (typeof Color !== "undefined" && Color.accent) {
+            return Color.accent
+        }
+        return "#00E5FF"
+    }
+
+    function auraColor(alpha) {
+        return Qt.rgba(root.waveColor.r, root.waveColor.g, root.waveColor.b, alpha)
+    }
 
     property int durationMs: 790
 
@@ -22,33 +34,137 @@ Item {
 
     property int cornerBloomSize: 84
 
-    // Softer perimeter aura than v0.12.
+    // Softer perimeter aura
     property int perimeterDepth: 36
     property int perimeterBlurMax: 12
 
     property bool initialized: false
-    property bool previousOnBattery: UPower.onBattery
+    property bool isCharging: false
+    property real lastTriggerTime: 0
     property int triggerSerial: 0
 
-    Component.onCompleted: {
-        previousOnBattery = UPower.onBattery
-        initialized = true
-        console.log("[PowerWave] v0.13 loaded, onBattery =", UPower.onBattery)
+    function triggerAnimation(source) {
+        var now = Date.now()
+        // Prevent rapid duplicate triggers within 1500ms
+        if (now - root.lastTriggerTime < 1500) {
+            console.log("[PowerWave] Debouncing trigger from", source)
+            return
+        }
+        root.lastTriggerTime = now
+        root.triggerSerial++
+        console.log("[PowerWave] Charging animation triggered! Source:", source, "Serial:", root.triggerSerial)
+    }
+
+    function onChargingStarted(source) {
+        if (!root.isCharging) {
+            root.isCharging = true
+            root.triggerAnimation(source)
+        }
+    }
+
+    function onChargingStopped(source) {
+        if (root.isCharging) {
+            root.isCharging = false
+            console.log("[PowerWave] Charging stopped (Source:", source, ")")
+        }
+    }
+
+    function forceTriggerAnimation() {
+        root.lastTriggerTime = Date.now()
+        root.triggerSerial++
+        console.log("[PowerWave] Force triggered via IPC! Serial:", root.triggerSerial)
+    }
+
+    // Real-time kernel uevent & sysfs monitor
+    Process {
+        id: powerMonitor
+        command: [
+            "python3", "-u",
+            Qt.resolvedUrl("scripts/power-monitor.py").toString().replace(/^file:\/\//, "")
+        ]
+        running: true
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(line) {
+                var text = line.trim()
+                if (text === "STATE:CHARGING") {
+                    root.isCharging = true
+                    root.initialized = true
+                    console.log("[PowerWave] Initial state: charging")
+                } else if (text === "STATE:DISCHARGING") {
+                    root.isCharging = false
+                    root.initialized = true
+                    console.log("[PowerWave] Initial state: discharging")
+                } else if (text === "CHARGING") {
+                    root.onChargingStarted("power-monitor")
+                } else if (text === "DISCHARGING") {
+                    root.onChargingStopped("power-monitor")
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            console.log("[PowerWave] power-monitor exited, restarting...")
+            monitorRestartTimer.restart()
+        }
+    }
+
+    Timer {
+        id: monitorRestartTimer
+        interval: 1000
+        repeat: false
+        onTriggered: {
+            powerMonitor.running = true
+        }
+    }
+
+    // Redundant UPower connections
+    Connections {
+        target: UPower.displayDevice
+        function onStateChanged() {
+            if (!root.initialized) return
+            if (UPower.displayDevice.state === UPowerDeviceState.Charging) {
+                root.onChargingStarted("upower.displayDevice")
+            } else if (UPower.displayDevice.state === UPowerDeviceState.Discharging) {
+                root.onChargingStopped("upower.displayDevice")
+            }
+        }
     }
 
     Connections {
         target: UPower
-
         function onOnBatteryChanged() {
-            if (!root.initialized)
-                return
-
-            if (root.previousOnBattery === true && UPower.onBattery === false) {
-                root.triggerSerial++
-                console.log("[PowerWave] AC connected, trigger =", root.triggerSerial)
+            if (!root.initialized) return
+            if (UPower.onBattery === false) {
+                root.onChargingStarted("upower.onBattery")
+            } else if (UPower.onBattery === true) {
+                root.onChargingStopped("upower.onBattery")
             }
+        }
+    }
 
-            root.previousOnBattery = UPower.onBattery
+    // Safety fallback timer: verifies state periodically
+    Timer {
+        interval: 2000
+        running: true
+        repeat: true
+        onTriggered: {
+            if (UPower.displayDevice && UPower.displayDevice.state === UPowerDeviceState.Charging) {
+                if (!root.isCharging) {
+                    root.onChargingStarted("timer-sync")
+                }
+            }
+        }
+    }
+
+    // IPC interface for testing and manual triggering
+    IpcHandler {
+        target: "x692137x.powerwave"
+        function trigger(): string {
+            root.forceTriggerAnimation()
+            return "triggered"
+        }
+        function status(): string {
+            return root.isCharging ? "charging" : "discharging"
         }
     }
 
@@ -62,6 +178,10 @@ Item {
                 required property var modelData
                 screen: modelData
 
+                WlrLayershell.namespace: "powerwave"
+                WlrLayershell.layer: WlrLayer.Overlay
+                WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
                 anchors {
                     top: true
                     bottom: true
@@ -73,8 +193,8 @@ Item {
                 exclusionMode: ExclusionMode.Ignore
                 mask: Region {}
 
+                // Only visible when active so the layer surface unmaps when animation completes
                 visible: active
-                updatesEnabled: active
 
                 property bool active: false
                 property real progress: 0.0
@@ -149,7 +269,6 @@ Item {
                 }
 
                 function frameEnvelope() {
-                    // Gentle fade in, stable low-level aura, gentle fade out.
                     if (progress < 0.12)
                         return progress / 0.12
 
@@ -174,339 +293,348 @@ Item {
                     return Math.pow(1 - d / range, 1.65)
                 }
 
-                // ============================================================
-                // SUBTLE BLURRED GRADIENT PERIMETER
-                // ============================================================
-
-                Rectangle {
-                    id: topAuraSource
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: root.perimeterDepth
-                    opacity: 0.26 * overlay.frameEnvelope()
-
-                    gradient: Gradient {
-                        orientation: Gradient.Vertical
-                        GradientStop { position: 0.00; color: "#88FFFFFF" }
-                        GradientStop { position: 0.16; color: "#48FFFFFF" }
-                        GradientStop { position: 0.42; color: "#1CFFFFFF" }
-                        GradientStop { position: 0.72; color: "#08FFFFFF" }
-                        GradientStop { position: 1.00; color: "#00FFFFFF" }
-                    }
-                }
-
-                MultiEffect {
-                    source: topAuraSource
-                    anchors.fill: topAuraSource
-                    visible: overlay.active
-                    opacity: 0.62 * overlay.frameEnvelope()
-                    blurEnabled: true
-                    blur: 0.58
-                    blurMax: root.perimeterBlurMax
-                    blurMultiplier: 1.0
-                    autoPaddingEnabled: false
-                }
-
-                Rectangle {
-                    id: bottomAuraSource
-                    anchors.bottom: parent.bottom
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: root.perimeterDepth
-                    opacity: 0.26 * overlay.frameEnvelope()
-
-                    gradient: Gradient {
-                        orientation: Gradient.Vertical
-                        GradientStop { position: 0.00; color: "#00FFFFFF" }
-                        GradientStop { position: 0.28; color: "#08FFFFFF" }
-                        GradientStop { position: 0.58; color: "#1CFFFFFF" }
-                        GradientStop { position: 0.84; color: "#48FFFFFF" }
-                        GradientStop { position: 1.00; color: "#88FFFFFF" }
-                    }
-                }
-
-                MultiEffect {
-                    source: bottomAuraSource
-                    anchors.fill: bottomAuraSource
-                    visible: overlay.active
-                    opacity: 0.62 * overlay.frameEnvelope()
-                    blurEnabled: true
-                    blur: 0.58
-                    blurMax: root.perimeterBlurMax
-                    blurMultiplier: 1.0
-                    autoPaddingEnabled: false
-                }
-
-                Rectangle {
-                    id: leftAuraSource
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    anchors.left: parent.left
-                    width: root.perimeterDepth
-                    opacity: 0.26 * overlay.frameEnvelope()
-
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.00; color: "#88FFFFFF" }
-                        GradientStop { position: 0.16; color: "#48FFFFFF" }
-                        GradientStop { position: 0.42; color: "#1CFFFFFF" }
-                        GradientStop { position: 0.72; color: "#08FFFFFF" }
-                        GradientStop { position: 1.00; color: "#00FFFFFF" }
-                    }
-                }
-
-                MultiEffect {
-                    source: leftAuraSource
-                    anchors.fill: leftAuraSource
-                    visible: overlay.active
-                    opacity: 0.62 * overlay.frameEnvelope()
-                    blurEnabled: true
-                    blur: 0.58
-                    blurMax: root.perimeterBlurMax
-                    blurMultiplier: 1.0
-                    autoPaddingEnabled: false
-                }
-
-                Rectangle {
-                    id: rightAuraSource
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    anchors.right: parent.right
-                    width: root.perimeterDepth
-                    opacity: 0.26 * overlay.frameEnvelope()
-
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.00; color: "#00FFFFFF" }
-                        GradientStop { position: 0.28; color: "#08FFFFFF" }
-                        GradientStop { position: 0.58; color: "#1CFFFFFF" }
-                        GradientStop { position: 0.84; color: "#48FFFFFF" }
-                        GradientStop { position: 1.00; color: "#88FFFFFF" }
-                    }
-                }
-
-                MultiEffect {
-                    source: rightAuraSource
-                    anchors.fill: rightAuraSource
-                    visible: overlay.active
-                    opacity: 0.62 * overlay.frameEnvelope()
-                    blurEnabled: true
-                    blur: 0.58
-                    blurMax: root.perimeterBlurMax
-                    blurMultiplier: 1.0
-                    autoPaddingEnabled: false
-                }
-
-                component EnergyTrail: Item {
-                    required property bool rightSide
-                    required property int bodySize
-                    required property real bodyOpacity
-                    required property real headBias
-
+                // Visual content container: only visible when active
+                Item {
+                    id: visualRoot
                     anchors.fill: parent
+                    visible: overlay.active
+                    opacity: overlay.active ? 1.0 : 0.0
+
+                    // ============================================================
+                    // SUBTLE BLURRED GRADIENT PERIMETER (THEME-ADAPTIVE)
+                    // ============================================================
+
+                    Rectangle {
+                        id: topAuraSource
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: root.perimeterDepth
+                        opacity: 0.26 * overlay.frameEnvelope()
+
+                        gradient: Gradient {
+                            orientation: Gradient.Vertical
+                            GradientStop { position: 0.00; color: root.auraColor(0.53) }
+                            GradientStop { position: 0.16; color: root.auraColor(0.28) }
+                            GradientStop { position: 0.42; color: root.auraColor(0.11) }
+                            GradientStop { position: 0.72; color: root.auraColor(0.03) }
+                            GradientStop { position: 1.00; color: root.auraColor(0.00) }
+                        }
+                    }
+
+                    MultiEffect {
+                        source: topAuraSource
+                        anchors.fill: topAuraSource
+                        visible: overlay.active
+                        opacity: 0.62 * overlay.frameEnvelope()
+                        blurEnabled: true
+                        blur: 0.58
+                        blurMax: root.perimeterBlurMax
+                        blurMultiplier: 1.0
+                        autoPaddingEnabled: false
+                    }
+
+                    Rectangle {
+                        id: bottomAuraSource
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: root.perimeterDepth
+                        opacity: 0.26 * overlay.frameEnvelope()
+
+                        gradient: Gradient {
+                            orientation: Gradient.Vertical
+                            GradientStop { position: 0.00; color: root.auraColor(0.00) }
+                            GradientStop { position: 0.28; color: root.auraColor(0.03) }
+                            GradientStop { position: 0.58; color: root.auraColor(0.11) }
+                            GradientStop { position: 0.84; color: root.auraColor(0.28) }
+                            GradientStop { position: 1.00; color: root.auraColor(0.53) }
+                        }
+                    }
+
+                    MultiEffect {
+                        source: bottomAuraSource
+                        anchors.fill: bottomAuraSource
+                        visible: overlay.active
+                        opacity: 0.62 * overlay.frameEnvelope()
+                        blurEnabled: true
+                        blur: 0.58
+                        blurMax: root.perimeterBlurMax
+                        blurMultiplier: 1.0
+                        autoPaddingEnabled: false
+                    }
+
+                    Rectangle {
+                        id: leftAuraSource
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        width: root.perimeterDepth
+                        opacity: 0.26 * overlay.frameEnvelope()
+
+                        gradient: Gradient {
+                            orientation: Gradient.Horizontal
+                            GradientStop { position: 0.00; color: root.auraColor(0.53) }
+                            GradientStop { position: 0.16; color: root.auraColor(0.28) }
+                            GradientStop { position: 0.42; color: root.auraColor(0.11) }
+                            GradientStop { position: 0.72; color: root.auraColor(0.03) }
+                            GradientStop { position: 1.00; color: root.auraColor(0.00) }
+                        }
+                    }
+
+                    MultiEffect {
+                        source: leftAuraSource
+                        anchors.fill: leftAuraSource
+                        visible: overlay.active
+                        opacity: 0.62 * overlay.frameEnvelope()
+                        blurEnabled: true
+                        blur: 0.58
+                        blurMax: root.perimeterBlurMax
+                        blurMultiplier: 1.0
+                        autoPaddingEnabled: false
+                    }
+
+                    Rectangle {
+                        id: rightAuraSource
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.right: parent.right
+                        width: root.perimeterDepth
+                        opacity: 0.26 * overlay.frameEnvelope()
+
+                        gradient: Gradient {
+                            orientation: Gradient.Horizontal
+                            GradientStop { position: 0.00; color: root.auraColor(0.00) }
+                            GradientStop { position: 0.28; color: root.auraColor(0.03) }
+                            GradientStop { position: 0.58; color: root.auraColor(0.11) }
+                            GradientStop { position: 0.84; color: root.auraColor(0.28) }
+                            GradientStop { position: 1.00; color: root.auraColor(0.53) }
+                        }
+                    }
+
+                    MultiEffect {
+                        source: rightAuraSource
+                        anchors.fill: rightAuraSource
+                        visible: overlay.active
+                        opacity: 0.62 * overlay.frameEnvelope()
+                        blurEnabled: true
+                        blur: 0.58
+                        blurMax: root.perimeterBlurMax
+                        blurMultiplier: 1.0
+                        autoPaddingEnabled: false
+                    }
+
+                    component EnergyTrail: Item {
+                        required property bool rightSide
+                        required property int bodySize
+                        required property real bodyOpacity
+                        required property real headBias
+
+                        anchors.fill: parent
+
+                        Repeater {
+                            model: root.trailCount
+
+                            Rectangle {
+                                required property int index
+
+                                readonly property real d: overlay.distanceForTrail(index)
+                                readonly property real strength: overlay.trailStrength(index)
+                                readonly property point pos: rightSide
+                                    ? overlay.rightPoint(
+                                        overlay.clamp(d, 0, overlay.halfPathLength),
+                                        bodySize / 2
+                                      )
+                                    : overlay.leftPoint(
+                                        overlay.clamp(d, 0, overlay.halfPathLength),
+                                        bodySize / 2
+                                      )
+
+                                readonly property real nearHead:
+                                    Math.max(0, 1 - index / 8.0)
+
+                                width: Math.max(
+                                    root.coreSize,
+                                    bodySize * (0.70 + 0.20 * strength + headBias * nearHead)
+                                )
+                                height: width
+
+                                x: Math.round(pos.x - width / 2)
+                                y: Math.round(pos.y - height / 2)
+
+                                color: root.waveColor
+                                opacity: (
+                                    d >= 0 &&
+                                    d <= overlay.halfPathLength
+                                ) ? bodyOpacity * strength : 0
+
+                                antialiasing: false
+                            }
+                        }
+                    }
+
+                    EnergyTrail {
+                        rightSide: true
+                        bodySize: root.glowOuter
+                        bodyOpacity: 0.075
+                        headBias: 0.12
+                    }
+
+                    EnergyTrail {
+                        rightSide: false
+                        bodySize: root.glowOuter
+                        bodyOpacity: 0.075
+                        headBias: 0.12
+                    }
+
+                    EnergyTrail {
+                        rightSide: true
+                        bodySize: root.glowMid
+                        bodyOpacity: 0.16
+                        headBias: 0.10
+                    }
+
+                    EnergyTrail {
+                        rightSide: false
+                        bodySize: root.glowMid
+                        bodyOpacity: 0.16
+                        headBias: 0.10
+                    }
+
+                    EnergyTrail {
+                        rightSide: true
+                        bodySize: root.glowInner
+                        bodyOpacity: 0.34
+                        headBias: 0.08
+                    }
+
+                    EnergyTrail {
+                        rightSide: false
+                        bodySize: root.glowInner
+                        bodyOpacity: 0.34
+                        headBias: 0.08
+                    }
+
+                    EnergyTrail {
+                        rightSide: true
+                        bodySize: root.coreSize
+                        bodyOpacity: 1.0
+                        headBias: 0.0
+                    }
+
+                    EnergyTrail {
+                        rightSide: false
+                        bodySize: root.coreSize
+                        bodyOpacity: 1.0
+                        headBias: 0.0
+                    }
 
                     Repeater {
-                        model: root.trailCount
-
+                        model: 4
                         Rectangle {
                             required property int index
 
-                            readonly property real d: overlay.distanceForTrail(index)
-                            readonly property real strength: overlay.trailStrength(index)
-                            readonly property point pos: rightSide
-                                ? overlay.rightPoint(
+                            readonly property real d:
+                                overlay.headDistance() - index * 5.2
+                            readonly property point pos:
+                                overlay.rightPoint(
                                     overlay.clamp(d, 0, overlay.halfPathLength),
-                                    bodySize / 2
-                                  )
-                                : overlay.leftPoint(
-                                    overlay.clamp(d, 0, overlay.halfPathLength),
-                                    bodySize / 2
-                                  )
+                                    root.headSize / 2
+                                )
 
-                            readonly property real nearHead:
-                                Math.max(0, 1 - index / 8.0)
-
-                            width: Math.max(
-                                root.coreSize,
-                                bodySize * (0.70 + 0.20 * strength + headBias * nearHead)
-                            )
+                            width: root.headSize - index * 3
                             height: width
-
                             x: Math.round(pos.x - width / 2)
                             y: Math.round(pos.y - height / 2)
-
                             color: root.waveColor
-                            opacity: (
-                                d >= 0 &&
-                                d <= overlay.halfPathLength
-                            ) ? bodyOpacity * strength : 0
-
+                            opacity: d >= 0 && d <= overlay.halfPathLength
+                                ? 0.95 - index * 0.17
+                                : 0
                             antialiasing: false
                         }
                     }
-                }
 
-                EnergyTrail {
-                    rightSide: true
-                    bodySize: root.glowOuter
-                    bodyOpacity: 0.075
-                    headBias: 0.12
-                }
+                    Repeater {
+                        model: 4
+                        Rectangle {
+                            required property int index
 
-                EnergyTrail {
-                    rightSide: false
-                    bodySize: root.glowOuter
-                    bodyOpacity: 0.075
-                    headBias: 0.12
-                }
+                            readonly property real d:
+                                overlay.headDistance() - index * 5.2
+                            readonly property point pos:
+                                overlay.leftPoint(
+                                    overlay.clamp(d, 0, overlay.halfPathLength),
+                                    root.headSize / 2
+                                )
 
-                EnergyTrail {
-                    rightSide: true
-                    bodySize: root.glowMid
-                    bodyOpacity: 0.16
-                    headBias: 0.10
-                }
-
-                EnergyTrail {
-                    rightSide: false
-                    bodySize: root.glowMid
-                    bodyOpacity: 0.16
-                    headBias: 0.10
-                }
-
-                EnergyTrail {
-                    rightSide: true
-                    bodySize: root.glowInner
-                    bodyOpacity: 0.34
-                    headBias: 0.08
-                }
-
-                EnergyTrail {
-                    rightSide: false
-                    bodySize: root.glowInner
-                    bodyOpacity: 0.34
-                    headBias: 0.08
-                }
-
-                EnergyTrail {
-                    rightSide: true
-                    bodySize: root.coreSize
-                    bodyOpacity: 1.0
-                    headBias: 0.0
-                }
-
-                EnergyTrail {
-                    rightSide: false
-                    bodySize: root.coreSize
-                    bodyOpacity: 1.0
-                    headBias: 0.0
-                }
-
-                Repeater {
-                    model: 4
-                    Rectangle {
-                        required property int index
-
-                        readonly property real d:
-                            overlay.headDistance() - index * 5.2
-                        readonly property point pos:
-                            overlay.rightPoint(
-                                overlay.clamp(d, 0, overlay.halfPathLength),
-                                root.headSize / 2
-                            )
-
-                        width: root.headSize - index * 3
-                        height: width
-                        x: Math.round(pos.x - width / 2)
-                        y: Math.round(pos.y - height / 2)
-                        color: root.waveColor
-                        opacity: d >= 0 && d <= overlay.halfPathLength
-                            ? 0.95 - index * 0.17
-                            : 0
-                        antialiasing: false
+                            width: root.headSize - index * 3
+                            height: width
+                            x: Math.round(pos.x - width / 2)
+                            y: Math.round(pos.y - height / 2)
+                            color: root.waveColor
+                            opacity: d >= 0 && d <= overlay.halfPathLength
+                                ? 0.95 - index * 0.17
+                                : 0
+                            antialiasing: false
+                        }
                     }
-                }
 
-                Repeater {
-                    model: 4
+                    // Bottom-center injection pulse
                     Rectangle {
-                        required property int index
+                        readonly property real local:
+                            Math.min(1.0, overlay.progress / 0.085)
 
-                        readonly property real d:
-                            overlay.headDistance() - index * 5.2
-                        readonly property point pos:
-                            overlay.leftPoint(
-                                overlay.clamp(d, 0, overlay.halfPathLength),
-                                root.headSize / 2
-                            )
+                        width: 110 + 150 * local
+                        height: 25 - 9 * local
+                        x: Math.round((overlay.width - width) / 2)
+                        y: overlay.height - height
 
-                        width: root.headSize - index * 3
-                        height: width
-                        x: Math.round(pos.x - width / 2)
-                        y: Math.round(pos.y - height / 2)
                         color: root.waveColor
-                        opacity: d >= 0 && d <= overlay.halfPathLength
-                            ? 0.95 - index * 0.17
+                        opacity: overlay.progress < 0.085
+                            ? 0.58 * (1.0 - local)
                             : 0
-                        antialiasing: false
                     }
-                }
 
-                // Bottom-center injection remains punchy.
-                Rectangle {
-                    readonly property real local:
-                        Math.min(1.0, overlay.progress / 0.085)
+                    // Corner blooms
+                    Rectangle {
+                        readonly property real e: overlay.cornerEnvelope()
+                        width: root.cornerBloomSize
+                        height: root.cornerBloomSize
+                        x: 0
+                        y: overlay.height - height
+                        color: root.waveColor
+                        opacity: 0.11 * e
+                    }
 
-                    width: 110 + 150 * local
-                    height: 25 - 9 * local
-                    x: Math.round((overlay.width - width) / 2)
-                    y: overlay.height - height
+                    Rectangle {
+                        readonly property real e: overlay.cornerEnvelope()
+                        width: root.cornerBloomSize
+                        height: root.cornerBloomSize
+                        x: overlay.width - width
+                        y: overlay.height - height
+                        color: root.waveColor
+                        opacity: 0.11 * e
+                    }
 
-                    color: root.waveColor
-                    opacity: overlay.progress < 0.085
-                        ? 0.58 * (1.0 - local)
-                        : 0
-                }
+                    // Top convergence bloom
+                    Rectangle {
+                        readonly property real local:
+                            overlay.progress < 0.955
+                            ? 0
+                            : (overlay.progress - 0.955) / 0.045
 
-                // Corner blooms slightly softened too.
-                Rectangle {
-                    readonly property real e: overlay.cornerEnvelope()
-                    width: root.cornerBloomSize
-                    height: root.cornerBloomSize
-                    x: 0
-                    y: overlay.height - height
-                    color: root.waveColor
-                    opacity: 0.11 * e
-                }
+                        width: 54 - 28 * local
+                        height: 18 - 7 * local
+                        x: Math.round((overlay.width - width) / 2)
+                        y: 0
 
-                Rectangle {
-                    readonly property real e: overlay.cornerEnvelope()
-                    width: root.cornerBloomSize
-                    height: root.cornerBloomSize
-                    x: overlay.width - width
-                    y: overlay.height - height
-                    color: root.waveColor
-                    opacity: 0.11 * e
-                }
-
-                Rectangle {
-                    readonly property real local:
-                        overlay.progress < 0.955
-                        ? 0
-                        : (overlay.progress - 0.955) / 0.045
-
-                    width: 54 - 28 * local
-                    height: 18 - 7 * local
-                    x: Math.round((overlay.width - width) / 2)
-                    y: 0
-
-                    color: root.waveColor
-                    opacity: overlay.progress < 0.955
-                        ? 0
-                        : (local < 0.32
-                            ? 0.95 * (local / 0.32)
-                            : 0.95 * (1 - (local - 0.32) / 0.68))
+                        color: root.waveColor
+                        opacity: overlay.progress < 0.955
+                            ? 0
+                            : (local < 0.32
+                                ? 0.95 * (local / 0.32)
+                                : 0.95 * (1 - (local - 0.32) / 0.68))
+                    }
                 }
 
                 NumberAnimation {
@@ -531,7 +659,7 @@ Item {
                         waveAnimation.stop()
                         overlay.progress = 0.0
                         overlay.active = true
-                        waveAnimation.start()
+                        waveAnimation.restart()
                     }
                 }
             }

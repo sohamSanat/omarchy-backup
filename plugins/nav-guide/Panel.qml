@@ -16,9 +16,6 @@ Panel {
   moduleName: "nav-guide"
   ipcTarget: "nav-guide"
 
-  implicitWidth: button.implicitWidth
-  implicitHeight: button.implicitHeight
-
   readonly property string icon: "󰞋"
 
   // Base directory of the plugin
@@ -167,7 +164,6 @@ Panel {
   }
 
   Component.onCompleted: {
-    Quickshell.execDetached([root.pluginDir + "/bin/register-keybind"])
     refreshAll()
   }
 
@@ -327,44 +323,76 @@ Panel {
     root.selectedIndex = 0
   }
 
-  // Bar button
-  BarIconButton {
-    id: button
-    anchors.fill: parent
-    bar: root.bar
-    text: root.icon
-    slotSize: Style.bar.statusSlot
-    tooltipText: "Super+K Alternative · " + (root.navigatorRank ? root.navigatorRank.title : "Guide")
-    onPressed: root.toggle()
-  }
-
-  // Flyout Panel
-  KeyboardPanel {
+  // Centered Window Panel
+  PanelWindow {
     id: panel
-    anchorItem: button
-    owner: root
-    bar: root.bar
-    open: root.opened
-    focusTarget: searchField
+    visible: root.opened
+    anchors { top: true; bottom: true; left: true; right: true }
+    color: "transparent"
+    exclusionMode: ExclusionMode.Ignore
 
-    contentWidth: panel.fittedContentWidth(Style.space(560))
-    contentHeight: panel.fittedContentHeight(Style.space(660), 760)
+    WlrLayershell.namespace: "omarchy-nav-guide"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    PanelKeyCatcher {
-      id: keyCatcher
+    // Scrim overlay dimming the backdrop
+    Rectangle {
       anchors.fill: parent
-      blocked: searchField.activeFocus
-      onCloseRequested: root.close()
-      onTabRequested: function(direction) { root.cycleTab(direction) }
-      onMoveRequested: function(dx, dy) {
-        if (dy > 0) root.selectNext()
-        else if (dy < 0) root.selectPrevious()
+      color: Color.menu.scrim
+      opacity: root.opened ? 1.0 : 0.0
+      Behavior on opacity {
+        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
       }
-      onActivateRequested: root.executeSelected()
+    }
 
-      ColumnLayout {
+    // Dismiss on outside click
+    MouseArea {
+      anchors.fill: parent
+      acceptedButtons: Qt.AllButtons
+      onClicked: root.close()
+    }
+
+    // Centered modal card
+    BorderSurface {
+      id: card
+      anchors.centerIn: parent
+      width: Math.min(Style.space(560), panel.width - Style.gapsOut * 2)
+      height: Math.min(Style.space(660), panel.height - Style.gapsOut * 2)
+      color: Color.popups.background
+      borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
+      padding: Style.spacing.popupPadding
+      radius: Style.cornerRadius
+      opacity: root.opened ? 1.0 : 0.0
+
+      Behavior on opacity {
+        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+      }
+
+      // Swallow clicks on the card so outside dismiss doesn't catch them
+      MouseArea {
         anchors.fill: parent
-        spacing: Style.space(8)
+        acceptedButtons: Qt.AllButtons
+      }
+
+      PanelKeyCatcher {
+        id: keyCatcher
+        anchors.fill: parent
+        anchors.topMargin: card.contentTopInset
+        anchors.rightMargin: card.contentRightInset
+        anchors.bottomMargin: card.contentBottomInset
+        anchors.leftMargin: card.contentLeftInset
+        blocked: searchField.activeFocus
+        onCloseRequested: root.close()
+        onTabRequested: function(direction) { root.cycleTab(direction) }
+        onMoveRequested: function(dx, dy) {
+          if (dy > 0) root.selectNext()
+          else if (dy < 0) root.selectPrevious()
+        }
+        onActivateRequested: root.executeSelected()
+
+        ColumnLayout {
+          anchors.fill: parent
+          spacing: Style.space(8)
 
         // 1. Sleek Top Header Row
         RowLayout {
@@ -1065,4 +1093,5 @@ Panel {
       }
     }
   }
+}
 }

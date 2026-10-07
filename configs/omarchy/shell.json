@@ -7,7 +7,7 @@
         {
           "format": "dddd HH:mm",
           "formatAlt": "d MMMM 'W'ww yyyy",
-          "id": "omarchy.clock",
+          "id": "soham.clock",
           "verticalFormat": "HH\n—\nmm"
         },
         {
@@ -29,9 +29,6 @@
       "left": [
         {
           "id": "omarchy.workspaces"
-        },
-        {
-          "id": "nav-guide"
         },
         {
           "id": "soham.pocket-left",
@@ -109,9 +106,12 @@
   ],
   "idle": {
     "lock": 750,
-    "screensaver": 150
+    "screensaver": 600
   },
   "plugins": [
+    {
+      "id": "nav-guide"
+    },
     {
       "id": "krall.switchboard"
     },
@@ -140,12 +140,6 @@
       "id": "io.github.adamcbrewer.voxtype-aura"
     },
     {
-      "id": "io.github.ef-code.omarchy-flow"
-    },
-    {
-      "id": "io.github.ellion369.omagent"
-    },
-    {
       "id": "soham.lock"
     },
     {
@@ -156,6 +150,9 @@
     },
     {
       "id": "soham.easyeffects"
+    },
+    {
+      "id": "soham.omagent"
     }
   ],
   "version": 1

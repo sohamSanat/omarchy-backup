@@ -1,24 +1,28 @@
-diff --git i/WorkspaceSwitcher.qml w/WorkspaceSwitcher.qml
-index fb8e271..74c2132 100644
---- i/WorkspaceSwitcher.qml
+diff --git c/WorkspaceSwitcher.qml w/WorkspaceSwitcher.qml
+index fb8e271..cf72292 100644
+--- c/WorkspaceSwitcher.qml
 +++ w/WorkspaceSwitcher.qml
-@@ -2,6 +2,7 @@ import Quickshell
+@@ -1,7 +1,9 @@
+ import Quickshell
  import Quickshell.Hyprland
  import Quickshell.Wayland
++import Quickshell.Io
  import QtQuick
 +import QtQuick.Layouts
  import qs.Commons
  
  Item {
-@@ -13,6 +14,7 @@ Item {
+@@ -13,34 +15,108 @@ Item {
    property bool revealed: false
    property bool quickSwitchPending: false
    property int selectedIndex: 0
 +  property int selectedWindowIndex: 0
    property var workspaceRows: []
    property var recentWorkspaceIds: []
-   property var retainedPreviewIds: []
-@@ -21,26 +23,99 @@ Item {
+-  property var retainedPreviewIds: []
++  property var previewMap: ({})
+ 
+   readonly property int maxWorkspaceCount: 10
    readonly property int maxWindowsPerWorkspace: 24
    readonly property int maxRetainedPreviewCount: maxWorkspaceCount
  
@@ -133,7 +137,7 @@ index fb8e271..74c2132 100644
    function friendlyAppName(className) {
      var name = String(className || "App")
      var normalized = name.toLowerCase()
-@@ -62,9 +137,12 @@ Item {
+@@ -62,9 +138,12 @@ Item {
        var waylandAppId = window.wayland ? window.wayland.appId : ""
        var at = ipc.at || [monitor ? monitor.x : 0, monitor ? monitor.y : 0]
        var size = ipc.size || [Style.space(300), Style.space(200)]
@@ -146,7 +150,7 @@ index fb8e271..74c2132 100644
          x: at[0],
          y: at[1],
          width: size[0],
-@@ -87,9 +165,6 @@ Item {
+@@ -87,9 +166,6 @@ Item {
    }
  
    function syncWorkspaceModel(rows) {
@@ -156,7 +160,57 @@ index fb8e271..74c2132 100644
      for (var i = 0; i < rows.length; i++) {
        var existingIndex = -1
        for (var j = i; j < workspaceModel.count; j++) {
-@@ -170,8 +245,6 @@ Item {
+@@ -112,12 +188,28 @@ Item {
+       workspaceModel.remove(workspaceModel.count - 1)
+   }
+ 
+-  function screenForMonitorName(name) {
+-    var screens = Quickshell.screens
+-    for (var i = 0; i < screens.length; i++) {
+-      if (screens[i].name === name) return screens[i]
++  function applyManifest(text) {
++    try {
++      var m = JSON.parse(text)
++      var map = {}
++      if (m && m.workspaces) {
++        for (var id in m.workspaces) map[id] = m.workspaces[id].path
++      }
++      root.previewMap = map
++    } catch (e) {}
++  }
++
++  function refreshPreviews() {
++    manifestProc.running = true
++  }
++
++  property Process manifestProc: Process {
++    id: manifestProc
++    command: ["sh", "-c", "cat \"${XDG_CACHE_HOME:-$HOME/.cache}/reomarchy-workspace-switcher/manifest.json\" 2>/dev/null"]
++    stdout: StdioCollector {
++      waitForEnd: true
++      onStreamFinished: root.applyManifest(text)
+     }
+-    return panel.screen
+   }
+ 
+   function rememberWorkspace(id) {
+@@ -131,15 +223,6 @@ Item {
+     root.recentWorkspaceIds = next.slice(0, root.maxWorkspaceCount)
+   }
+ 
+-  function retainPreview(id) {
+-    var next = [id]
+-    for (var i = 0; i < root.retainedPreviewIds.length; i++) {
+-      var existingId = root.retainedPreviewIds[i]
+-      if (existingId !== id) next.push(existingId)
+-    }
+-    root.retainedPreviewIds = next.slice(0, root.maxRetainedPreviewCount)
+-  }
+-
+   function recentWorkspaceRank(id) {
+     for (var i = 0; i < root.recentWorkspaceIds.length; i++) {
+       if (root.recentWorkspaceIds[i] === id) return i
+@@ -170,8 +253,6 @@ Item {
      }
      if (insertAt >= root.maxWorkspaceCount) return
  
@@ -165,7 +219,7 @@ index fb8e271..74c2132 100644
      for (var i = root.maxWorkspaceCount - 1; i > insertAt; i--)
        candidates[i] = candidates[i - 1]
      candidates[insertAt] = candidate
-@@ -191,14 +264,9 @@ Item {
+@@ -191,14 +272,9 @@ Item {
          root.retainWorkspaceCandidate(candidates, workspace)
      }
  
@@ -180,7 +234,26 @@ index fb8e271..74c2132 100644
      rows.sort(function(left, right) { return left.id - right.id })
  
      root.syncWorkspaceModel(rows)
-@@ -257,21 +325,107 @@ Item {
+@@ -228,18 +304,6 @@ Item {
+     return 0
+   }
+ 
+-  function captureFocusedWorkspace() {
+-    if (root.opened || !Hyprland.focusedWorkspace) return
+-
+-    root.rebuild()
+-    var index = root.rowIndexForWorkspace(Hyprland.focusedWorkspace.id)
+-    if (index < 0) return
+-
+-    var card = workspaceList.itemAtIndex(index)
+-    if (card && typeof card.capturePreview === "function")
+-      card.capturePreview()
+-  }
+-
+   function previousWorkspaceIndex(currentId) {
+     for (var i = 0; i < root.recentWorkspaceIds.length; i++) {
+       var recentId = root.recentWorkspaceIds[i]
+@@ -257,21 +321,109 @@ Item {
    function select(direction) {
      if (root.workspaceRows.length < 2) return
      root.selectedIndex = (root.selectedIndex + direction + root.workspaceRows.length) % root.workspaceRows.length
@@ -245,6 +318,7 @@ index fb8e271..74c2132 100644
 +        root.opened = true
 +        root.revealed = true
 +        root.quickSwitchPending = false
++        root.refreshPreviews()
 +      }
 +      var targetId = payload.selectWorkspace
 +      var idx = root.rowIndexForWorkspace(targetId)
@@ -262,7 +336,7 @@ index fb8e271..74c2132 100644
 +        Quickshell.execDetached([
 +          "hyprctl",
 +          "dispatch",
-+          'hl.dsp.focus({ workspace = "' + targetId + '" })'
++          'hl.dsp.focus({ workspace = ' + targetId + ' })'
 +        ])
 +        root.dismiss()
 +      }
@@ -283,6 +357,7 @@ index fb8e271..74c2132 100644
 +        root.searchQuery = "";
 +        root.hudActionText = "SUPER + TAB";
 +        console.log("SWITCHER: opened and revealed set to true!");
++        root.refreshPreviews();
 +        workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Center);
 +        Qt.callLater(function() { keyCatcher.forceActiveFocus(); });
 +      }
@@ -292,7 +367,7 @@ index fb8e271..74c2132 100644
      var direction = payload.direction === -1 ? -1 : 1
  
      if (!root.opened) {
-@@ -282,30 +436,30 @@ Item {
+@@ -282,30 +434,31 @@ Item {
        root.selectedIndex = direction < 0
          ? (currentIndex - 1 + root.workspaceRows.length) % root.workspaceRows.length
          : root.previousWorkspaceIndex(currentId)
@@ -302,6 +377,7 @@ index fb8e271..74c2132 100644
        root.quickSwitchPending = true
 +      root.searchQuery = ""
 +      root.hudActionText = direction > 0 ? "SUPER + TAB" : "SUPER + SHIFT + TAB"
++      root.refreshPreviews()
        revealTimer.restart()
      } else {
 -      // The first press is reserved for a quick MRU switch. If another Tab
@@ -329,7 +405,7 @@ index fb8e271..74c2132 100644
      revealTimer.stop()
    }
  
-@@ -313,7 +467,13 @@ Item {
+@@ -313,7 +466,13 @@ Item {
      root.opened = false
      root.revealed = false
      root.quickSwitchPending = false
@@ -343,7 +419,7 @@ index fb8e271..74c2132 100644
      if (root.shell && typeof root.shell.hide === "function")
        root.shell.hide((root.manifest && root.manifest.id) || "reomarchy.workspace-switcher")
    }
-@@ -324,13 +484,27 @@ Item {
+@@ -324,13 +483,29 @@ Item {
        return
      }
  
@@ -355,12 +431,14 @@ index fb8e271..74c2132 100644
 +
 +    if (root.selectedWindowIndex >= 0 && root.selectedWindowIndex < row.windows.length) {
 +      var win = row.windows[root.selectedWindowIndex]
-+      if (win && win.address) {
++      var winAddr = win.address
++      if (winAddr && winAddr.indexOf("0x") !== 0) winAddr = "0x" + winAddr
++      console.log("SWITCHER: activate win idx:", root.selectedWindowIndex, "address:", winAddr, "class:", win ? win.className : "null")
++      if (winAddr) {
 +        Quickshell.execDetached([
 +          "hyprctl",
 +          "dispatch",
-+          "focuswindow",
-+          "address:" + win.address
++          'hl.dsp.focus({ window = "address:' + winAddr + '" })'
 +        ])
 +        root.dismiss()
 +        return
@@ -371,11 +449,24 @@ index fb8e271..74c2132 100644
        "hyprctl",
        "dispatch",
 -      "hl.dsp.focus({ workspace = \"" + workspaceId + "\" })"
-+      'hl.dsp.focus({ workspace = "' + workspaceId + '" })'
++      'hl.dsp.focus({ workspace = ' + workspaceId + ' })'
      ])
      root.dismiss()
    }
-@@ -351,18 +525,14 @@ Item {
+@@ -339,30 +514,19 @@ Item {
+     root.rebuild()
+     if (Hyprland.focusedWorkspace)
+       root.rememberWorkspace(Hyprland.focusedWorkspace.id)
+-    initialCaptureTimer.restart()
+-  }
+-
+-  Timer {
+-    id: captureTimer
+-    interval: 300
+-    repeat: false
+-    onTriggered: root.captureFocusedWorkspace()
++    root.refreshPreviews()
+   }
  
    Timer {
      id: revealTimer
@@ -395,18 +486,16 @@ index fb8e271..74c2132 100644
        }
        root.revealed = true
        Qt.callLater(function() { keyCatcher.forceActiveFocus() })
-@@ -371,21 +541,34 @@ Item {
- 
-   Timer {
-     id: initialCaptureTimer
--    // Screencopy contexts are initialized asynchronously. The later first
--    // capture avoids racing that setup when the shell itself has just started.
-     interval: 1500
-     repeat: false
-     onTriggered: root.captureFocusedWorkspace()
+@@ -370,12 +534,20 @@ Item {
    }
  
-+  Timer {
+   Timer {
+-    id: initialCaptureTimer
+-    // Screencopy contexts are initialized asynchronously. The later first
+-    // capture avoids racing that setup when the shell itself has just started.
+-    interval: 1500
+-    repeat: false
+-    onTriggered: root.captureFocusedWorkspace()
 +    interval: 1000
 +    running: root.revealed
 +    repeat: true
@@ -421,20 +510,19 @@ index fb8e271..74c2132 100644
 +    running: root.revealed
 +    repeat: true
 +    onTriggered: root.cursorBlink = !root.cursorBlink
-+  }
-+
-   Connections {
-     target: Hyprland
+   }
  
+   Connections {
+@@ -384,18 +556,12 @@ Item {
      function onFocusedWorkspaceChanged() {
        if (Hyprland.focusedWorkspace) {
          root.rememberWorkspace(Hyprland.focusedWorkspace.id)
 -        // Let the compositor finish switching before taking the one cached
 -        // frame. Nothing is captured continuously.
-         captureTimer.restart()
+-        captureTimer.restart()
        }
      }
-@@ -393,9 +576,6 @@ Item {
+   }
  
    PanelWindow {
      id: panel
@@ -444,7 +532,7 @@ index fb8e271..74c2132 100644
      visible: true
      anchors { top: true; bottom: true; left: true; right: true }
      color: "transparent"
-@@ -404,22 +584,61 @@ Item {
+@@ -404,22 +570,61 @@ Item {
      WlrLayershell.keyboardFocus: root.revealed ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
      exclusionMode: ExclusionMode.Ignore
      mask: Region {
@@ -510,7 +598,7 @@ index fb8e271..74c2132 100644
      Item {
        id: keyCatcher
        anchors.fill: parent
-@@ -429,200 +648,606 @@ Item {
+@@ -429,200 +634,586 @@ Item {
        Keys.priority: Keys.BeforeItem
        Keys.onPressed: function(event) {
          if (event.key === Qt.Key_Escape) {
@@ -581,7 +669,7 @@ index fb8e271..74c2132 100644
 +            Quickshell.execDetached([
 +              "hyprctl",
 +              "dispatch",
-+              'hl.dsp.focus({ workspace = "' + targetId + '" })'
++              'hl.dsp.focus({ workspace = ' + targetId + ' })'
 +            ])
 +            root.dismiss()
 +          }
@@ -602,7 +690,7 @@ index fb8e271..74c2132 100644
 +            Quickshell.execDetached([
 +              "hyprctl",
 +              "dispatch",
-+              'hl.dsp.focus({ workspace = "' + targetId + '" })'
++              'hl.dsp.focus({ workspace = ' + targetId + ' })'
 +            ])
 +            root.dismiss()
 +          }
@@ -952,7 +1040,7 @@ index fb8e271..74c2132 100644
 +
 +        readonly property bool isCurrent: index === root.selectedIndex
 +        readonly property bool isHovered: previewMouse.containsMouse
-+        readonly property bool retainPreview: root.retainedPreviewIds.indexOf(row.id) >= 0
++        readonly property string previewSource: root.previewMap[row.id] ? ("file://" + root.previewMap[row.id]) : ""
 +
 +        width: root.cardWidth
 +        height: root.previewHeight + root.labelHeight
@@ -965,25 +1053,6 @@ index fb8e271..74c2132 100644
 +        }
 +        Behavior on opacity {
 +          NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-+        }
-+
-+        function capturePreview() {
-+          root.retainPreview(row.id)
-+          var source = root.screenForMonitorName(row.monitorName)
-+          if (workspaceCapture.captureSource !== source)
-+            workspaceCapture.captureSource = source
-+
-+          if (workspaceCapture.hasContent)
-+            workspaceCapture.captureFrame()
-+          else
-+            workspaceCapture.live = true
-+        }
-+
-+        onRetainPreviewChanged: {
-+          if (!retainPreview) {
-+            workspaceCapture.live = false
-+            workspaceCapture.captureSource = null
-+          }
 +        }
 +
 +        // Preview Box with Cyber Frame & Corners
@@ -999,24 +1068,23 @@ index fb8e271..74c2132 100644
 +            : Util.alpha(Color.foreground, 0.22)
 +          clip: true
 +
-+          // Screencopy Live Screenshot
-+          ScreencopyView {
++          // Static snapshot taken just before the switcher opened
++          Image {
 +            id: workspaceCapture
 +            anchors.fill: parent
 +            anchors.margins: 1
-+            captureSource: null
-+            live: false
-+            paintCursor: false
-+            visible: hasContent
-+            onHasContentChanged: {
-+              if (hasContent && live) live = false
-+            }
++            asynchronous: true
++            cache: false
++            mipmap: true
++            fillMode: Image.PreserveAspectCrop
++            source: workspaceCard.previewSource
++            visible: status === Image.Ready
 +          }
 +
 +          // Fallback Wireframe Window Layout
 +          Item {
 +            anchors.fill: parent
-+            visible: !workspaceCapture.hasContent
++            visible: workspaceCapture.status !== Image.Ready
 +
 +            Repeater {
 +              model: workspaceCard.row.windows
@@ -1282,16 +1350,26 @@ index fb8e271..74c2132 100644
          }
        }
      }
-diff --git i/bindings.lua w/bindings.lua
-index 8483a9e..b092ba9 100644
---- i/bindings.lua
+diff --git c/bindings.lua w/bindings.lua
+index 8483a9e..053bec6 100644
+--- c/bindings.lua
 +++ w/bindings.lua
-@@ -31,23 +31,45 @@ release_watchdog = hl.timer(function()
+@@ -5,6 +5,8 @@ hl.unbind("SUPER + SHIFT + TAB")
+ local workspace_switcher_active = false
+ local workspace_switcher_submap = "reomarchy-workspace-switcher"
+ local release_watchdog
++local plugin_dir = (os.getenv("HOME") or "") .. "/.config/omarchy/plugins/reomarchy.workspace-switcher"
++local capture_cmd = plugin_dir .. "/scripts/capture-previews.sh; "
+ 
+ local function finish_workspace_switcher(commit)
+   if not workspace_switcher_active then return end
+@@ -31,23 +33,53 @@ release_watchdog = hl.timer(function()
  end, { timeout = 100, type = "repeat" })
  release_watchdog:set_enabled(false)
  
 -local function summon_workspace_switcher(direction)
 +local function summon_workspace_switcher(direction, immediate)
++  local was_active = workspace_switcher_active
    if not workspace_switcher_active then
      workspace_switcher_active = true
      hl.dispatch(hl.dsp.submap(workspace_switcher_submap))
@@ -1304,7 +1382,14 @@ index 8483a9e..b092ba9 100644
 +  else
 +    payload = '{\"direction\":' .. direction .. '}'
 +  end
-+  hl.exec_cmd("omarchy-shell shell summon reomarchy.workspace-switcher '" .. payload .. "'")
++  -- Snapshot the visible workspaces BEFORE the overlay appears, so the
++  -- previews show what was actually on screen. While the switcher is already
++  -- open, re-capturing would bake the overlay itself into the thumbnails.
++  if was_active then
++    hl.exec_cmd("omarchy-shell shell summon reomarchy.workspace-switcher '" .. payload .. "'")
++  else
++    hl.exec_cmd(capture_cmd .. "omarchy-shell shell summon reomarchy.workspace-switcher '" .. payload .. "'")
++  end
  end
  
  hl.define_submap(workspace_switcher_submap, function()
@@ -1338,3 +1423,54 @@ index 8483a9e..b092ba9 100644
  
  -- XKB keycodes 133/134 are left/right Command/Super; state 0 is release.
  hl.on("input.keyboard.key", function(keycode, _, state)
+diff --git c/scripts/capture-previews.sh w/scripts/capture-previews.sh
+new file mode 100755
+index 0000000..36ee3f7
+--- /dev/null
++++ w/scripts/capture-previews.sh
+@@ -0,0 +1,45 @@
++#!/usr/bin/env bash
++# Captures one PNG per currently visible workspace (one per monitor) with
++# grim, BEFORE the switcher overlay is summoned, and records them in
++# manifest.json. The QML overlay reads that manifest and paints the PNGs as
++# the per-workspace previews.
++set -u
++export PATH=/usr/bin:/bin
++
++CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/reomarchy-workspace-switcher"
++mkdir -p "$CACHE"
++
++ts=$(date +%s%N)
++pairs=$(mktemp "$CACHE/pairs.XXXXXX")
++trap 'rm -f "$pairs"' EXIT
++
++hyprctl -j monitors | jq -r '.[] | select(.activeWorkspace.id != null) | "\(.name)\t\(.activeWorkspace.id)"' | \
++  while IFS=$'\t' read -r mname wsid; do
++    out="$CACHE/ws-${wsid}-${ts}.png"
++    if grim -o "$mname" "$out" 2>/dev/null; then
++      printf '%s\t%s\t%s\n' "$wsid" "$out" "$mname" >> "$pairs"
++    fi
++  done
++
++old="$CACHE/manifest.json"
++new_ws=$(jq -Rs --argjson ts "$ts" '
++  split("\n") | map(select(length > 0)) | map(split("\t")) |
++  {ts: $ts, workspaces: (map({(.[0]): {path: .[1], monitor: .[2]}}) | add // {})}' "$pairs")
++
++# Merge: fresh captures override, older entries (hidden workspaces) persist
++# until their PNG is pruned below.
++if [ -s "$old" ]; then
++  merged=$(jq -s '.[0] as $o | .[1] as $n |
++    {ts: $n.ts, workspaces: (($o.workspaces // {}) * ($n.workspaces // {}))}' \
++    "$old" <(printf '%s\n' "$new_ws") 2>/dev/null) || merged="$new_ws"
++else
++  merged="$new_ws"
++fi
++
++tmp="$CACHE/manifest.json.tmp"
++printf '%s\n' "$merged" > "$tmp"
++mv "$tmp" "$old"
++
++# Prune captures older than a day so the cache cannot grow forever.
++find "$CACHE" -maxdepth 1 -name 'ws-*.png' -mmin +1440 -delete 2>/dev/null || true
++exit 0

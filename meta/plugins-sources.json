@@ -118,7 +118,9 @@
     "remote": "https://github.com/srineshr1/omarchy-whatsapp.git",
     "commit": "0a9b19cbc7c6e376ecf4dc3d3229543620caecca",
     "has_local_changes": true,
+    "patch": "meta/patches/io.github.ricky.whatsapp.patch",
     "dirty_files": [
+      "?? bin/omarchy-whatsapp-paste-image",
       "?? bin/omarchy-whatsapp-pick-image",
       "M Model.js",
       "M Panel.qml",
@@ -128,7 +130,7 @@
       "M daemon/lib/message.js",
       "M daemon/lib/store.js"
     ],
-    "note": "Enhanced with image attachments, image picker script, and store improvements"
+    "note": "Enhanced with image attachments, clipboard Ctrl+V image pasting (bin/omarchy-whatsapp-paste-image), image picker script, and store improvements"
   },
   "io.github.weedwhitesandwine.obsiduous": {
     "remote": "https://github.com/weedwhitesandwine/obsiduous.git",
@@ -199,10 +201,11 @@
   },
   "nav-guide": {
     "remote": "https://github.com/infinitegithub/omarchy-nav-guide.git",
-    "commit": "91ecd553988c0755abfca5ab34cbc43d2e2f5fc9",
-    "has_local_changes": false,
-    "dirty_files": [],
-    "description": "Super+K Alternative: Enhanced keybindings teacher and context-aware shortcuts window"
+    "base_upstream_commit": "91ecd553988c0755abfca5ab34cbc43d2e2f5fc9",
+    "commit": "95e37096d2fe2b7a4816c7a40974794baef63bb6",
+    "has_local_changes": true,
+    "patch": "meta/patches/nav-guide.patch",
+    "description": "Super+K Alternative: Enhanced keybindings teacher converted to centered overlay modal with background scrim"
   },
   "nguyenn.clipboard": {
     "remote": "https://github.com/htrnguyen-labs/omarchy-clipboard.git",
@@ -249,8 +252,10 @@
     "has_local_changes": true,
     "dirty_files": [
       "M WorkspaceSwitcher.qml",
-      "M bindings.lua"
-    ]
+      "M bindings.lua",
+      "?? scripts/capture-previews.sh"
+    ],
+    "note": "Supercharged with grim pre-capture snapshot engine (scripts/capture-previews.sh) saving high-performance static PNGs to manifest.json, replacing laggy live screencopy frames"
   },
   "ricardosuman.pretty-screenshot": {
     "remote": "https://github.com/ricardosuman/omarchy-pretty-screenshot.git",
@@ -267,6 +272,12 @@
     "dirty_files": [],
     "note": "User customized fork of omarchy.agents"
   },
+  "soham.clock": {
+    "remote": null,
+    "custom": true,
+    "cloned_from": "omarchy.clock",
+    "description": "Customized date/time label and calendar popup widget for navbar left section"
+  },
   "soham.easyeffects": {
     "remote": null,
     "custom": true,
@@ -275,6 +286,12 @@
   "soham.lock": {
     "remote": null,
     "custom": true
+  },
+  "soham.omagent": {
+    "remote": null,
+    "custom": true,
+    "cloned_from": "io.github.ellion369.omagent",
+    "description": "Customized command pill assistant running default coding agent with built-in Local/Web toggle"
   },
   "soham.pocket-left": {
     "remote": null,
@@ -306,8 +323,10 @@
   },
   "x692137x.powerwave": {
     "remote": "https://github.com/sjgng/omarchy-powerwave-plugin.git",
-    "commit": "7d50efe23230e07603792d83827585cb8f918908",
-    "has_local_changes": false,
-    "dirty_files": []
+    "base_upstream_commit": "7d50efe23230e07603792d83827585cb8f918908",
+    "commit": "e22d801267868019685ae2750e599903fa8a36d2",
+    "has_local_changes": true,
+    "patch": "meta/patches/x692137x.powerwave.patch",
+    "note": "Supercharged with netlink/sysfs power-monitor daemon (scripts/power-monitor.py) for real-time AC charging detection and immediate layer unmapping on animation completion"
   }
 }

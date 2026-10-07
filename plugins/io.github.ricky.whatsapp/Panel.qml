@@ -394,7 +394,7 @@ Panel {
 
   Process {
     id: clipboardPaster
-    command: ["bash", "-c", "TMP=\"/tmp/wa-clip-$(date +%s%N).png\"; wl-paste --type image/png > \"$TMP\" 2>/dev/null && [ -s \"$TMP\" ] && echo \"$TMP\" || { rm -f \"$TMP\"; exit 1; }"]
+    command: [root.pluginDir + "/bin/omarchy-whatsapp-paste-image"]
     stdout: SplitParser {
       onRead: function (data) {
         var path = String(data || "").trim()
@@ -405,7 +405,7 @@ Panel {
       }
     }
     function paste() {
-      running = true
+      if (!running) running = true
     }
   }
 
@@ -459,6 +459,12 @@ Panel {
       onActivateRequested: root.activateCursor()
       onTextKey: function (text) {
         if (text === "r" || text === "R") root.refreshChats()
+      }
+      Keys.onPressed: function (event) {
+        if (root.view === "chat" && (event.modifiers & Qt.ControlModifier) && (event.key === Qt.Key_V)) {
+          clipboardPaster.paste()
+          event.accepted = true
+        }
       }
 
       Column {
@@ -1298,7 +1304,9 @@ Panel {
                     text: {
                       if (!root.attachedImagePath) return ""
                       var parts = root.attachedImagePath.split("/")
-                      return parts[parts.length - 1] || "Image attached"
+                      var name = parts[parts.length - 1] || "Image attached"
+                      if (name.indexOf("wa-clip") === 0) return "Clipboard image"
+                      return name
                     }
                     color: root.foreground
                     font.family: root.fontFamily

@@ -1,0 +1,444 @@
+#!/usr/bin/env python3
+"""
+Omarchy Dictation Engine
+- Triggered via Super+H (toggle recording / transcribe)
+- Integrates with Voxtype Aura (io.github.adamcbrewer.voxtype-aura) for HUD visual state
+- Primary backend: Google Gemini 3.5 Transcribe
+- Fallback backend: Local Voxtype Whisper (base.en) if quota is exhausted or offline
+- Post-processes transcript with custom replacements and Omarchy voxtype hook
+- Injects text directly into focused Wayland application using wtype (or clipboard)
+"""
+
+import base64
+import os
+import re
+import signal
+import subprocess
+import sys
+import time
+
+try:
+    import tomllib
+except ImportError:
+    tomllib = None
+
+RUNTIME_DIR = os.path.join(
+    os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"), "omarchy-dictate"
+)
+os.makedirs(RUNTIME_DIR, exist_ok=True)
+
+PID_FILE = os.path.join(RUNTIME_DIR, "recorder.pid")
+AUDIO_FILE = os.path.join(RUNTIME_DIR, "recording.wav")
+QUOTA_MARKER_FILE = os.path.join(RUNTIME_DIR, "quota_exceeded")
+LOG_FILE = os.path.join(RUNTIME_DIR, "dictate.log")
+VOXTYPE_CONFIG = os.path.expanduser("~/.config/voxtype/config.toml")
+VOXTYPE_HOOK = os.path.expanduser("~/.local/bin/omarchy-voxtype-hook")
+
+QUOTA_COOLDOWN_SECONDS = 300  # 5 minutes cooldown before retrying cloud after 429
+
+
+def log(msg: str):
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{ts}] {msg}\n"
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception:
+        pass
+
+
+def aura_ipc(method: str, arg: str = "") -> bool:
+    """Send IPC command to voxtype-aura plugin."""
+    cmd = ["omarchy-shell", "io.github.adamcbrewer.voxtype-aura", method]
+    if arg:
+        cmd.append(arg)
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+        return res.returncode == 0
+    except Exception as e:
+        log(f"aura_ipc failed ({method}): {e}")
+        return False
+
+
+def is_recording_active() -> tuple[bool, int]:
+    if not os.path.isfile(PID_FILE):
+        return False, 0
+    try:
+        with open(PID_FILE, "r") as f:
+            pid = int(f.read().strip())
+        os.kill(pid, 0)
+        return True, pid
+    except (OSError, ValueError):
+        try:
+            os.remove(PID_FILE)
+        except OSError:
+            pass
+        return False, 0
+
+
+def start_recording():
+    active, pid = is_recording_active()
+    if active:
+        log(f"Recording already active with PID {pid}")
+        return
+
+    # Clean previous audio file
+    if os.path.exists(AUDIO_FILE):
+        try:
+            os.remove(AUDIO_FILE)
+        except OSError:
+            pass
+
+    # Launch ffmpeg recording 16kHz mono PCM audio
+    try:
+        proc = subprocess.Popen(
+            [
+                "ffmpeg",
+                "-loglevel",
+                "error",
+                "-y",
+                "-f",
+                "pulse",
+                "-i",
+                "default",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                "-c:a",
+                "pcm_s16le",
+                AUDIO_FILE,
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        with open(PID_FILE, "w") as f:
+            f.write(str(proc.pid))
+        log(f"Started recording (PID {proc.pid})")
+        aura_ipc("setListening")
+    except Exception as e:
+        log(f"Failed to start ffmpeg: {e}")
+        aura_ipc("hide")
+
+
+def stop_and_transcribe():
+    active, pid = is_recording_active()
+    if not active:
+        log("No active recording to stop")
+        aura_ipc("hide")
+        return
+
+    aura_ipc("setTranscribing", "")
+    log(f"Stopping recording PID {pid}")
+
+    # Graceful stop with SIGINT so ffmpeg flushes WAV header
+    try:
+        os.kill(pid, signal.SIGINT)
+    except OSError:
+        pass
+
+    deadline = time.monotonic() + 1.5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+            time.sleep(0.05)
+        except OSError:
+            break
+    else:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+
+    if os.path.exists(PID_FILE):
+        try:
+            os.remove(PID_FILE)
+        except OSError:
+            pass
+
+    # Validate audio file
+    if not os.path.isfile(AUDIO_FILE) or os.path.getsize(AUDIO_FILE) < 1600:
+        log("Audio file too short or missing (<100ms)")
+        aura_ipc("hide")
+        return
+
+    transcript = transcribe_audio(AUDIO_FILE)
+    if not transcript or not transcript.strip():
+        log("Transcription resulted in empty text")
+        aura_ipc("hide")
+        return
+
+    # Post process text
+    processed_text = post_process_text(transcript.strip())
+    log(f"Final transcript: {processed_text!r}")
+
+    # Inject text into focused app
+    inject_text(processed_text)
+    aura_ipc("setDone")
+
+
+def is_quota_exceeded() -> bool:
+    if not os.path.exists(QUOTA_MARKER_FILE):
+        return False
+    try:
+        mtime = os.path.getmtime(QUOTA_MARKER_FILE)
+        if time.time() - mtime < QUOTA_COOLDOWN_SECONDS:
+            return True
+        os.remove(QUOTA_MARKER_FILE)
+    except OSError:
+        pass
+    return False
+
+
+def mark_quota_exceeded():
+    try:
+        with open(QUOTA_MARKER_FILE, "w") as f:
+            f.write(str(time.time()))
+    except Exception:
+        pass
+
+
+def get_gemini_api_key() -> str:
+    """Discover GEMINI_API_KEY from environment or persistent configs."""
+    env_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if env_key:
+        return env_key
+
+    # Common persistent config locations
+    candidates = [
+        os.path.expanduser("~/.config/omarchy/gemini_api_key"),
+        os.path.expanduser("~/.config/gemini/api_key"),
+        os.path.expanduser("~/.gemini/api_key"),
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    k = f.read().strip()
+                if k:
+                    return k
+            except Exception:
+                pass
+
+    # Check omagent configuration
+    omagent_cfg = os.path.expanduser("~/.config/omagent/config.json")
+    if os.path.isfile(omagent_cfg):
+        try:
+            import json
+            with open(omagent_cfg, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            k = data.get("gemini_api_key", "").strip()
+            if k:
+                return k
+        except Exception:
+            pass
+
+    return ""
+
+
+def transcribe_gemini(audio_path: str) -> str:
+    """Transcribe using Gemini 3.5 Transcribe."""
+    api_key = get_gemini_api_key()
+    if not api_key:
+        raise RuntimeError("Missing GEMINI_API_KEY")
+
+    from google import genai
+    from google.genai import types
+
+    with open(audio_path, "rb") as f:
+        audio_bytes = f.read()
+
+    client = genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(
+            timeout=10000,
+            retry_options=types.HttpRetryOptions(attempts=1),
+        ),
+    )
+
+    interaction = client.interactions.create(
+        model="gemini-3.5-transcribe",
+        input=[
+            {
+                "type": "audio",
+                "data": base64.b64encode(audio_bytes).decode("ascii"),
+                "mime_type": "audio/wav",
+            }
+        ],
+        generation_config={"transcription_config": {"mode": "smart"}},
+        store=False,
+    )
+    text = getattr(interaction, "output_text", "")
+    if text:
+        return text.strip()
+    return ""
+
+
+def transcribe_local_voxtype(audio_path: str) -> str:
+    """Fallback transcription using local Voxtype Whisper base.en."""
+    log("Running local voxtype transcribe...")
+    env = os.environ.copy()
+    env["NO_COLOR"] = "1"
+    res = subprocess.run(
+        ["voxtype", "transcribe", audio_path],
+        capture_output=True,
+        text=True,
+        timeout=25,
+        env=env,
+    )
+    ansi_re = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+    clean_output = ansi_re.sub("", res.stdout)
+    noise_re = re.compile(
+        r"^(Loading audio file:|Audio format:|Processing \d+ samples|No speech detected|VAD:|whisper_|\d{4}-\d{2}-\d{2}T|INFO|WARN|DEBUG|ERROR)"
+    )
+    lines = []
+    for line in clean_output.splitlines():
+        line = line.strip()
+        if line and not noise_re.match(line):
+            lines.append(line)
+    return " ".join(lines).strip()
+
+
+def transcribe_audio(audio_path: str) -> str:
+    """Primary: Gemini 3.5 Transcribe. Fallback: Local Voxtype Whisper on quota error or failure."""
+    if not is_quota_exceeded():
+        try:
+            log("Attempting transcription via Gemini 3.5 Transcribe...")
+            text = transcribe_gemini(audio_path)
+            log("Gemini 3.5 Transcribe succeeded")
+            return text
+        except Exception as e:
+            err_str = str(e).upper()
+            err_name = type(e).__name__
+            log(f"Gemini transcription failed ({err_name}): {e}")
+            if any(k in err_str for k in ("429", "RESOURCE_EXHAUSTED", "RATELIMIT", "QUOTA")):
+                log("Quota limit reached! Marking quota exceeded and switching to local Voxtype")
+                mark_quota_exceeded()
+                aura_ipc("setStatus", "Quota Exceeded - Using Local Whisper")
+            else:
+                aura_ipc("setStatus", "Cloud Offline - Using Local Whisper")
+    else:
+        log("Quota marker active; skipping cloud and using local Voxtype")
+        aura_ipc("setStatus", "Quota Exceeded - Using Local Whisper")
+
+    # Fallback to local Voxtype
+    try:
+        return transcribe_local_voxtype(audio_path)
+    except Exception as e:
+        log(f"Local voxtype transcription also failed: {e}")
+        return ""
+
+
+def load_word_replacements() -> dict[str, str]:
+    if not tomllib or not os.path.isfile(VOXTYPE_CONFIG):
+        return {}
+    try:
+        with open(VOXTYPE_CONFIG, "rb") as f:
+            cfg = tomllib.load(f)
+        return cfg.get("text", {}).get("replacements", {})
+    except Exception:
+        return {}
+
+
+def post_process_text(text: str) -> str:
+    replacements = load_word_replacements()
+    for word, target in replacements.items():
+        pattern = r"\b" + re.escape(word) + r"\b"
+        text = re.sub(pattern, target, text, flags=re.IGNORECASE)
+    return text
+
+
+def inject_text(text: str):
+    if not text:
+        return
+
+    # Check if Omarchy Voxtype hook can intercept (e.g. for Omagent)
+    if os.path.isfile(VOXTYPE_HOOK) and os.access(VOXTYPE_HOOK, os.X_OK):
+        try:
+            res = subprocess.run(
+                [VOXTYPE_HOOK],
+                input=text,
+                text=True,
+                capture_output=True,
+                timeout=3,
+            )
+            if res.returncode == 0:
+                output = res.stdout
+                if not output:
+                    # Hook ingested text directly (e.g. into Omagent prompt)
+                    log("Text consumed directly by hook/Omagent")
+                    return
+                text = output
+        except Exception as e:
+            log(f"Hook failed: {e}")
+
+    # Ensure modifier release before typing
+    time.sleep(0.05)
+
+    # Type with wtype
+    try:
+        wtype_res = subprocess.run(
+            ["wtype", "-s", "30", "-d", "1", "--", text],
+            capture_output=True,
+            timeout=10,
+        )
+        if wtype_res.returncode == 0:
+            return
+    except Exception as e:
+        log(f"wtype failed: {e}")
+
+    # Fallback: copy to clipboard
+    try:
+        subprocess.run(["wl-copy", "--", text], timeout=2)
+        log("Fell back to wl-copy")
+    except Exception:
+        pass
+
+
+def cancel_recording():
+    active, pid = is_recording_active()
+    if active:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+    if os.path.exists(PID_FILE):
+        try:
+            os.remove(PID_FILE)
+        except OSError:
+            pass
+    if os.path.exists(AUDIO_FILE):
+        try:
+            os.remove(AUDIO_FILE)
+        except OSError:
+            pass
+    aura_ipc("hide")
+    log("Recording cancelled")
+
+
+def toggle_recording():
+    active, _ = is_recording_active()
+    if active:
+        stop_and_transcribe()
+    else:
+        start_recording()
+
+
+if __name__ == "__main__":
+    action = sys.argv[1] if len(sys.argv) > 1 else "toggle"
+    if action == "toggle":
+        toggle_recording()
+    elif action == "start":
+        start_recording()
+    elif action in ("stop", "submit"):
+        stop_and_transcribe()
+    elif action == "cancel":
+        cancel_recording()
+    elif action == "status":
+        active, pid = is_recording_active()
+        print("recording" if active else "idle")
+    else:
+        print(f"Unknown action: {action}")
+        sys.exit(1)

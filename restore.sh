@@ -558,6 +558,11 @@ find "${USER_HOME}/.config/omarchy/plugins" -type d \( -name scripts -o -name bi
 if [[ -f "${USER_HOME}/.config/omarchy/plugins/soham.easyeffects/purge-preset.sh" ]]; then
   chmod +x "${USER_HOME}/.config/omarchy/plugins/soham.easyeffects/purge-preset.sh"
 fi
+for om_route in "${USER_HOME}/.config/omarchy/plugins"/soham.omagent/omagent-route "${USER_HOME}/.config/omarchy/plugins"/io.github.ellion369.omagent/omagent-route; do
+  if [[ -f "$om_route" ]]; then
+    chmod +x "$om_route"
+  fi
+done
 
 # Install node dependencies for plugins if needed (e.g. whatsapp daemon)
 if [[ -f "${USER_HOME}/.config/omarchy/plugins/io.github.ricky.whatsapp/daemon/package.json" ]]; then
@@ -599,7 +604,7 @@ fi
 if [[ -f "${USER_HOME}/.config/omarchy/plugins/soham.power/scripts/battery-limiter.sh" ]]; then
   ln -nsf "${USER_HOME}/.config/omarchy/plugins/soham.power/scripts/battery-limiter.sh" "${USER_HOME}/.local/bin/omarchy-battery-limit"
 fi
-for wa_bin in omarchy-whatsapp omarchy-whatsapp-ctl omarchy-whatsapp-daemon omarchy-whatsapp-focus omarchy-whatsapp-login omarchy-whatsapp-open omarchy-whatsapp-pick-image; do
+for wa_bin in omarchy-whatsapp omarchy-whatsapp-ctl omarchy-whatsapp-daemon omarchy-whatsapp-focus omarchy-whatsapp-login omarchy-whatsapp-open omarchy-whatsapp-pick-image omarchy-whatsapp-paste-image; do
   if [[ -f "${USER_HOME}/.config/omarchy/plugins/io.github.ricky.whatsapp/bin/${wa_bin}" ]]; then
     ln -nsf "${USER_HOME}/.config/omarchy/plugins/io.github.ricky.whatsapp/bin/${wa_bin}" "${USER_HOME}/.local/bin/${wa_bin}"
   fi

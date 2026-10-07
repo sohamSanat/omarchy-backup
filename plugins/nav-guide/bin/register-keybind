@@ -45,7 +45,3 @@ if ! pgrep -f "nav-guide/bin/hypr-listener" >/dev/null 2>&1; then
   setsid python3 "$DIR/hypr-listener" </dev/null >/dev/null 2>&1 &
 fi
 
-# Send a notification to inform the user
-if command -v omarchy-notification-send >/dev/null 2>&1; then
-  omarchy-notification-send -g "󰞋" "Super+K Alternative active" "Bound to SUPER + K · Classic menu moved to Super+Shift+K" || true
-fi

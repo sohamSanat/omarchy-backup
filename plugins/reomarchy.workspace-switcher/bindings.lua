@@ -5,6 +5,8 @@ hl.unbind("SUPER + SHIFT + TAB")
 local workspace_switcher_active = false
 local workspace_switcher_submap = "reomarchy-workspace-switcher"
 local release_watchdog
+local plugin_dir = (os.getenv("HOME") or "") .. "/.config/omarchy/plugins/reomarchy.workspace-switcher"
+local capture_cmd = plugin_dir .. "/scripts/capture-previews.sh; "
 
 local function finish_workspace_switcher(commit)
   if not workspace_switcher_active then return end
@@ -32,6 +34,7 @@ end, { timeout = 100, type = "repeat" })
 release_watchdog:set_enabled(false)
 
 local function summon_workspace_switcher(direction, immediate)
+  local was_active = workspace_switcher_active
   if not workspace_switcher_active then
     workspace_switcher_active = true
     hl.dispatch(hl.dsp.submap(workspace_switcher_submap))
@@ -43,7 +46,14 @@ local function summon_workspace_switcher(direction, immediate)
   else
     payload = '{\"direction\":' .. direction .. '}'
   end
-  hl.exec_cmd("omarchy-shell shell summon reomarchy.workspace-switcher '" .. payload .. "'")
+  -- Snapshot the visible workspaces BEFORE the overlay appears, so the
+  -- previews show what was actually on screen. While the switcher is already
+  -- open, re-capturing would bake the overlay itself into the thumbnails.
+  if was_active then
+    hl.exec_cmd("omarchy-shell shell summon reomarchy.workspace-switcher '" .. payload .. "'")
+  else
+    hl.exec_cmd(capture_cmd .. "omarchy-shell shell summon reomarchy.workspace-switcher '" .. payload .. "'")
+  end
 end
 
 hl.define_submap(workspace_switcher_submap, function()

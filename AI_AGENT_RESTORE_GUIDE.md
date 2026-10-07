@@ -78,7 +78,7 @@ This repository contains the full snapshot of user customizations:
 - `sakura-mochi`, `aetheria`, `akaito`, `amekoji`, `artzen`, `city-783`, `harbor`, `harbordark`, `nous` (light-mode research theme), `omagen1`, `omarchy_signature`, `quattrocento-light`, `synthetica`.
 
 ### E. Shell Plugins (`plugins/` -> `~/.config/omarchy/plugins/`)
-33 plugins included with complete source code:
+35 plugins included with complete source code:
 - **`krall.switchboard`**: Full-screen grid launcher replacement for default `omarchy.menu`. Supercharged with a Raycast-like intelligence engine (`RaycastSearch.js` with math/base/percentage calculations, currency conversions, timezone converter, FMHY SQLite FTS5 search, and 14 quick links in `~/.config/omarchy/quicklinks.json`), weighted application fuzzy search (`AppSearch.js`), token navigation, and custom scripts (`scripts/enabled`, `scripts/toggle`, `scripts/fmhy-search`, `scripts/fmhy-sync.py`).
 - **`io.github.i12bp8.fmhy-deck`**: FreeMediaHeckYeah Deck bar widget and category panel (14,500+ resources) with seamless Switchboard search integration.
 - **`akshit.island`**: Dynamic Island status widget for media playback, battery level, and active alerts.
@@ -86,6 +86,7 @@ This repository contains the full snapshot of user customizations:
 - **`tiertek.scratchpad-deck`**: Scratchpad deck manager for quick notes and Hyprland scratchpad toggling (`bin/scratchpad-deck`).
 - **`nguyenn.clipboard`**: Clipboard history plugin with custom "Clear attachments" feature and patch.
 - **`reidenxerx.tile-blueprints`**: Dynamic layout blueprint manager bound to `Super + Alt + L`.
+- **`soham.omagent`**: Soham's personal fork/custom command pill overlay assistant running default coding agent with built-in Local/Web toggle, bound to `Alt + Space`.
 - **`io.github.ellion369.omagent`**: Personal AI Assistant with 3-lane multi-intent router (Flash chat, Web search, Herdr coding execution), Nothing Phone PWA intercom bridge, and Quickshell glass HUD overlay. Refactored to `ui_concepts/v1` architecture:
   - Adaptive execution policy (`omagent_core/execution_policy.py`) sizing work envelopes: `needle` (8 tool calls, 10 min), `standard` (24 tool calls, 45 min), and `sword` (64 tool calls, 4 agents, 90 min).
   - Generates 3 structurally unique concept candidates differing across ≥3 design axes (IA, composition, typography, interaction, motion, asset strategy).
@@ -93,14 +94,16 @@ This repository contains the full snapshot of user customizations:
   - Deterministic visual QA (`omagent_core/visual_qa.py`) with multi-viewport render manifests (desktop, tablet, mobile) and local perceptual hashing.
   - Quality engine (`omagent_core/quality/`) strictly gates completion on independent visual review receipts, with bounded 2-pass repair loops.
   - Backed by 137 automated unit and integration tests.
-- **`reomarchy.workspace-switcher`**: Visual workspace switcher with hold-Super activation, live screencopy previews, active window titles, corner marks, bottom navigation HUD (`← →`, `↑ ↓`, `1-9`, `↵`, `esc`), and type-to-filter search (includes custom patch).
+- **`reomarchy.workspace-switcher`**: Visual workspace switcher with hold-Super activation, static snapshot thumbnail caching (`scripts/capture-previews.sh` taking grim snapshots per monitor before overlay opens), active window titles, corner marks, bottom navigation HUD (`← →`, `↑ ↓`, `1-9`, `↵`, `esc`), and type-to-filter search (includes custom patch).
+- **`nav-guide`**: Super+K Alternative converted to centered overlay modal (`PanelWindow`) with background scrim, contextual shortcut suggestions, and process-identity verification.
+- **`soham.clock`**: Customized date/time label and calendar popup for the navbar left section (cloned from `omarchy.clock`).
 - **`kenny.nightlight`**: Night light color temperature bar control widget.
 - **`mryll.printbar`**: Printer hardware status and G2060 maintenance panel (includes custom patch).
 - **`soham.agents`**: Bespoke user-forked Omarchy agents selector.
 - **`mahmoodkhalil57.qrgen`**: QR generator bar widget with dynamic theme foreground/background adaptation (includes custom patch).
 - **`io.github.adamcbrewer.voxtype-aura`**: Native audio recording OSD for Voxtype dictation.
 - **`io.github.weedwhitesandwine.obsiduous`**: Obsidian status & indexing bar widget (includes custom vault path resolution patch).
-- **`x692137x.powerwave`**: PowerWave audio wave animation indicator.
+- **`x692137x.powerwave`**: PowerWave audio charging wave indicator with real-time netlink/sysfs monitoring daemon (`scripts/power-monitor.py`) and instant layer unmapping.
 - **`jrmmhm.pocket`**: Collapsible drawer plugin that groups tray and status widgets together.
 - **`soham.power`**: Fully custom battery limiter & power panel plugin written by Soham.
 - **`charlieras262.floating-bar`**: Custom floating status bar container.
@@ -133,6 +136,8 @@ This repository contains the full snapshot of user customizations:
 - `omarchy-sync-obsidian`: Extracts theme colors and writes them to Obsidian CSS snippets.
 - `omarchy-sync-zen`: Injects Omarchy CSS variables, userChrome.css, userContent.css, and transparency into Zen Browser.
 - `omagent-screenshot`: Headless browser visual verification CLI supporting `--mobile`, `--tablet`, `--full`, with strict `--workspace` confinement and `--allow-host` restrictions.
+- `omarchy-dictate`: Google Gemini 3.5 transcribe dictation engine with Voxtype Aura HUD visual integration, local Whisper fallback, and direct wtype injection (`Super + H`, `Super + Alt + V`).
+- `omarchy-fix-fingerprint`: FPC 10a5:9200 fingerprint controller setup, udev persistence, and suspend/resume reset hook.
 - `powerwave`: CLI helper to inspect and trigger PowerWave charging animations via Quickshell IPC.
 - `omniroute` & `omniroute-desktop`: OmniRoute desktop launchers.
 

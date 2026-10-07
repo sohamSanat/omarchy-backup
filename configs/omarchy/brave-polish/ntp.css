@@ -3,173 +3,298 @@
  * ------------------------------------------------------------------------------
  * Template: ~/.config/omarchy/themed/brave-ntp.css.tpl
  * Compiled to: ~/.local/state/omarchy/current/theme/brave-ntp.css
- * Consumed by: ~/.config/omarchy/brave-polish/ntp.html (companion MV3 ext)
- *
- * NOTE: Brave window stays fully opaque (no compositor transparency).
- * Glass effect here is pure CSS backdrop-filter over the theme background,
- * so loaded websites are never affected.
+ * Consumed by: ~/.config/omarchy/brave-polish/ntp.html
  * ============================================================================== */
 
 :root {
-  --omarchy-bg: #1E3061;
-  --omarchy-fg: #E8EEFF;
-  --omarchy-accent: #4D8FFF;
-  --omarchy-muted: #6080C0;
-  --omarchy-surface: color-mix(in srgb, #E8EEFF 8%, #1E3061);
-  --omarchy-surface-hover: color-mix(in srgb, #E8EEFF 15%, #1E3061);
-  --omarchy-border: color-mix(in srgb, #E8EEFF 18%, transparent);
+  --omarchy-bg: #1B1B1B;
+  --omarchy-fg: #efebdc;
+  --omarchy-accent: #e75a50;
+  --omarchy-muted: #817f68;
+  
+  --omarchy-surface: color-mix(in srgb, #efebdc 7%, #1B1B1B);
+  --omarchy-surface-hover: color-mix(in srgb, #efebdc 14%, #1B1B1B);
+  --omarchy-surface-active: color-mix(in srgb, #efebdc 22%, #1B1B1B);
+  --omarchy-border: color-mix(in srgb, #efebdc 16%, transparent);
+  --omarchy-border-hover: color-mix(in srgb, #e75a50 45%, var(--omarchy-border));
+  --omarchy-accent-subtle: color-mix(in srgb, #e75a50 22%, transparent);
 }
 
-* { box-sizing: border-box; }
-
-/* Footer guard: Brave-Origin injects an attribution footer
- * ("extension name" + Customize button) into extension NTPs.
- * Only Omarchy's own elements may render. */
-body > :not(.omarchy-clock):not(.omarchy-date):not(.omarchy-search):not(.omarchy-topsites):not(script):not(style):not(link) {
-  display: none !important;
-  visibility: hidden !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
 html, body {
-  margin: 0;
-  padding: 0;
-  min-height: 100vh;
-  /* Transparent canvas: Hyprland wallpaper blur bleeds through on empty tabs
-   * (terminal-style glass). Loaded websites stay solid via global.js opaque
-   * base + Dark Reader fork backgrounds. */
-  background: transparent !important;
-  background-color: transparent !important;
-  color: #E8EEFF !important;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--omarchy-bg) !important;
+  color: var(--omarchy-fg);
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  user-select: none;
 }
 
 body {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  gap: 28px;
-  overflow-x: hidden;
-  /* Terminal-style veil: translucent theme background dims bright wallpapers
-   * while Hyprland blur still bleeds through. Keeps light text readable. */
-  background:
-    radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, #4D8FFF 20%, transparent), transparent 70%),
-    radial-gradient(40% 35% at 85% 90%, color-mix(in srgb, #4D8FFF 10%, transparent), transparent 70%),
-    color-mix(in srgb, #1E3061 68%, transparent) !important;
+  padding: 24px 32px;
+  background-color: var(--omarchy-bg) !important;
 }
 
-.omarchy-clock {
-  font-size: 64px;
-  font-weight: 200;
-  letter-spacing: 0.04em;
-  color: #E8EEFF;
-  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+/* --- Top Header Navigation Bar --- */
+.ntp-header {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  animation: fadeIn 0.4s ease-out;
 }
 
-.omarchy-date {
-  margin-top: -20px;
-  font-size: 15px;
-  color: color-mix(in srgb, #E8EEFF 70%, transparent);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.omarchy-search {
-  width: min(560px, 86vw);
+.ntp-badge-space {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 13px 18px;
-  border-radius: 14px;
-  background: color-mix(in srgb, #1E3061 62%, transparent);
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--omarchy-accent-subtle);
+  border: 1px solid color-mix(in srgb, var(--omarchy-accent) 40%, transparent);
+  color: var(--omarchy-accent);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.ntp-badge-space:hover {
+  transform: scale(1.05);
+  background: color-mix(in srgb, var(--omarchy-accent) 35%, transparent);
+}
+
+.ntp-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ntp-pill-theme {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: var(--omarchy-surface);
   border: 1px solid var(--omarchy-border);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--omarchy-fg);
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-.omarchy-search:focus-within {
-  border-color: #4D8FFF;
-  box-shadow: 0 0 0 2px color-mix(in srgb, #4D8FFF 40%, transparent), 0 12px 36px rgba(0, 0, 0, 0.45);
+.ntp-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--omarchy-accent);
+  box-shadow: 0 0 8px var(--omarchy-accent);
+  animation: pulseDot 2.5s infinite ease-in-out;
 }
 
-.omarchy-search input {
-  flex: 1;
+.ntp-pill-clock {
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: var(--omarchy-surface);
+  border: 1px solid var(--omarchy-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--omarchy-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Center Search & Launchpad --- */
+.ntp-center {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+  margin-top: -40px;
+  animation: slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Zen-Style Search Pill */
+.search-container {
+  width: 100%;
+  position: relative;
+}
+
+.search-bar {
+  width: 100%;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  background: var(--omarchy-surface);
+  border: 1px solid var(--omarchy-border);
+  border-radius: 27px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--omarchy-border);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.search-bar:hover {
+  background: var(--omarchy-surface-hover);
+  border-color: var(--omarchy-border-hover);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--omarchy-border-hover);
+}
+
+.search-bar:focus-within {
+  background: color-mix(in srgb, var(--omarchy-bg) 92%, var(--omarchy-fg) 8%);
+  border-color: var(--omarchy-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--omarchy-accent) 35%, transparent), 0 20px 52px rgba(0, 0, 0, 0.65);
+  transform: translateY(-1px);
+}
+
+.search-icon {
+  width: 20px;
+  height: 20px;
+  fill: var(--omarchy-fg);
+  opacity: 0.85;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.search-bar:focus-within .search-icon {
+  opacity: 1;
+  fill: var(--omarchy-accent);
+  transform: scale(1.05);
+}
+
+.search-input {
+  width: 100%;
+  height: 100%;
   background: transparent;
   border: none;
   outline: none;
   font-size: 16px;
-  color: #E8EEFF;
+  color: var(--omarchy-fg);
+  font-family: inherit;
+  font-weight: 500;
 }
 
-.omarchy-search input::placeholder {
-  color: color-mix(in srgb, #E8EEFF 55%, transparent);
+.search-input::placeholder {
+  color: var(--omarchy-accent);
+  opacity: 0.9;
+  font-weight: 400;
+  transition: opacity 0.2s ease;
 }
 
-.omarchy-search .search-icon {
-  color: #4D8FFF;
-  font-size: 17px;
+.search-input:focus::placeholder {
+  opacity: 0.45;
 }
 
-.omarchy-topsites {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  width: min(560px, 86vw);
-}
-
-.omarchy-top {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 16px 8px 12px;
-  border-radius: 12px;
-  text-decoration: none;
-  background: color-mix(in srgb, #1E3061 60%, transparent);
-  border: 1px solid color-mix(in srgb, #E8EEFF 14%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  transition: transform 0.15s ease, border-color 0.15s ease;
-}
-
-.omarchy-top:hover {
-  border-color: #4D8FFF;
-  transform: translateY(-2px);
-}
-
-.omarchy-top img {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-}
-
-.omarchy-top .tile-letter {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+/* --- Quick Launch Shortcuts --- */
+.shortcuts-grid {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 15px;
-  background: color-mix(in srgb, #4D8FFF 25%, #1E3061);
-  color: #E8EEFF;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.omarchy-top span {
-  font-size: 12px;
-  color: #E8EEFF;
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.shortcut-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  min-width: 90px;
+  background: var(--omarchy-surface);
+  border: 1px solid var(--omarchy-border);
+  border-radius: 16px;
+  text-decoration: none;
+  color: var(--omarchy-fg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.shortcut-card:hover {
+  transform: translateY(-3px);
+  background: var(--omarchy-surface-hover);
+  border-color: var(--omarchy-border-hover);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--omarchy-border-hover);
+}
+
+.shortcut-card:active {
+  transform: translateY(-1px);
+  background: var(--omarchy-surface-active);
+}
+
+.shortcut-icon-wrapper {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--omarchy-bg) 70%, transparent);
+  border: 1px solid var(--omarchy-border);
+  transition: transform 0.2s ease;
+}
+
+.shortcut-card:hover .shortcut-icon-wrapper {
+  transform: scale(1.08);
+}
+
+.shortcut-icon-wrapper svg {
+  width: 22px;
+  height: 22px;
+}
+
+.shortcut-label {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  opacity: 0.9;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.shortcut-card:hover .shortcut-label {
+  opacity: 1;
+  color: var(--omarchy-accent);
+}
+
+/* Footer info */
+.ntp-footer {
+  font-size: 11px;
+  color: var(--omarchy-muted);
+  opacity: 0.6;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.3); }
 }

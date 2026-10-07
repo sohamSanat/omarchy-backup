@@ -100,7 +100,11 @@ Branch: `main`
 - **`omagent-screenshot`**: Headless browser screenshot tool (`--mobile`, `--tablet`) for automated visual layout validation.
 - **`omarchy-video-idle-inhibit`**: Daemon preventing idle/screensaver lock during media playback and whenever an active Herdr agent swarm workspace is in focus, with screensaver lock-guard.
 - **`omarchy-pretty-screenshot` (`Print`)**: Beautiful window/desktop screenshot tool with wallpaper and gradient frames (`plugins/ricardosuman.pretty-screenshot`).
-- **`voxtype-dictate-toggle` (`Super + H`, `Ctrl + H`)**: Toggle microphone recording and transcription for Voxtype.
+- **Visual Workspace Switcher Snapshot Engine**: `plugins/reomarchy.workspace-switcher` with `scripts/capture-previews.sh` utilizing grim to take static PNG snapshots per monitor before overlay summoning, eliminating heavy live screencopy lag.
+- **`omarchy-dictate` (`Super + H`, `Super + Alt + V`)**: Primary Google Gemini 3.5 Transcribe dictation engine with Voxtype Aura HUD integration, local Whisper fallback, and direct wtype text injection.
+- **`soham.clock`**: Custom date/time label and calendar popup plugin tailored for the floating navbar.
+- **`soham.omagent`**: Custom command pill overlay assistant running default coding agent with local/web mode toggle (`Alt + Space`).
+- **`omarchy-fix-fingerprint`**: FPC 10a5:9200 fingerprint controller setup, udev persistence, and suspend/resume reset hook.
 - **`cmf-buds-mode`**: CLI utility controlling Active Noise Cancellation modes for Nothing CMF Buds.
 - **`omarchy-dictionary-lookup` (`Super + D`)**: Fast dictionary popup for active text selections with automatic clipboard and primary selection extraction.
 - **`omarchy-sync-vlc`**: Dynamically writes 4-stop slider gradient and dark/light palette into `~/.config/vlc/vlcrc`.
@@ -109,9 +113,11 @@ Branch: `main`
 - **Wayland Idle Inhibitors**: `omarchy-wayland-inhibit` (compiled C Wayland protocol client) and `omarchy-video-idle-inhibit` (MPRIS and PipeWire audio stream daemon with screensaver lock-guard).
 - **Sunshine & Tablet Mode Streaming**: `bin/tablet-mode` and `configs/sunshine/` enabling zero-latency wireless streaming and virtual display scaling to Redmi Pad SE via `HEADLESS-1` (1200x2000 90° portrait or 2000x1200 landscape).
 - **EasyEffects Audio Ecosystem & Navbar Switcher**: Full integration including `plugins/soham.easyeffects/` (with `purge-preset.sh`, stock baseline protection, mouse-wheel scrolling, and modal confirmation), all 6 curated IEM Equalizer presets in `configs/easyeffects/output/` (Diablo, Daybreak, Nightfall, Maestro Mini, Nightingale, Tangzu Wan'er Stock), hardware routing autoload rules in `configs/easyeffects/autoload/output/`, database configurations in `configs/easyeffects/db/`, autostart entry `configs/autostart/easyeffects.desktop`, and systemd service `configs/systemd/user/easyeffects.service`.
-- **Omarchy Flow Voice Dictation**: `plugins/io.github.ef-code.omarchy-flow` and `bin/flowctl` providing ultra-low-latency Gemini 3.5 transcribe & fallback with character injection guards.
+- **Navigation Guide Modal**: `plugins/nav-guide` centered overlay modal with background scrim suggesting context-aware shortcuts (`Super + K`).
+- **PowerWave Charging Indicator**: `plugins/x692137x.powerwave` with real-time netlink/sysfs power monitoring daemon and `bin/powerwave` CLI trigger.
+- **WhatsApp Bridge & Clipboard Pasting**: `plugins/io.github.ricky.whatsapp` with Ctrl+V clipboard image paste integration (`bin/omarchy-whatsapp-paste-image`).
 - **Antigravity Interactive Question Ting**: `configs/antigravity-app/gemini-config/hooks/ring-ting.sh` and `sounds/ting.wav` ringing an audio chime and terminal bell whenever interactive choices (`ask_question`) await user input.
-- **Agy Command Watcher**: `bin/agy-ting-watcher` tailing logs to emit audio chimes upon background command completion.
+- **Agy Command Watcher**: `bin/agy-ting-watcher` tailing logs to emit audio chimes upon background command completion (CPU-optimized polling).
 - **Wayscrollshot & IPv4 Library**: `bin/wayscrollshot` paired with `lib/force_ipv4.so` (`lib/force_ipv4.c`) for reliable full-page scrolling Wayland screenshots over IPv4 networks.
 - **Screensaver Launcher**: `omarchy-launch-screensaver` with intelligent audio and stay-awake inhibition.
 - **Systemd User Units**: Daemons for EasyEffects, Omagent mobile bridge, crash monitor, video inhibitor, WhatsApp bridge, and cleanup timers.

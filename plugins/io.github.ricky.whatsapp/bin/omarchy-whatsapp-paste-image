@@ -1,0 +1,66 @@
+#!/bin/bash
+set -euo pipefail
+
+# Ensure wl-paste is available
+command -v wl-paste >/dev/null 2>&1 || exit 1
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/omarchy-whatsapp/clipboard"
+mkdir -p "$CACHE_DIR" 2>/dev/null || CACHE_DIR="/tmp"
+
+# Clean up temporary clipboard files older than 2 days
+find "$CACHE_DIR" -maxdepth 1 -name "wa-clip-*" -mtime +2 -delete 2>/dev/null || true
+
+TYPES="$(wl-paste --list-types 2>/dev/null || true)"
+[[ -z "$TYPES" ]] && exit 1
+
+# 1. Check for text/uri-list (e.g. copied image file from a file manager or web browser)
+if echo "$TYPES" | grep -qx "text/uri-list"; then
+  while IFS= read -r line; do
+    line="$(echo "$line" | tr -d '\r\n')"
+    if [[ "$line" =~ ^file:// ]]; then
+      file_path="${line#file://}"
+      # URL-decode the path in case spaces or special chars were escaped
+      decoded_path="$(python3 -c "import urllib.parse, sys; print(urllib.parse.unquote(sys.argv[1]))" "$file_path" 2>/dev/null || echo "$file_path")"
+      if [[ -f "$decoded_path" ]]; then
+        ext="${decoded_path##*.}"
+        ext="$(echo "$ext" | tr '[:upper:]' '[:lower:]')"
+        case "$ext" in
+          png|jpg|jpeg|webp|gif)
+            echo "$decoded_path"
+            exit 0
+            ;;
+        esac
+      fi
+    fi
+  done < <(wl-paste --type text/uri-list 2>/dev/null || true)
+fi
+
+# 2. Check for raw image MIME data from clipboard
+MIME=""
+EXT=""
+if echo "$TYPES" | grep -qx "image/png"; then
+  MIME="image/png"
+  EXT="png"
+elif echo "$TYPES" | grep -qx "image/jpeg"; then
+  MIME="image/jpeg"
+  EXT="jpg"
+elif echo "$TYPES" | grep -qx "image/webp"; then
+  MIME="image/webp"
+  EXT="webp"
+elif echo "$TYPES" | grep -qx "image/gif"; then
+  MIME="image/gif"
+  EXT="gif"
+fi
+
+if [[ -n "$MIME" && -n "$EXT" ]]; then
+  DEST="$CACHE_DIR/wa-clip-$(date +%s%N).$EXT"
+  if wl-paste --type "$MIME" > "$DEST" 2>/dev/null && [[ -s "$DEST" ]]; then
+    echo "$DEST"
+    exit 0
+  else
+    rm -f "$DEST"
+    exit 1
+  fi
+fi
+
+exit 1

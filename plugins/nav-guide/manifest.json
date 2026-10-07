@@ -9,16 +9,10 @@
   "repository": "https://github.com/infinitegithub/omarchy-nav-guide",
   "description": "An enhanced Super+K window that teaches you Omarchy keybindings by suggesting shortcuts based on what you have open.",
   "kinds": [
-    "bar-widget"
+    "overlay"
   ],
+  "keepLoaded": true,
   "entryPoints": {
-    "barWidget": "Panel.qml"
-  },
-  "barWidget": {
-    "displayName": "Super+K Alternative",
-    "description": "Enhanced Super+K window that suggests shortcuts for your open apps",
-    "category": "Utilities",
-    "allowMultiple": false,
-    "defaultSection": "center"
+    "overlay": "Panel.qml"
   }
 }

@@ -9,11 +9,11 @@ the same treatment Zen Browser gets, adapted for Chromium constraints.
   in `manifest.json`, generated from the Omarchy palette
   (`~/.config/omarchy/themed/brave-manifest.json.tpl`). Toolbar = background,
   frame = darker background, active tab text = foreground, accents = accent.
-- **New TabPage (`ntp.html`)**: transparent canvas + glass clock, search,
+- **New TabPage (`ntp.html`)**: solid theme canvas with glass clock, search,
   and top-sites, themed via `ntp.css` (compiled from
-  `~/.config/omarchy/themed/brave-ntp.css.tpl`). Hyprland wallpaper blur
-  bleeds through on empty tabs (terminal-style glass); loaded websites stay
-  solid. Re-read on every new tab → hot-applies, no restart.
+  `~/.config/omarchy/themed/brave-ntp.css.tpl`). The window stays fully
+  opaque (Hyprland `1.0 1.0`) so websites render crisp. Re-read on every
+  new tab → hot-applies, no restart.
 - **NTP delivery without override**: the extension deliberately declares NO
   `chrome_url_overrides` — Brave-Origin brands every extension-provided NTP
   with an unremovable `NewTabFooterWebView` attribution bar (proven: absent

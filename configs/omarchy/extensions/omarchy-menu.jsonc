@@ -92,14 +92,20 @@
 
 ,
 
+,
+
+,
+
+,
+
   // BEGIN OMARCHY SENSEI (managed by omarchy-sensei setup)
   "learn.herdr-keybindings": {"parent":"learn","label":"Herdr","action":"omarchy-sensei run --action 'herdr-keybindings' --title 'Herdr keybindings' --shortcut 'SUPER CTRL + K' -- 'omarchy-menu-herdr-keybindings'","icon":""},
-  "learn.keybindings": {"parent":"learn","label":"Keybindings","action":"omarchy-sensei run --action 'keybindings' --title 'Keybindings' --shortcut 'SUPER + K' -- 'omarchy-menu-keybindings'","icon":""},
+  "learn.keybindings": {"parent":"learn","label":"Keybindings","action":"omarchy-sensei run --action 'classic-keybindings-menu' --title 'Classic Keybindings Menu' --shortcut 'SUPER SHIFT + K' -- 'omarchy-menu-keybindings'","icon":""},
   "learn.tmux-keybindings": {"parent":"learn","label":"Tmux","action":"omarchy-sensei run --action 'tmux-keybindings' --title 'Tmux keybindings' --shortcut 'SUPER ALT + K' -- 'omarchy-menu-tmux-keybindings'","icon":""},
   "style.background": {"parent":"style","label":"Background","action":"omarchy-sensei run --action 'background-switcher' --title 'Background switcher' --shortcut 'SUPER CTRL + SPACE' -- 'background=$(omarchy-theme-bg-switcher); [[ -n $background ]] && omarchy-theme-bg-set \"$background\"'","icon":"","aliases":["background","wallpaper"]},
   "system.lock": {"parent":"system","label":"Lock","action":"omarchy-sensei run --action 'lock-system' --title 'Lock system' --shortcut 'SUPER CTRL + L' -- 'omarchy-system-lock'","icon":""},
   "trigger.capture.color": {"parent":"trigger.capture","label":"Color","action":"omarchy-sensei run --action 'color-picker' --title 'Color picker' --shortcut 'SUPER + PRINT' -- 'pkill hyprpicker || hyprpicker -a'","icon":"󰃉"},
-  "trigger.capture.screenshot": {"parent":"trigger.capture","label":"Screenshot","action":"omarchy-sensei run --action 'screenshot' --title 'Screenshot' --shortcut 'PRINT' -- '~/.config/omarchy/plugins/ricardosuman.pretty-screenshot/omarchy-pretty-screenshot'","icon":""},
+  "trigger.capture.screenshot": {"parent":"trigger.capture","label":"Screenshot","action":"omarchy-sensei run --action 'screenshot' --title 'Screenshot' --shortcut 'PRINT' -- 'omarchy-capture-screenshot'","icon":""},
   "trigger.capture.text": {"parent":"trigger.capture","label":"Text","action":"omarchy-sensei run --action 'extract-text-ocr-from-screenshot' --title 'Extract text (OCR) from screenshot' --shortcut 'SUPER CTRL + PRINT' -- 'omarchy-capture-text'","icon":"󰴑"},
   "trigger.emoji": {"parent":"trigger","label":"Emoji","action":"omarchy-sensei run --action 'emojis' --title 'Emojis' --shortcut 'SUPER CTRL + E' -- 'omarchy-menu-emoji'","icon":"","aliases":["emoji","emojis"]},
   "trigger.hardware.laptop-display": {"parent":"trigger.hardware","label":"Laptop Display","action":"omarchy-sensei run --action 'toggle-laptop-display' --title 'Toggle laptop display' --shortcut 'SUPER CTRL + Delete' -- 'omarchy-hyprland-monitor-internal toggle'","icon":"󰛧","when":"omarchy-hw-laptop"},
@@ -116,7 +122,6 @@
   "trigger.toggle.window-gaps": {"parent":"trigger.toggle","label":"Window Gaps","action":"omarchy-sensei run --action 'toggle-window-gaps' --title 'Toggle window gaps' --shortcut 'SUPER SHIFT + BACKSPACE' -- 'omarchy-hyprland-window-gaps-toggle'","icon":""},
   "trigger.toggle.workspace-layout": {"parent":"trigger.toggle","label":"Workspace Layout","action":"omarchy-sensei run --action 'toggle-workspace-layout' --title 'Toggle workspace layout' --shortcut 'SUPER + L' -- 'omarchy-hyprland-workspace-layout-toggle'","icon":"󱂬"},
   "trigger.transcode": {"parent":"trigger","label":"Transcode","action":"omarchy-sensei run --action 'transcode' --title 'Transcode' --shortcut 'SUPER CTRL + PERIOD' -- 'omarchy-transcode'","icon":"󰧸"},
-  "setup.tile-blueprints.open": {"parent":"setup.tile-blueprints","label":"Edit blueprints","action":"omarchy-sensei run --action 'tile-blueprints' --title 'Tile blueprints' --shortcut 'SUPER ALT + L' -- 'omarchy-shell shell toggle reidenxerx.tile-blueprints '\\''{}'\\'''","icon":"󰕴"},
   // END OMARCHY SENSEI,
   "style.theme": {"icon":"󰸌","label":"Theme","aliases":["theme","themes"],"action":"omarchy-shell themebook pick"}
 }

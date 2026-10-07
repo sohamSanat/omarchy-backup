@@ -76,8 +76,4 @@ except ProcessLookupError:
     pass
 PYEOF
   rm -f "$LOCK_FILE" 2>/dev/null || true
-
-  if command -v omarchy-notification-send >/dev/null 2>&1; then
-    omarchy-notification-send -g "󰞋" "Navigation Guide keybindings restored to defaults" || true
-  fi
 fi

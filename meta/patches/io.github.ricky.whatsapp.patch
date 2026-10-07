@@ -1,0 +1,1939 @@
+diff --git c/.gitignore w/.gitignore
+index 862bde3..d132c18 100644
+--- c/.gitignore
++++ w/.gitignore
+@@ -1,3 +1,4 @@
+ node_modules/
+ *.log
+ *.tmp
++__pycache__/
+diff --git c/Model.js w/Model.js
+index 4932152..765ddbd 100644
+--- c/Model.js
++++ w/Model.js
+@@ -93,6 +93,19 @@ function chatPreview(chat) {
+   return text
+ }
+ 
++function quotedTitle(quoted) {
++  if (!quoted) return ""
++  if (quoted.fromMe) return "You"
++  return quoted.senderName || "Message"
++}
++
++function quotedPreview(quoted) {
++  if (!quoted) return ""
++  var text = oneLine(quoted.text)
++  if (!text && quoted.imagePath) return "Photo"
++  return truncate(text, 50)
++}
++
+ // Baileys status enum: 1 pending, 2 server ack, 3 delivered, 4 read, 5 played.
+ // Two nf-fa-check glyphs, not nf-fa-check-double: that codepoint is a copy
+ // icon in a lot of Nerd Fonts, so "delivered" was rendering as one tick.
+@@ -234,5 +247,8 @@ function formatMessageText(text, linkColor) {
+   return docPrefix + result
+ }
+ 
+-
+-
++function copyableText(text) {
++  if (!text) return ""
++  var raw = String(text)
++  return raw.replace(/^[\uf000-\uf2e0]\s*/, "")
++}
+diff --git c/Panel.qml w/Panel.qml
+index 419bf54..e67733f 100644
+--- c/Panel.qml
++++ w/Panel.qml
+@@ -32,6 +32,9 @@ Panel {
+   property bool refreshing: false
+   property string peekImagePath: ""
+   readonly property bool peekActive: peekImagePath.length > 0
++  property var replyingTo: null
++  property string highlightedMessageId: ""
++  property string attachedImagePath: ""
+ 
+   readonly property var chats: client ? client.chats : []
+   readonly property bool daemonOnline: client ? client.daemonOnline : false
+@@ -79,6 +82,9 @@ Panel {
+     root.activeJid = jid
+     root.activeChat = null
+     root.messages = []
++    root.replyingTo = null
++    root.highlightedMessageId = ""
++    root.attachedImagePath = ""
+     root.pinToLatest = true
+     root.view = "chat"
+     root.client.loadMessages(jid, root.messageLimit)
+@@ -97,6 +103,9 @@ Panel {
+     root.activeJid = ""
+     root.activeChat = null
+     root.messages = []
++    root.replyingTo = null
++    root.highlightedMessageId = ""
++    root.attachedImagePath = ""
+     composer.text = ""
+     Qt.callLater(function () { keyCatcher.forceActiveFocus() })
+   }
+@@ -136,15 +145,69 @@ Panel {
+     if (chat) root.selectChat(chat.jid)
+   }
+ 
++  function startReply(msg) {
++    if (!msg) return
++    root.replyingTo = msg
++    Qt.callLater(function () { composer.forceActiveFocus() })
++  }
++
++  function cancelReply() {
++    root.replyingTo = null
++  }
++
++  function jumpToMessage(messageId) {
++    if (!messageId) return
++    for (var i = 0; i < root.messages.length; i++) {
++      if (root.messages[i] && root.messages[i].id === messageId) {
++        root.pinToLatest = false
++        messageList.positionViewAtIndex(i, ListView.Center)
++        root.highlightedMessageId = messageId
++        highlightTimer.restart()
++        return
++      }
++    }
++  }
++
++  function clearAttachedImage() {
++    root.attachedImagePath = ""
++  }
++
++  function copyMessage(msg) {
++    if (!msg) return
++    var rawText = msg.text || ""
++    var img = msg.imagePath || ""
++    var isPhotoOnly = img && (!rawText || Model.isPhotoPlaceholder(rawText))
++
++    if (isPhotoOnly) {
++      Quickshell.execDetached(["bash", "-c", "if command -v wl-copy >/dev/null 2>&1; then wl-copy < " + Util.shellQuote(img) + "; fi"])
++    } else {
++      var textToCopy = Model.copyableText(rawText)
++      if (!textToCopy && img) {
++        Quickshell.execDetached(["bash", "-c", "if command -v wl-copy >/dev/null 2>&1; then wl-copy < " + Util.shellQuote(img) + "; fi"])
++      } else if (textToCopy) {
++        Quickshell.execDetached(["bash", "-c", "if command -v wl-copy >/dev/null 2>&1; then printf %s " + Util.shellQuote(textToCopy) + " | wl-copy; fi"])
++      }
++    }
++  }
++
++  function copyImage(path) {
++    if (!path) return
++    Quickshell.execDetached(["bash", "-c", "if command -v wl-copy >/dev/null 2>&1; then wl-copy < " + Util.shellQuote(path) + "; fi"])
++  }
++
+   function sendReply() {
+     var text = composer.text
+-    if (!text || !text.trim().length) return
++    var img = root.attachedImagePath
++    if ((!text || !text.trim().length) && (!img || !img.length)) return
+     if (!root.client || !root.client.ready) {
+       root.statusLine = "Not connected to WhatsApp"
+       return
+     }
+-    if (root.client.sendMessage(root.activeJid, text)) {
++    var quotedId = root.replyingTo ? root.replyingTo.id : undefined
++    if (root.client.sendMessage(root.activeJid, text, quotedId, img)) {
+       composer.text = ""
++      root.attachedImagePath = ""
++      root.replyingTo = null
+       root.statusLine = ""
+       typingTimer.stop()
+       root.client.setTyping(root.activeJid, "paused")
+@@ -248,6 +311,10 @@ Panel {
+       if (root.refreshing && root.view !== "chat") root.finishRefresh()
+     }
+ 
++    function onChatsEpochChanged() {
++      if (root.refreshing && root.view !== "chat") root.finishRefresh()
++    }
++
+     function onMessageArrived(jid, message, chat) {
+       if (jid !== root.activeJid) return
+       if (chat) root.activeChat = chat
+@@ -308,6 +375,40 @@ Panel {
+     }
+   }
+ 
++  Process {
++    id: imagePickerProcess
++    command: [root.pluginDir + "/bin/omarchy-whatsapp-pick-image"]
++    stdout: SplitParser {
++      onRead: function (data) {
++        var path = String(data || "").trim()
++        if (path.length > 0) {
++          root.attachedImagePath = path
++          Qt.callLater(function () { composer.forceActiveFocus() })
++        }
++      }
++    }
++    function pick() {
++      if (!running) running = true
++    }
++  }
++
++  Process {
++    id: clipboardPaster
++    command: [root.pluginDir + "/bin/omarchy-whatsapp-paste-image"]
++    stdout: SplitParser {
++      onRead: function (data) {
++        var path = String(data || "").trim()
++        if (path.length > 0) {
++          root.attachedImagePath = path
++          Qt.callLater(function () { composer.forceActiveFocus() })
++        }
++      }
++    }
++    function paste() {
++      if (!running) running = true
++    }
++  }
++
+   // Coalesces keystrokes into one "composing" presence, then one "paused" a
+   // few seconds after the user stops.
+   Timer {
+@@ -324,6 +425,13 @@ Panel {
+     onTriggered: root.finishRefresh()
+   }
+ 
++  Timer {
++    id: highlightTimer
++    interval: 1500
++    repeat: false
++    onTriggered: root.highlightedMessageId = ""
++  }
++
+   KeyboardPanel {
+     id: panel
+     anchorItem: root.anchorItem
+@@ -352,6 +460,12 @@ Panel {
+       onTextKey: function (text) {
+         if (text === "r" || text === "R") root.refreshChats()
+       }
++      Keys.onPressed: function (event) {
++        if (root.view === "chat" && (event.modifiers & Qt.ControlModifier) && (event.key === Qt.Key_V)) {
++          clipboardPaster.paste()
++          event.accepted = true
++        }
++      }
+ 
+       Column {
+         id: content
+@@ -690,7 +804,7 @@ Panel {
+               Item {
+                 id: bubbleRow
+                 width: parent.width
+-                implicitHeight: bubble.height
++                implicitHeight: Math.max(bubble.height, actionButtons.implicitHeight)
+                 height: implicitHeight
+ 
+                 readonly property real pad: Style.space(8)
+@@ -699,9 +813,9 @@ Panel {
+                 // content to both bubble edges instead would make the bubble's
+                 // width depend on content that depends on the bubble: a binding
+                 // loop, which collapses every bubble to a few pixels.
+-                readonly property real maxInner: Math.max(Style.space(60), bubbleRow.width * 0.82 - bubbleRow.pad * 2)
+-                readonly property bool hasImage: messageRow.modelData.imagePath
+-                  && String(messageRow.modelData.imagePath).length > 0
++                readonly property real maxInner: Math.max(Style.space(60), bubbleRow.width * 0.76 - bubbleRow.pad * 2)
++                readonly property bool hasImage: !!(messageRow.modelData && messageRow.modelData.imagePath
++                  && String(messageRow.modelData.imagePath).length > 0)
+                 readonly property bool showBody: {
+                   var text = messageRow.modelData.text || ""
+                   if (!text.length) return false
+@@ -711,6 +825,120 @@ Panel {
+                 readonly property bool showSender: !messageRow.modelData.fromMe
+                   && root.activeChat !== null
+                   && root.activeChat.isGroup === true
++                readonly property bool canCopy: !!(messageRow.modelData && (
++                  String(messageRow.modelData.text || "").trim().length > 0 ||
++                  String(messageRow.modelData.imagePath || "").length > 0
++                ))
++
++                MouseArea {
++                  id: bubbleRowHover
++                  anchors.fill: parent
++                  hoverEnabled: true
++                  acceptedButtons: Qt.RightButton
++                  cursorShape: Qt.ArrowCursor
++                  onClicked: function (mouse) {
++                    if (mouse.button === Qt.RightButton) {
++                      root.startReply(messageRow.modelData)
++                    }
++                  }
++                }
++
++                Row {
++                  id: actionButtons
++                  visible: bubbleRowHover.containsMouse || replyBtnMouse.containsMouse || copyBtnMouse.containsMouse
++                  spacing: Style.space(4)
++                  anchors.verticalCenter: bubble.verticalCenter
++                  anchors.left: messageRow.modelData.fromMe ? undefined : bubble.right
++                  anchors.leftMargin: messageRow.modelData.fromMe ? 0 : Style.space(6)
++                  anchors.right: messageRow.modelData.fromMe ? bubble.left : undefined
++                  anchors.rightMargin: messageRow.modelData.fromMe ? Style.space(6) : 0
++                  z: 3
++
++                  Rectangle {
++                    id: replyBtn
++                    width: Style.space(22)
++                    height: Style.space(22)
++                    radius: width / 2
++                    color: replyBtnMouse.containsMouse
++                      ? Style.hoverFillFor(root.foreground, root.bar ? root.bar.urgent : Color.accent)
++                      : Style.normalFillFor(root.foreground, Color.accent)
++                    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
++                    border.width: 1
++
++                    Text {
++                      anchors.centerIn: parent
++                      text: "\uf112"
++                      color: root.foreground
++                      font.family: root.fontFamily
++                      font.pixelSize: Style.font.caption
++                    }
++
++                    MouseArea {
++                      id: replyBtnMouse
++                      anchors.fill: parent
++                      hoverEnabled: true
++                      cursorShape: Qt.PointingHandCursor
++                      onClicked: root.startReply(messageRow.modelData)
++                    }
++
++                    PanelToolTip {
++                      visible: replyBtnMouse.containsMouse
++                      text: "Reply"
++                      fontFamily: root.fontFamily
++                    }
++                  }
++
++                  Rectangle {
++                    id: copyBtn
++                    visible: bubbleRow.canCopy
++                    property bool copied: false
++                    width: Style.space(22)
++                    height: Style.space(22)
++                    radius: width / 2
++                    color: (copyBtnMouse.containsMouse || copyBtn.copied)
++                      ? Style.hoverFillFor(root.foreground, root.bar ? root.bar.urgent : Color.accent)
++                      : Style.normalFillFor(root.foreground, Color.accent)
++                    border.color: copyBtn.copied
++                      ? (root.bar ? root.bar.urgent : Color.accent)
++                      : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
++                    border.width: 1
++
++                    Text {
++                      anchors.centerIn: parent
++                      text: copyBtn.copied ? "\uf00c" : "\uf0c5"
++                      color: copyBtn.copied
++                        ? (root.bar ? root.bar.urgent : Color.accent)
++                        : root.foreground
++                      font.family: root.fontFamily
++                      font.pixelSize: Style.font.caption
++                    }
++
++                    MouseArea {
++                      id: copyBtnMouse
++                      anchors.fill: parent
++                      hoverEnabled: true
++                      cursorShape: Qt.PointingHandCursor
++                      onClicked: {
++                        root.copyMessage(messageRow.modelData)
++                        copyBtn.copied = true
++                        copyResetTimer.restart()
++                      }
++                    }
++
++                    Timer {
++                      id: copyResetTimer
++                      interval: 1500
++                      repeat: false
++                      onTriggered: copyBtn.copied = false
++                    }
++
++                    PanelToolTip {
++                      visible: copyBtnMouse.containsMouse
++                      text: copyBtn.copied ? "Copied!" : "Copy message"
++                      fontFamily: root.fontFamily
++                    }
++                  }
++                }
+ 
+                 Rectangle {
+                   id: bubble
+@@ -722,14 +950,19 @@ Panel {
+                   color: messageRow.modelData.fromMe
+                     ? Style.selectedFillFor(root.foreground, root.bar ? root.bar.urgent : Color.accent)
+                     : Style.normalFillFor(root.foreground, Color.accent)
++                  border.color: root.highlightedMessageId === messageRow.modelData.id
++                    ? (root.bar ? root.bar.urgent : Color.accent)
++                    : "transparent"
++                  border.width: root.highlightedMessageId === messageRow.modelData.id ? 2 : 0
+ 
+                   Column {
+                     id: bubbleContent
+                     x: bubbleRow.pad
+                     y: bubbleRow.pad / 2
+-                    spacing: Style.space(1)
++                    spacing: Style.space(2)
+                     width: Math.max(
+                       bubbleRow.showSender ? senderLabel.width : 0,
++                      quotedBox.visible ? quotedBox.width : 0,
+                       bubbleRow.hasImage ? photo.width : 0,
+                       bodyLabel.visible ? bodyLabel.width : 0,
+                       Math.min(metaLabel.implicitWidth, bubbleRow.maxInner))
+@@ -746,6 +979,67 @@ Panel {
+                       elide: Text.ElideRight
+                     }
+ 
++                    Rectangle {
++                      id: quotedBox
++                      readonly property var quoted: messageRow.modelData ? messageRow.modelData.quoted : null
++                      visible: !!(quoted && (quoted.text || quoted.id))
++                      width: Math.min(bubbleRow.maxInner, Math.max(quotedInner.implicitWidth + Style.space(16), Style.space(120)))
++                      implicitHeight: quotedInner.implicitHeight + Style.space(6)
++                      height: implicitHeight
++                      radius: Style.cornerRadius > 0 ? Math.max(2, Style.cornerRadius - 2) : Style.space(4)
++                      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
++                      clip: true
++
++                      Rectangle {
++                        id: quotedBar
++                        anchors.left: parent.left
++                        anchors.top: parent.top
++                        anchors.bottom: parent.bottom
++                        width: Style.space(3)
++                        color: root.bar ? root.bar.urgent : Color.accent
++                      }
++
++                      Column {
++                        id: quotedInner
++                        anchors.left: quotedBar.right
++                        anchors.leftMargin: Style.space(6)
++                        anchors.right: parent.right
++                        anchors.rightMargin: Style.space(6)
++                        anchors.verticalCenter: parent.verticalCenter
++                        spacing: Style.space(1)
++
++                        Text {
++                          width: parent.width
++                          text: Model.quotedTitle(quotedBox.quoted)
++                          color: root.bar ? root.bar.urgent : Color.accent
++                          font.family: root.fontFamily
++                          font.pixelSize: Style.font.caption
++                          font.bold: true
++                          elide: Text.ElideRight
++                        }
++
++                        Text {
++                          width: parent.width
++                          text: Model.quotedPreview(quotedBox.quoted)
++                          color: root.secondaryForeground
++                          font.family: root.fontFamily
++                          font.pixelSize: Style.font.caption
++                          elide: Text.ElideRight
++                        }
++                      }
++
++                      MouseArea {
++                        anchors.fill: parent
++                        hoverEnabled: true
++                        cursorShape: Qt.PointingHandCursor
++                        onClicked: {
++                          if (quotedBox.quoted && quotedBox.quoted.id) {
++                            root.jumpToMessage(quotedBox.quoted.id)
++                          }
++                        }
++                      }
++                    }
++
+                     Image {
+                       id: photo
+                       visible: bubbleRow.hasImage && photo.status !== Image.Error
+@@ -840,43 +1134,294 @@ Panel {
+           }
+ 
+           // ── Inline reply ───────────────────────────────────────────────
+-          Item {
++          Column {
+             width: parent.width
+-            implicitHeight: Math.max(composer.implicitHeight, sendButton.implicitHeight)
++            spacing: Style.space(4)
+ 
+-            TextField {
+-              id: composer
+-              anchors.left: parent.left
+-              anchors.right: sendButton.left
+-              anchors.rightMargin: Style.space(6)
+-              anchors.verticalCenter: parent.verticalCenter
+-              foreground: root.foreground
+-              accent: root.bar ? root.bar.urgent : Color.accent
+-              placeholderText: root.linked ? "Reply\u2026" : "Not connected"
+-              enabled: root.linked
+-              onAccepted: root.sendReply()
+-              onTextChanged: {
+-                if (!root.client || !root.activeJid || !text.length) return
+-                if (!typingTimer.running) root.client.setTyping(root.activeJid, "composing")
+-                typingTimer.restart()
++            // Replying to banner
++            Rectangle {
++              id: replyBanner
++              visible: root.replyingTo !== null
++              width: parent.width
++              implicitHeight: replyBannerContent.implicitHeight + Style.space(8)
++              height: implicitHeight
++              radius: Style.cornerRadius > 0 ? Style.cornerRadius : Style.space(4)
++              color: Style.normalFillFor(root.foreground, Color.accent)
++              border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.15)
++              border.width: 1
++              clip: true
++
++              Rectangle {
++                id: replyIndicator
++                anchors.left: parent.left
++                anchors.top: parent.top
++                anchors.bottom: parent.bottom
++                width: Style.space(3)
++                color: root.bar ? root.bar.urgent : Color.accent
+               }
+-              Keys.onEscapePressed: function (event) {
+-                if (composer.text.length > 0) composer.text = ""
+-                else root.back()
+-                event.accepted = true
++
++              Row {
++                id: replyBannerContent
++                anchors.left: replyIndicator.right
++                anchors.leftMargin: Style.space(8)
++                anchors.right: parent.right
++                anchors.rightMargin: Style.space(6)
++                anchors.verticalCenter: parent.verticalCenter
++                spacing: Style.space(6)
++
++                Text {
++                  anchors.verticalCenter: parent.verticalCenter
++                  text: "\uf112"
++                  color: root.bar ? root.bar.urgent : Color.accent
++                  font.family: root.fontFamily
++                  font.pixelSize: Style.font.caption
++                }
++
++                Column {
++                  id: replyBannerText
++                  width: parent.width - Style.space(52)
++                  anchors.verticalCenter: parent.verticalCenter
++                  spacing: Style.space(1)
++
++                  Text {
++                    width: parent.width
++                    text: {
++                      if (!root.replyingTo) return ""
++                      var name = root.replyingTo.fromMe ? "You" : (root.replyingTo.senderName || "Message")
++                      return "Replying to " + name
++                    }
++                    color: root.bar ? root.bar.urgent : Color.accent
++                    font.family: root.fontFamily
++                    font.pixelSize: Style.font.caption
++                    font.bold: true
++                    elide: Text.ElideRight
++                  }
++
++                  Text {
++                    width: parent.width
++                    text: {
++                      if (!root.replyingTo) return ""
++                      var t = Model.oneLine(root.replyingTo.text)
++                      if (!t && root.replyingTo.imagePath) return "Photo"
++                      return Model.truncate(t, 60)
++                    }
++                    color: root.secondaryForeground
++                    font.family: root.fontFamily
++                    font.pixelSize: Style.font.caption
++                    elide: Text.ElideRight
++                  }
++                }
++
++                Rectangle {
++                  anchors.verticalCenter: parent.verticalCenter
++                  width: Style.space(20)
++                  height: Style.space(20)
++                  radius: width / 2
++                  color: cancelReplyMouse.containsMouse
++                    ? Style.hoverFillFor(root.foreground, root.bar ? root.bar.urgent : Color.accent)
++                    : "transparent"
++
++                  Text {
++                    anchors.centerIn: parent
++                    text: "\uf00d"
++                    color: root.secondaryForeground
++                    font.family: root.fontFamily
++                    font.pixelSize: Style.font.caption
++                  }
++
++                  MouseArea {
++                    id: cancelReplyMouse
++                    anchors.fill: parent
++                    hoverEnabled: true
++                    cursorShape: Qt.PointingHandCursor
++                    onClicked: root.cancelReply()
++                  }
++                }
+               }
+             }
+ 
+-            PanelActionButton {
+-              id: sendButton
+-              anchors.right: parent.right
+-              anchors.verticalCenter: parent.verticalCenter
+-              iconText: "\uf1d8"
+-              tooltipText: "Send"
+-              enabled: root.linked && composer.text.trim().length > 0
+-              foreground: root.foreground
+-              fontFamily: root.fontFamily
+-              onClicked: root.sendReply()
++            // Attached Image Preview Banner
++            Rectangle {
++              id: imageAttachmentBanner
++              visible: root.attachedImagePath.length > 0
++              width: parent.width
++              implicitHeight: attachRow.implicitHeight + Style.space(8)
++              height: implicitHeight
++              radius: Style.cornerRadius > 0 ? Style.cornerRadius : Style.space(4)
++              color: Style.normalFillFor(root.foreground, Color.accent)
++              border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.15)
++              border.width: 1
++              clip: true
++
++              Rectangle {
++                id: imageIndicator
++                anchors.left: parent.left
++                anchors.top: parent.top
++                anchors.bottom: parent.bottom
++                width: Style.space(3)
++                color: root.bar ? root.bar.urgent : Color.accent
++              }
++
++              Row {
++                id: attachRow
++                anchors.left: imageIndicator.right
++                anchors.leftMargin: Style.space(8)
++                anchors.right: parent.right
++                anchors.rightMargin: Style.space(6)
++                anchors.verticalCenter: parent.verticalCenter
++                spacing: Style.space(8)
++
++                Image {
++                  id: attachThumbnail
++                  anchors.verticalCenter: parent.verticalCenter
++                  width: Style.space(34)
++                  height: Style.space(34)
++                  fillMode: Image.PreserveAspectCrop
++                  asynchronous: true
++                  cache: false
++                  source: root.attachedImagePath.length > 0
++                    ? Qt.resolvedUrl("file://" + root.attachedImagePath)
++                    : ""
++                  clip: true
++
++                  Rectangle {
++                    anchors.fill: parent
++                    color: "transparent"
++                    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.2)
++                    border.width: 1
++                    radius: Style.cornerRadius > 0 ? Math.max(2, Style.cornerRadius - 2) : Style.space(2)
++                  }
++                }
++
++                Column {
++                  id: attachTextCol
++                  width: parent.width - attachThumbnail.width - cancelAttachBtn.width - Style.space(26)
++                  anchors.verticalCenter: parent.verticalCenter
++                  spacing: Style.space(1)
++
++                  Text {
++                    width: parent.width
++                    text: {
++                      if (!root.attachedImagePath) return ""
++                      var parts = root.attachedImagePath.split("/")
++                      var name = parts[parts.length - 1] || "Image attached"
++                      if (name.indexOf("wa-clip") === 0) return "Clipboard image"
++                      return name
++                    }
++                    color: root.foreground
++                    font.family: root.fontFamily
++                    font.pixelSize: Style.font.caption
++                    font.bold: true
++                    elide: Text.ElideRight
++                  }
++
++                  Text {
++                    width: parent.width
++                    text: composer.text.length > 0 ? "Caption added" : "Attach image (Enter to send)"
++                    color: root.secondaryForeground
++                    font.family: root.fontFamily
++                    font.pixelSize: Style.font.caption
++                    elide: Text.ElideRight
++                  }
++                }
++
++                Rectangle {
++                  id: cancelAttachBtn
++                  anchors.verticalCenter: parent.verticalCenter
++                  width: Style.space(20)
++                  height: Style.space(20)
++                  radius: width / 2
++                  color: cancelAttachMouse.containsMouse
++                    ? Style.hoverFillFor(root.foreground, root.bar ? root.bar.urgent : Color.accent)
++                    : "transparent"
++
++                  Text {
++                    anchors.centerIn: parent
++                    text: "\uf00d"
++                    color: root.secondaryForeground
++                    font.family: root.fontFamily
++                    font.pixelSize: Style.font.caption
++                  }
++
++                  MouseArea {
++                    id: cancelAttachMouse
++                    anchors.fill: parent
++                    hoverEnabled: true
++                    cursorShape: Qt.PointingHandCursor
++                    onClicked: root.clearAttachedImage()
++                  }
++                }
++              }
++            }
++
++            Item {
++              width: parent.width
++              implicitHeight: Math.max(composer.implicitHeight, sendButton.implicitHeight, attachButton.implicitHeight)
++
++              PanelActionButton {
++                id: attachButton
++                anchors.left: parent.left
++                anchors.verticalCenter: parent.verticalCenter
++                iconText: "\uf0c6"
++                tooltipText: "Attach image (or paste with Ctrl+V)"
++                enabled: root.linked
++                foreground: root.foreground
++                fontFamily: root.fontFamily
++                onClicked: imagePickerProcess.pick()
++              }
++
++              TextField {
++                id: composer
++                anchors.left: attachButton.right
++                anchors.leftMargin: Style.space(6)
++                anchors.right: sendButton.left
++                anchors.rightMargin: Style.space(6)
++                anchors.verticalCenter: parent.verticalCenter
++                foreground: root.foreground
++                accent: root.bar ? root.bar.urgent : Color.accent
++                placeholderText: {
++                  if (!root.linked) return "Not connected"
++                  if (root.attachedImagePath.length > 0) return "Add a caption\u2026"
++                  if (root.replyingTo !== null) return "Type a reply\u2026"
++                  return "Reply\u2026"
++                }
++                enabled: root.linked
++                onAccepted: root.sendReply()
++                onTextChanged: {
++                  if (!root.client || !root.activeJid || !text.length) return
++                  if (!typingTimer.running) root.client.setTyping(root.activeJid, "composing")
++                  typingTimer.restart()
++                }
++                Keys.onPressed: function (event) {
++                  if ((event.modifiers & Qt.ControlModifier) && (event.key === Qt.Key_V)) {
++                    clipboardPaster.paste()
++                  }
++                }
++                Keys.onEscapePressed: function (event) {
++                  if (root.attachedImagePath.length > 0) {
++                    root.attachedImagePath = ""
++                  } else if (root.replyingTo !== null) {
++                    root.replyingTo = null
++                  } else if (composer.text.length > 0) {
++                    composer.text = ""
++                  } else {
++                    root.back()
++                  }
++                  event.accepted = true
++                }
++              }
++
++              PanelActionButton {
++                id: sendButton
++                anchors.right: parent.right
++                anchors.verticalCenter: parent.verticalCenter
++                iconText: "\uf1d8"
++                tooltipText: "Send"
++                enabled: root.linked && (composer.text.trim().length > 0 || root.attachedImagePath.length > 0)
++                foreground: root.foreground
++                fontFamily: root.fontFamily
++                onClicked: root.sendReply()
++              }
+             }
+           }
+         }
+@@ -957,6 +1502,58 @@ Panel {
+             anchors.fill: parent
+             onClicked: function (event) { event.accepted = true }
+           }
++
++          Rectangle {
++            id: peekCopyBtn
++            property bool copied: false
++            anchors.top: parent.top
++            anchors.right: parent.right
++            anchors.margins: Style.space(12)
++            width: Style.space(32)
++            height: Style.space(32)
++            radius: width / 2
++            color: (peekCopyMouse.containsMouse || peekCopyBtn.copied)
++              ? Style.hoverFillFor(root.foreground, root.bar ? root.bar.urgent : Color.accent)
++              : Qt.rgba(0, 0, 0, 0.6)
++            border.color: peekCopyBtn.copied
++              ? (root.bar ? root.bar.urgent : Color.accent)
++              : Qt.rgba(255, 255, 255, 0.3)
++            border.width: 1
++            z: 10
++
++            Text {
++              anchors.centerIn: parent
++              text: peekCopyBtn.copied ? "\uf00c" : "\uf0c5"
++              color: peekCopyBtn.copied ? (root.bar ? root.bar.urgent : Color.accent) : "#ffffff"
++              font.family: root.fontFamily
++              font.pixelSize: Style.font.body
++            }
++
++            MouseArea {
++              id: peekCopyMouse
++              anchors.fill: parent
++              hoverEnabled: true
++              cursorShape: Qt.PointingHandCursor
++              onClicked: {
++                root.copyImage(root.peekImagePath)
++                peekCopyBtn.copied = true
++                peekCopyTimer.restart()
++              }
++            }
++
++            Timer {
++              id: peekCopyTimer
++              interval: 1500
++              repeat: false
++              onTriggered: peekCopyBtn.copied = false
++            }
++
++            PanelToolTip {
++              visible: peekCopyMouse.containsMouse
++              text: peekCopyBtn.copied ? "Copied!" : "Copy image"
++              fontFamily: root.fontFamily
++            }
++          }
+         }
+       }
+     }
+diff --git c/README.md w/README.md
+index a1f4354..6265220 100644
+--- c/README.md
++++ w/README.md
+@@ -82,6 +82,12 @@ systemctl --user edit omarchy-whatsapp     # Environment=OMARCHY_WHATSAPP_PAIRIN
+ | Refresh chats | Refresh button, or `r` |
+ | Open a chat | `Enter` |
+ | Reply | Type, then `Enter` |
++| Reply to specific message | Hover over bubble and click , or right-click bubble |
++| Copy message | Hover over bubble and click  |
++| Cancel specific reply | `Escape` or click `✕` on reply banner |
++| Jump to quoted message | Click the quoted preview box inside a message bubble |
++| Attach image | Click paperclip icon (📎), or paste image directly with `Ctrl+V` |
++| Remove attached image | Click `✕` on image preview banner |
+ | Back to the chat list | `Escape` |
+ | Close the panel | `Escape` from the list |
+ | Full WhatsApp Web | Right-click the icon, or the ⧉ button in the panel |
+@@ -103,6 +109,8 @@ mutes muted before this fix are rewritten from WhatsApp app-state.
+ ```sh
+ omarchy-whatsapp status                          # connection, account, unread
+ omarchy-whatsapp send 919812345678@s.whatsapp.net "on my way"
++omarchy-whatsapp send 919812345678@s.whatsapp.net "looks great" --image ~/Pictures/photo.jpg
++omarchy-whatsapp send 919812345678@s.whatsapp.net "agreed" --reply <messageId>
+ omarchy-whatsapp chats 10                        # recent chats as JSON
+ omarchy-whatsapp refresh                         # resync the chat list from WhatsApp
+ omarchy-whatsapp focus 919812345678@s.whatsapp.net   # open the panel on a chat
+diff --git c/WhatsAppClient.qml w/WhatsAppClient.qml
+index f6ec227..e738f47 100644
+--- c/WhatsAppClient.qml
++++ w/WhatsAppClient.qml
+@@ -122,10 +122,15 @@ Item {
+     root.setChats(list)
+   }
+ 
+-  function sendMessage(jid, text, quotedId) {
+-    if (!jid || !text || !text.length) return false
+-    var payload = { t: "send", jid: jid, text: text }
++  function sendMessage(jid, text, quotedId, imagePath) {
++    if (!jid) return false
++    var hasText = text && text.length > 0
++    var hasImage = imagePath && imagePath.length > 0
++    if (!hasText && !hasImage) return false
++    var payload = { t: "send", jid: jid }
++    if (hasText) payload.text = text
+     if (quotedId) payload.quoted = quotedId
++    if (hasImage) payload.image = imagePath
+     return request(payload)
+   }
+ 
+diff --git c/bin/omarchy-whatsapp-paste-image w/bin/omarchy-whatsapp-paste-image
+new file mode 100755
+index 0000000..d840fd4
+--- /dev/null
++++ w/bin/omarchy-whatsapp-paste-image
+@@ -0,0 +1,66 @@
++#!/bin/bash
++set -euo pipefail
++
++# Ensure wl-paste is available
++command -v wl-paste >/dev/null 2>&1 || exit 1
++
++CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/omarchy-whatsapp/clipboard"
++mkdir -p "$CACHE_DIR" 2>/dev/null || CACHE_DIR="/tmp"
++
++# Clean up temporary clipboard files older than 2 days
++find "$CACHE_DIR" -maxdepth 1 -name "wa-clip-*" -mtime +2 -delete 2>/dev/null || true
++
++TYPES="$(wl-paste --list-types 2>/dev/null || true)"
++[[ -z "$TYPES" ]] && exit 1
++
++# 1. Check for text/uri-list (e.g. copied image file from a file manager or web browser)
++if echo "$TYPES" | grep -qx "text/uri-list"; then
++  while IFS= read -r line; do
++    line="$(echo "$line" | tr -d '\r\n')"
++    if [[ "$line" =~ ^file:// ]]; then
++      file_path="${line#file://}"
++      # URL-decode the path in case spaces or special chars were escaped
++      decoded_path="$(python3 -c "import urllib.parse, sys; print(urllib.parse.unquote(sys.argv[1]))" "$file_path" 2>/dev/null || echo "$file_path")"
++      if [[ -f "$decoded_path" ]]; then
++        ext="${decoded_path##*.}"
++        ext="$(echo "$ext" | tr '[:upper:]' '[:lower:]')"
++        case "$ext" in
++          png|jpg|jpeg|webp|gif)
++            echo "$decoded_path"
++            exit 0
++            ;;
++        esac
++      fi
++    fi
++  done < <(wl-paste --type text/uri-list 2>/dev/null || true)
++fi
++
++# 2. Check for raw image MIME data from clipboard
++MIME=""
++EXT=""
++if echo "$TYPES" | grep -qx "image/png"; then
++  MIME="image/png"
++  EXT="png"
++elif echo "$TYPES" | grep -qx "image/jpeg"; then
++  MIME="image/jpeg"
++  EXT="jpg"
++elif echo "$TYPES" | grep -qx "image/webp"; then
++  MIME="image/webp"
++  EXT="webp"
++elif echo "$TYPES" | grep -qx "image/gif"; then
++  MIME="image/gif"
++  EXT="gif"
++fi
++
++if [[ -n "$MIME" && -n "$EXT" ]]; then
++  DEST="$CACHE_DIR/wa-clip-$(date +%s%N).$EXT"
++  if wl-paste --type "$MIME" > "$DEST" 2>/dev/null && [[ -s "$DEST" ]]; then
++    echo "$DEST"
++    exit 0
++  else
++    rm -f "$DEST"
++    exit 1
++  fi
++fi
++
++exit 1
+diff --git c/bin/omarchy-whatsapp-pick-image w/bin/omarchy-whatsapp-pick-image
+new file mode 100755
+index 0000000..98c3ac4
+--- /dev/null
++++ w/bin/omarchy-whatsapp-pick-image
+@@ -0,0 +1,90 @@
++#!/usr/bin/env python3
++import sys
++import os
++import subprocess
++import shutil
++
++def pick_image():
++    # Priority 1: Omarchy system portal file chooser (opens Strata)
++    portal_picker = shutil.which("omarchy-file-select")
++    if portal_picker:
++        try:
++            res = subprocess.run(
++                [portal_picker, "--title", "Select image to attach", "--extensions", "png jpg jpeg webp gif heic avif"],
++                capture_output=True,
++                text=True
++            )
++            if res.returncode == 0:
++                selected = res.stdout.strip()
++                if selected and os.path.isfile(selected):
++                    print(selected)
++                    return 0
++            elif res.returncode == 1:
++                # User cancelled selection in Strata
++                return 0
++        except Exception:
++            pass
++
++    # Priority 2: Fallback without extension filter if first attempt didn't launch
++    if portal_picker:
++        try:
++            res = subprocess.run(
++                [portal_picker, "--title", "Select image to attach"],
++                capture_output=True,
++                text=True
++            )
++            if res.returncode == 0:
++                selected = res.stdout.strip()
++                if selected and os.path.isfile(selected):
++                    print(selected)
++                    return 0
++        except Exception:
++            pass
++
++    # Priority 3: Fallback to native GTK FileChooserDialog
++    try:
++        import gi
++        gi.require_version('Gtk', '3.0')
++        from gi.repository import Gtk
++
++        dialog = Gtk.FileChooserDialog(
++            title="Select Image to Attach",
++            action=Gtk.FileChooserAction.OPEN
++        )
++        dialog.add_buttons(
++            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
++            Gtk.STOCK_OPEN, Gtk.ResponseType.ACCEPT
++        )
++        dialog.set_default_response(Gtk.ResponseType.ACCEPT)
++
++        filter_images = Gtk.FileFilter()
++        filter_images.set_name("Images (*.png, *.jpg, *.jpeg, *.webp, *.gif)")
++        for mime in ["image/png", "image/jpeg", "image/webp", "image/gif"]:
++            filter_images.add_mime_type(mime)
++        for pat in ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.gif", "*.PNG", "*.JPG", "*.JPEG", "*.WEBP", "*.GIF"]:
++            filter_images.add_pattern(pat)
++        dialog.add_filter(filter_images)
++
++        filter_all = Gtk.FileFilter()
++        filter_all.set_name("All Files (*.*)")
++        filter_all.add_pattern("*")
++        dialog.add_filter(filter_all)
++
++        response = dialog.run()
++        selected = None
++        if response == Gtk.ResponseType.ACCEPT:
++            selected = dialog.get_filename()
++        dialog.destroy()
++        while Gtk.events_pending():
++            Gtk.main_iteration_do(False)
++
++        if selected and os.path.isfile(selected):
++            print(selected)
++            return 0
++    except Exception:
++        pass
++
++    return 0
++
++if __name__ == "__main__":
++    sys.exit(pick_image())
+diff --git c/daemon/ctl.js w/daemon/ctl.js
+index c8c4057..adfbe77 100755
+--- c/daemon/ctl.js
++++ w/daemon/ctl.js
+@@ -19,6 +19,8 @@ const USAGE = `Usage: omarchy-whatsapp-ctl <command> [args]
+   login                  start QR pairing (stops after 5 minutes)
+   pair <phone>           request an 8-digit pairing code instead of a QR
+   reconnect              drop the socket and reconnect
++  repair [jid]            reset stale encrypted sessions and re-key contacts;
++                          with a jid, only that contact (fast re-key)
+   logout                 unlink this device and clear local credentials
+   ping                   check the daemon is alive
+ `
+@@ -41,9 +43,27 @@ function buildRequest() {
+     case 'messages':
+       if (!args[0]) fail('messages: jid required')
+       return { t: 'messages', jid: args[0], limit: Number(args[1]) || 60 }
+-    case 'send':
+-      if (args.length < 2) fail('send: jid and text required')
+-      return { t: 'send', jid: args[0], text: args.slice(1).join(' ') }
++    case 'send': {
++      let replyId = undefined
++      let imagePath = undefined
++      const cleanArgs = []
++      for (let i = 0; i < args.length; i++) {
++        if ((args[i] === '--reply' || args[i] === '--quote') && i + 1 < args.length) {
++          replyId = args[++i]
++        } else if ((args[i] === '--image' || args[i] === '--attach' || args[i] === '-i') && i + 1 < args.length) {
++          imagePath = args[++i]
++        } else {
++          cleanArgs.push(args[i])
++        }
++      }
++      if (cleanArgs.length < 1) fail('send: jid required (usage: send <jid> [text...] [--image <path>] [--reply <id>])')
++      if (cleanArgs.length < 2 && !imagePath) fail('send: message text or --image required')
++      const payload = { t: 'send', jid: cleanArgs[0] }
++      if (cleanArgs.length > 1) payload.text = cleanArgs.slice(1).join(' ')
++      if (replyId) payload.quoted = replyId
++      if (imagePath) payload.image = imagePath
++      return payload
++    }
+     case 'read':
+       if (!args[0]) fail('read: jid required')
+       return { t: 'read', jid: args[0] }
+@@ -57,6 +77,8 @@ function buildRequest() {
+       return { t: 'pair', phone: args[0] }
+     case 'reconnect':
+       return { t: 'reconnect' }
++    case 'repair':
++      return { t: 'repair', jid: args[0] || undefined }
+     case 'logout':
+       return { t: 'logout' }
+     default:
+@@ -74,12 +96,13 @@ const socket = net.connect(socketPath)
+ let buffer = ''
+ let settled = false
+ 
++// Large accounts re-key hundreds of peers; allow the repair plenty of time.
+ const timeout = setTimeout(() => {
+   if (settled) return
+   settled = true
+   socket.destroy()
+   fail('timed out waiting for the daemon')
+-}, 15000)
++}, 300000)
+ 
+ socket.on('connect', () => socket.write(`${JSON.stringify(request)}\n`))
+ 
+@@ -99,9 +122,14 @@ socket.on('data', (chunk) => {
+       continue
+     }
+ 
+-    // Every client gets a `state` push on connect. For `status` that *is* the
+-    // answer; for anything else it is noise to skip.
++    // Every client gets a `state` push on connect (for `status` that *is* the
++    // answer) and, while commands run, the daemon broadcasts live activity to
++    // every connected client: chats updates, incoming messages, status ticks,
++    // media paths, focus requests. Those are all noise to a one-shot CLI caller
++    // — only the direct reply to this command settles it.
++    const broadcastTypes = new Set(['state', 'chats', 'message', 'messageStatus', 'messageMedia', 'focus', 'pairCode'])
+     if (payload.t === 'state' && command !== 'status') continue
++    if (command !== 'status' && broadcastTypes.has(payload.t)) continue
+ 
+     settled = true
+     clearTimeout(timeout)
+diff --git c/daemon/index.js w/daemon/index.js
+index 987304c..894e281 100644
+--- c/daemon/index.js
++++ w/daemon/index.js
+@@ -1,10 +1,13 @@
+-import { chmodSync, readdirSync, readFileSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
++import { chmodSync, copyFileSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
+ import { spawn } from 'node:child_process'
+-import { join } from 'node:path'
++import { extname, join } from 'node:path'
++import { fileURLToPath } from 'node:url'
+ import makeWASocket, {
+   Browsers,
+   DisconnectReason,
+   fetchLatestBaileysVersion,
++  jidDecode,
++  jidEncode,
+   jidNormalizedUser,
+   makeCacheableSignalKeyStore,
+   useMultiFileAuthState,
+@@ -18,8 +21,8 @@ import { logger, waLogger } from './lib/logger.js'
+ import { Store, normalizeJid } from './lib/store.js'
+ import { Notifier } from './lib/notify.js'
+ import { Bus } from './lib/server.js'
+-import { extractImage, isGroupJid, isIgnorableChat, isPhotoPlaceholder, isSilent, messageText, messageType, prettyJid } from './lib/message.js'
+-import { existingMediaPath, MediaCache } from './lib/media.js'
++import { extractImage, extractQuotedInfo, isGroupJid, isIgnorableChat, isPhotoPlaceholder, isSilent, messageText, messageType, prettyJid } from './lib/message.js'
++import { existingMediaPath, mediaPathFor, MediaCache } from './lib/media.js'
+ import {
+   applyChatNotificationPreferences,
+   isChatMuted,
+@@ -28,6 +31,27 @@ import {
+ } from './lib/preferences.js'
+ import { watchPluginState as observePluginState } from './lib/plugin-state.js'
+ 
++const __dirname = fileURLToPath(new URL('.', import.meta.url))
++
++// Ensure Baileys does not drop peer retry receipts due to recipient attribute
++function ensureBaileysPatched() {
++  try {
++    const target = join(__dirname, 'node_modules', 'baileys', 'lib', 'Socket', 'messages-recv.js')
++    if (!existsSync(target)) return
++    let content = readFileSync(target, 'utf8')
++    const unpatched = "const fromMe = !attrs.recipient || ((attrs.type === 'sender') && isNodeFromMe);"
++    const patched = "const fromMe = !attrs.recipient || attrs.type === 'retry' || ((attrs.type === 'sender') && isNodeFromMe);"
++    if (content.includes(unpatched)) {
++      content = content.replace(unpatched, patched)
++      writeFileSync(target, content, 'utf8')
++      logger.info('baileys: auto-patched retry receipt handling in messages-recv.js')
++    }
++  } catch (err) {
++    logger.warn({ err }, 'baileys: failed to patch messages-recv.js')
++  }
++}
++ensureBaileysPatched()
++
+ const RECONNECT_BASE_MS = 2000
+ const RECONNECT_MAX_MS = 60000
+ // WhatsApp hands out a batch of ~6 QR refs and then closes the socket with 408.
+@@ -59,6 +83,104 @@ const MSG_DELIVERED = 3
+ const MSG_READ = 4
+ const MSG_PLAYED = 5
+ 
++// In-memory cache of recent proto.Messages (sent and received) for fulfilling
++// Baileys retry requests and rich quotes with 100% fidelity.
++const MAX_MESSAGE_CACHE = 1000
++const messageCache = new Map()
++
++function cacheMessage(id, rawMsg) {
++  if (!id || !rawMsg) return
++  if (messageCache.size >= MAX_MESSAGE_CACHE) {
++    const firstKey = messageCache.keys().next().value
++    messageCache.delete(firstKey)
++  }
++  messageCache.set(id, rawMsg)
++}
++
++// Signal sessions are per-peer-device negotiation state. When a contact
++// relinks their phone (or after a WhatsApp outage), the session both sides
++// believed was current goes stale: messages the panel sends are accepted by the
++// server (grey tick) but encrypted with a key the peer no longer holds.
++// Genuine crypto failures (Bad MAC or No session) are recorded and automatically
++// healed without requiring manual intervention.
++// Note: MessageCounterError is normal replay protection for duplicate offline
++// stanzas in libsignal-protocol and is intentionally NOT treated as session failure.
++const brokenSessions = new Map() // remoteJid -> { count, lastSeen }
++const autoHealTimers = new Map() // remoteJid -> timestamp
++let cryptoErrorCount = 0
++let lastCryptoError = ''
++
++function rememberCryptoFailure(jid, message) {
++  if (!jid) return
++  const entry = brokenSessions.get(jid) || { count: 0, lastSeen: 0 }
++  entry.count += 1
++  entry.lastSeen = Date.now()
++  brokenSessions.set(jid, entry)
++  cryptoErrorCount += 1
++  lastCryptoError = String(message || 'signal session error').slice(0, 240)
++  pushState()
++}
++
++function scheduleAutoHeal(jid) {
++  if (!jid) return
++  const norm = normalizeJid(jid)
++  if (!norm) return
++  const lastHeal = autoHealTimers.get(norm) || 0
++  const now = Date.now()
++  if (now - lastHeal < 60_000) return
++  autoHealTimers.set(norm, now)
++
++  logger.info({ jid: norm }, 'session: auto-healing Signal session for contact')
++  setTimeout(async () => {
++    try {
++      if (!sock || connection !== 'open') return
++      clearSignalSessions(norm)
++      await rekeyAllSessions(norm)
++      brokenSessions.delete(norm)
++      if (brokenSessions.size === 0) {
++        cryptoErrorCount = 0
++        lastCryptoError = ''
++        pushState()
++      }
++      logger.info({ jid: norm }, 'session: auto-heal completed for contact')
++    } catch (err) {
++      logger.warn({ err, jid: norm }, 'session: auto-heal encountered an error')
++    }
++  }, 1000).unref?.()
++}
++
++// Watch the logger handed to Baileys so session breakage on any peer is noticed
++// and healed automatically. This only records state; it never alters or swallows log lines.
++function wrapWaLogger(base) {
++  return new Proxy(base, {
++    get(target, prop) {
++      if (typeof prop !== 'string') return target[prop]
++      const value = target[prop]
++      if (typeof value !== 'function' || !['error', 'fatal', 'warn'].includes(prop)) return value
++      return (...args) => {
++        try {
++          const obj = args.find((a) => a && typeof a === 'object') || {}
++          const err = obj.err || obj
++          const remoteJid = typeof obj.key === 'string' ? obj.key : obj.key?.remoteJid || ''
++          const message = String(err?.message || err?.name || err?.type || '')
++          if (
++            /Bad MAC/.test(message) ||
++            (err?.type === 'SessionError' && /No session/.test(message))
++          ) {
++            const jid = String(remoteJid || '')
++            rememberCryptoFailure(jid, `${err.type || err.name || 'CryptoError'}: ${message}`)
++            if (jid) scheduleAutoHeal(jid)
++          }
++        } catch {
++          // Watching must never take logging down with it.
++        }
++        return value.apply(target, args)
++      }
++    }
++  })
++}
++const watchedWaLogger = wrapWaLogger(waLogger)
++
+ const store = new Store()
+ const notifier = new Notifier()
+ const media = new MediaCache()
+@@ -87,6 +209,9 @@ let chatsFlushTimer = null
+ let lastStateJson = ''
+ let resolvingNames = false
+ let refreshInFlight = false
++// `repair` wipes and rebuilds the key store; a concurrent second run could
++// delete sessions the first just wrote, so it must be single-flight.
++let repairInFlight = false
+ const groupNames = new Map()
+ const wantedChats = new Set()
+ /** @type {Map<string, NodeJS.Timeout>} */
+@@ -158,6 +283,11 @@ function state() {
+     me: store.me,
+     unread: store.totalUnread(),
+     lastError,
++    cryptoErrorCount,
++    lastCryptoError,
++    repairHint: cryptoErrorCount > 0
++      ? `stale signal sessions with ${brokenSessions.size} contact(s); run: omarchy-whatsapp-ctl repair`
++      : '',
+     daemonPid: process.pid
+   }
+ }
+@@ -229,7 +359,9 @@ function storedToWaContent(message) {
+   if (message.media) {
+     const node = { mimetype: message.media.mimetype }
+     if (message.text && !isPhotoPlaceholder(message.text)) node.caption = message.text
+-    return message.media.kind === 'sticker' ? { stickerMessage: node } : { imageMessage: node }
++    if (message.media.kind === 'sticker') return { stickerMessage: node }
++    if (message.media.kind === 'video') return { videoMessage: node }
++    return { imageMessage: node }
+   }
+   if (!message.text) return undefined
+   return { conversation: message.text }
+@@ -237,7 +369,10 @@ function storedToWaContent(message) {
+ 
+ async function getStoredMessage(key) {
+   if (!key?.id) return undefined
+-  const found = store.findMessage(key.remoteJid, key.id)
++  const cached = messageCache.get(key.id)
++  if (cached) return cached
++  const canonical = store.canonicalJid(key.remoteJid) || key.remoteJid
++  const found = store.findMessage(key.remoteJid, key.id) || (canonical ? store.findMessage(canonical, key.id) : null)
+   return storedToWaContent(found)
+ }
+ 
+@@ -320,6 +455,52 @@ function flatten(chatJid, message) {
+     flat.media = payload
+     flat.imagePath = existingMediaPath({ id, media: payload, imagePath: '' })
+   }
++
++  const quotedInfo = extractQuotedInfo(message.message)
++  if (quotedInfo) {
++    const existingQuoted = store.findMessage(chatJid, quotedInfo.id)
++    const normParticipant = quotedInfo.participant ? (jidNormalizedUser(quotedInfo.participant) || quotedInfo.participant) : ''
++
++    let isFromMe = false
++    if (existingQuoted) {
++      isFromMe = !!existingQuoted.fromMe
++    } else if (normParticipant) {
++      const myId = store.me?.id ? jidNormalizedUser(store.me.id) : ''
++      const myPn = myId ? myId.split('@')[0].split(':')[0] : ''
++      const partPn = normParticipant.split('@')[0].split(':')[0]
++      if (myPn && partPn && myPn === partPn) isFromMe = true
++    } else if (!isGroupJid(chatJid) && message.key?.fromMe === false) {
++      isFromMe = true
++    }
++
++    let quotedText = ''
++    if (existingQuoted && existingQuoted.text) {
++      quotedText = existingQuoted.text
++    } else if (quotedInfo.quotedMessage) {
++      const qImage = extractImage(quotedInfo.quotedMessage)
++      quotedText = qImage ? (qImage.caption || messageText(quotedInfo.quotedMessage)) : messageText(quotedInfo.quotedMessage)
++    }
++
++    let senderName = ''
++    if (isFromMe) {
++      senderName = 'You'
++    } else if (existingQuoted && existingQuoted.senderName) {
++      senderName = existingQuoted.senderName
++    } else if (normParticipant) {
++      senderName = store.lookupName(normParticipant) || prettyJid(normParticipant)
++    } else if (!isGroupJid(chatJid)) {
++      senderName = store.lookupName(chatJid) || prettyJid(chatJid)
++    }
++
++    flat.quoted = {
++      id: quotedInfo.id,
++      fromMe: isFromMe,
++      senderName: senderName || (isFromMe ? 'You' : 'Message'),
++      senderJid: normParticipant,
++      text: quotedText || ''
++    }
++  }
++
+   return flat
+ }
+ 
+@@ -341,6 +522,10 @@ function ingest(chatJid, raw) {
+   if (isIgnorableChat(chatJid)) return null
+   if (isSilent(raw.message)) return null
+ 
++  if (raw?.key?.id && raw.message) {
++    cacheMessage(raw.key.id, raw.message)
++  }
++
+   learnAliasesFromMessage(raw)
+   const hintedPn = raw?.key?.remoteJidAlt || raw?.key?.senderPn
+   if (hintedPn) store.alias(chatJid, hintedPn)
+@@ -519,6 +704,178 @@ async function resolveContactLids() {
+   }
+ }
+ 
++// --- Session repair -----------------------------------------------------------
++//
++// Sessions and sender keys are pure negotiation state, unlike creds.json (the
++// linked login) and the pre-keys (our identity on the wire). Relinking a phone,
++// a WhatsApp outage, or an older session left behind by a previous run makes
++// them go stale, and then messages silently stop decrypting on one side. The
++// fix is to wipe that state and let every peer re-key from a fresh prekey
++// bundle — exactly what the official apps do when they resync encryption.
++
++function clearSignalSessions(onlyJid = '') {
++  let removed = 0
++  const targetUsers = new Set()
++  if (onlyJid) {
++    const norm = normalizeJid(onlyJid) || onlyJid
++    const u1 = jidDecode(norm)?.user
++    if (u1) targetUsers.add(u1)
++    const alias = store.aliases.get(norm)
++    if (alias) {
++      const u2 = jidDecode(normalizeJid(alias))?.user
++      if (u2) targetUsers.add(u2)
++    }
++  }
++  try {
++    for (const name of readdirSync(authDir)) {
++      if (!name.startsWith('session-') && !name.startsWith('sender-key')) continue
++      if (targetUsers.size) {
++        let matches = false
++        for (const u of targetUsers) {
++          if (name.startsWith(`session-${u}.`) || name.includes(`--${u}--`)) {
++            matches = true
++            break
++          }
++        }
++        if (!matches) continue
++      }
++      unlinkSync(join(authDir, name))
++      removed += 1
++    }
++  } catch (err) {
++    logger.warn({ err }, 'repair: wiping sessions failed')
++  }
++  return removed
++}
++
++// Fold a raw jid (anything the store has seen) into the peer map, remembering
++// both addressing forms under every user key they touch — the phone number and
++// the linked-id of the same account are separate signal users, and a peer whose
++// client sends with its LID needs a session asserted under the LID user too.
++function addPeerJid(peers, raw, alt) {
++  const pairs = []
++  for (const value of [raw, alt]) {
++    if (!value) continue
++    const { user } = jidDecode(String(value)) || {}
++    if (user) pairs.push([user, String(value)])
++  }
++  if (!pairs.length) return
++  const forms = { pn: '', lid: '' }
++  for (const [, value] of pairs) {
++    if (value.endsWith('@lid')) forms.lid = value
++    else if (value.endsWith('@s.whatsapp.net')) forms.pn = value
++  }
++  for (const [user] of pairs) {
++    const entry = peers.get(user) || { pn: '', lid: '' }
++    if (forms.pn) entry.pn = forms.pn
++    if (forms.lid) entry.lid = forms.lid
++    peers.set(user, entry)
++  }
++}
++
++// Re-establish fresh Signal sessions with every known peer — all aliased
++// contacts, every chat, and every group member — by fetching current prekey
++// bundles and injecting them, exactly as Baileys does on a normal send. Nothing
++// user-visible is sent to anyone; the peer is not notified.
++async function rekeyAllSessions(onlyJid = '') {
++  if (!sock || connection !== 'open') return 0
++  const peers = new Map()
++
++  if (onlyJid) {
++    const norm = normalizeJid(onlyJid) || onlyJid
++    let resolved = false
++    for (const [from, to] of store.aliases) {
++      if (from === onlyJid || from === norm || to === onlyJid || to === norm) {
++        addPeerJid(peers, from, to)
++        resolved = true
++      }
++    }
++    if (!resolved) {
++      addPeerJid(peers, onlyJid)
++      const mate = store.aliases.get(norm)
++      if (mate) addPeerJid(peers, mate)
++    }
++  } else {
++    for (const [from, to] of store.aliases) {
++      addPeerJid(peers, from, to)
++    }
++    for (const chat of store.chats.values()) {
++      addPeerJid(peers, chat.jid)
++    }
++
++    // Lid-addressed groups re-key every participant from fresh metadata so
++    // members who only ever appear in group send-key fanout are covered too.
++    for (const chat of store.chats.values()) {
++      if (!chat.isGroup) continue
++      try {
++        const meta = await sock.groupMetadata(chat.jid)
++        for (const participant of meta?.participants || []) {
++          addPeerJid(peers, participant?.id, participant?.lid)
++          addPeerJid(peers, participant?.lid)
++        }
++      } catch {
++        // Best-effort; 1:1 peers above already cover most of the account.
++      }
++    }
++  }
++
++  // Resolve the current device list for every peer (both addressing forms).
++  // The server normalizes every device row to the phone-number user, so after
++  // fetching devices we assert each device under *every* form the account is
++  // known by — peers that address messages with their linked-id need a session
++  // stored under the LID user too, or their incoming messages won't decrypt.
++  const requested = []
++  for (const pair of peers.values()) {
++    if (pair.pn) requested.push(pair.pn)
++    if (pair.lid) requested.push(pair.lid)
++  }
++  const deviceJids = new Set()
++  for (let i = 0; i < requested.length; i += 25) {
++    const chunk = requested.slice(i, i + 25)
++    const serverOf = new Map()
++    for (const jid of chunk) {
++      const { user } = jidDecode(jid) || {}
++      if (user) serverOf.set(user, jid.endsWith('@lid') ? 'lid' : 's.whatsapp.net')
++    }
++    const devices = await sock.getUSyncDevices(chunk, false, false).catch(() => [])
++    for (const device of devices || []) {
++      if (!device?.user || device.device === undefined) continue
++      const forms = new Set()
++      if (serverOf.get(device.user)) forms.add(serverOf.get(device.user))
++      const peer = peers.get(device.user)
++      if (peer) {
++        if (peer.lid) forms.add('lid')
++        if (peer.pn) forms.add('s.whatsapp.net')
++      }
++      if (!forms.size) forms.add('s.whatsapp.net')
++      for (const server of forms) {
++        const userPart = server === 'lid' && peer?.lid ? (jidDecode(peer.lid)?.user || device.user) : device.user
++        deviceJids.add(jidEncode(userPart, server, device.device))
++      }
++    }
++  }
++
++  if (deviceJids.size) {
++    // Keep batches small: the encrypt-IQ for a batch of ~100 linked-id jids
++    // routinely exceeded the query timeout and aborted the whole re-key. 25
++    // stays well under it, and one slow batch must not sink the rest.
++    const allDeviceJids = [...deviceJids]
++    let failedBatches = 0
++    for (let i = 0; i < allDeviceJids.length; i += 25) {
++      try {
++        await sock.assertSessions(allDeviceJids.slice(i, i + 25), true)
++      } catch (err) {
++        failedBatches += 1
++        logger.debug({ err, offset: i }, 'repair: session batch re-key failed, continuing')
++      }
++    }
++    if (failedBatches) {
++      logger.warn({ failedBatches, total: Math.ceil(allDeviceJids.length / 25) }, 'repair: some session batches failed; any next send still re-keys automatically')
++    }
++  }
++  return deviceJids.size
++}
++
+ function applyContacts(contacts) {
+   for (const contact of contacts || []) {
+     if (!contact?.id && !contact?.lid && !contact?.jid) continue
+@@ -714,7 +1071,7 @@ async function connect() {
+         creds: authState.creds,
+         keys: makeCacheableSignalKeyStore(authState.keys, waLogger)
+       },
+-      logger: waLogger,
++      logger: watchedWaLogger,
+       // The phone keeps pushing its own notifications while this device stays
+       // "offline", so the user never loses phone alerts by linking Omarchy.
+       markOnlineOnConnect: false,
+@@ -1172,31 +1529,92 @@ async function handleCommand(payload, reply) {
+     case 'send': {
+       const rawJid = payload.jid
+       const text = String(payload.text || '')
++      const imagePath = payload.image ? String(payload.image) : ''
+       if (!rawJid) throw new Error('send: jid required')
+-      if (!text.trim()) throw new Error('send: empty message')
++      if (!text.trim() && !imagePath) throw new Error('send: empty message')
++      if (imagePath && !existsSync(imagePath)) throw new Error(`send: image file not found: ${imagePath}`)
+       if (!sock || connection !== 'open') throw new Error('send: not connected to WhatsApp')
+ 
+-      const canonical = store.canonicalJid(rawJid) || rawJid
++      const targetJid = store.resolveDeliveryJid(rawJid) || rawJid
++      const canonical = store.canonicalJid(targetJid) || store.canonicalJid(rawJid) || rawJid
++      const isGroup = isGroupJid(targetJid) || isGroupJid(rawJid)
+       const options = {}
++      let quotedMsgObj = null
+       if (payload.quoted) {
+-        const list = store.messages.get(canonical) || []
+-        const quoted = list.find((m) => m.id === payload.quoted)
+-        if (quoted?.key) options.quoted = { key: quoted.key, message: { conversation: quoted.text } }
++        const quoted = store.findMessage(canonical, payload.quoted)
++          || store.findMessage(targetJid, payload.quoted)
++          || store.findMessage(rawJid, payload.quoted)
++        if (quoted) {
++          const quotedKey = {
++            remoteJid: targetJid,
++            id: quoted.key?.id || quoted.id,
++            fromMe: !!quoted.fromMe,
++            participant: isGroup ? (quoted.key?.participant || quoted.senderJid || undefined) : undefined
++          }
++          const content = messageCache.get(quoted.id) || storedToWaContent(quoted) || { conversation: quoted.text || '' }
++          options.quoted = { key: quotedKey, message: content }
++          quotedMsgObj = quoted
++        }
+       }
+ 
+-      const sent = await sock.sendMessage(rawJid, { text }, options)
++      const waContent = imagePath
++        ? {
++            image: { url: imagePath },
++            caption: text || undefined
++          }
++        : { text }
++
++      const sent = await sock.sendMessage(targetJid, waContent, options)
+       if (sent) {
++        if (sent.key?.id && sent.message) {
++          cacheMessage(sent.key.id, sent.message)
++        }
++        if (imagePath && sent.key?.id) {
++          const ext = extname(imagePath).toLowerCase()
++          const mime = ext === '.png' ? 'image/png' : (ext === '.webp' ? 'image/webp' : (ext === '.gif' ? 'image/gif' : 'image/jpeg'))
++          const cachedTarget = mediaPathFor(sent.key.id, mime)
++          try {
++            copyFileSync(imagePath, cachedTarget)
++          } catch (err) {
++            logger.warn({ err, imagePath }, 'media: failed to cache sent image')
++          }
++        }
++
+         // generateWAMessage stamps PENDING. relayMessage has already succeeded
+         // here, so the server has the stanza — show a single tick immediately.
+         if (asStatus(sent.status) < MSG_SERVER_ACK) sent.status = MSG_SERVER_ACK
+-        const res = ingest(rawJid, sent)
++        const res = ingest(targetJid, sent)
+         if (res) {
+           const { message, canonicalTarget } = res
++          if (imagePath && !message.imagePath) {
++            const ext = extname(imagePath).toLowerCase()
++            const mime = ext === '.png' ? 'image/png' : (ext === '.webp' ? 'image/webp' : (ext === '.gif' ? 'image/gif' : 'image/jpeg'))
++            const cachedTarget = mediaPathFor(sent.key.id, mime)
++            if (existsSync(cachedTarget)) message.imagePath = cachedTarget
++            else message.imagePath = imagePath
++            store.upsertMessage(canonicalTarget, message)
++          }
++          if (quotedMsgObj && !message.quoted) {
++            message.quoted = {
++              id: quotedMsgObj.id,
++              fromMe: !!quotedMsgObj.fromMe,
++              senderName: quotedMsgObj.fromMe ? 'You' : (quotedMsgObj.senderName || 'Message'),
++              senderJid: quotedMsgObj.senderJid || '',
++              text: quotedMsgObj.text || ''
++            }
++            store.upsertMessage(canonicalTarget, message)
++          }
+           if ((message.status || 0) < MSG_SERVER_ACK) {
+             message.status = MSG_SERVER_ACK
+             store.upsertMessage(canonicalTarget, message)
+           }
+           bus.broadcast({ t: 'message', jid: rawJid, message: publicMessage(message), chat: store.chat(canonicalTarget), unread: store.totalUnread() })
++          if (rawJid !== canonicalTarget) {
++            bus.broadcast({ t: 'message', jid: canonicalTarget, message: publicMessage(message), chat: store.chat(canonicalTarget), unread: store.totalUnread() })
++          }
++          if (targetJid !== rawJid && targetJid !== canonicalTarget) {
++            bus.broadcast({ t: 'message', jid: targetJid, message: publicMessage(message), chat: store.chat(canonicalTarget), unread: store.totalUnread() })
++          }
+           applyMessageStatus(canonicalTarget, message.id, MSG_SERVER_ACK)
+           pushChats()
+         }
+@@ -1265,6 +1683,42 @@ async function handleCommand(payload, reply) {
+       reply({ t: 'ack', id, ok: true })
+       return
+ 
++        case 'repair': {
++      if (!sock || connection !== 'open') throw new Error('repair: not connected to WhatsApp')
++      if (repairInFlight) {
++        reply({ t: 'ack', id, ok: false, message: 'repair already running' })
++        return
++      }
++      const jid = payload.jid ? String(payload.jid) : ''
++      repairInFlight = true
++      {
++        const removed = clearSignalSessions(jid)
++        let rekeyed = 0
++        try {
++          rekeyed = await rekeyAllSessions(jid)
++        } catch (err) {
++          logger.warn({ err, jid }, 'repair: proactive re-key incomplete (next send to any contact still re-keys automatically)')
++        }
++        brokenSessions.clear()
++        cryptoErrorCount = 0
++        lastCryptoError = ''
++        reply({ t: 'ack', id, ok: true, removed, rekeyed, reconnecting: true, targeted: !!jid, jid })
++        setTimeout(async () => {
++          repairInFlight = false
++          if (stopping) return
++          reconnectAttempts = 0
++          cancelReconnect()
++          connecting = false
++          try {
++            await connect()
++          } catch (err) {
++            logger.warn({ err }, 'repair: reconnect failed, will retry')
++          }
++        }, 300).unref?.()
++        return
++      }
++    }
++
+     case 'logout':
+       try {
+         await sock?.logout()
+diff --git c/daemon/lib/message.js w/daemon/lib/message.js
+index e605167..04a1eb2 100644
+--- c/daemon/lib/message.js
++++ w/daemon/lib/message.js
+@@ -243,3 +243,29 @@ export function prettyJid(jid) {
+   if (server === 'lid') return user
+   return /^\d{6,}$/.test(user) ? `+${user}` : user
+ }
++
++export function extractContextInfo(message) {
++  const rawContent = normalizeMessageContent(message)
++  if (!rawContent) return null
++  const content = unwrapMessage(rawContent) || rawContent
++  if (!content || typeof content !== 'object') return null
++  if (content.contextInfo) return content.contextInfo
++  for (const key of Object.keys(content)) {
++    const val = content[key]
++    if (val && typeof val === 'object' && val.contextInfo) {
++      return val.contextInfo
++    }
++  }
++  return null
++}
++
++export function extractQuotedInfo(message) {
++  const ci = extractContextInfo(message)
++  if (!ci || !ci.stanzaId) return null
++  return {
++    id: String(ci.stanzaId),
++    participant: ci.participant ? String(ci.participant) : '',
++    remoteJid: ci.remoteJid ? String(ci.remoteJid) : '',
++    quotedMessage: ci.quotedMessage || null
++  }
++}
+diff --git c/daemon/lib/store.js w/daemon/lib/store.js
+index 77ff9a3..2bfeca7 100644
+--- c/daemon/lib/store.js
++++ w/daemon/lib/store.js
+@@ -58,6 +58,34 @@ export class Store {
+     return key
+   }
+ 
++  resolveDeliveryJid(jid) {
++    if (!jid) return ''
++    const norm = normalizeJid(jid)
++    if (!norm) return ''
++    if (norm.endsWith('@g.us') || norm === 'status@broadcast' || norm.endsWith('@newsletter')) {
++      return norm
++    }
++    if (norm.endsWith('@lid')) {
++      return norm
++    }
++
++    const canonical = this.canonicalJid(norm) || norm
++    const messages = this.messages.get(canonical) || this.messages.get(norm) || []
++    for (let i = messages.length - 1; i >= 0; i--) {
++      const remoteJid = messages[i]?.key?.remoteJid
++      if (remoteJid && normalizeJid(remoteJid).endsWith('@lid')) {
++        return normalizeJid(remoteJid)
++      }
++    }
++
++    const alias = this.aliases.get(norm) || this.aliases.get(canonical)
++    if (alias && normalizeJid(alias).endsWith('@lid')) {
++      return normalizeJid(alias)
++    }
++
++    return canonical || norm
++  }
++
+   load() {
+     let raw
+     try {
+diff --git c/daemon/test/message.test.js w/daemon/test/message.test.js
+new file mode 100644
+index 0000000..9119b3c
+--- /dev/null
++++ w/daemon/test/message.test.js
+@@ -0,0 +1,60 @@
++import assert from 'node:assert/strict'
++import test from 'node:test'
++
++import { extractQuotedInfo, extractContextInfo, messageText } from '../lib/message.js'
++
++test('extractQuotedInfo extracts stanzaId and quoted text from extendedTextMessage', () => {
++  const msg = {
++    extendedTextMessage: {
++      text: 'This is my reply',
++      contextInfo: {
++        stanzaId: 'MSG-12345',
++        participant: '919876543210@s.whatsapp.net',
++        quotedMessage: {
++          conversation: 'Original message text'
++        }
++      }
++    }
++  }
++
++  const ci = extractContextInfo(msg)
++  assert.ok(ci)
++  assert.equal(ci.stanzaId, 'MSG-12345')
++  assert.equal(ci.participant, '919876543210@s.whatsapp.net')
++
++  const quoted = extractQuotedInfo(msg)
++  assert.ok(quoted)
++  assert.equal(quoted.id, 'MSG-12345')
++  assert.equal(quoted.participant, '919876543210@s.whatsapp.net')
++  assert.equal(messageText(quoted.quotedMessage), 'Original message text')
++})
++
++test('extractQuotedInfo handles imageMessage with contextInfo', () => {
++  const msg = {
++    imageMessage: {
++      caption: 'Look at this photo',
++      contextInfo: {
++        stanzaId: 'MSG-67890',
++        participant: '123456789@s.whatsapp.net',
++        quotedMessage: {
++          conversation: 'What is that?'
++        }
++      }
++    }
++  }
++
++  const quoted = extractQuotedInfo(msg)
++  assert.ok(quoted)
++  assert.equal(quoted.id, 'MSG-67890')
++  assert.equal(quoted.participant, '123456789@s.whatsapp.net')
++  assert.equal(messageText(quoted.quotedMessage), 'What is that?')
++})
++
++test('extractQuotedInfo returns null when no contextInfo exists', () => {
++  const msg = {
++    conversation: 'Plain text without reply'
++  }
++
++  const quoted = extractQuotedInfo(msg)
++  assert.equal(quoted, null)
++})
+diff --git c/daemon/test/store.test.js w/daemon/test/store.test.js
+index 496c8c7..38984e0 100644
+--- c/daemon/test/store.test.js
++++ w/daemon/test/store.test.js
+@@ -51,3 +51,30 @@ test('alias merge prefers Always mute over a shorter primary timed mute', () =>
+   assert.equal(canonical.muteEndTime, -1)
+   assert.equal(canonical.muted, true)
+ })
++
++test('resolveDeliveryJid correctly prioritizes LID for modern WhatsApp 1:1 threads', () => {
++  const store = new Store()
++
++  // 1. Group JID returns group directly
++  assert.equal(store.resolveDeliveryJid('120363020983435052@g.us'), '120363020983435052@g.us')
++
++  // 2. Explicit LID returns LID directly
++  assert.equal(store.resolveDeliveryJid('114327851900986@lid'), '114327851900986@lid')
++
++  // 3. Regular phone number without LID alias or LID messages returns PN
++  assert.equal(store.resolveDeliveryJid('918250701183@s.whatsapp.net'), '918250701183@s.whatsapp.net')
++
++  // 4. Phone number with LID alias returns LID
++  store.alias('919046173654@s.whatsapp.net', '114327851900986@lid')
++  assert.equal(store.resolveDeliveryJid('919046173654@s.whatsapp.net'), '114327851900986@lid')
++
++  // 5. Phone number whose chat has messages with LID remoteJid returns LID
++  const store2 = new Store()
++  store2.upsertMessage('919999999999@s.whatsapp.net', {
++    id: 'MSG1',
++    ts: 1000,
++    text: 'hello',
++    key: { remoteJid: '222333444@lid', id: 'MSG1', fromMe: false }
++  })
++  assert.equal(store2.resolveDeliveryJid('919999999999@s.whatsapp.net'), '222333444@lid')
++})
+diff --git c/systemd/omarchy-whatsapp.service w/systemd/omarchy-whatsapp.service
+index 59d0b9b..6b2c49a 100644
+--- c/systemd/omarchy-whatsapp.service
++++ w/systemd/omarchy-whatsapp.service
+@@ -11,7 +11,7 @@ ExecStart=@PLUGIN_DIR@/bin/omarchy-whatsapp-daemon
+ Restart=on-failure
+ RestartSec=5
+ # The bridge only needs the network, the state dir, and a notification bus.
+-PrivateTmp=yes
++PrivateTmp=no
+ ProtectKernelTunables=yes
+ ProtectKernelModules=yes
+ ProtectControlGroups=yes

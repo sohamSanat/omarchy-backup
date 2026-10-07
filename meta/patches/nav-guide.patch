@@ -1,0 +1,184 @@
+diff --git c/Panel.qml w/Panel.qml
+index d3b463a..7e45d94 100644
+--- c/Panel.qml
++++ w/Panel.qml
+@@ -16,9 +16,6 @@ Panel {
+   moduleName: "nav-guide"
+   ipcTarget: "nav-guide"
+ 
+-  implicitWidth: button.implicitWidth
+-  implicitHeight: button.implicitHeight
+-
+   readonly property string icon: "󰞋"
+ 
+   // Base directory of the plugin
+@@ -167,7 +164,6 @@ Panel {
+   }
+ 
+   Component.onCompleted: {
+-    Quickshell.execDetached([root.pluginDir + "/bin/register-keybind"])
+     refreshAll()
+   }
+ 
+@@ -327,44 +323,76 @@ Panel {
+     root.selectedIndex = 0
+   }
+ 
+-  // Bar button
+-  BarIconButton {
+-    id: button
+-    anchors.fill: parent
+-    bar: root.bar
+-    text: root.icon
+-    slotSize: Style.bar.statusSlot
+-    tooltipText: "Super+K Alternative · " + (root.navigatorRank ? root.navigatorRank.title : "Guide")
+-    onPressed: root.toggle()
+-  }
+-
+-  // Flyout Panel
+-  KeyboardPanel {
++  // Centered Window Panel
++  PanelWindow {
+     id: panel
+-    anchorItem: button
+-    owner: root
+-    bar: root.bar
+-    open: root.opened
+-    focusTarget: searchField
++    visible: root.opened
++    anchors { top: true; bottom: true; left: true; right: true }
++    color: "transparent"
++    exclusionMode: ExclusionMode.Ignore
+ 
+-    contentWidth: panel.fittedContentWidth(Style.space(560))
+-    contentHeight: panel.fittedContentHeight(Style.space(660), 760)
++    WlrLayershell.namespace: "omarchy-nav-guide"
++    WlrLayershell.layer: WlrLayer.Overlay
++    WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+ 
+-    PanelKeyCatcher {
+-      id: keyCatcher
++    // Scrim overlay dimming the backdrop
++    Rectangle {
+       anchors.fill: parent
+-      blocked: searchField.activeFocus
+-      onCloseRequested: root.close()
+-      onTabRequested: function(direction) { root.cycleTab(direction) }
+-      onMoveRequested: function(dx, dy) {
+-        if (dy > 0) root.selectNext()
+-        else if (dy < 0) root.selectPrevious()
++      color: Color.menu.scrim
++      opacity: root.opened ? 1.0 : 0.0
++      Behavior on opacity {
++        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+       }
+-      onActivateRequested: root.executeSelected()
++    }
+ 
+-      ColumnLayout {
++    // Dismiss on outside click
++    MouseArea {
++      anchors.fill: parent
++      acceptedButtons: Qt.AllButtons
++      onClicked: root.close()
++    }
++
++    // Centered modal card
++    BorderSurface {
++      id: card
++      anchors.centerIn: parent
++      width: Math.min(Style.space(560), panel.width - Style.gapsOut * 2)
++      height: Math.min(Style.space(660), panel.height - Style.gapsOut * 2)
++      color: Color.popups.background
++      borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
++      padding: Style.spacing.popupPadding
++      radius: Style.cornerRadius
++      opacity: root.opened ? 1.0 : 0.0
++
++      Behavior on opacity {
++        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
++      }
++
++      // Swallow clicks on the card so outside dismiss doesn't catch them
++      MouseArea {
+         anchors.fill: parent
+-        spacing: Style.space(8)
++        acceptedButtons: Qt.AllButtons
++      }
++
++      PanelKeyCatcher {
++        id: keyCatcher
++        anchors.fill: parent
++        anchors.topMargin: card.contentTopInset
++        anchors.rightMargin: card.contentRightInset
++        anchors.bottomMargin: card.contentBottomInset
++        anchors.leftMargin: card.contentLeftInset
++        blocked: searchField.activeFocus
++        onCloseRequested: root.close()
++        onTabRequested: function(direction) { root.cycleTab(direction) }
++        onMoveRequested: function(dx, dy) {
++          if (dy > 0) root.selectNext()
++          else if (dy < 0) root.selectPrevious()
++        }
++        onActivateRequested: root.executeSelected()
++
++        ColumnLayout {
++          anchors.fill: parent
++          spacing: Style.space(8)
+ 
+         // 1. Sleek Top Header Row
+         RowLayout {
+@@ -1066,3 +1094,4 @@ Panel {
+     }
+   }
+ }
++}
+diff --git c/bin/register-keybind w/bin/register-keybind
+index c990982..542b99c 100755
+--- c/bin/register-keybind
++++ w/bin/register-keybind
+@@ -45,7 +45,3 @@ if ! pgrep -f "nav-guide/bin/hypr-listener" >/dev/null 2>&1; then
+   setsid python3 "$DIR/hypr-listener" </dev/null >/dev/null 2>&1 &
+ fi
+ 
+-# Send a notification to inform the user
+-if command -v omarchy-notification-send >/dev/null 2>&1; then
+-  omarchy-notification-send -g "󰞋" "Super+K Alternative active" "Bound to SUPER + K · Classic menu moved to Super+Shift+K" || true
+-fi
+diff --git c/bin/unregister-keybind w/bin/unregister-keybind
+index 24b633b..28f1c2d 100755
+--- c/bin/unregister-keybind
++++ w/bin/unregister-keybind
+@@ -76,8 +76,4 @@ except ProcessLookupError:
+     pass
+ PYEOF
+   rm -f "$LOCK_FILE" 2>/dev/null || true
+-
+-  if command -v omarchy-notification-send >/dev/null 2>&1; then
+-    omarchy-notification-send -g "󰞋" "Navigation Guide keybindings restored to defaults" || true
+-  fi
+ fi
+diff --git c/manifest.json w/manifest.json
+index b379859..e93c898 100644
+--- c/manifest.json
++++ w/manifest.json
+@@ -9,16 +9,10 @@
+   "repository": "https://github.com/infinitegithub/omarchy-nav-guide",
+   "description": "An enhanced Super+K window that teaches you Omarchy keybindings by suggesting shortcuts based on what you have open.",
+   "kinds": [
+-    "bar-widget"
++    "overlay"
+   ],
++  "keepLoaded": true,
+   "entryPoints": {
+-    "barWidget": "Panel.qml"
+-  },
+-  "barWidget": {
+-    "displayName": "Super+K Alternative",
+-    "description": "Enhanced Super+K window that suggests shortcuts for your open apps",
+-    "category": "Utilities",
+-    "allowMultiple": false,
+-    "defaultSection": "center"
++    "overlay": "Panel.qml"
+   }
+ }

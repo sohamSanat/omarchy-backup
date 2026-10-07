@@ -25,8 +25,8 @@
 
 -- Logitech MX Keys examples:
 -- o.bind("SUPER + SHIFT + S", nil, "omarchy-capture-screenshot")
-o.bind("SUPER + H", "Toggle dictation", "omarchy-shell io.github.ef-code.omarchy-flow.service toggle")
-o.bind("CTRL + H", "Toggle dictation", "omarchy-shell io.github.ef-code.omarchy-flow.service toggle")
+o.bind("SUPER + H", "Toggle dictation", "omarchy-dictate toggle")
+o.bind("CTRL + H", "Toggle dictation", "omarchy-dictate toggle")
 -- o.bind("SUPER + PERIOD", nil, "omarchy-shell shell toggle omarchy.emojis")
 
 -- Use Strata instead of Nautilus for Omarchy's file-manager shortcuts.
@@ -63,11 +63,6 @@ hl.unbind("PRINT")
 o.bind("PRINT", "Screenshot", "omarchy-pretty-screenshot")
 -- ricardosuman.pretty-screenshot (end)
 
--- io.github.ellion369.omagent: begin
-o.bind("ALT + SPACE", "Omagent overlay", "omarchy-shell shell toggle io.github.ellion369.omagent")
-o.bind("SUPER + A", "Omagent overlay", "omarchy-shell shell toggle io.github.ellion369.omagent")
-hl.layer_rule({ match = { namespace = "omarchy-omagent" }, blur = true, ignore_alpha = 0.6 })
--- io.github.ellion369.omagent: end
 
 -- nguyenn.clipboard: begin (overrides built-in omarchy.clipboard)
 hl.unbind("SUPER + CTRL + V")
@@ -110,20 +105,21 @@ end
 o.bind("SUPER + CTRL + SLASH", "Next scratchpad", deck .. " next")
 -- tiertek.scratchpad-deck: end
 
--- >>> omarchy-flow managed hotkeys >>>
--- Managed by Omarchy Flow. Configure these in the Flow settings menu.
+-- Dictation shortcuts (Gemini 3.5 Transcribe with Voxtype Aura & local fallback)
 hl.unbind("SUPER + ALT + V")
-o.bind("SUPER + ALT + V", "Flow: Toggle dictation", "omarchy-shell io.github.ef-code.omarchy-flow.service toggle")
-hl.unbind("SUPER + ALT + SHIFT + V")
-o.bind("SUPER + ALT + SHIFT + V", "Flow: Dictate & submit", "omarchy-shell io.github.ef-code.omarchy-flow.service toggleSubmit")
-hl.unbind("F6")
-o.bind("F6", "Flow: Push to talk", "omarchy-shell io.github.ef-code.omarchy-flow.service start")
-o.bind("F6", "Flow: Push to talk (release)", "omarchy-shell io.github.ef-code.omarchy-flow.service stop", { release = true })
-hl.unbind("SUPER + ALT + P")
-o.bind("SUPER + ALT + P", "Flow: Pause / resume", "omarchy-shell io.github.ef-code.omarchy-flow.service pause")
+o.bind("SUPER + ALT + V", "Toggle dictation", "omarchy-dictate toggle")
 hl.unbind("SUPER + ALT + C")
-o.bind("SUPER + ALT + C", "Flow: Cancel recording", "omarchy-shell io.github.ef-code.omarchy-flow.service cancel")
--- <<< omarchy-flow managed hotkeys <<<
+o.bind("SUPER + ALT + C", "Cancel dictation", "omarchy-dictate cancel")
+
+-- soham.omagent: begin
+-- ALT+SPACE was unassigned, so no unbind is needed. If a future Omarchy
+-- update claims it, add hl.unbind("ALT + SPACE") above this binding.
+o.bind("ALT + SPACE", "Omagent", "omarchy-shell shell toggle soham.omagent")
+-- The pill and results card are translucent, so the compositor has to blur what
+-- is behind them to keep them legible. ignore_alpha keeps the blur on those two
+-- surfaces and off the full-screen scrim, which is far more transparent.
+hl.layer_rule({ match = { namespace = "omarchy-omagent" }, blur = true, ignore_alpha = 0.6 })
+-- soham.omagent: end
 
 -- [nav-guide-keybind]
 -- Enhanced Super+K window for Omarchy
@@ -131,4 +127,5 @@ hl.unbind("SUPER + K")
 o.bind("SUPER + K", "Super+K Alternative", "omarchy-shell nav-guide toggle")
 -- Preserve the classic keybindings menu on a dedicated fallback shortcut
 o.bind("SUPER + SHIFT + K", "Classic Keybindings Menu", "omarchy-menu-keybindings")
+hl.layer_rule({ match = { namespace = "omarchy-nav-guide" }, no_anim = true, animation = "none" })
 -- [/nav-guide-keybind]

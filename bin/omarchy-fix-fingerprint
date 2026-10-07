@@ -1,0 +1,39 @@
+#!/bin/bash
+set -euo pipefail
+
+echo "==> Configuring FPC Fingerprint Sensor (10a5:9200)..."
+
+# 1. Disable USB autosuspend and enable persistence
+echo "==> Setting up udev rule to disable autosuspend..."
+cat << 'EOF' | sudo tee /etc/udev/rules.d/50-fingerprint-autosuspend.rules > /dev/null
+# Disable autosuspend and enable persistence for FPC Fingerprint Controller (10a5:9200)
+ACTION=="add|change", SUBSYSTEM=="usb", ATTR{idVendor}=="10a5", ATTR{idProduct}=="9200", ATTR{power/control}="on", ATTR{power/persist}="1"
+EOF
+
+sudo udevadm control --reload-rules
+sudo udevadm trigger --subsystem-match=usb
+
+# 2. Add systemd-sleep hook to reset sensor after suspend/resume
+echo "==> Setting up sleep/resume hook in /usr/lib/systemd/system-sleep/fingerprint-reset..."
+cat << 'EOF' | sudo tee /usr/lib/systemd/system-sleep/fingerprint-reset > /dev/null
+#!/bin/bash
+# Reset FPC 10a5:9200 fingerprint sensor on resume to prevent stalled USB endpoint
+if [[ $1 == "post" ]]; then
+  /usr/bin/usbreset 10a5:9200 >/dev/null 2>&1 || true
+  systemctl restart fprintd >/dev/null 2>&1 || true
+fi
+EOF
+
+sudo chmod +x /usr/lib/systemd/system-sleep/fingerprint-reset
+
+# 3. Reset the USB device and restart fprintd right now
+echo "==> Resetting USB sensor device now..."
+sudo usbreset 10a5:9200 || true
+echo "==> Restarting fprintd..."
+sudo systemctl restart fprintd
+
+echo "==> Done! Testing fingerprint reader status..."
+fprintd-list "$USER"
+echo ""
+echo "Please verify by placing your finger on the sensor now if prompted:"
+fprintd-verify

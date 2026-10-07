@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
+import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
@@ -17,7 +18,7 @@ Item {
   property int selectedWindowIndex: 0
   property var workspaceRows: []
   property var recentWorkspaceIds: []
-  property var retainedPreviewIds: []
+  property var previewMap: ({})
 
   readonly property int maxWorkspaceCount: 10
   readonly property int maxWindowsPerWorkspace: 24
@@ -187,12 +188,28 @@ Item {
       workspaceModel.remove(workspaceModel.count - 1)
   }
 
-  function screenForMonitorName(name) {
-    var screens = Quickshell.screens
-    for (var i = 0; i < screens.length; i++) {
-      if (screens[i].name === name) return screens[i]
+  function applyManifest(text) {
+    try {
+      var m = JSON.parse(text)
+      var map = {}
+      if (m && m.workspaces) {
+        for (var id in m.workspaces) map[id] = m.workspaces[id].path
+      }
+      root.previewMap = map
+    } catch (e) {}
+  }
+
+  function refreshPreviews() {
+    manifestProc.running = true
+  }
+
+  property Process manifestProc: Process {
+    id: manifestProc
+    command: ["sh", "-c", "cat \"${XDG_CACHE_HOME:-$HOME/.cache}/reomarchy-workspace-switcher/manifest.json\" 2>/dev/null"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.applyManifest(text)
     }
-    return panel.screen
   }
 
   function rememberWorkspace(id) {
@@ -204,15 +221,6 @@ Item {
       if (existingId !== id) next.push(existingId)
     }
     root.recentWorkspaceIds = next.slice(0, root.maxWorkspaceCount)
-  }
-
-  function retainPreview(id) {
-    var next = [id]
-    for (var i = 0; i < root.retainedPreviewIds.length; i++) {
-      var existingId = root.retainedPreviewIds[i]
-      if (existingId !== id) next.push(existingId)
-    }
-    root.retainedPreviewIds = next.slice(0, root.maxRetainedPreviewCount)
   }
 
   function recentWorkspaceRank(id) {
@@ -296,18 +304,6 @@ Item {
     return 0
   }
 
-  function captureFocusedWorkspace() {
-    if (root.opened || !Hyprland.focusedWorkspace) return
-
-    root.rebuild()
-    var index = root.rowIndexForWorkspace(Hyprland.focusedWorkspace.id)
-    if (index < 0) return
-
-    var card = workspaceList.itemAtIndex(index)
-    if (card && typeof card.capturePreview === "function")
-      card.capturePreview()
-  }
-
   function previousWorkspaceIndex(currentId) {
     for (var i = 0; i < root.recentWorkspaceIds.length; i++) {
       var recentId = root.recentWorkspaceIds[i]
@@ -382,6 +378,7 @@ Item {
         root.opened = true
         root.revealed = true
         root.quickSwitchPending = false
+        root.refreshPreviews()
       }
       var targetId = payload.selectWorkspace
       var idx = root.rowIndexForWorkspace(targetId)
@@ -420,6 +417,7 @@ Item {
         root.searchQuery = "";
         root.hudActionText = "SUPER + TAB";
         console.log("SWITCHER: opened and revealed set to true!");
+        root.refreshPreviews();
         workspaceList.positionViewAtIndex(root.selectedIndex, ListView.Center);
         Qt.callLater(function() { keyCatcher.forceActiveFocus(); });
       }
@@ -442,6 +440,7 @@ Item {
       root.quickSwitchPending = true
       root.searchQuery = ""
       root.hudActionText = direction > 0 ? "SUPER + TAB" : "SUPER + SHIFT + TAB"
+      root.refreshPreviews()
       revealTimer.restart()
     } else {
       if (root.quickSwitchPending) {
@@ -515,14 +514,7 @@ Item {
     root.rebuild()
     if (Hyprland.focusedWorkspace)
       root.rememberWorkspace(Hyprland.focusedWorkspace.id)
-    initialCaptureTimer.restart()
-  }
-
-  Timer {
-    id: captureTimer
-    interval: 300
-    repeat: false
-    onTriggered: root.captureFocusedWorkspace()
+    root.refreshPreviews()
   }
 
   Timer {
@@ -539,13 +531,6 @@ Item {
       root.revealed = true
       Qt.callLater(function() { keyCatcher.forceActiveFocus() })
     }
-  }
-
-  Timer {
-    id: initialCaptureTimer
-    interval: 1500
-    repeat: false
-    onTriggered: root.captureFocusedWorkspace()
   }
 
   Timer {
@@ -571,7 +556,6 @@ Item {
     function onFocusedWorkspaceChanged() {
       if (Hyprland.focusedWorkspace) {
         root.rememberWorkspace(Hyprland.focusedWorkspace.id)
-        captureTimer.restart()
       }
     }
   }
@@ -923,7 +907,7 @@ Item {
 
         readonly property bool isCurrent: index === root.selectedIndex
         readonly property bool isHovered: previewMouse.containsMouse
-        readonly property bool retainPreview: root.retainedPreviewIds.indexOf(row.id) >= 0
+        readonly property string previewSource: root.previewMap[row.id] ? ("file://" + root.previewMap[row.id]) : ""
 
         width: root.cardWidth
         height: root.previewHeight + root.labelHeight
@@ -936,25 +920,6 @@ Item {
         }
         Behavior on opacity {
           NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-        }
-
-        function capturePreview() {
-          root.retainPreview(row.id)
-          var source = root.screenForMonitorName(row.monitorName)
-          if (workspaceCapture.captureSource !== source)
-            workspaceCapture.captureSource = source
-
-          if (workspaceCapture.hasContent)
-            workspaceCapture.captureFrame()
-          else
-            workspaceCapture.live = true
-        }
-
-        onRetainPreviewChanged: {
-          if (!retainPreview) {
-            workspaceCapture.live = false
-            workspaceCapture.captureSource = null
-          }
         }
 
         // Preview Box with Cyber Frame & Corners
@@ -970,24 +935,23 @@ Item {
             : Util.alpha(Color.foreground, 0.22)
           clip: true
 
-          // Screencopy Live Screenshot
-          ScreencopyView {
+          // Static snapshot taken just before the switcher opened
+          Image {
             id: workspaceCapture
             anchors.fill: parent
             anchors.margins: 1
-            captureSource: null
-            live: false
-            paintCursor: false
-            visible: hasContent
-            onHasContentChanged: {
-              if (hasContent && live) live = false
-            }
+            asynchronous: true
+            cache: false
+            mipmap: true
+            fillMode: Image.PreserveAspectCrop
+            source: workspaceCard.previewSource
+            visible: status === Image.Ready
           }
 
           // Fallback Wireframe Window Layout
           Item {
             anchors.fill: parent
-            visible: !workspaceCapture.hasContent
+            visible: workspaceCapture.status !== Image.Ready
 
             Repeater {
               model: workspaceCard.row.windows

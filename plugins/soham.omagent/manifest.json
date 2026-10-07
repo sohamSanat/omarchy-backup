@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "soham.omagent",
+  "name": "Omagent",
+  "version": "0.2.0",
+  "author": "soham",
+  "license": "MIT",
+  "description": "A command pill that runs your Omarchy default coding agent under the overlay, with a built-in Local/Web mode toggle",
+  "kinds": [
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Omagent.qml"
+  }
+}
