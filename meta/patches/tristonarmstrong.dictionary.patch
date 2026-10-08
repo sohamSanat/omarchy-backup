@@ -214,7 +214,7 @@ index f9e96c4..bf541f0 100644
      if (a.word > b.word) return 1
      return 0
 diff --git c/Panel.qml w/Panel.qml
-index 84d7e3b..74be375 100644
+index 84d7e3b..aa4fe20 100644
 --- c/Panel.qml
 +++ w/Panel.qml
 @@ -88,15 +88,75 @@ Panel {
@@ -633,7 +633,7 @@ index 84d7e3b..74be375 100644
              event.accepted = true
            }
          }
-@@ -626,55 +805,214 @@ Column {
+@@ -626,55 +805,197 @@ Column {
                }
              }
  
@@ -738,27 +738,19 @@ index 84d7e3b..74be375 100644
 +              Rectangle {
 +                id: closestCard
                  width: parent.width
--                spacing: Style.space(6)
 +                implicitHeight: Style.space(52)
 +                radius: Style.cornerRadius
 +                visible: root.closestWord !== ""
 +                color: Style.selectedFillFor(root.contentForeground, Color.accent)
 +                border.width: Style.spacing.hairline
 +                border.color: Color.accent
- 
--                Repeater {
--                  model: root.suggestions
++
 +                MouseArea {
 +                  anchors.fill: parent
 +                  hoverEnabled: true
 +                  cursorShape: Qt.PointingHandCursor
 +                  onClicked: root.searchSuggestion(root.closestWord)
- 
--                  Button {
--                    required property string modelData
--                    text: modelData
--                    foreground: root.contentForeground
--                    onClicked: root.search(modelData)
++
 +                  Row {
 +                    anchors.fill: parent
 +                    anchors.leftMargin: Style.space(12)
@@ -810,16 +802,18 @@ index 84d7e3b..74be375 100644
 +                      anchors.verticalCenter: parent.verticalCenter
 +                      onClicked: root.searchSuggestion(root.closestWord)
 +                    }
-                   }
-                 }
-               }
++                  }
++                }
++              }
 +
 +              // Suggested words row (5 closest words as interactive chips)
 +              Column {
 +                width: parent.width
 +                visible: (root.aiSuggestions.length > 0 || root.suggestions.length > 0)
-+                spacing: Style.space(6)
-+
+                 spacing: Style.space(6)
+ 
+-                Repeater {
+-                  model: root.suggestions
 +                Text {
 +                  width: parent.width
 +                  text: root.aiStatus === "ok" ? "✨ AI Top 5 closest words:" : "Suggestions:"
@@ -829,7 +823,12 @@ index 84d7e3b..74be375 100644
 +                  font.bold: true
 +                  font.letterSpacing: 1.0
 +                }
-+
+ 
+-                  Button {
+-                    required property string modelData
+-                    text: modelData
+-                    foreground: root.contentForeground
+-                    onClicked: root.search(modelData)
 +                Flow {
 +                  width: parent.width
 +                  spacing: Style.space(6)
@@ -844,26 +843,9 @@ index 84d7e3b..74be375 100644
 +                      foreground: index === 0 ? Color.accent : root.contentForeground
 +                      onClicked: root.searchSuggestion(modelData)
 +                    }
-+                  }
-+                }
-+              }
-+
-+              // Footnote for status
-+              Text {
-+                width: parent.width
-+                visible: root.aiStatus === "ok" || root.aiStatus === "missing-key" || root.aiStatus === "error"
-+                text: {
-+                  if (root.aiStatus === "ok") return "✨ AI spelling assistance powered by Gemini"
-+                  if (root.aiStatus === "missing-key") return "💡 Tip: Configure GEMINI_API_KEY in ~/.config/omagent/config.json for AI-powered suggestions."
-+                  return "💡 AI suggestions offline · showing local dictionary suggestions."
-+                }
-+                textFormat: Text.PlainText
-+                color: root.aiStatus === "ok" ? Color.accent : Qt.darker(root.contentForeground, 1.6)
-+                font.family: root.contentFontFamily
-+                font.pixelSize: Style.font.caption
-+                font.italic: true
-+                wrapMode: Text.WordWrap
-+              }
+                   }
+                 }
+               }
              }
  
 -            // Not found (no fuzzy candidates).
@@ -876,7 +858,7 @@ index 84d7e3b..74be375 100644
  
                Text {
                  width: parent.width
-@@ -929,70 +1267,6 @@ Column {
+@@ -929,70 +1250,6 @@ Column {
              }
            }
          }

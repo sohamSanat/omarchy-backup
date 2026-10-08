@@ -989,23 +989,6 @@ Column {
                   }
                 }
               }
-
-              // Footnote for status
-              Text {
-                width: parent.width
-                visible: root.aiStatus === "ok" || root.aiStatus === "missing-key" || root.aiStatus === "error"
-                text: {
-                  if (root.aiStatus === "ok") return "✨ AI spelling assistance powered by Gemini"
-                  if (root.aiStatus === "missing-key") return "💡 Tip: Configure GEMINI_API_KEY in ~/.config/omagent/config.json for AI-powered suggestions."
-                  return "💡 AI suggestions offline · showing local dictionary suggestions."
-                }
-                textFormat: Text.PlainText
-                color: root.aiStatus === "ok" ? Color.accent : Qt.darker(root.contentForeground, 1.6)
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.caption
-                font.italic: true
-                wrapMode: Text.WordWrap
-              }
             }
 
             // Not found (only visible when no suggestions exist at all)
