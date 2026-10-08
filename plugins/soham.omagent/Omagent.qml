@@ -128,7 +128,7 @@ Item {
     // The mode is a standing preference rather than part of the transcript, so
     // it is restored before the early return below. Otherwise clearing the card
     // and restarting the shell would silently drop WEB back to LOCAL.
-    root.mode = data.mode === "web" ? "web" : "local"
+    root.mode = data.mode === "web" || data.mode === "code" ? data.mode : "local"
     if (!data.entries || data.entries.length === 0) return
 
     entries.clear()
@@ -187,6 +187,18 @@ Item {
     ? String(manifest["__sourceDir"])
     : Quickshell.env("HOME") + "/.config/omarchy/plugins/soham.omagent"
   readonly property string routerPath: pluginDir + "/omagent-route"
+  readonly property string harnessViewerPath: pluginDir + "/omagent-harness-view"
+
+  function openHarness() {
+    root.dismiss()
+    var home = Quickshell.env("HOME")
+    var cwd = home + "/Work"
+    var appId = "org.omarchy.omagent.harness"
+    Quickshell.execDetached({
+      command: ["omarchy-launch-or-focus-tui", "--app-id=" + appId, root.harnessViewerPath],
+      workingDirectory: cwd
+    })
+  }
 
   // A payload may set the mode so a future keybinding can jump straight to
   // WEB, e.g. omarchy-shell shell toggle soham.omagent '{"mode":"web"}'
@@ -197,7 +209,7 @@ Item {
     } catch (error) {
       payload = null
     }
-    if (payload && (payload.mode === "web" || payload.mode === "local"))
+    if (payload && (payload.mode === "web" || payload.mode === "local" || payload.mode === "code"))
       root.mode = payload.mode
     root.opened = true
     prompt.text = ""
@@ -223,7 +235,7 @@ Item {
   function pushRow(kind, text) {
     if (!text) return
     var last = entries.count > 0 ? entries.get(entries.count - 1) : null
-    if (kind === "tool" && last && last.rowKind === "tool") {
+    if (kind === "tool" && last && last.rowKind === "tool" && !root.codeMode) {
       var steps = last.rowLines.split("\n")
       steps.push(String(text))
       while (steps.length > 40) steps.shift()
@@ -418,7 +430,7 @@ Item {
   }
 
   function setMode(next) {
-    if (next !== "local" && next !== "web") return
+    if (next !== "local" && next !== "web" && next !== "code") return
     if (next === root.mode) return
     root.mode = next
     root.save()
@@ -426,12 +438,13 @@ Item {
   }
 
   function toggleMode() {
-    root.setMode(root.mode === "web" ? "local" : "web")
+    root.setMode(root.mode === "local" ? "web" : (root.mode === "web" ? "code" : "local"))
   }
 
   readonly property bool webMode: root.mode === "web"
-  readonly property string modeLabel: root.webMode ? "WEB" : "LOCAL"
-  readonly property color modeTint: root.webMode ? Color.accent : Color.menu.text
+  readonly property bool codeMode: root.mode === "code"
+  readonly property string modeLabel: root.webMode ? "WEB" : (root.codeMode ? "CODE" : "LOCAL")
+  readonly property color modeTint: root.webMode ? Color.accent : (root.codeMode ? "#cba6f7" : Color.menu.text)
 
   function toggleDictation() {
     prompt.forceActiveFocus()
@@ -497,6 +510,17 @@ Item {
     stdout: SplitParser {
       onRead: function(data) { root.updateDictation(data) }
     }
+  }
+
+  function lastCodeSteps() {
+    var steps = []
+    for (var i = entries.count - 1; i >= 0 && steps.length < 8; i--) {
+      var row = entries.get(i)
+      if (row.rowKind === "tool" || row.rowKind === "status") {
+        steps.unshift(row.rowText)
+      }
+    }
+    return steps.length > 0 ? steps.join("\n") : (root.runState === "running" ? "Harness is running…" : "No steps recorded yet.")
   }
 
   PanelWindow {
@@ -697,6 +721,11 @@ Item {
                 } else if (event.key === Qt.Key_T) {
                   root.toggleMode()
                   event.accepted = true
+                } else if (event.key === Qt.Key_E) {
+                  if (root.codeMode) {
+                    root.openHarness()
+                  }
+                  event.accepted = true
                 } else if (event.key === Qt.Key_Y) {
                   root.copyLast()
                   event.accepted = true
@@ -741,7 +770,7 @@ Item {
                 ? "Transcribing…"
                 : (root.hasHistory
                   ? "Follow up…"
-                  : (root.webMode ? "Ask the web…" : "Ask from memory…")))
+                  : (root.webMode ? "Ask the web…" : (root.codeMode ? "Ask the agent…" : "Ask from memory…"))))
             color: Color.menu.text
             opacity: root.dictationState === "idle" ? 0.44 : 0.72
             font.family: Style.font.menuFamily
@@ -756,7 +785,8 @@ Item {
           // Sized to the wider of the two words so the pill does not resize
           // every time the mode flips.
           readonly property int slot: Math.max(localWord.implicitWidth,
-                                               webWord.implicitWidth)
+                                               webWord.implicitWidth,
+                                               codeWord.implicitWidth)
           width: slot + Style.space(20)
           height: parent.height
 
@@ -771,6 +801,13 @@ Item {
             id: webWord
             visible: false
             text: "WEB"
+            font: modeLabel.font
+          }
+
+          Text {
+            id: codeWord
+            visible: false
+            text: "CODE"
             font: modeLabel.font
           }
 
@@ -1236,6 +1273,17 @@ Item {
               horizontalPadding: Style.space(7)
               verticalPadding: Style.space(3)
               onClicked: root.copyLast()
+            }
+
+            Button {
+              text: "Harness ^E"
+              tooltipText: "Ctrl+E \u2014 open the background Antigravity harness in the terminal"
+              visible: root.codeMode
+              fontSize: Style.font.caption
+              foreground: Color.muted
+              horizontalPadding: Style.space(7)
+              verticalPadding: Style.space(3)
+              onClicked: root.openHarness()
             }
 
             Button {

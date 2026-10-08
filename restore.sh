@@ -558,7 +558,7 @@ find "${USER_HOME}/.config/omarchy/plugins" -type d \( -name scripts -o -name bi
 if [[ -f "${USER_HOME}/.config/omarchy/plugins/soham.easyeffects/purge-preset.sh" ]]; then
   chmod +x "${USER_HOME}/.config/omarchy/plugins/soham.easyeffects/purge-preset.sh"
 fi
-for om_route in "${USER_HOME}/.config/omarchy/plugins"/soham.omagent/omagent-route "${USER_HOME}/.config/omarchy/plugins"/io.github.ellion369.omagent/omagent-route; do
+for om_route in "${USER_HOME}/.config/omarchy/plugins"/soham.omagent/omagent-route "${USER_HOME}/.config/omarchy/plugins"/soham.omagent/omagent-harness-view "${USER_HOME}/.config/omarchy/plugins"/io.github.ellion369.omagent/omagent-route; do
   if [[ -f "$om_route" ]]; then
     chmod +x "$om_route"
   fi

@@ -3,8 +3,9 @@
 A question box for [Omarchy](https://omarchy.org). Press `ALT + SPACE`, type a
 question, and the answer appears in a card on screen.
 
-**The pill answers in the UI itself.** It calls the Gemini API directly and
-streams the reply into the card. It does not open a terminal and does not launch
+**The pill answers in the UI itself.** `LOCAL` calls the Gemini API directly and
+streams the reply into the card; `WEB` searches DuckDuckGo and prints the
+results. It does not open a terminal and does not launch
 `agy`, `opencode`, `claude`, `codex`, or any other agent CLI — a one-line
 question should not cost you a window.
 
@@ -57,7 +58,7 @@ in the pill or the button in the card footer.
 | Mode | What it sends |
 |---|---|
 | `LOCAL` | The model plus a system instruction saying it has no internet. No tools are attached, so there is nothing to search with. |
-| `WEB` | The same, plus `tools: [{"google_search": {}}]`, so the model can search live and the API returns the sources it used. |
+| `WEB` | A live DuckDuckGo search, answered straight from the results. **No Gemini call and no API key.** |
 
 `LOCAL` is a real capability limit rather than a request: the `google_search`
 tool is simply not offered, so the model cannot reach the network even if it
@@ -74,7 +75,7 @@ The two modes want different models, so each is configured separately.
 | Mode | Default | Why |
 |---|---|---|
 | `LOCAL` | `gemini-3.5-flash-lite` | Answering from memory needs speed, not depth. |
-| `WEB` | `gemini-3.8-flash` | Synthesising an answer from a few search snippets is easy, so this could just as well be the lite model. Set `modelWeb` to `gemini-3.5-flash-lite` for the same ~2s latency as `LOCAL`. |
+| `WEB` | — | WEB does not call Gemini anymore; `modelWeb` is accepted in config for backward compatibility but ignored. |
 
 Measured on a one-line question, median time to first token:
 
@@ -135,22 +136,51 @@ case 11s, capped at 20s. Before, a stalled request could hang past 120s.
 
 ## Web search
 
-`WEB` no longer uses Gemini's `google_search` grounding. That tool is metered
-per query separately from ordinary prompts, so a free-tier key runs out quickly
-and `WEB` died with `You exceeded your current quota` while `LOCAL` kept working.
-
-Instead the router does the search itself and hands the results to the model as
-context, so the model call is an ordinary unmetered prompt.
+`WEB` answers with DuckDuckGo directly — no Gemini key, no quota. The router
+searches and prints the results itself.
 
 | Engine | Key | What it covers |
 |---|---|---|
 | Brave Search | `braveKey` | Real web search. Free tier 2000 queries/month. |
 | DuckDuckGo Instant Answer | none | Encyclopedia entities and a few built-in calculators. |
+| DuckDuckGo `html.duckduckgo.com` | none | Real web search; answers news, products, anything. |
 
-Brave is used when `braveKey` is set. Otherwise DuckDuckGo's Instant Answer API
-is used, which is free and does not bot-block — the same endpoint an earlier
-version of this plugin used. Every other keyless backend was tested and refused
-automated clients:
+Brave is used when `braveKey` is set. Otherwise the Instant Answer API is tried
+first (fast hit for "who is X" / "tell me about X"), and DuckDuckGo's HTML web
+search covers everything else. The HTML endpoint sometimes serves an anti-bot
+challenge page instead of results; that page is detected and treated as "no
+results", not a crash.
+
+The raw hits are then summarised by a free endpoint so WEB replies read like an
+AI answer. The free anonymous backends (Pollinations, LLM7) both 402/429 after
+light use, so a proper setup plugs in a free key:
+
+```json
+{
+  "geminiKey": "your-key",
+  "summaryKey": "your-free-groq-key",
+  "summaryModel": "llama-3.3-70b-versatile",
+  "summaryBaseUrl": "https://api.groq.com/openai/v1"
+}
+```
+
+Groq is free at <https://console.groq.com/keys> (no credit card). Without
+`summaryKey` the router still tries the keyless backends first and then falls
+back to showing raw links with an explaining status line.
+
+### Follow-ups
+
+A short follow-up like `what are his winning % on polymarket?` does not know
+its own subject, and a DuckDuckGo search for the bare words returns nothing
+useful. The router therefore:
+
+1. First asks the summariser whether the previous answer already covers the
+   follow-up. If it does, it answers straight from it.
+2. Otherwise it rewrites the follow-up as a standalone search query (using the
+   previous question/answer for context), searches again, and summarises the
+   fresh results — with the earlier answer passed along as extra context.
+
+Other keyless engines were tested and rejected:
 
 | Backend | Result |
 |---|---|
@@ -185,11 +215,11 @@ conversational scaffolding before searching: `tell me about mount everest` and
 `python programming language`, which is the difference between no results and a
 full Wikipedia abstract.
 
-When a lookup comes back empty the card shows `No web results` and the model is
-told to answer from its own knowledge and say plainly that it could not check.
-It is never given invented citations.
+When a lookup comes back empty the card says
+`No web results. DuckDuckGo returned nothing for this — try rephrasing...`.
+It is never invented, and no model guesses on its own.
 
-If you need real web search without paying Google, add a Brave key:
+If you need a stronger backend, add a Brave key:
 
 ```json
 { "geminiKey": "your-key", "braveKey": "your-brave-key" }

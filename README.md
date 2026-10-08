@@ -102,8 +102,8 @@ Branch: `main`
 - **`omarchy-pretty-screenshot` (`Print`)**: Beautiful window/desktop screenshot tool with wallpaper and gradient frames (`plugins/ricardosuman.pretty-screenshot`).
 - **Visual Workspace Switcher Snapshot Engine**: `plugins/reomarchy.workspace-switcher` with `scripts/capture-previews.sh` utilizing grim to take static PNG snapshots per monitor before overlay summoning, eliminating heavy live screencopy lag.
 - **`omarchy-dictate` (`Super + H`, `Super + Alt + V`)**: Primary Google Gemini 3.5 Transcribe dictation engine with Voxtype Aura HUD integration, local Whisper fallback, and direct wtype text injection.
-- **`soham.clock`**: Custom date/time label and calendar popup plugin tailored for the floating navbar.
-- **`soham.omagent`**: Custom command pill overlay assistant running default coding agent with local/web mode toggle (`Alt + Space`).
+- **`soham.omagent`**: Custom command pill overlay assistant (`Alt + Space`) with tri-mode routing: `LOCAL` (pure Gemini API), `WEB` (direct DuckDuckGo search), and `CODE` (background Antigravity harness execution with `omagent-harness-view` terminal streaming and seamless CLI handover via `Ctrl + E`).
+- **`omagent-agent-status`**: CLI session watcher polling and formatting the latest actions and status from active Antigravity/Omagent sessions.
 - **`omarchy-fix-fingerprint`**: FPC 10a5:9200 fingerprint controller setup, udev persistence, and suspend/resume reset hook.
 - **`cmf-buds-mode`**: CLI utility controlling Active Noise Cancellation modes for Nothing CMF Buds.
 - **`omarchy-dictionary-lookup` (`Super + D`)**: Fast dictionary popup for active text selections with automatic clipboard and primary selection extraction.

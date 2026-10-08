@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""Open and view the background Antigravity harness for Omagent.
+
+If a background turn is actively executing:
+  Streams live progress, step updates, and generated tokens in the terminal.
+  As soon as the turn finishes, hands over cleanly to the interactive Antigravity CLI.
+If no turn is currently active:
+  Immediately launches the interactive Antigravity CLI resumed on the conversation.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+import time
+from pathlib import Path
+
+STATE_DIR = Path.home() / ".local" / "state" / "soham.omagent"
+CONV_FILE = STATE_DIR / "code_conv"
+PID_FILE = STATE_DIR / "live_harness.pid"
+LOG_FILE = STATE_DIR / "live_harness.log"
+
+
+def work_dir() -> Path:
+    home_work = Path.home() / "Work"
+    return home_work if home_work.is_dir() else Path.home()
+
+
+def read_conv_id() -> str:
+    try:
+        return CONV_FILE.read_text(errors="ignore").strip()
+    except OSError:
+        return ""
+
+
+def is_pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def get_active_pid() -> int | None:
+    try:
+        raw = PID_FILE.read_text(errors="ignore").strip()
+        pid = int(raw)
+        return pid if is_pid_alive(pid) else None
+    except (OSError, ValueError):
+        return None
+
+
+def get_colors() -> tuple[str, str, str, str, str]:
+    is_light = False
+    try:
+        import omarchy_theme
+        is_light = omarchy_theme.is_light()
+    except Exception:
+        is_light = os.environ.get("OMARCHY_THEME_MODE", "").lower() == "light"
+
+    if is_light:
+        reset = "\033[0m"
+        bold = "\033[1m"
+        accent = "\033[38;5;91m"     # Royal plum
+        muted = "\033[38;5;240m"    # Dark slate
+        text = "\033[38;5;235m"     # Deep charcoal
+    else:
+        reset = "\033[0m"
+        bold = "\033[1m"
+        accent = "\033[38;5;183m"   # Soft lavender
+        muted = "\033[38;5;246m"    # Muted gray
+        text = "\033[38;5;253m"     # Light foreground
+
+    return reset, bold, accent, muted, text
+
+
+def main() -> int:
+    os.chdir(work_dir())
+    reset, bold, accent, muted, text = get_colors()
+    active_pid = get_active_pid()
+    conv_id = read_conv_id()
+
+    if active_pid is not None:
+        sys.stdout.write(f"\n{accent}{bold}✦ Antigravity Harness{reset} {muted}(Omagent Session){reset}\n")
+        if conv_id:
+            sys.stdout.write(f"{muted}Session:{reset} {text}{conv_id}{reset}\n")
+        sys.stdout.write(f"{muted}Status:{reset}  {accent}Harness is actively working in background…{reset}\n")
+        sys.stdout.write(f"{muted}{'─' * 60}{reset}\n\n")
+        sys.stdout.flush()
+
+        offset = 0
+        if LOG_FILE.is_file():
+            try:
+                content = LOG_FILE.read_text(errors="ignore")
+                sys.stdout.write(content)
+                sys.stdout.flush()
+                offset = LOG_FILE.stat().st_size
+            except OSError:
+                offset = 0
+
+        while is_pid_alive(active_pid):
+            time.sleep(0.15)
+            if LOG_FILE.is_file():
+                try:
+                    curr_size = LOG_FILE.stat().st_size
+                    if curr_size > offset:
+                        with open(LOG_FILE, "r", errors="ignore") as f:
+                            f.seek(offset)
+                            chunk = f.read()
+                            offset = f.tell()
+                        sys.stdout.write(chunk)
+                        sys.stdout.flush()
+                except OSError:
+                    pass
+
+        # Drain any final bytes from the log
+        if LOG_FILE.is_file():
+            try:
+                curr_size = LOG_FILE.stat().st_size
+                if curr_size > offset:
+                    with open(LOG_FILE, "r", errors="ignore") as f:
+                        f.seek(offset)
+                        chunk = f.read()
+                    sys.stdout.write(chunk)
+                    sys.stdout.flush()
+            except OSError:
+                pass
+
+        sys.stdout.write(f"\n\n{accent}{bold}✦ Background turn finished.{reset} {muted}Attaching interactive Antigravity CLI…{reset}\n\n")
+        sys.stdout.flush()
+        time.sleep(0.3)
+        conv_id = read_conv_id()
+
+    # Hand over to interactive agy CLI
+    argv = ["agy"]
+    if conv_id:
+        argv += ["--conversation", conv_id]
+    else:
+        argv += ["-c"]
+
+    try:
+        os.execvp(argv[0], argv)
+    except FileNotFoundError:
+        print(f"Error: Could not execute {argv[0]} CLI.", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -156,7 +156,7 @@ sync_darkreader() {
     return 0
   fi
 
-  if [[ -f "$ext_xpi" || -f "$ext_xpi.orig" ]]; then
+  if [[ -f "$ext_xpi" || -f "$ext_xpi.orig" || -d "$profile_dir/extensions" ]]; then
     if [[ -f "$compiled_css" ]]; then
       cp "$compiled_css" "$DARKREADER_MOD_SRC/ui/popup/omarchy-theme.css"
     fi
@@ -165,7 +165,28 @@ sync_darkreader() {
       cp "$compiled_json" "$DARKREADER_MOD_SRC/config/omarchy-theme.json"
     fi
     mkdir -p "$profile_dir/extensions"
-    (cd "$DARKREADER_MOD_SRC" && zip -q -r9 "$ext_xpi" *)
+    rm -f "$ext_xpi"
+    (cd "$DARKREADER_MOD_SRC" && zip -q -r9 "$ext_xpi" * -x "META-INF/*")
+
+    # Lock extension against AMO auto-updates in extensions.json
+    local ext_json="$profile_dir/extensions.json"
+    if [[ -f "$ext_json" ]]; then
+      local updated_json
+      updated_json=$(jq '
+        if .addons then
+          .addons = [.addons[] | if .id == "addon@darkreader.org" then
+            .applyBackgroundUpdates = 0 |
+            .version = "4.9.999.1" |
+            .signedState = 0 |
+            .active = true |
+            .userDisabled = false |
+            .appDisabled = false
+          else . end]
+        else . end
+      ' "$ext_json" 2>/dev/null || cat "$ext_json")
+      echo "$updated_json" > "$ext_json"
+    fi
+
     echo "[omarchy-sync-zen] Synced Dark Reader mod for profile: $(basename "$profile_dir")"
   fi
 }
@@ -608,6 +629,13 @@ do_restart() {
     kill -9 $(pgrep -x zen) 2>/dev/null || true
     sleep 0.5
   fi
+
+  # Resync profiles and clear addonStartup.json.lz4 while Zen is closed
+  while IFS= read -r p; do
+    [[ -d "$p" ]] || continue
+    rm -f "$p/addonStartup.json.lz4"
+    sync_profile "$p"
+  done < <(get_zen_profiles)
 
   echo "[omarchy-sync-zen] Relaunching Zen Browser..."
   launch_zen

@@ -86,7 +86,7 @@ This repository contains the full snapshot of user customizations:
 - **`tiertek.scratchpad-deck`**: Scratchpad deck manager for quick notes and Hyprland scratchpad toggling (`bin/scratchpad-deck`).
 - **`nguyenn.clipboard`**: Clipboard history plugin with custom "Clear attachments" feature and patch.
 - **`reidenxerx.tile-blueprints`**: Dynamic layout blueprint manager bound to `Super + Alt + L`.
-- **`soham.omagent`**: Soham's personal fork/custom command pill overlay assistant running default coding agent with built-in Local/Web toggle, bound to `Alt + Space`.
+- **`soham.omagent`**: Soham's personal fork/custom command pill overlay assistant running default coding agent with tri-mode routing (`LOCAL`, `WEB`, and `CODE` with background Antigravity harness execution via `omagent-harness-view` and `Ctrl + E`), bound to `Alt + Space`.
 - **`io.github.ellion369.omagent`**: Personal AI Assistant with 3-lane multi-intent router (Flash chat, Web search, Herdr coding execution), Nothing Phone PWA intercom bridge, and Quickshell glass HUD overlay. Refactored to `ui_concepts/v1` architecture:
   - Adaptive execution policy (`omagent_core/execution_policy.py`) sizing work envelopes: `needle` (8 tool calls, 10 min), `standard` (24 tool calls, 45 min), and `sword` (64 tool calls, 4 agents, 90 min).
   - Generates 3 structurally unique concept candidates differing across ≥3 design axes (IA, composition, typography, interaction, motion, asset strategy).
@@ -136,6 +136,7 @@ This repository contains the full snapshot of user customizations:
 - `omarchy-sync-obsidian`: Extracts theme colors and writes them to Obsidian CSS snippets.
 - `omarchy-sync-zen`: Injects Omarchy CSS variables, userChrome.css, userContent.css, and transparency into Zen Browser.
 - `omagent-screenshot`: Headless browser visual verification CLI supporting `--mobile`, `--tablet`, `--full`, with strict `--workspace` confinement and `--allow-host` restrictions.
+- `omagent-agent-status`: Antigravity/Omagent session watcher CLI displaying latest actions and status with live `--follow` support.
 - `omarchy-dictate`: Google Gemini 3.5 transcribe dictation engine with Voxtype Aura HUD visual integration, local Whisper fallback, and direct wtype injection (`Super + H`, `Super + Alt + V`).
 - `omarchy-fix-fingerprint`: FPC 10a5:9200 fingerprint controller setup, udev persistence, and suspend/resume reset hook.
 - `powerwave`: CLI helper to inspect and trigger PowerWave charging animations via Quickshell IPC.

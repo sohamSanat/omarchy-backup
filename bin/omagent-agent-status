@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+"""Print the latest rows from the most recently active Antigravity session.
+
+--follow (or -f): poll once per second and echo only new rows, until killed.
+"""
+
+import json
+import sys
+import time
+from pathlib import Path
+
+SESSIONS = Path.home() / ".local" / "state" / "omagent" / "sessions"
+
+
+def newest_session() -> Path | None:
+    try:
+        candidates = [p for p in SESSIONS.glob("*.json")
+                      if p.is_file() and "." not in p.stem
+                      and not p.name.endswith(".history.json")]
+    except OSError:
+        return None
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def session_rows(path: Path) -> list:
+    try:
+        data = json.loads(path.read_text(errors="ignore"))
+    except (OSError, ValueError):
+        return []
+    rows = data.get("entries") if isinstance(data, dict) else data
+    if not isinstance(rows, list):
+        rows = []
+    return [r for r in rows if isinstance(r, dict)]
+
+
+def main() -> int:
+    follow = "--follow" in sys.argv or "-f" in sys.argv
+    if not follow:
+        newest = newest_session()
+        if newest is None:
+            print("No sessions yet.")
+            return 0
+        for row in session_rows(newest)[-8:]:
+            kind = row.get("rowKind") or "row"
+            text = (row.get("rowText") or row.get("text") or "").strip()
+            if not text:
+                continue
+            print(f"[{kind}] {' '.join(text.split())[:160]}")
+        return 0
+
+    seen = 0
+    last_file = None
+    while True:
+        newest = newest_session()
+        if newest is None:
+            time.sleep(1.0)
+            continue
+        rows = session_rows(newest)
+        if newest != last_file:
+            last_file = newest
+            seen = len(rows)
+            time.sleep(1.0)
+            continue
+        for row in rows[seen:]:
+            kind = row.get("rowKind") or "row"
+            text = (row.get("rowText") or row.get("text") or "").strip()
+            if not text:
+                continue
+            print(f"[{kind}] {' '.join(text.split())[:160]}", flush=True)
+        seen = len(rows)
+        time.sleep(1.0)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

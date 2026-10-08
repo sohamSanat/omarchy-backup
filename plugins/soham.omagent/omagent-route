@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Answer an Omagent request by calling the Gemini API directly.
+"""Answer an Omagent request: Gemini for LOCAL, DuckDuckGo for WEB.
 
 The pill used to hand every prompt to a coding agent CLI and stream that agent's
 output back. That meant opening a terminal for a one-line question. This router
-no longer launches any agent: it calls Gemini over HTTPS, streams the answer, and
+no longer launches any agent: LOCAL calls Gemini over HTTPS and streams the
+answer; WEB searches DuckDuckGo directly and prints what it finds. Either way it
 emits the same line protocol the QML overlay already speaks.
 
 Standard library only, so the plugin has no install step.
@@ -12,10 +13,14 @@ Standard library only, so the plugin has no install step.
 from __future__ import annotations
 
 import http.client
+import html as html_module
 import json
 import os
+import re
+import shutil
 import signal
 import socket
+import subprocess
 import sys
 import time
 import urllib.error
@@ -75,6 +80,7 @@ PREAMBLE = (
 
 MODE_LOCAL = "local"
 MODE_WEB = "web"
+MODE_CODE = "code"
 
 # The rule rides in systemInstruction on every request. In LOCAL nothing is
 # searched and no results are supplied, so "no internet" holds because there is
@@ -94,12 +100,18 @@ MODE_RULES = {
         "documentation. If no results were supplied, say that you could not "
         "check rather than presenting your own knowledge as current fact."
     ),
+    MODE_CODE: (
+        "Hand the request to the default coding agent. No web search, no model "
+        "call in this router; the coding agent handles the rest."
+    ),
 }
 
 DRY_RUN = os.environ.get("OMAGENT_DRY_RUN") == "1"
 DEBUG = os.environ.get("OMAGENT_DEBUG") == "1"
 
 EMITTED_ERROR = False
+ACTIVE_PROC: subprocess.Popen | None = None
+
 
 
 def emit(kind: str, **fields: object) -> None:
@@ -292,6 +304,81 @@ def ddg_instant_answer(query: str) -> list[dict]:
     return found[:4]
 
 
+def strip_html(fragment: str) -> str:
+    return html_module.unescape(re.sub(r"<[^>]+>", "", fragment)).strip()
+
+
+def http_post_text(url: str, data: bytes, timeout: int,
+                   headers: dict | None = None) -> str | None:
+    parts = urllib.parse.urlsplit(url)
+    conn = http.client.HTTPSConnection(parts.hostname, timeout=timeout)
+    try:
+        conn.request("POST", parts.path, body=data,
+                     headers={"Content-Type": "application/x-www-form-urlencoded",
+                              **(headers or {})})
+        response = conn.getresponse()
+        if response.status != 200:
+            return None
+        return response.read().decode("utf-8", "replace")
+    except (OSError, http.client.HTTPException):
+        return None
+    finally:
+        conn.close()
+
+
+def ddg_web_search(query: str) -> list[dict]:
+    """Best-effort real web results from DuckDuckGo's HTML endpoint.
+
+    There is no key. The endpoint usually serves results to a browser user
+    agent, but occasionally it answers with an anti-bot challenge page; that
+    page is detected and treated as "no results" rather than a crash.
+    """
+    for attempt in (1, 2):
+        page = http_post_text(
+            "https://html.duckduckgo.com/html/",
+            urllib.parse.urlencode({"q": query}).encode("utf-8"),
+            SEARCH_TIMEOUT,
+            {"User-Agent": ("Mozilla/5.0 (X11; Linux x86_64; rv:128.0) "
+                            "Gecko/20100101 Firefox/128.0" if attempt == 1 else
+                            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/124.0 Safari/537.36"),
+             "Accept": "text/html",
+             "Referer": "https://duckduckgo.com/"},
+        )
+        if page and "challenge-form" not in page and "anomaly-modal" not in page:
+            break
+        if attempt == 1:
+            time.sleep(1.5)
+    else:
+        return None  # type: ignore[return-value]
+    if not page:
+        return []
+    if "challenge-form" in page or "anomaly-modal" in page:
+        return None  # type: ignore[return-value]
+
+    titles = re.findall(r'<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
+                        page, re.DOTALL)
+    snippets = re.findall(r'class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>',
+                          page, re.DOTALL)
+
+    found: list[dict] = []
+    for index, (href, title_html) in enumerate(titles):
+        title = clip(strip_html(title_html), 120, collapse=True)
+        text = clip(strip_html(snippets[index]), MAX_SOURCE_CHARS) if index < len(snippets) else ""
+        if not title and not text:
+            continue
+        real_url = href
+        parsed = urllib.parse.urlparse(href if href.startswith("http") else f"https:{href}")
+        uddg = urllib.parse.parse_qs(parsed.query).get("uddg")
+        if uddg:
+            real_url = uddg[0]
+        found.append({"title": title, "text": text, "url": real_url})
+        if len(found) >= 5:
+            break
+    return found
+
+
 def search_query(text: str) -> str:
     """Reduce a conversational question to something entity-like.
 
@@ -304,9 +391,10 @@ def search_query(text: str) -> str:
     prefixes = (
         "tell me about", "can you tell me about", "i want to know about",
         "give me information about", "what do you know about",
+        "news regarding", "regarding", "news on", "latest on", "news about",
         "who is", "who was", "who are", "what is", "what are", "what was",
         "tell me", "explain", "describe", "define", "information about",
-        "details about", "info on", "news about", "latest on",
+        "details about", "info on",
     )
     changed = True
     while changed:
@@ -319,17 +407,311 @@ def search_query(text: str) -> str:
     return cleaned or " ".join(str(text or "").split()).strip()
 
 
-def gather_sources(query: str, mode: str, brave_key: str) -> tuple[list[dict], str]:
-    """Look the question up ourselves. Brave first when a key is configured."""
+def gather_sources(query: str, mode: str, brave_key: str) -> tuple[list[dict], str, bool]:
+    """Look the question up ourselves. Brave first when a key is configured,
+    then DuckDuckGo's Instant Answer API for entity lookups, then a real
+    best-effort DuckDuckGo web search. The third return value means DDG
+    rate-limited/challenged us."""
     if mode != MODE_WEB:
-        return [], ""
+        return [], "", False
     lookup = search_query(query)
     if brave_key:
         results = brave_search(lookup, brave_key)
         if results:
-            return results, "Brave Search"
-    results = ddg_instant_answer(lookup)
-    return (results, "DuckDuckGo") if results else ([], "")
+            return results, "Brave Search", False
+    direct = ddg_instant_answer(lookup)
+    if direct:
+        return direct, "DuckDuckGo", False
+    web = ddg_web_search(lookup)
+    if web:
+        return web, "DuckDuckGo", False
+    if web is None:
+        return [], "", True  # DuckDuckGo challenged/rate-limited us
+    return [], "", False
+
+
+def https_post_json(url: str, payload: dict, timeout: int) -> str | None:
+    parts = urllib.parse.urlsplit(url)
+    conn = http.client.HTTPSConnection(parts.hostname, timeout=timeout)
+    try:
+        conn.request("POST", parts.path,
+                     body=json.dumps(payload).encode("utf-8"),
+                     headers={"Content-Type": "application/json",
+                              "Accept": "text/plain, application/json"})
+        response = conn.getresponse()
+        if response.status != 200:
+            return None
+        return response.read().decode("utf-8", "replace").strip()
+    except (OSError, ValueError, http.client.HTTPException):
+        return None
+    finally:
+        conn.close()
+
+
+SUMMARY_TIMEOUT = 20
+SUMMARY_MODEL = "openai"
+
+
+def pollinations(prompt: str, timeout: int = SUMMARY_TIMEOUT) -> str | None:
+    """Keyless chat completion, used to (pre-)research web questions.
+
+    LLM7.io currently accepts requests without an API key; Pollinations used to
+    work but started returning 402/"budget exhausted" for every anonymous
+    request, so it is no longer the primary backend.
+    """
+    payload = {"model": "default",
+               "messages": [{"role": "user", "content": prompt}],
+               "temperature": 0.3, "max_tokens": 600}
+    for attempt in (1, 2):
+        reply = https_post_json("https://api.llm7.io/v1/chat/completions",
+                                payload, timeout)
+        if not reply:
+            if attempt == 1:
+                time.sleep(1.0)
+            continue
+        try:
+            data = json.loads(reply)
+            content = (data.get("choices") or [{}])[0].get("message", {}).get("content")
+            if content:
+                return clip(str(content).strip(), 2000)
+        except (ValueError, IndexError, TypeError, KeyError):
+            pass
+        if attempt == 1:
+            time.sleep(1.0)
+
+    # Keyless endpoints (Pollinations, LLM7) both 402/429 once you use them a
+    # bit, so support a real OpenAI-compatible key (Groq is free, no billing):
+    key = os.environ.get("OMAGENT_SUMMARY_KEY") or ""
+    base = os.environ.get("OMAGENT_SUMMARY_BASE_URL",
+                                    "https://api.groq.com/openai/v1")
+    model = os.environ.get("OMAGENT_SUMMARY_MODEL", "llama-3.3-70b-versatile")
+    path = config_path()
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(errors="ignore"))
+            if isinstance(data, dict):
+                key = str(data.get("summaryKey") or "").strip()
+                base = str(data.get("summaryBaseUrl") or base).strip()
+                model = str(data.get("summaryModel") or model).strip()
+        except (OSError, ValueError):
+            pass
+    key = os.environ.get("OMAGENT_SUMMARY_KEY") or key
+    if key:
+        payload = {"model": model,
+                   "messages": [{"role": "user", "content": prompt}],
+                   "temperature": 0.3, "max_tokens": 600}
+        parts = urllib.parse.urlsplit(base)
+        conn = http.client.HTTPSConnection(parts.hostname, timeout=timeout)
+        try:
+            conn.request("POST", parts.path.rstrip("/") + "/chat/completions",
+                         body=json.dumps(payload).encode("utf-8"),
+                         headers={"Content-Type": "application/json",
+                                  "Authorization": f"Bearer {key}"})
+            response = conn.getresponse()
+            if response.status == 200:
+                data = json.loads(response.read().decode("utf-8", "replace"))
+                content = (data.get("choices") or [{}])[0].get("message", {}).get("content")
+                if content:
+                    return clip(str(content).strip(), 2000)
+        except (OSError, ValueError, http.client.HTTPException):
+            pass
+        finally:
+            conn.close()
+
+    # Last resort: reuse the user's own Gemini key just for this summarising
+    # step if any keyless path failed. Search is still DuckDuckGo.
+    gemini_key = os.environ.get("OMAGENT_GEMINI_KEY") or ""
+    path = config_path()
+    if not gemini_key and path.is_file():
+        try:
+            data = json.loads(path.read_text(errors="ignore"))
+            if isinstance(data, dict):
+                gemini_key = str(data.get("geminiKey") or "").strip()
+        except (OSError, ValueError):
+            pass
+    if gemini_key and "PASTE" not in gemini_key:
+        body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": {"maxOutputTokens": 1200, "temperature": 0.3}}
+        conn = http.client.HTTPSConnection(API_HOST, timeout=timeout)
+        try:
+            conn.request("POST",
+                         f"/v1beta/models/{DEFAULT_LOCAL_MODEL}:generateContent?key={urllib.parse.quote(gemini_key)}",
+                         body=json.dumps(body).encode("utf-8"),
+                         headers={"Content-Type": "application/json"})
+            response = conn.getresponse()
+            if response.status == 200:
+                data = json.loads(response.read().decode("utf-8", "replace"))
+                parts = (((data.get("candidates") or [{}])[0]
+                          .get("content", {}).get("parts")) or [])
+                text = "".join(str(p.get("text") or "") for p in parts).strip()
+                if text:
+                    return clip(text, 2000)
+        except (OSError, ValueError, http.client.HTTPException):
+            pass
+        finally:
+            conn.close()
+    return None
+
+
+FOLLOWUP_MARKERS = (
+    "it ", "its ", "his ", "her ", "their ", "they ", "he ", "she ",
+    "that ", "those ", "these ", "this ", "him ", "them ", "its",
+    "what about", "how about", "and ", "also ", "so ",
+)
+
+
+def fresh_query(request: str) -> str:
+    """Bias time-sensitive web queries toward the current year."""
+    text = request.strip()
+    low = text.lower()
+    if any(trigger in low for trigger in (
+        "this season", "current season", "latest", "news", "right now",
+        "this year", "today", "recent",
+    )):
+        year = str(time.localtime().tm_year)
+        if year not in text:
+            return f"{text} {year}"
+    return text
+
+
+def looks_like_followup(request: str, history: list[dict]) -> bool:
+    has_prior_user = any(t.get("r") == "user" for t in history[-6:])
+    if not has_prior_user:
+        return False
+    text = request.strip().lower()
+    if len(text) <= 45:
+        return True
+    return text.startswith(FOLLOWUP_MARKERS) or any(
+        token in text for token in FOLLOWUP_MARKERS
+    )
+
+
+def last_answer_text(history: list[dict]) -> str:
+    for turn in reversed(history):
+        if turn.get("r") != "user" and str(turn.get("t") or "").strip():
+            return str(turn["t"])
+    return ""
+
+
+def last_user_text(history: list[dict]) -> str:
+    for turn in reversed(history):
+        if turn.get("r") == "user" and str(turn.get("t") or "").strip():
+            return str(turn["t"])
+    return ""
+
+
+def answer_from_primary(request: str, primary: str) -> str | None:
+    """Try to answer a follow-up from the previous answer itself.
+
+    Returns the answer text, or None when the previous answer cannot cover it.
+    """
+    prompt = (
+        "The previous exchange was:\n"
+        f"Answer: {primary}\n\n"
+        f"New question: {request}\n\n"
+        "If the new question is answered by the previous answer, answer it "
+        "with the detail the previous material supports; otherwise reply with "
+        "exactly NO_ANSWER and nothing else."
+    )
+    reply = pollinations(prompt, timeout=12)
+    if not reply:
+        return None
+    if reply.strip().upper().startswith("NO_ANSWER"):
+        return None
+    return reply
+
+
+def summary_gives_up(summary: str) -> bool:
+    low = summary.lower()
+    return any(marker in low for marker in (
+        "do not contain", "does not contain", "cannot be answered",
+        "could not find", "no information", "not contain", "does not answer",
+        "results do not", "insufficient",
+    ))
+
+
+def refined_search_query(request: str, history: list[dict]) -> str:
+    prompt = (
+        f"The first web search for this question did not answer it: {request}\n\n"
+        "Write ONE short different web search query (max 12 words) that would "
+        "find direct reactions, fan comments, quotes or community discussion "
+        "about the same thing. Reply with only the query."
+    )
+    rewritten = pollinations(prompt, timeout=10)
+    if rewritten and 3 <= len(rewritten) <= 120:
+        return fresh_query(rewritten.strip().strip('"'))
+    return fresh_query(contextual_search_query(request, history))
+
+
+def contextual_search_query(request: str, history: list[dict]) -> str:
+    """Make a follow-up searchable by giving it its missing subject."""
+    last_q = last_user_text(history)
+    if not last_q:
+        return request
+    prompt = (
+        "Conversation so far:\n"
+        f"User: {last_q}\n"
+        f"Assistant: {last_answer_text(history)[:800]}\n\n"
+        f"The user now asks: {request}\n\n"
+        "Write a short standalone web search query (max 12 words) that adds "
+        "the missing subject or context from the conversation. Reply with "
+        "only the query, nothing else."
+    )
+    rewritten = pollinations(prompt, timeout=10)
+    if rewritten and 3 <= len(rewritten) <= 120:
+        return rewritten.strip().strip('"')
+    # Fallback: glue the previous question's topic onto the follow-up.
+    base = search_query(last_q)
+    return f"{base} {request}"
+
+
+def summarize_web_answer(request: str, sources: list[dict],
+                         primary: str = "", relaxed: bool = False) -> str | None:
+    """Turn raw search hits into a plain-language answer, no API key.
+
+    Uses Pollinations' anonymous web endpoint. Any failure returns None so the
+    caller can fall back to printing the raw links.
+    """
+    lines = []
+    for index, item in enumerate(sources, 1):
+        lines.append(f"[{index}] {item['title']}".strip())
+        if item.get("text"):
+            lines.append(item["text"])
+        if item.get("url"):
+            lines.append(item["url"])
+        lines.append("")
+    context = f"Earlier answer that may help: {primary[:600]}\n\n" if primary else ""
+    today = time.strftime("%Y-%m-%d")
+    prompt = (
+        "Answer the user's question using only the web results below. "
+        "Be detailed: aim for 6-10 bullet lines, plain text, no markdown. "
+        "Include concrete names, numbers, dates, and any quotes worth quoting. "
+        "Do NOT start with disclaimers like 'the results do not answer' or "
+        "'the results do not directly address'. "
+        "If no exact answer is visible, just give the closest relevant "
+        "information from the results as the answer, phrased directly. "
+        "Never say that the results are insufficient, do not contain, or "
+        "fail to address the question.\n\n"
+        + context +
+        f"The current date is {today}. Assume results from over a year ago "
+        "are outdated unless the question is not time-sensitive.\n\n"
+        f"Question: {request}\n\nResults:\n" + "\n".join(lines)
+    )
+    return pollinations(prompt)
+
+
+def format_web_results(sources: list[dict]) -> str:
+    """Plain-text answer built from the search hits themselves."""
+    lines: list[str] = []
+    for index, item in enumerate(sources, 1):
+        title = clip(item["title"] or item["url"] or "Untitled", 110, collapse=True)
+        lines.append(f"{index}. {title}")
+        if item["text"]:
+            lines.append(f"   {clip(item['text'], 220, collapse=True)}")
+        if item["url"]:
+            lines.append(f"   {item['url']}")
+        lines.append("")
+    return "\n".join(lines).strip()
 
 
 def trim_history(raw: str) -> list[dict]:
@@ -387,6 +769,20 @@ def error_text(code: int, status: str, message: str, mode: str) -> str:
 
 
 def stop(_signum: int, _frame: object) -> None:
+    global ACTIVE_PROC
+    try:
+        CODE_PID_FILE.unlink(missing_ok=True)
+    except Exception:
+        pass
+    if ACTIVE_PROC is not None:
+        try:
+            ACTIVE_PROC.terminate()
+            ACTIVE_PROC.wait(timeout=0.4)
+        except Exception:
+            try:
+                ACTIVE_PROC.kill()
+            except Exception:
+                pass
     emit("done", ok=False, code=130, stopped=True)
     os._exit(130)
 
@@ -464,9 +860,216 @@ def sse_events(model: str, body: dict, key: str, mode: str):
         conn.close()
 
 
+CODE_STATE_DIR = Path.home() / ".local" / "state" / "soham.omagent"
+CODE_CONV_FILE = CODE_STATE_DIR / "code_conv"
+CODE_PID_FILE = CODE_STATE_DIR / "live_harness.pid"
+CODE_LOG_FILE = CODE_STATE_DIR / "live_harness.log"
+
+
+
+def work_dir() -> Path:
+    # Antigravity is run from ~/Work when it exists, like the detach TUI
+    # launcher does, so the agent acts in your working directory.
+    home_work = Path.home() / "Work"
+    return home_work if home_work.is_dir() else Path.home()
+
+
+def read_code_conv() -> str:
+    try:
+        return CODE_CONV_FILE.read_text(errors="ignore").strip()
+    except OSError:
+        return ""
+
+
+def write_code_conv(conv_id: str) -> None:
+    try:
+        CODE_CONV_FILE.parent.mkdir(parents=True, exist_ok=True)
+        CODE_CONV_FILE.write_text(conv_id)
+    except OSError:
+        pass
+
+
+def clear_code_conv() -> None:
+    try:
+        CODE_CONV_FILE.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def format_tool_message(tool_name: str, params: dict, state: str = "ACTIVE") -> str:
+    """Turn a tool execution event into an informative, human-readable live update."""
+    action = str(params.get("toolAction") or "").strip().strip('"\'')
+    summary = str(params.get("toolSummary") or "").strip().strip('"\'')
+    desc = str(params.get("Description") or "").strip().strip('"\'')
+
+    def short_path(p: str) -> str:
+        if not p:
+            return ""
+        clean_p = p.strip().strip('"\'')
+        try:
+            path = Path(clean_p)
+            home = Path.home()
+            if path == home:
+                return "~"
+            if home in path.parents:
+                return f"~/{path.relative_to(home)}"
+            return path.name or clean_p
+        except Exception:
+            return clean_p
+
+    # 1. File creation / writing
+    if tool_name in ("write_to_file",):
+        target = short_path(str(params.get("TargetFile") or params.get("path") or ""))
+        if state == "ACTIVE":
+            if action:
+                return f"{action}: {target}" if target else action
+            return f"Making file: {target}" if target else "Making file…"
+        else:  # DONE
+            return f"Created {target} · Double-checking code…" if target else "File created · Double-checking code…"
+
+    # 2. File editing / modifying
+    elif tool_name in ("replace_file_content", "multi_replace_file_content", "sed_file", "notebook_edit"):
+        target = short_path(str(params.get("TargetFile") or params.get("path") or ""))
+        instr = str(params.get("Instruction") or desc or "").strip().strip('"\'')
+        if state == "ACTIVE":
+            if action:
+                return f"{action}: {target}" if target else action
+            if instr:
+                return f"Editing {target} ({clip(instr, 60)})" if target else f"Editing file: {clip(instr, 60)}"
+            return f"Editing {target}" if target else "Editing file…"
+        else:
+            return f"Updated {target} · Verifying changes…" if target else "File updated · Verifying changes…"
+
+    # 3. Running commands
+    elif tool_name in ("run_command", "send_command_input", "execute_browser_javascript"):
+        cmd = str(params.get("CommandLine") or params.get("command") or "").strip().strip('"\'')
+        if state == "ACTIVE":
+            if action:
+                return f"{action}: {clip(cmd, 70, collapse=True)}" if cmd else action
+            return f"Running: {clip(cmd, 80, collapse=True)}" if cmd else "Running command…"
+        else:
+            return "Command finished · Reviewing output…"
+
+    # 4. Viewing / inspecting files
+    elif tool_name in ("view_file", "read_resource"):
+        target = short_path(str(params.get("AbsolutePath") or params.get("TargetFile") or params.get("path") or ""))
+        if state == "ACTIVE":
+            if action:
+                return f"{action}: {target}" if target else action
+            return f"Reading {target}" if target else "Reading file…"
+        else:
+            return ""
+
+    # 5. Searching / grep
+    elif tool_name in ("grep_search", "find_by_name"):
+        q = str(params.get("query") or params.get("Pattern") or "").strip().strip('"\'')
+        if state == "ACTIVE":
+            return f"Searching code: {clip(q, 60)}" if q else "Searching codebase…"
+        else:
+            return ""
+
+    # 6. Listing directories
+    elif tool_name in ("list_dir",):
+        target = short_path(str(params.get("Directory") or params.get("Path") or ""))
+        if state == "ACTIVE":
+            return f"Checking directory: {target}" if target else "Checking directory…"
+        else:
+            return ""
+
+    # 7. Web / URL fetching
+    elif tool_name in ("search_web",):
+        q = str(params.get("query") or "").strip().strip('"\'')
+        if state == "ACTIVE":
+            return f"Searching web: {clip(q, 60)}" if q else "Searching web…"
+        else:
+            return ""
+    elif tool_name in ("read_url_content", "open_browser_url"):
+        url = str(params.get("Url") or params.get("url") or "").strip()
+        if state == "ACTIVE":
+            return f"Fetching URL: {clip(url, 70)}" if url else "Fetching web page…"
+        else:
+            return ""
+
+    # 8. Subagents & tasks
+    elif tool_name in ("invoke_subagent",):
+        subs = params.get("Subagents") or []
+        role = ""
+        if isinstance(subs, list) and subs and isinstance(subs[0], dict):
+            role = str(subs[0].get("Role") or subs[0].get("TypeName") or "")
+        if state == "ACTIVE":
+            return f"Launching subagent: {role}" if role else "Launching subagent…"
+        else:
+            return f"Subagent {role} finished" if role else ""
+    elif tool_name in ("manage_task",):
+        act = str(params.get("Action") or "").strip()
+        if state == "ACTIVE":
+            return f"Managing task: {act}" if act else "Managing background task…"
+        else:
+            return ""
+
+    # Fallback to action/summary/desc or friendly tool name
+    if state == "ACTIVE":
+        if action:
+            return action
+        if summary:
+            return summary
+        if desc:
+            return clip(desc, 80)
+        friendly = tool_name.replace("_", " ").strip().capitalize()
+        return f"Doing {friendly}…"
+    return ""
+
+
+def format_code_summary(
+    response: str,
+    created_files: list[str] | None = None,
+    modified_files: list[str] | None = None,
+    commands_run: list[str] | None = None,
+) -> str:
+    """Format a clean, concise completion summary without raw code blocks."""
+    # 1. Remove all fenced code blocks ```...```
+    cleaned = re.sub(r"```[\s\S]*?```", "", response or "")
+
+    # 2. Remove markdown headings (### Heading, etc.)
+    cleaned = re.sub(r"^#+\s*.*$", "", cleaned, flags=re.MULTILINE)
+
+    # 3. Remove common lead-in boilerplate that introduced code blocks
+    cleaned = re.sub(
+        r"(?i)\b(here is the code|here's the code|compile and run|compile & run|run it using|you can run it using|you can run this|to run this|output:)\s*:?",
+        "",
+        cleaned,
+    )
+
+    # 4. Strip markdown file links: [`file`](file://...) -> file
+    cleaned = re.sub(r"\[`?([^\]`]+)`?\]\(file://[^\)]+\)", r"\1", cleaned)
+    cleaned = re.sub(r"\[`?([^\]`]+)`?\]\([^\)]+\)", r"\1", cleaned)
+
+    # 5. Clean up inline backticks around filenames or single words
+    cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)
+
+    # 6. Clean empty lines and trailing colons
+    lines = [line.strip().rstrip(":") for line in cleaned.splitlines() if line.strip()]
+    text = " ".join(lines).strip()
+
+    parts: list[str] = []
+    if text:
+        text = text.rstrip(" :-,")
+        if not text.endswith((".", "!", "?")):
+            text += "."
+        parts.append(text)
+
+    lower = text.lower()
+    if "works as intended" not in lower and "working as intended" not in lower:
+        parts.append("Everything works as intended.")
+
+    final = " ".join(parts).strip()
+    return final or "Everything works as intended."
+
+
+
 def stream(request: str, history: list[dict], mode: str) -> int:
     key, model, brave_key = load_config(mode)
-    if not key:
+    if not key and mode == "local":
         emit("error", text="No API key. Add geminiKey to "
                            f"{config_path()} or set OMAGENT_GEMINI_KEY.")
         emit("done", ok=False, code=1, stopped=False)
@@ -475,11 +1078,256 @@ def stream(request: str, history: list[dict], mode: str) -> int:
     for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(sig, stop)
 
-    # Search first, so the model call is an ordinary prompt with no metered
-    # grounding tool attached. A backend failure just means no sources.
-    found, engine = gather_sources(request, mode, brave_key)
+    if mode == MODE_CODE:
+        if DRY_RUN:
+            emit("agent", name="antigravity", label="Antigravity", model="",
+                 mode=mode, web=False, engine=None, sources=0)
+            emit("status", text="Would run: agy --print <request> --output-format stream-json --dangerously-skip-permissions"
+                           + (" --conversation <saved-id>" if read_code_conv() else ""))
+            emit("done", ok=True, code=0, stopped=False)
+            return 0
+        if shutil.which("agy") is None and shutil.which("antigravity") is None:
+            emit("error", text="agy/antigravity not installed. Choose one with: omarchy default agent <name>")
+            emit("done", ok=False, code=1, stopped=False)
+            return 1
+        if not history:
+            # New pill thread → fresh harness conversation.
+            clear_code_conv()
+        conv_id = read_code_conv()
+
+        emit("status", text="Launching Antigravity harness…")
+
+        argv = ["agy", "--print", request, "--output-format", "stream-json",
+                "--dangerously-skip-permissions"]
+        if conv_id:
+            argv += ["--conversation", conv_id]
+
+        said_text = False
+        emitted_result = False
+        last_status = ""
+
+        def emit_status(text: str) -> None:
+            nonlocal last_status
+            clean = text.strip()
+            if clean and clean != last_status:
+                last_status = clean
+                emit("status", text=clean)
+                try:
+                    with open(CODE_LOG_FILE, "a", errors="ignore") as f:
+                        f.write(f"[{time.strftime('%H:%M:%S')}] • {clean}\n")
+                except OSError:
+                    pass
+
+        global ACTIVE_PROC
+        try:
+            proc = subprocess.Popen(argv, cwd=str(work_dir()),
+                                    stdout=subprocess.PIPE, text=True, bufsize=1)
+            ACTIVE_PROC = proc
+            try:
+                CODE_STATE_DIR.mkdir(parents=True, exist_ok=True)
+                CODE_PID_FILE.write_text(str(proc.pid))
+                CODE_LOG_FILE.write_text(f"[{time.strftime('%H:%M:%S')}] Launching Antigravity harness…\n")
+            except OSError:
+                pass
+        except OSError as error:
+            emit("error", text=f"Cannot start agy: {error}")
+            emit("done", ok=False, code=1, stopped=False)
+            return 1
+
+        active_tools: dict[int, tuple[str, dict]] = {}
+        created_files: list[str] = []
+        modified_files: list[str] = []
+        commands_run: list[str] = []
+
+        try:
+            for line in proc.stdout or []:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                except ValueError:
+                    continue
+                ev_name = ev.get("event")
+                if ev_name == "init":
+                    new_conv = ev.get("conversation_id") or ""
+                    if new_conv:
+                        write_code_conv(new_conv)
+                    init_data = ev.get("init") or {}
+                    model_name = str(init_data.get("model") or "")
+                    emit("agent", name="antigravity", label="Antigravity",
+                         model=model_name,
+                         mode=mode, web=False, engine=None, sources=0)
+                    emit_status("Antigravity harness launched")
+
+                elif ev_name == "step_update":
+                    su = ev.get("step_update") or {}
+                    stype = su.get("step_type")
+                    state = su.get("state")
+                    step_idx = su.get("step_index", 0)
+
+                    if stype == "user_input" and state == "DONE":
+                        emit_status("Analyzing request & planning steps…")
+
+                    elif stype == "tool":
+                        tool_name = str(su.get("tool_name") or "tool")
+                        params = (su.get("tool_info") or {}).get("parameters") or {}
+                        if state == "ACTIVE":
+                            active_tools[step_idx] = (tool_name, params)
+                            if tool_name == "write_to_file":
+                                tgt = Path(str(params.get("TargetFile") or "")).name
+                                if tgt and tgt not in created_files:
+                                    created_files.append(tgt)
+                            elif tool_name in ("replace_file_content", "multi_replace_file_content", "sed_file"):
+                                tgt = Path(str(params.get("TargetFile") or "")).name
+                                if tgt and tgt not in modified_files:
+                                    modified_files.append(tgt)
+                            elif tool_name in ("run_command", "send_command_input"):
+                                cmd = str(params.get("CommandLine") or "").strip()
+                                if cmd and cmd not in commands_run:
+                                    commands_run.append(cmd)
+
+                            msg = format_tool_message(tool_name, params, state="ACTIVE")
+                            if msg:
+                                emit_status(msg)
+                        elif state == "DONE":
+                            tool_name, prev_params = active_tools.pop(step_idx, (tool_name, params))
+                            done_params = {**prev_params, **params}
+                            msg = format_tool_message(tool_name, done_params, state="DONE")
+                            if msg:
+                                emit_status(msg)
+
+                    elif stype == "agent_response":
+                        text_delta = su.get("text_delta")
+                        if text_delta:
+                            try:
+                                with open(CODE_LOG_FILE, "a", errors="ignore") as f:
+                                    f.write(text_delta)
+                            except OSError:
+                                pass
+
+                elif ev_name == "result":
+                    emitted_result = True
+                    result = ev.get("result") or {}
+                    usage = result.get("usage") or {}
+                    total = usage.get("total_tokens")
+                    if isinstance(total, (int, float)):
+                        emit("usage", tokens=int(total), cost=None)
+                    if result.get("status") == "SUCCESS":
+                        raw_resp = str(result.get("response") or "")
+                        summary = format_code_summary(
+                            raw_resp,
+                            created_files=created_files,
+                            modified_files=modified_files,
+                            commands_run=commands_run,
+                        )
+                        emit("text", text=summary)
+                    else:
+                        emit("error", text=f"Agent returned {result.get('status')}")
+        finally:
+            ACTIVE_PROC = None
+            try:
+                CODE_PID_FILE.unlink(missing_ok=True)
+                with open(CODE_LOG_FILE, "a", errors="ignore") as f:
+                    f.write(f"\n[{time.strftime('%H:%M:%S')}] ✦ Turn complete.\n")
+            except OSError:
+                pass
+            proc.wait()
+
+        if proc.returncode != 0 and not EMITTED_ERROR:
+            emit("error", text=f"agy exited {proc.returncode}")
+            emit("done", ok=False, code=proc.returncode or 1, stopped=False)
+            return proc.returncode or 1
+        if not emitted_result:
+            emit("error", text="agy produced no result event")
+            emit("done", ok=False, code=1, stopped=False)
+            return 1
+        emit("done", ok=True, code=0, stopped=False)
+        return 0
+
+
     if mode == MODE_WEB:
+        # WEB mode deliberately does not call Gemini. It answers straight from
+        # the search results, so it works with no Gemini key at all.
+        emit("agent", name="duckduckgo", label="DuckDuckGo", model="DuckDuckGo",
+             mode=mode, web=True, engine=None, sources=0)
+
+        # Follow-up question? First check whether the previous answer already
+        # covers it — only hit the network when it does not.
+        primary = last_answer_text(history)
+        if primary and looks_like_followup(request, history):
+            if DRY_RUN:
+                emit("done", ok=True, code=0, stopped=False)
+                return 0
+            emit("tool", text="Checking previous answer…")
+            covered = answer_from_primary(request, primary)
+            if covered:
+                emit("text", text=covered)
+                emit("status", text="Answered from the previous response")
+                emit("done", ok=True, code=0, stopped=False)
+                return 0
+            emit("tool", text="Not covered — searching the web…")
+
+        # Fresh question, or a follow-up the previous answer could not cover:
+        # do real research. Follow-ups get a context-ful query so the search
+        # engine knows what "it"/"his" refers to.
+        primary = last_answer_text(history)
+        seed = fresh_query(request)
+        if looks_like_followup(request, history):
+            seed = contextual_search_query(request, history)
+        found, engine, ddg_blocked = gather_sources(seed, mode, brave_key)
         emit("tool", text=(f"Searched {engine}" if found else "No web results"))
+        if DRY_RUN:
+            emit("done", ok=True, code=0, stopped=False)
+            return 0
+        if found:
+            summary = summarize_web_answer(request, found, primary=primary)
+            if summary and not summary_gives_up(summary):
+                emit("text", text=summary)
+            else:
+                # Results did not answer the question: do one more targeted
+                # search rather than giving up.
+                emit("tool", text="Not answered — searching again…")
+                better_seed = refined_search_query(request, history)
+                found2, engine2, _b2 = gather_sources(better_seed, mode,
+                                                      brave_key)
+                tried2 = bool(found2)
+                summary2 = (summarize_web_answer(request, found2,
+                                                 primary=primary,
+                                                 relaxed=True)
+                            if tried2 else None)
+                if summary2 and not summary_gives_up(summary2):
+                    emit("tool", text=f"Searched {engine2} again")
+                    emit("text", text=summary2)
+                    found = found2
+                elif tried2:
+                    emit("tool", text=f"Searched {engine2} again")
+                    emit("text", text=(summary2 or format_web_results(found2)))
+                    found = found2
+                else:
+                    emit("text", text=(summary or format_web_results(found)))
+            shown = ", ".join(
+                dict.fromkeys(
+                    urllib.parse.urlparse(item["url"]).netloc or item["url"]
+                    for item in found if item["url"]
+                )
+            )
+            if shown:
+                emit("status", text="Sources: " + shown)
+        else:
+            if ddg_blocked:
+                emit("text", text="DuckDuckGo is rate-limiting this machine "
+                                  "right now — ask again in a moment, or add "
+                                  "a braveKey to the config for a stronger "
+                                  "backend.")
+            else:
+                emit("text", text="No web results. DuckDuckGo returned nothing "
+                                  "for this — try rephrasing, or add a braveKey "
+                                  "to the config for a stronger backend.")
+        emit("done", ok=True, code=0, stopped=False)
+        return 0
+
+    found, engine, _blocked = gather_sources(request, mode, brave_key)
 
     body = build_body(request, history, mode, found, engine)
     emit("agent", name="gemini", label="Gemini", model=model, mode=mode,
