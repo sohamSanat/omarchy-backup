@@ -688,7 +688,7 @@ if [[ -d "${SCRIPT_DIR}/apps" ]]; then
   for app_dir in "${SCRIPT_DIR}/apps"/*; do
     if [[ -d "$app_dir" ]]; then
       app_name="$(basename "$app_dir")"
-      if [[ "$app_name" != "photocraft" ]]; then
+      if [[ "$app_name" != "photocraft" && "$app_name" != "vectorcraft" ]]; then
         mkdir -p "${USER_HOME}/Projects/${app_name}"
         cp -a "${app_dir}/." "${USER_HOME}/Projects/${app_name}/"
         echo "  [OK] Restored application: ~/Projects/${app_name}"
@@ -700,6 +700,11 @@ fi
 if [[ -f "${SCRIPT_DIR}/apps/photocraft/install.sh" ]]; then
   echo "  -> Restoring and installing PhotoCraft release build..."
   "${SCRIPT_DIR}/apps/photocraft/install.sh"
+fi
+
+if [[ -f "${SCRIPT_DIR}/apps/vectorcraft/install.sh" ]]; then
+  echo "  -> Restoring and installing VectorCraft release build..."
+  "${SCRIPT_DIR}/apps/vectorcraft/install.sh"
 fi
 
 if [[ -d "${SCRIPT_DIR}/mcp" ]]; then
@@ -743,6 +748,11 @@ if command -v omarchy >/dev/null 2>&1; then
   if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-photocraft" ]]; then
     echo "  -> Syncing PhotoCraft with active Omarchy theme..."
     "${USER_HOME}/.local/bin/omarchy-sync-photocraft" 2>/dev/null || true
+  fi
+
+  if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-vectorcraft" ]]; then
+    echo "  -> Syncing VectorCraft with active Omarchy theme..."
+    "${USER_HOME}/.local/bin/omarchy-sync-vectorcraft" 2>/dev/null || true
   fi
 
   echo "  -> Setting font: JetBrainsMono Nerd Font"

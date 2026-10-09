@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# VectorCraft launcher wrapper for Omarchy Linux
+# ------------------------------------------------------------------------------
+# 1. Enables loopback control server so Omarchy theme changes update live
+# 2. Exposes VECTORCRAFT_THEME_FILE for live dynamic per-theme color customization
+# 3. Supports optional XWayland fallback (VECTORCRAFT_USE_XWAYLAND=1)
+# ==============================================================================
+
+export VECTORCRAFT_CONTROL_PORT="${VECTORCRAFT_CONTROL_PORT:-48292}"
+export VECTORCRAFT_THEME_FILE="${VECTORCRAFT_THEME_FILE:-$HOME/.config/vectorcraft/theme.json}"
+
+# Ensure initial theme.json is populated from current Omarchy theme
+if [[ ! -f "$VECTORCRAFT_THEME_FILE" ]]; then
+  "$HOME/.local/bin/omarchy-sync-vectorcraft" 2>/dev/null || true
+fi
+
+if [[ -n "${VECTORCRAFT_USE_XWAYLAND:-}" ]]; then
+  unset WAYLAND_DISPLAY
+fi
+
+exec "$HOME/.local/bin/vectorcraft.real" "$@"
