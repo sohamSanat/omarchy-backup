@@ -1,0 +1,1 @@
+{"name":"cmd_preset_update","description":"Update Preset with Current Settings (command `preset.update`). Params: {id, groups?: [settingsGroup] (default: the groups the preset already sets)} — from the active photo.","parameters":{"additionalProperties":true,"type":"object"}}

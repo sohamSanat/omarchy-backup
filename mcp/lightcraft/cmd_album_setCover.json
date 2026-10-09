@@ -1,0 +1,1 @@
+{"name":"cmd_album_setCover","description":"Set as Album Cover (command `album.setCover`). Params: {id: albumId, photo?: photoId}.","parameters":{"additionalProperties":true,"type":"object"}}

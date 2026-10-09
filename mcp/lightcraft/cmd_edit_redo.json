@@ -1,0 +1,1 @@
+{"name":"cmd_edit_redo","description":"Redo (command `edit.redo`). Params: {}. Menu: Edit. Shortcut: Cmd+Shift+Z.","parameters":{"additionalProperties":true,"type":"object"}}

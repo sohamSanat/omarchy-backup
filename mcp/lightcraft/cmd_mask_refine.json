@@ -1,0 +1,1 @@
+{"name":"cmd_mask_refine","description":"Refine Mask Edges (command `mask.refine`). Params: {id?, value: 0..100} — the mask's edges snap to the photo's (guided filter; rendered on the CPU).","parameters":{"additionalProperties":true,"type":"object"}}

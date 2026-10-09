@@ -1,0 +1,1 @@
+{"name":"cmd_develop_sync","description":"Sync Settings (command `develop.sync`). Params: {groups?} — copy the active photo's settings to all selected photos.","parameters":{"additionalProperties":true,"type":"object"}}

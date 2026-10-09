@@ -1,0 +1,1 @@
+{"name":"cmd_keyword_deleteSet","description":"Delete Keyword Set (command `keyword.deleteSet`). Params: {name}.","parameters":{"additionalProperties":true,"type":"object"}}

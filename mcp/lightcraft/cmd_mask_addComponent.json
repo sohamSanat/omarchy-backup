@@ -1,0 +1,1 @@
+{"name":"cmd_mask_addComponent","description":"Add/Subtract/Intersect Mask (command `mask.addComponent`). Params: {id?: maskId, op: add|subtract|intersect, kind, ...shape params}.","parameters":{"additionalProperties":true,"type":"object"}}

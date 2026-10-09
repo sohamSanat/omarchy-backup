@@ -1,0 +1,1 @@
+{"name":"cmd_folder_move","description":"Move Folder (command `folder.move`). Params: {path, into: destination folder} — move a folder on disk into another and relink the photos in it; one undo step (undo moves it back, refused if the old place is taken) → {path, relinked}.","parameters":{"additionalProperties":true,"type":"object"}}

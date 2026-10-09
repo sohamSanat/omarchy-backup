@@ -1,0 +1,1 @@
+{"name":"cmd_photo_restore","description":"Restore (command `photo.restore`). Params: {ids?}. Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

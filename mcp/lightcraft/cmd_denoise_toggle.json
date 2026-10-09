@@ -1,0 +1,1 @@
+{"name":"cmd_denoise_toggle","description":"AI Denoise (command `denoise.toggle`). Params: {id?: photoId, enabled?: bool} → {id, enabled, amount} — turn AI Denoise on (50% initially) or off for one raw photo, independent of selection and Auto Sync; needs an installed model to turn on.","parameters":{"additionalProperties":true,"type":"object"}}

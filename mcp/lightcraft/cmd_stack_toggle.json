@@ -1,0 +1,1 @@
+{"name":"cmd_stack_toggle","description":"Expand/Collapse Stack (command `stack.toggle`). Params: {ids?, collapsed?: bool}. Menu: Photo › Stack. Shortcut: S.","parameters":{"additionalProperties":true,"type":"object"}}

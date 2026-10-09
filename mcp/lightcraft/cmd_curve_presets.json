@@ -1,0 +1,1 @@
+{"name":"cmd_curve_presets","description":"Point Curve Presets (command `curve.presets`). Params: {} → {presets: [{name, master, red, green, blue: [[x,y],...], builtin?}], current: name of the preset the active photo's point curves match, or null}.","parameters":{"additionalProperties":true,"type":"object"}}

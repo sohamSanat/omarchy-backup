@@ -1,0 +1,1 @@
+{"name":"cmd_photo_copyMetadata","description":"Copy Metadata (command `photo.copyMetadata`). Params: {} — title, caption, copyright (notice, status, usage terms, info URL), creator, location and keywords of the active photo. Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

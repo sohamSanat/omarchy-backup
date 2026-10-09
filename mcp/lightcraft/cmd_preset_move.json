@@ -1,0 +1,1 @@
+{"name":"cmd_preset_move","description":"Move Preset to Group (command `preset.move`). Params: {id, group}.","parameters":{"additionalProperties":true,"type":"object"}}

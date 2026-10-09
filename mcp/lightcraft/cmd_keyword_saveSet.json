@@ -1,0 +1,1 @@
+{"name":"cmd_keyword_saveSet","description":"Save Keyword Set (command `keyword.saveSet`). Params: {name, keywords?: [up to 9] (default: the current nine)} — replaces a set of that name and makes it current.","parameters":{"additionalProperties":true,"type":"object"}}

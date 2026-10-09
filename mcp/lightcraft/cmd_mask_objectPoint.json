@@ -1,0 +1,1 @@
+{"name":"cmd_mask_objectPoint","description":"Add Object Click (command `mask.objectPoint`). Params: {x, y: normalized image point, exclude?: bool (⌥-click: leave this part out), id?: maskId} — a click on the selected mask's Object selection (its last Object component); SAM 3 re-segments the object → {include, exclude}.","parameters":{"additionalProperties":true,"type":"object"}}

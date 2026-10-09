@@ -1,0 +1,1 @@
+{"name":"cmd_profile_favorite","description":"Favorite Profile (command `profile.favorite`). Params: {id, favorite?: bool} (toggles when omitted).","parameters":{"additionalProperties":true,"type":"object"}}

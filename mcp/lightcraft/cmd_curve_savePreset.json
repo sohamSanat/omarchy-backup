@@ -1,0 +1,1 @@
+{"name":"cmd_curve_savePreset","description":"Save Point Curve Preset (command `curve.savePreset`). Params: {name} — the active photo's point curves under a name (replaces a user preset of that name; built-in names are reserved), saved with the library.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_stack_expandAll","description":"Expand All Stacks (command `stack.expandAll`). Params: {}. Menu: View › Stacks.","parameters":{"additionalProperties":true,"type":"object"}}

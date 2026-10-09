@@ -1,0 +1,1 @@
+{"name":"cmd_preset_create","description":"Create Preset (command `preset.create`). Params: {name, group?, groups?: [settingsGroup]}. Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_library_memory","description":"Memory Usage (command `library.memory`). Params: {} — bytes held by each cache (decoded sources, rendered previews, GPU buffers; heap when instrumented).","parameters":{"additionalProperties":true,"type":"object"}}

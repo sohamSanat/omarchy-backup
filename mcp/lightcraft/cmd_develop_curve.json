@@ -1,0 +1,1 @@
+{"name":"cmd_develop_curve","description":"Set Point Curve (command `develop.curve`). Params: {channel: master|red|green|blue, points: [[x,y],...] in 0..1}.","parameters":{"additionalProperties":true,"type":"object"}}

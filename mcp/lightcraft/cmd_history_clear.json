@@ -1,0 +1,1 @@
+{"name":"cmd_history_clear","description":"Clear History (command `history.clear`). Params: {} — keeps the current settings as the only step.","parameters":{"additionalProperties":true,"type":"object"}}

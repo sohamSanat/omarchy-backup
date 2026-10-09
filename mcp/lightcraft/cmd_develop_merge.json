@@ -1,0 +1,1 @@
+{"name":"cmd_develop_merge","description":"Apply Settings JSON (command `develop.merge`). Params: {settings: partial DevelopSettings JSON, label?}.","parameters":{"additionalProperties":true,"type":"object"}}

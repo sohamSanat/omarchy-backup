@@ -1,0 +1,1 @@
+{"name":"cmd_spot_delete","description":"Delete Spot (command `spot.delete`). Params: {index? (the selected spot)}.","parameters":{"additionalProperties":true,"type":"object"}}

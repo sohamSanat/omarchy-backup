@@ -1,0 +1,1 @@
+{"name":"cmd_redeye_catchlight","description":"Pet Eye Catchlight (command `redeye.catchlight`). Params: {index, on?: bool (default true), offset?: [dx, dy] from the pupil centre in pupil radii (default [-0.35, -0.35])}.","parameters":{"additionalProperties":true,"type":"object"}}

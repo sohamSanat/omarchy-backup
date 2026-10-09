@@ -1,0 +1,1 @@
+{"name":"cmd_photo_rotateRight","description":"Rotate Right (command `photo.rotateRight`). Params: {ids?}. Menu: Photo. Shortcut: Cmd+].","parameters":{"additionalProperties":true,"type":"object"}}

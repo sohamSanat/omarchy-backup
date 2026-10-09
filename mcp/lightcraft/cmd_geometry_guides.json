@@ -1,0 +1,1 @@
+{"name":"cmd_geometry_guides","description":"Guided Upright Guides (command `geometry.guides`). Params: {guides: [[x0,y0,x1,y1], …] (≤ 4, normalized coords of the lens-corrected image), add?: bool (append one guide, dropping the oldest beyond 4)} — switches Upright to Guided.","parameters":{"additionalProperties":true,"type":"object"}}

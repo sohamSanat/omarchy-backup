@@ -1,0 +1,1 @@
+{"name":"cmd_denoise_models_downloads","description":"Denoise Model Downloads (command `denoise.models.downloads`). Params: {} → {running, downloads: [{id, state: running | done | installed | failed | cancelled, bytes, total, error, from}]} — also installs any download that has arrived.","parameters":{"additionalProperties":true,"type":"object"}}

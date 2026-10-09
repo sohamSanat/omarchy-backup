@@ -1,0 +1,1 @@
+{"name":"cmd_preset_favorite","description":"Favorite Preset (command `preset.favorite`). Params: {id, favorite?: bool}.","parameters":{"additionalProperties":true,"type":"object"}}

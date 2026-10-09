@@ -1,0 +1,1 @@
+{"name":"cmd_library_emptyRecentlyDeleted","description":"Empty Recently Deleted (command `library.emptyRecentlyDeleted`). Params: {} → {deleted} — removes every photo in Recently Deleted from the library (files on disk stay). Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

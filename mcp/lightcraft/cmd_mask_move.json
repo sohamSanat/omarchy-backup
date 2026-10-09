@@ -1,0 +1,1 @@
+{"name":"cmd_mask_move","description":"Move Mask (command `mask.move`). Params: {id?, to?: index (0 = top), delta?: ±n} — reorder the masks list.","parameters":{"additionalProperties":true,"type":"object"}}

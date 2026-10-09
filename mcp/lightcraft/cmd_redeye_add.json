@@ -1,0 +1,1 @@
+{"name":"cmd_redeye_add","description":"Add Red Eye Correction (command `redeye.add`). Params: {center: [x,y] normalized, rx, ry: radii as fractions of the long edge, pet?: bool, pupilSize?: 0..100, darken?: 0..100} — the pupil inside is found automatically; returns {index}.","parameters":{"additionalProperties":true,"type":"object"}}

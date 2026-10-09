@@ -1,0 +1,1 @@
+{"name":"cmd_library_missing","description":"Missing Photos (command `library.missing`). Params: {} → [{id, path}] — photos whose original file isn't where the library expects it.","parameters":{"additionalProperties":true,"type":"object"}}

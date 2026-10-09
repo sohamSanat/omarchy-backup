@@ -1,0 +1,1 @@
+{"name":"cmd_version_create","description":"Create Version (command `version.create`). Params: {name?}. Menu: Photo. Shortcut: Cmd+Shift+S.","parameters":{"additionalProperties":true,"type":"object"}}

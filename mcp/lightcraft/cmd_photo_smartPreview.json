@@ -1,0 +1,1 @@
+{"name":"cmd_photo_smartPreview","description":"Smart Preview Status (command `photo.smartPreview`). Params: {id?} → {smartPreview: bool, originalOnline: bool}.","parameters":{"additionalProperties":true,"type":"object"}}

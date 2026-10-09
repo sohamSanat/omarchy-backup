@@ -1,0 +1,1 @@
+{"name":"cmd_denoise_models_remove","description":"Remove Denoise Model (command `denoise.models.remove`). Params: {id} → {removed, model} — delete an installed model (its cached pictures stay until they are evicted).","parameters":{"additionalProperties":true,"type":"object"}}

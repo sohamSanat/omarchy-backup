@@ -1,0 +1,1 @@
+{"name":"cmd_album_move","description":"Move Album (command `album.move`). Params: {id, parent?: folderId|null}.","parameters":{"additionalProperties":true,"type":"object"}}

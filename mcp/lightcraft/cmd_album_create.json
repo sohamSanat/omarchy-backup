@@ -1,0 +1,1 @@
+{"name":"cmd_album_create","description":"New Album (command `album.create`). Params: {name, parent?: folderId, folder?: bool, addSelected?: bool}. Menu: File.","parameters":{"additionalProperties":true,"type":"object"}}

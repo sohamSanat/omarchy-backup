@@ -1,0 +1,1 @@
+{"name":"cmd_export_savePreset","description":"Save Export Preset (command `export.savePreset`). Params: {name, params?: app.export params (default: the last export's)} — adds or replaces a user preset, saved with the library → presets.","parameters":{"additionalProperties":true,"type":"object"}}

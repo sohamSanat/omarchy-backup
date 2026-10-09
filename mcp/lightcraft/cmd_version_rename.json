@@ -1,0 +1,1 @@
+{"name":"cmd_version_rename","description":"Rename Version (command `version.rename`). Params: {index, name}.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_beforeAfter_resetBefore","description":"Reset Before to Import State (command `beforeAfter.resetBefore`). Params: {}. Menu: View › Before/After Settings.","parameters":{"additionalProperties":true,"type":"object"}}

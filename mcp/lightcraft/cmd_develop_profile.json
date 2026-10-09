@@ -1,0 +1,1 @@
+{"name":"cmd_develop_profile","description":"Set Profile (command `develop.profile`). Params: {id: profile id (see profiles.list), amount?: 0..200}.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_faces_models_list","description":"Face Models (command `faces.models.list`). Params: {} → {dir, enabled, embedder, runtime, models: [{id, name, role, licence{name, commercial, url, notice}, provenance, source, sizeBytes, known, installed, selected}]}.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_metadata_applyPreset","description":"Apply Metadata Preset (command `metadata.applyPreset`). Params: {name, ids?} — text fields replace, keywords are added; one undo step.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_develop_pastePrevious","description":"Paste Settings from Previous (command `develop.pastePrevious`). Params: {ids?, groups?: [settingsGroup] (default: the copy groups)} — from the photo that was active before this one. Menu: Edit. Shortcut: Cmd+Alt+V.","parameters":{"additionalProperties":true,"type":"object"}}

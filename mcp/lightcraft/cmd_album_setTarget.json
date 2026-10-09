@@ -1,0 +1,1 @@
+{"name":"cmd_album_setTarget","description":"Set as Target Album (command `album.setTarget`). Params: {id: albumId | null} (null = the Quick Collection).","parameters":{"additionalProperties":true,"type":"object"}}

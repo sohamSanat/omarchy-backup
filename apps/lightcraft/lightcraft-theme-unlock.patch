@@ -1,0 +1,285 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 5f7c85d..0b117b0 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -110,7 +110,9 @@ opt-level = 2
+ opt-level = 1
+ 
+ [profile.release]
+-debug = "line-tables-only"
++debug = false
++lto = false
++codegen-units = 8
+ 
+ [profile.dist]
+ inherits = "release"
+diff --git a/crates/ui-egui/src/lib.rs b/crates/ui-egui/src/lib.rs
+index 7684f00..f04b434 100644
+--- a/crates/ui-egui/src/lib.rs
++++ b/crates/ui-egui/src/lib.rs
+@@ -260,6 +260,8 @@ pub struct LightcraftApp {
+     /// The library failed to open at launch: the blocking window, then the temporary-session
+     /// banner (issue #100). Cleared once a library opens.
+     pub library_problem: Option<panels::library_problem::LibraryProblem>,
++    #[cfg(not(target_arch = "wasm32"))]
++    pub live_tokens: theme::live::LiveTokens,
+ }
+ 
+ impl LightcraftApp {
+@@ -319,6 +321,8 @@ impl LightcraftApp {
+             memory_applied: None,
+             library_problem: None,
+             model_setup: Default::default(),
++            #[cfg(not(target_arch = "wasm32"))]
++            live_tokens: theme::live::LiveTokens::from_env(),
+         }
+     }
+ 
+@@ -637,6 +641,8 @@ impl LightcraftApp {
+         // same scroll offsets, open sections, style… as the window
+         let memory = main.memory(|m| m.clone());
+         view.ctx.memory_mut(|m| *m = memory);
++        let t = theme::Tokens::get(main);
++        theme::apply_tokens(&view.ctx, t);
+         view.run(headless::HeadlessView::raw_input(size, ppp, time, vec![]), |ui| self.ui(ui));
+         let img = capture.then(|| {
+             let mut tex = self.renderer.cpu_textures();
+@@ -704,6 +710,8 @@ impl LightcraftApp {
+         } else {
+             self.fonts_ready = true;
+         }
++        #[cfg(not(target_arch = "wasm32"))]
++        self.live_tokens.poll(ctx);
+         panels::notices::logic(self);
+         // closing the window (or Quit) with changes only in memory: retry, else ask first
+         if ctx.input(|i| i.viewport().close_requested()) && !panels::notices::may_close(self) {
+diff --git a/crates/ui-egui/src/theme.rs b/crates/ui-egui/src/theme.rs
+index 9534ebb..3769dcf 100644
+--- a/crates/ui-egui/src/theme.rs
++++ b/crates/ui-egui/src/theme.rs
+@@ -116,9 +116,44 @@ impl Default for Tokens {
+     }
+ }
+ 
++pub const THEME_ID: &str = "lightcraft-theme";
++
++pub fn theme_file_path() -> Option<std::path::PathBuf> {
++    std::env::var_os("LIGHTCRAFT_THEME_FILE")
++        .map(std::path::PathBuf::from)
++        .or_else(|| {
++            std::env::var_os("HOME")
++                .map(|h| std::path::PathBuf::from(h).join(".config/lightcraft/theme.json"))
++        })
++}
++
+ impl Tokens {
++    pub fn is_dark(&self) -> bool {
++        let c = self.chrome;
++        0.2126 * (c.r() as f32) + 0.7152 * (c.g() as f32) + 0.0722 * (c.b() as f32) < 128.0
++    }
++    #[cfg(not(target_arch = "wasm32"))]
++    pub fn load_from_file() -> Option<Tokens> {
++        let path = theme_file_path()?;
++        let text = std::fs::read_to_string(path).ok()?;
++        let v = serde_json::from_str::<serde_json::Value>(&text).ok()?;
++        let mut t = Tokens::default();
++        live::apply_overrides(&mut t, &v);
++        Some(t)
++    }
+     pub fn get(ctx: &egui::Context) -> Tokens {
+-        ctx.data(|d| d.get_temp::<Tokens>(egui::Id::NULL)).unwrap_or_default()
++        ctx.data(|d| d.get_temp::<Tokens>(egui::Id::new(THEME_ID)))
++            .or_else(|| {
++                #[cfg(not(target_arch = "wasm32"))]
++                {
++                    Self::load_from_file()
++                }
++                #[cfg(target_arch = "wasm32")]
++                {
++                    None
++                }
++            })
++            .unwrap_or_default()
+     }
+     pub fn font(&self, size: f32) -> FontId {
+         FontId::proportional(size)
+@@ -183,9 +218,23 @@ fn craft_font_name(f: &lightcraft_engine::CraftFont) -> String {
+ }
+ 
+ pub fn apply(ctx: &egui::Context) {
+-    let t = Tokens::default();
+-    ctx.data_mut(|d| d.insert_temp(egui::Id::NULL, t));
+-    let mut v = Visuals::dark();
++    let t = {
++        #[cfg(not(target_arch = "wasm32"))]
++        {
++            Tokens::load_from_file().unwrap_or_default()
++        }
++        #[cfg(target_arch = "wasm32")]
++        {
++            Tokens::default()
++        }
++    };
++    apply_tokens(ctx, t);
++}
++
++pub fn apply_tokens(ctx: &egui::Context, t: Tokens) {
++    ctx.data_mut(|d| d.insert_temp(egui::Id::new(THEME_ID), t));
++    let dark = t.is_dark();
++    let mut v = if dark { Visuals::dark() } else { Visuals::light() };
+     v.panel_fill = t.chrome;
+     v.window_fill = t.chrome;
+     v.extreme_bg_color = t.field;
+@@ -195,9 +244,12 @@ pub fn apply(ctx: &egui::Context) {
+     v.menu_corner_radius = CornerRadius::same(6);
+     v.selection.bg_fill = t.accent.gamma_multiply(0.6);
+     v.selection.stroke = Stroke::new(1.0, t.accent);
+-    v.override_text_color = Some(t.text_label);
+-    v.popup_shadow = egui::epaint::Shadow { offset: [0, 4], blur: 16, spread: 0, color: Color32::from_black_alpha(140) };
+-    v.window_shadow = egui::epaint::Shadow { offset: [0, 8], blur: 30, spread: 0, color: Color32::from_black_alpha(160) };
++    v.hyperlink_color = t.accent;
++    v.warn_fg_color = t.caution;
++    v.error_fg_color = t.reject;
++    v.override_text_color = Some(t.text);
++    v.popup_shadow = egui::epaint::Shadow { offset: [0, 4], blur: 16, spread: 0, color: Color32::from_black_alpha(if dark { 140 } else { 40 }) };
++    v.window_shadow = egui::epaint::Shadow { offset: [0, 8], blur: 30, spread: 0, color: Color32::from_black_alpha(if dark { 160 } else { 50 }) };
+     let w = &mut v.widgets;
+     for (wv, fill) in [
+         (&mut w.noninteractive, t.chrome),
+@@ -209,10 +261,12 @@ pub fn apply(ctx: &egui::Context) {
+         wv.bg_fill = fill;
+         wv.weak_bg_fill = fill;
+         wv.corner_radius = CornerRadius::same(4);
+-        wv.fg_stroke = Stroke::new(1.0, t.text_label);
++        wv.fg_stroke = Stroke::new(1.0, t.text);
+     }
+     w.noninteractive.bg_stroke = Stroke::new(1.0, t.divider);
+     w.inactive.bg_stroke = Stroke::new(1.0, t.button_border);
++    w.hovered.bg_stroke = Stroke::new(1.0, t.field_border);
++    w.active.bg_stroke = Stroke::new(1.0, t.accent);
+     ctx.set_visuals(v);
+     ctx.global_style_mut(|s| {
+         s.spacing.item_spacing = egui::vec2(6.0, 4.0);
+@@ -225,3 +279,122 @@ pub fn apply(ctx: &egui::Context) {
+         s.animation_time = 0.08;
+     });
+ }
++
++#[cfg(not(target_arch = "wasm32"))]
++pub mod live {
++    use super::{Tokens, apply_tokens, theme_file_path};
++    use egui::Color32;
++    use std::time::SystemTime;
++
++    #[derive(Default)]
++    pub struct LiveTokens {
++        path: Option<std::path::PathBuf>,
++        stamp: Option<SystemTime>,
++        last_check: f64,
++    }
++
++    impl LiveTokens {
++        pub fn from_env() -> Self {
++            Self { path: theme_file_path(), ..Default::default() }
++        }
++
++        /// Check theme file and re-apply overrides on change. Returns true when tokens were updated.
++        pub fn poll(&mut self, ctx: &egui::Context) -> bool {
++            let Some(path) = &self.path else { return false };
++            let now = ctx.input(|i| i.time);
++            if now - self.last_check < 0.25 {
++                ctx.request_repaint_after(std::time::Duration::from_millis(250));
++                return false;
++            }
++            self.last_check = now;
++            ctx.request_repaint_after(std::time::Duration::from_millis(250));
++            let Ok(meta) = std::fs::metadata(path) else { return false };
++            let stamp = meta.modified().ok();
++            if stamp == self.stamp && self.stamp.is_some() {
++                return false;
++            }
++            self.stamp = stamp;
++            let Ok(text) = std::fs::read_to_string(path) else { return false };
++            match serde_json::from_str::<serde_json::Value>(&text) {
++                Ok(v) => {
++                    let mut t = Tokens::default();
++                    let unknown = apply_overrides(&mut t, &v);
++                    apply_tokens(ctx, t);
++                    if !unknown.is_empty() {
++                        log::warn!("unknown token keys in theme file: {unknown:?}");
++                    }
++                    ctx.request_repaint();
++                    true
++                }
++                Err(e) => {
++                    log::warn!("theme file error: {e}");
++                    false
++                }
++            }
++        }
++    }
++
++    fn color(v: &serde_json::Value) -> Option<Color32> {
++        let s = v.as_str()?.trim_start_matches('#');
++        let b = |i: usize| u8::from_str_radix(s.get(i..i + 2)?, 16).ok();
++        match s.len() {
++            6 => Some(Color32::from_rgb(b(0)?, b(2)?, b(4)?)),
++            8 => Some(Color32::from_rgba_unmultiplied(b(0)?, b(2)?, b(4)?, b(6)?)),
++            _ => None,
++        }
++    }
++
++    pub fn apply_overrides(t: &mut Tokens, v: &serde_json::Value) -> Vec<String> {
++        let mut unknown = Vec::new();
++        let Some(obj) = v.as_object() else { return unknown };
++        for (k, val) in obj {
++            macro_rules! c {
++                ($($f:ident),*) => {
++                    match k.as_str() {
++                        $(stringify!($f) => { if let Some(col) = color(val) { t.$f = col; } })*
++                        "top_bar_h" => { if let Some(x) = val.as_f64() { t.top_bar_h = x as f32; } }
++                        "bottom_bar_h" => { if let Some(x) = val.as_f64() { t.bottom_bar_h = x as f32; } }
++                        "panel_w" => { if let Some(x) = val.as_f64() { t.panel_w = x as f32; } }
++                        "strip_w" => { if let Some(x) = val.as_f64() { t.strip_w = x as f32; } }
++                        "slider_row_h" => { if let Some(x) = val.as_f64() { t.slider_row_h = x as f32; } }
++                        "section_h" => { if let Some(x) = val.as_f64() { t.section_h = x as f32; } }
++                        "film_h" => { if let Some(x) = val.as_f64() { t.film_h = x as f32; } }
++                        _ => unknown.push(k.clone()),
++                    }
++                };
++            }
++            c!(
++                chrome,
++                canvas,
++                grid_bg,
++                cell,
++                cell_selected,
++                divider,
++                inset,
++                field,
++                field_border,
++                button,
++                button_border,
++                hover,
++                pressed,
++                tool_active,
++                text,
++                text_label,
++                text_dim,
++                text_disabled,
++                icon,
++                track,
++                thumb,
++                thumb_hover,
++                accent,
++                star,
++                pick,
++                reject,
++                caution,
++                mask_overlay
++            );
++        }
++        unknown
++    }
++}
++

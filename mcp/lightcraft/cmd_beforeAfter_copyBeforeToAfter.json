@@ -1,0 +1,1 @@
+{"name":"cmd_beforeAfter_copyBeforeToAfter","description":"Copy Before's Settings to After (command `beforeAfter.copyBeforeToAfter`). Params: {}. Menu: View › Before/After Settings.","parameters":{"additionalProperties":true,"type":"object"}}

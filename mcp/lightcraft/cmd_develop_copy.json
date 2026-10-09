@@ -1,0 +1,1 @@
+{"name":"cmd_develop_copy","description":"Copy Edit Settings (command `develop.copy`). Params: {groups?: [settingsGroup]} (default: all but crop, masks, remove). Menu: Edit. Shortcut: Cmd+C.","parameters":{"additionalProperties":true,"type":"object"}}

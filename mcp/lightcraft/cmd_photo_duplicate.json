@@ -1,0 +1,1 @@
+{"name":"cmd_photo_duplicate","description":"Duplicate (command `photo.duplicate`). Params: {ids?} — copy each photo's file next to it (`-copy`) and add it with the same settings, metadata and albums (a real file, unlike a virtual copy) → {ids}. Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

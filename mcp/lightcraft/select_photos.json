@@ -1,0 +1,1 @@
+{"name":"select_photos","description":"Set the selection; the active photo (the one develop tools edit) is `active` or the first id.","parameters":{"properties":{"active":{"type":"integer"},"ids":{"description":"Photo ids","items":{"type":"integer"},"type":"array"},"mode":{"enum":["replace","add","toggle","range"],"type":"string"}},"required":["ids"],"type":"object"}}

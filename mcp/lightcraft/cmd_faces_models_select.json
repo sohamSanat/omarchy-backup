@@ -1,0 +1,1 @@
+{"name":"cmd_faces_models_select","description":"Choose Face Recognition Model (command `faces.models.select`). Params: {id: installed recogniser | null}.","parameters":{"additionalProperties":true,"type":"object"}}

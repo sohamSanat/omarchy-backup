@@ -1,0 +1,1 @@
+{"name":"cmd_keyword_delete","description":"Delete Keyword (command `keyword.delete`). Params: {keyword} — removes it (and the keywords below it) from every photo.","parameters":{"additionalProperties":true,"type":"object"}}

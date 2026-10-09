@@ -1,0 +1,1 @@
+{"name":"cmd_curve_exportPresets","description":"Export Point Curve Presets (command `curve.exportPresets`). Params: {path, names?: [name] (default: every user preset)} — writes a .lccurve JSON file → {path, count}.","parameters":{"additionalProperties":true,"type":"object"}}

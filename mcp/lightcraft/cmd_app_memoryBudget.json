@@ -1,0 +1,1 @@
+{"name":"cmd_app_memoryBudget","description":"Memory Budget (command `app.memoryBudget`). Params: {mb?: number} — set the memory budget shared by the caches (default: a quarter of RAM, at most 1536 MB); returns the report.","parameters":{"additionalProperties":true,"type":"object"}}

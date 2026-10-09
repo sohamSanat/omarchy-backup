@@ -1,0 +1,1 @@
+{"name":"cmd_mask_deleteAll","description":"Delete All Masks (command `mask.deleteAll`). Params: {}.","parameters":{"additionalProperties":true,"type":"object"}}

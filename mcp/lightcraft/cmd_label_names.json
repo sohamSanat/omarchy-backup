@@ -1,0 +1,1 @@
+{"name":"cmd_label_names","description":"Color Label Names (command `label.names`). Params: {} → [{label, name, custom}].","parameters":{"additionalProperties":true,"type":"object"}}

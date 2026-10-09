@@ -1,0 +1,1 @@
+{"name":"cmd_preset_delete","description":"Delete Preset (command `preset.delete`). Params: {id}.","parameters":{"additionalProperties":true,"type":"object"}}

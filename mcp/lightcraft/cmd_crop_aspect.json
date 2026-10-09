@@ -1,0 +1,1 @@
+{"name":"cmd_crop_aspect","description":"Crop Aspect (command `crop.aspect`). Params: {aspect: \"original\"|\"free\"|\"current\" (lock the crop's present shape)|\"toggle\" (lock ↔ free)|\"1x1\"|\"4x5\"|\"8.5x11\"|\"5x7\"|\"2x3\"|\"4x3\"|\"16x9\"|\"16x10\"|[w,h]}.","parameters":{"additionalProperties":true,"type":"object"}}

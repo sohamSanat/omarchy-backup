@@ -1,0 +1,1 @@
+{"name":"cmd_curve_deletePreset","description":"Delete Point Curve Preset (command `curve.deletePreset`). Params: {name} — a user preset (built-ins can't be deleted).","parameters":{"additionalProperties":true,"type":"object"}}

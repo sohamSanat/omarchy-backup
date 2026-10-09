@@ -1,0 +1,1 @@
+{"name":"cmd_metadata_deletePreset","description":"Delete Metadata Preset (command `metadata.deletePreset`). Params: {name}.","parameters":{"additionalProperties":true,"type":"object"}}

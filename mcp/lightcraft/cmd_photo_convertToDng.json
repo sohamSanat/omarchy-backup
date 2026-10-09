@@ -1,0 +1,1 @@
+{"name":"cmd_photo_convertToDng","description":"Convert to DNG (command `photo.convertToDng`). Params: {ids?} — write each raw photo as a lossless DNG next to it (settings embedded) and relink the photo to it; originals are kept → {converted: [{id, path, original}], skipped}. Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

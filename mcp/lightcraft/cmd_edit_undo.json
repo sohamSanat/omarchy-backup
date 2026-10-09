@@ -1,0 +1,1 @@
+{"name":"cmd_edit_undo","description":"Undo (command `edit.undo`). Params: {}. Menu: Edit. Shortcut: Cmd+Z.","parameters":{"additionalProperties":true,"type":"object"}}

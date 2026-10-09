@@ -1,0 +1,1 @@
+{"name":"cmd_version_update","description":"Update Version with Current Settings (command `version.update`). Params: {index}.","parameters":{"additionalProperties":true,"type":"object"}}

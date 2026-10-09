@@ -1,0 +1,1 @@
+{"name":"cmd_history_restore","description":"Go to History Step (command `history.restore`). Params: {index}.","parameters":{"additionalProperties":true,"type":"object"}}

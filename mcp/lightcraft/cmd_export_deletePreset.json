@@ -1,0 +1,1 @@
+{"name":"cmd_export_deletePreset","description":"Delete Export Preset (command `export.deletePreset`). Params: {name} — removes a user preset → presets.","parameters":{"additionalProperties":true,"type":"object"}}

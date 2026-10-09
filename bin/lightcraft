@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# LightCraft launcher wrapper for Omarchy Linux
+# ------------------------------------------------================--------------
+# 1. Enables loopback control server (default port 7980) for live automation & MCP
+# 2. Exposes LIGHTCRAFT_THEME_FILE for live dynamic per-theme color customization
+# 3. Native Wayland by default; set LIGHTCRAFT_FORCE_XWAYLAND=1 to force XWayland.
+# 4. Ensures GPU backend preference is set cleanly for Intel Iris Xe Mesa.
+# ==============================================================================
+
+export LIGHTCRAFT_CONTROL_PORT="${LIGHTCRAFT_CONTROL_PORT:-7980}"
+export LIGHTCRAFT_THEME_FILE="${LIGHTCRAFT_THEME_FILE:-$HOME/.config/lightcraft/theme.json}"
+
+# Ensure initial theme.json is populated from current Omarchy theme
+if [[ ! -f "$LIGHTCRAFT_THEME_FILE" ]]; then
+  "$HOME/.local/bin/omarchy-sync-lightcraft" 2>/dev/null || true
+fi
+
+# Optional graphics backend override (default to Vulkan for Iris Xe)
+if [[ -z "${LIGHTCRAFT_GPU_BACKEND:-}" && -z "${WGPU_BACKEND:-}" ]]; then
+  export LIGHTCRAFT_GPU_BACKEND="vulkan"
+fi
+
+if [[ -n "${LIGHTCRAFT_FORCE_XWAYLAND:-}" ]]; then
+  unset WAYLAND_DISPLAY
+fi
+
+exec "$HOME/.local/bin/lightcraft.real" "$@"

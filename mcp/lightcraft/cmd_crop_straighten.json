@@ -1,0 +1,1 @@
+{"name":"cmd_crop_straighten","description":"Straighten (command `crop.straighten`). Params: {angle: degrees -45..45} — keeps the largest crop of the current aspect.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# omarchy-sync-lightcraft: Dynamic Theme Synchronization Engine for LightCraft
+# ------------------------------------------------------------------------------
+# Generates per-theme color tokens directly from Omarchy's active theme palette
+# and updates ~/.config/lightcraft/theme.json for instant live hot-reloading.
+# ==============================================================================
+set -euo pipefail
+
+PREFS_DIR="$HOME/.config/lightcraft"
+THEME_JSON="$PREFS_DIR/theme.json"
+PREFS_FILE="$PREFS_DIR/ui.json"
+CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+COLORS_TOML="$CURRENT_THEME_DIR/colors.toml"
+
+mkdir -p "$PREFS_DIR"
+
+# 1. Determine colors.toml source
+SPECIFIED_THEME="${1:-}"
+if [[ -n "$SPECIFIED_THEME" && -f "$HOME/.config/omarchy/themes/$SPECIFIED_THEME/colors.toml" ]]; then
+  COLORS_TOML="$HOME/.config/omarchy/themes/$SPECIFIED_THEME/colors.toml"
+elif [[ -n "$SPECIFIED_THEME" && -f "/usr/share/omarchy/themes/$SPECIFIED_THEME/colors.toml" ]]; then
+  COLORS_TOML="/usr/share/omarchy/themes/$SPECIFIED_THEME/colors.toml"
+fi
+
+# Fallback check
+if [[ ! -f "$COLORS_TOML" ]]; then
+  if [[ -f "$HOME/.local/state/omarchy/current/theme/colors.toml" ]]; then
+    COLORS_TOML="$HOME/.local/state/omarchy/current/theme/colors.toml"
+  fi
+fi
+
+# 2. Run Python palette synthesis
+python3 - <<PY
+import tomllib, json, os
+
+def hex_to_rgb(h):
+    h = h.strip().lstrip('#')
+    if len(h) == 3:
+        h = ''.join(c * 2 for c in h)
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+def rgb_to_hex(r, g, b):
+    return f"#{int(max(0, min(255, round(r)))):02x}{int(max(0, min(255, round(g)))):02x}{int(max(0, min(255, round(b)))):02x}"
+
+def blend(c1, c2, factor):
+    r1, g1, b1 = hex_to_rgb(c1)
+    r2, g2, b2 = hex_to_rgb(c2)
+    return rgb_to_hex(
+        r1 * (1.0 - factor) + r2 * factor,
+        g1 * (1.0 - factor) + g2 * factor,
+        b1 * (1.0 - factor) + b2 * factor
+    )
+
+colors_path = "$COLORS_TOML"
+colors = {}
+if os.path.exists(colors_path):
+    try:
+        with open(colors_path, "rb") as f:
+            colors = tomllib.load(f)
+    except Exception:
+        pass
+
+bg = colors.get("background", "#1B1B1B")
+fg = colors.get("foreground", "#efebdc")
+accent = colors.get("accent", colors.get("color4", "#e75a50"))
+
+# Palette overrides if specified by theme
+dark_bg = colors.get("dark_background")
+darker_bg = colors.get("darker_background")
+lighter_bg = colors.get("lighter_background")
+dark_fg = colors.get("dark_foreground")
+light_fg = colors.get("light_foreground")
+bright_fg = colors.get("bright_foreground")
+muted = colors.get("muted")
+
+c0 = colors.get("color0", bg)
+c1 = colors.get("color1", colors.get("red", "#ef4444"))
+c2 = colors.get("color2", colors.get("green", "#22c55e"))
+c3 = colors.get("color3", colors.get("yellow", "#eab308"))
+c7 = colors.get("color7", fg)
+c8 = colors.get("color8", blend(bg, fg, 0.3))
+
+mode = colors.get("mode", os.environ.get("OMARCHY_THEME_MODE", ""))
+r, g, b = hex_to_rgb(bg)
+lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+is_light = mode == "light" or (mode != "dark" and lum > 128)
+
+if is_light:
+    # High-contrast light darkroom theme adhering to Omarchy guidelines
+    chrome = dark_bg if dark_bg else blend(bg, "#000000", 0.05)
+    canvas = darker_bg if darker_bg else blend(bg, "#000000", 0.10)
+    grid_bg = blend(bg, "#000000", 0.14)
+    cell = "#ffffff" if bg != "#ffffff" else "#f7f7f7"
+    cell_selected = blend(accent, bg, 0.75)
+    divider = blend(muted, bg, 0.5) if muted else blend(bg, "#000000", 0.15)
+    inset = blend(bg, "#000000", 0.04)
+    field = "#ffffff"
+    field_border = muted if muted else blend(bg, "#000000", 0.25)
+    button = blend(bg, "#000000", 0.06)
+    button_border = blend(muted, bg, 0.4) if muted else blend(bg, "#000000", 0.22)
+    hover = blend(bg, "#000000", 0.10)
+    pressed = blend(bg, "#000000", 0.18)
+    tool_active = blend(accent, bg, 0.70)
+    text = bright_fg if bright_fg else fg
+    text_label = dark_fg if dark_fg else blend(fg, bg, 0.20)
+    text_dim = muted if muted else blend(fg, bg, 0.45)
+    text_disabled = blend(fg, bg, 0.65)
+    icon = text_label
+    track = blend(bg, "#000000", 0.24)
+    thumb = text_label
+    thumb_hover = accent
+else:
+    # Rich, immersive dark darkroom theme responding to Omarchy active colors
+    chrome = lighter_bg if lighter_bg else blend(bg, "#ffffff", 0.05)
+    canvas = darker_bg if darker_bg else blend(bg, "#000000", 0.25)
+    grid_bg = blend(darker_bg, "#000000", 0.20) if darker_bg else blend(bg, "#000000", 0.40)
+    cell = lighter_bg if lighter_bg else blend(bg, "#ffffff", 0.06)
+    cell_selected = blend(accent, bg, 0.60)
+    divider = blend(muted, bg, 0.5) if muted else blend(bg, "#ffffff", 0.10)
+    inset = dark_bg if dark_bg else blend(bg, "#000000", 0.18)
+    field = dark_bg if dark_bg else blend(bg, "#000000", 0.15)
+    field_border = muted if muted else blend(bg, "#ffffff", 0.15)
+    button = blend(bg, "#ffffff", 0.08)
+    button_border = blend(muted, bg, 0.4) if muted else blend(bg, "#ffffff", 0.18)
+    hover = blend(bg, "#ffffff", 0.14)
+    pressed = blend(bg, "#ffffff", 0.22)
+    tool_active = blend(accent, bg, 0.55)
+    text = bright_fg if bright_fg else fg
+    text_label = light_fg if light_fg else blend(fg, bg, 0.25)
+    text_dim = muted if muted else blend(fg, bg, 0.45)
+    text_disabled = blend(fg, bg, 0.65)
+    icon = text_label
+    track = blend(bg, "#ffffff", 0.22)
+    thumb = text_label
+    thumb_hover = accent
+
+tokens = {
+    "chrome": chrome,
+    "canvas": canvas,
+    "grid_bg": grid_bg,
+    "cell": cell,
+    "cell_selected": cell_selected,
+    "divider": divider,
+    "inset": inset,
+    "field": field,
+    "field_border": field_border,
+    "button": button,
+    "button_border": button_border,
+    "hover": hover,
+    "pressed": pressed,
+    "tool_active": tool_active,
+    "text": text,
+    "text_label": text_label,
+    "text_dim": text_dim,
+    "text_disabled": text_disabled,
+    "icon": icon,
+    "track": track,
+    "thumb": thumb,
+    "thumb_hover": thumb_hover,
+    "accent": accent,
+    "star": c3,
+    "pick": c2,
+    "reject": c1,
+    "caution": c3,
+    "mask_overlay": f"{c1}99"
+}
+
+with open("$THEME_JSON", "w") as out:
+    json.dump(tokens, out, indent=2)
+
+# Ensure externalEditor and GPU persist in ui.json
+prefs_path = "$PREFS_FILE"
+prefs = {}
+if os.path.exists(prefs_path):
+    try:
+        with open(prefs_path, "r") as pf:
+            prefs = json.load(pf)
+    except Exception:
+        pass
+
+if "settings" not in prefs:
+    prefs["settings"] = {}
+prefs["settings"]["externalEditor"] = "photocraft"
+prefs["settings"]["gpu"] = True
+
+with open(prefs_path, "w") as pf:
+    json.dump(prefs, pf, indent=2)
+PY
+
+# 3. If LightCraft is running on loopback, wake up and apply immediately
+CONTROL_PORT="${LIGHTCRAFT_CONTROL_PORT:-7980}"
+if command -v python3 >/dev/null 2>&1; then
+  python3 - <<PY 2>/dev/null || true
+import socket, json
+
+try:
+    s = socket.create_connection(("127.0.0.1", int("$CONTROL_PORT")), timeout=0.5)
+    f = s.makefile("rw")
+    f.write(json.dumps({"id": 1, "method": "ui.inspect", "params": {}}) + "\n")
+    f.flush()
+    f.readline()
+    s.close()
+except Exception:
+    pass
+PY
+fi

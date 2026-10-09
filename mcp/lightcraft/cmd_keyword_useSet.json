@@ -1,0 +1,1 @@
+{"name":"cmd_keyword_useSet","description":"Use Keyword Set (command `keyword.useSet`). Params: {name} (\"Recent Keywords\" = the recently added ones).","parameters":{"additionalProperties":true,"type":"object"}}

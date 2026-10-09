@@ -1,0 +1,1 @@
+{"name":"cmd_library_sort","description":"Sort (command `library.sort`). Params: {key?: captureDate|importDate|editDate|fileName|rating|fileSize|random, ascending?: bool, group?: auto|none|day|month|year, seed?: u64 (the shuffle `random` gives)}. Menu: View › Sort.","parameters":{"additionalProperties":true,"type":"object"}}

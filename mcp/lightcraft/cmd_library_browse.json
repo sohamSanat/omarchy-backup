@@ -1,0 +1,1 @@
+{"name":"cmd_library_browse","description":"Browse Folder (command `library.browse`). Params: {path, subfolders?: bool} — show a folder's photos without adding them to the library (they're read in place; edits go to XMP sidecars) → {path, photos, new}.","parameters":{"additionalProperties":true,"type":"object"}}

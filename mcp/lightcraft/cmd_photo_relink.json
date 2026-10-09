@@ -1,0 +1,1 @@
+{"name":"cmd_photo_relink","description":"Locate Photo (command `photo.relink`). Params: {id?, path} — point a photo at its file's new location (undo never moves files).","parameters":{"additionalProperties":true,"type":"object"}}

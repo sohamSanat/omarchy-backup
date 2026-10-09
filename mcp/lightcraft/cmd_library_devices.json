@@ -1,0 +1,1 @@
+{"name":"cmd_library_devices","description":"Cameras and Cards (command `library.devices`). Params: {} → [{name, path (its DCIM folder), root}] — mounted volumes with a DCIM folder.","parameters":{"additionalProperties":true,"type":"object"}}

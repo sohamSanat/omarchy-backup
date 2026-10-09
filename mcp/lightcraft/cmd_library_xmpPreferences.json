@@ -1,0 +1,1 @@
+{"name":"cmd_library_xmpPreferences","description":"XMP Sidecar Preferences (command `library.xmpPreferences`). Params: {autoWrite?: bool, naming?: stem (IMG_1.xmp, default) | full (IMG_1.CR3.xmp)} → current preferences (saved with the library).","parameters":{"additionalProperties":true,"type":"object"}}

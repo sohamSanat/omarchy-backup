@@ -1,0 +1,1 @@
+{"name":"cmd_photo_inspect","description":"Inspect Photo (command `photo.inspect`). Params: {id?}.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_photo_addToLibrary","description":"Add to My Photos (command `photo.addToLibrary`). Params: {ids?} — browsed (Local) photos join the library. Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

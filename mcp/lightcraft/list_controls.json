@@ -1,0 +1,1 @@
+{"name":"list_controls","description":"Every develop slider (id like `light.exposure`, label, section, min, max, default, current value) for the active photo.","parameters":{"properties":{"section":{"description":"Only this section (e.g. light, color, effects, detail)","type":"string"}},"required":[],"type":"object"}}

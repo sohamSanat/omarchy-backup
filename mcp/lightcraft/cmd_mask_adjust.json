@@ -1,0 +1,1 @@
+{"name":"cmd_mask_adjust","description":"Set Mask Adjustments (command `mask.adjust`). Params: {id?, values: {exposure, contrast, highlights, shadows, whites, blacks, temp, tint, texture, clarity, dehaze, hue, saturation, sharpness, noise, moire, defringe, color_hue, color_sat, amount}}.","parameters":{"additionalProperties":true,"type":"object"}}

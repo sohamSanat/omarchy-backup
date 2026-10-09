@@ -1,0 +1,1 @@
+{"name":"cmd_label_saveSet","description":"Save Color Label Set (command `label.saveSet`). Params: {name} — save the current label names as a set (replaces a user set of that name).","parameters":{"additionalProperties":true,"type":"object"}}

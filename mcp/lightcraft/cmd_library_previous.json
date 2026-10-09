@@ -1,0 +1,1 @@
+{"name":"cmd_library_previous","description":"Previous Photo (command `library.previous`). Params: {}. Shortcut: Left.","parameters":{"additionalProperties":true,"type":"object"}}

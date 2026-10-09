@@ -1,0 +1,1 @@
+{"name":"cmd_mask_brushStroke","description":"Brush Stroke (command `mask.brushStroke`). Params: {id?: maskId, points: [[x,y],…] normalized, size?: fraction of long edge (0.03), feather?, flow?, density?, erase?: bool, autoMask?: bool}.","parameters":{"additionalProperties":true,"type":"object"}}

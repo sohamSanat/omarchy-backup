@@ -1,0 +1,1 @@
+{"name":"cmd_preset_rename","description":"Rename Preset (command `preset.rename`). Params: {id, name}.","parameters":{"additionalProperties":true,"type":"object"}}

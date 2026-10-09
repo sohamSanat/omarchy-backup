@@ -1,0 +1,1 @@
+{"name":"cmd_album_sort","description":"Sort Albums by Name (command `album.sort`). Params: {parent?: folderId|null} — drops the hand order of the albums inside the folder (default: the top level), so they are listed by name → {changed}: how many albums lost their place.","parameters":{"additionalProperties":true,"type":"object"}}

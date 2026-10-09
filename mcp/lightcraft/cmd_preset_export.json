@@ -1,0 +1,1 @@
+{"name":"cmd_preset_export","description":"Export Presets (command `preset.export`). Params: {path, ids?: [presetId], group?: name} (default: all user presets) → {path, count}; writes a .lcpreset JSON file.","parameters":{"additionalProperties":true,"type":"object"}}

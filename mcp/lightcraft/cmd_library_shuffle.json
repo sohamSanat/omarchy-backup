@@ -1,0 +1,1 @@
+{"name":"cmd_library_shuffle","description":"Reshuffle (command `library.shuffle`). Params: {seed?: 0..2^53-1} — sort at random; without `seed` a new shuffle each time. Menu: View › Sort.","parameters":{"additionalProperties":true,"type":"object"}}

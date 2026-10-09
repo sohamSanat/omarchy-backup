@@ -1,0 +1,1 @@
+{"name":"cmd_export_presets","description":"Export Presets (command `export.presets`). Params: {} → [{name, builtin, params}] (use with app.export {preset: name, …overrides}).","parameters":{"additionalProperties":true,"type":"object"}}

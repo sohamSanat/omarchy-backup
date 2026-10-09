@@ -1,0 +1,1 @@
+{"name":"cmd_merge_hdrPanorama","description":"HDR Panorama Merge (command `merge.hdrPanorama`). Params: {ids?, bracket=0 (auto from EXIF), align, deghost, projection, boundaryWarp, autoCrop, fillEdges, autoSettings, stack, preview, previewPath?}.","parameters":{"additionalProperties":true,"type":"object"}}

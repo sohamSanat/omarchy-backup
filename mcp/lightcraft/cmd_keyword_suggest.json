@@ -1,0 +1,1 @@
+{"name":"cmd_keyword_suggest","description":"Keyword Suggestions (command `keyword.suggest`). Params: {prefix?: typed text, ids?, limit?: 12} → keywords to suggest for the photos (co-occurring / most used, or matching the prefix).","parameters":{"additionalProperties":true,"type":"object"}}

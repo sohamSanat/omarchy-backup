@@ -1,0 +1,1 @@
+{"name":"cmd_profile_deleteImported","description":"Delete Imported Profile (command `profile.deleteImported`). Params: {id: lut:…}.","parameters":{"additionalProperties":true,"type":"object"}}

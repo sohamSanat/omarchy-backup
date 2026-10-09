@@ -1,0 +1,1 @@
+{"name":"cmd_library_toggleAutoWriteXmp","description":"Automatically Write Changes into XMP (command `library.toggleAutoWriteXmp`). Params: {} → {autoWrite}. Menu: File.","parameters":{"additionalProperties":true,"type":"object"}}

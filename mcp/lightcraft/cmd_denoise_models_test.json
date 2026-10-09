@@ -1,0 +1,1 @@
+{"name":"cmd_denoise_models_test","description":"Test Denoise Model (command `denoise.models.test`). Params: {id} → {ok, result} — load an installed model and check it gives sensible pictures; needs the denoise runtime.","parameters":{"additionalProperties":true,"type":"object"}}

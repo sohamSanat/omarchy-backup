@@ -1,0 +1,1 @@
+{"name":"cmd_albums_list","description":"List Albums (command `albums.list`). Params: {}.","parameters":{"additionalProperties":true,"type":"object"}}

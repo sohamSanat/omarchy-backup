@@ -1,0 +1,1 @@
+{"name":"cmd_keyword_sets","description":"Keyword Sets (command `keyword.sets`). Params: {} → {sets: [{name, keywords}], current, keywords: the nine ⌥1–⌥9 apply}.","parameters":{"additionalProperties":true,"type":"object"}}

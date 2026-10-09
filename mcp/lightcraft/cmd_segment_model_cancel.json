@@ -1,0 +1,1 @@
+{"name":"cmd_segment_model_cancel","description":"Cancel AI Mask Model Download (command `segment.model.cancel`). Params: {} — stop the SAM 3 download (what has arrived is kept, and a new download resumes from it) → {cancelled}.","parameters":{"additionalProperties":true,"type":"object"}}

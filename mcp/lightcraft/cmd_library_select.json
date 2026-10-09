@@ -1,0 +1,1 @@
+{"name":"cmd_library_select","description":"Select Photos (command `library.select`). Params: {ids: [id], active?: id, mode?: replace|add|toggle|range} — every id must be a photo of the library.","parameters":{"additionalProperties":true,"type":"object"}}

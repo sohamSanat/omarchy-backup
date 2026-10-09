@@ -1,0 +1,1 @@
+{"name":"cmd_library_source","description":"Show Source (command `library.source`). Params: {kind: all|recentlyAdded|album|recentlyDeleted|picks|missing|libraryFolder, id?: albumId, path?: a path from library.folders (for libraryFolder)}.","parameters":{"additionalProperties":true,"type":"object"}}

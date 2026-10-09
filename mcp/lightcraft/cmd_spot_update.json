@@ -1,0 +1,1 @@
+{"name":"cmd_spot_update","description":"Edit Spot (command `spot.update`). Params: {index? (the selected spot), move?: [dx,dy] (the target, normalized), source?: [dx,dy] (offset from the target), moveSource?: [dx,dy], size?, feather?, opacity?, mode?}.","parameters":{"additionalProperties":true,"type":"object"}}

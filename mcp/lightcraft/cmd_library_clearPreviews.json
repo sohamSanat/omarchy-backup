@@ -1,0 +1,1 @@
+{"name":"cmd_library_clearPreviews","description":"Clear Preview Cache (command `library.clearPreviews`). Params: {}. Menu: File.","parameters":{"additionalProperties":true,"type":"object"}}

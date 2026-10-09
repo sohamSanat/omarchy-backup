@@ -1,0 +1,1 @@
+{"name":"cmd_develop_resetControl","description":"Reset Control (command `develop.resetControl`). Params: {control}.","parameters":{"additionalProperties":true,"type":"object"}}

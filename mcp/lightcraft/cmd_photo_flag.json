@@ -1,0 +1,1 @@
+{"name":"cmd_photo_flag","description":"Set Flag (command `photo.flag`). Params: {flag: pick|reject|none, ids?, advance?: bool}. Menu: Photo › Set Flag.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_mask_visible","description":"Show/Hide Mask (command `mask.visible`). Params: {id?, visible?: bool}.","parameters":{"additionalProperties":true,"type":"object"}}

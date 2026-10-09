@@ -1,0 +1,1 @@
+{"name":"cmd_stack_collapseAll","description":"Collapse All Stacks (command `stack.collapseAll`). Params: {}. Menu: View › Stacks.","parameters":{"additionalProperties":true,"type":"object"}}

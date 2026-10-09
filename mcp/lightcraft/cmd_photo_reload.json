@@ -1,0 +1,1 @@
+{"name":"cmd_photo_reload","description":"Reload from Disk (command `photo.reload`). Params: {ids?} — re-read photos whose files changed on disk (e.g. saved by an external editor), or raws shown from their embedded preview that can be decoded now; camera fields the catalog lacks are filled in → {reloaded}. Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

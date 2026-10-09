@@ -89,6 +89,7 @@ Branch: `main`
   - `apps/vectorcraft`: Full application build, dynamic theming engine, and system integration for VectorCraft vector graphics editor. Includes precompiled release archive (`build/vectorcraft-linux-x86_64.tar.xz`), custom `LiveTokens` dynamic theming patch (`vectorcraft-theme-unlock.patch`), headless/MCP server (`vectorcraft-cli`), Freedesktop launcher (`ai.storyteller.vectorcraft.desktop`), full icon suite (`icons/hicolor/`), configs (`configs/vectorcraft/`), theme hook (`vectorcraft-sync.sh`), and one-line installer (`apps/vectorcraft/install.sh`).
   - `apps/filmcraft`: Full application build, dynamic theming engine, and system integration for FilmCraft non-linear video editing workstation. Includes precompiled release archive (`build/filmcraft-linux-x86_64.tar.xz`), custom `LiveTokens` dynamic theming patch (`filmcraft-theme-unlock.patch`), headless CLI / MCP server (`filmcraft-cli`), Freedesktop launcher (`ai.storyteller.filmcraft.desktop`), AppStream metainfo, full icon suite (`icons/hicolor/`), configs (`configs/filmcraft/`), theme hook (`filmcraft-sync.sh`), 20 Antigravity MCP tool schemas (`mcp/filmcraft/`), and one-line installer (`apps/filmcraft/install.sh`).
   - `apps/pdfcraft`: Full application build, dynamic theming engine, and system integration for PdfCraft (v0.4.0) PDF workbench. Includes precompiled release archive (`build/pdfcraft-linux-x86_64.tar.xz`), custom `LiveTokens` dynamic theming patch (`pdfcraft-theme-unlock.patch`), headless CLI / MCP server (`pdfcraft-cli`), Freedesktop launcher (`ai.storyteller.pdfcraft.desktop`), AppStream metainfo (`apps/pdfcraft/metainfo/ai.storyteller.pdfcraft.metainfo.xml`), MIME package (`apps/pdfcraft/mime/ai.storyteller.pdfcraft.xml`), full icon suite (`icons/hicolor/`), configs (`configs/pdfcraft/`), theme hook (`pdfcraft-sync.sh`), 132 Antigravity MCP tool schemas (`mcp/pdfcraft/`), and one-line installer (`apps/pdfcraft/install.sh`).
+  - `apps/lightcraft`: Full application build, dynamic theming engine, and system integration for LightCraft (v0.4.0) non-destructive RAW photo developer and catalog workbench. Includes precompiled release archive (`build/lightcraft-linux-x86_64.tar.xz`), custom `LiveTokens` dynamic theming patch (`lightcraft-theme-unlock.patch`), headless CLI / MCP server (`lightcraft-cli`), Freedesktop launcher (`ai.storyteller.lightcraft.desktop`), AppStream metainfo (`apps/lightcraft/metainfo/ai.storyteller.lightcraft.metainfo.xml`), MIME package (`apps/lightcraft/mime/ai.storyteller.lightcraft.xml`), full icon suite (`icons/hicolor/`), configs (`configs/lightcraft/`), theme hook (`lightcraft-sync.sh`), 296 Antigravity MCP tool schemas (`mcp/lightcraft/`), and one-line installer (`apps/lightcraft/install.sh`).
   - `apps/photos-gallery`: Windows 11 Fluent Photo Gallery & Vault app with biometric/PIN unlock, image adjustments, and EXIF metadata view (Electron 43). Restored to `~/Projects/photos-gallery` with `p-gallery.desktop` and `bin/p-gallery`.
   - `apps/gallery`: Minimalist desktop photo viewer restored to `~/Projects/gallery` with `gallery.desktop` and `bin/gallery`.
 - **Ghostty Smooth Cursor Shader**: Custom GLSL shader `configs/terminals/ghostty/shaders/cursor_glide.glsl` enabling cubic-eased cell-to-cell cursor gliding with SDF edge antialiasing.
@@ -170,7 +171,7 @@ Self-signed TLS certificates for the Nothing Phone PWA bridge (`~/.config/omagen
 ```
 omarchy-backup/
 ├── agents/                  # AI agent skills, rules, and durable learnings (~/.agents)
-├── apps/                    # Standalone GUI applications (PhotoCraft, VectorCraft, FilmCraft, PdfCraft, Photos Gallery, Gallery)
+├── apps/                    # Standalone GUI applications (PhotoCraft, VectorCraft, FilmCraft, PdfCraft, LightCraft, Photos Gallery, Gallery)
 ├── bin/                     # Custom binaries and helper executables (~/.local/bin)
 ├── configs/                 # Dotfiles and application configs (~/.config)
 │   ├── omagent/             # Omagent prompt, mobile PWA web client, and config template
@@ -179,6 +180,7 @@ omarchy-backup/
 │   ├── vectorcraft/         # VectorCraft UI preferences and real-time token schema
 │   ├── filmcraft/           # FilmCraft preferences and real-time video token schema
 │   ├── pdfcraft/            # PdfCraft preferences, UI state, and real-time token schema
+│   ├── lightcraft/          # LightCraft UI state, RAW library settings, and token schema
 │   ├── hypr/                # Hyprland rules, inputs, look-and-feel, and keybindings
 │   ├── kimchi/              # Kimchi agent harness, model routing, and themes
 │   ├── omarchy/             # Omarchy shell.json, theme templates, and homelab-launcher

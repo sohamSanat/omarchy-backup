@@ -1,0 +1,1 @@
+{"name":"cmd_stack_auto","description":"Auto-Stack by Capture Time (command `stack.auto`). Params: {gap?: seconds between consecutive captures (default 60), ids? (default: the selection if several photos, else the current view), preview?: bool} → {stacks, photos}.","parameters":{"additionalProperties":true,"type":"object"}}

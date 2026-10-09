@@ -1,0 +1,1 @@
+{"name":"cmd_album_delete","description":"Delete Album (command `album.delete`). Params: {id}.","parameters":{"additionalProperties":true,"type":"object"}}

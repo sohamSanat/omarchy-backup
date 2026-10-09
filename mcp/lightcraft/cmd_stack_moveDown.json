@@ -1,0 +1,1 @@
+{"name":"cmd_stack_moveDown","description":"Move Down in Stack (command `stack.moveDown`). Params: {id?} — one place away from the top. Menu: Photo › Stack.","parameters":{"additionalProperties":true,"type":"object"}}

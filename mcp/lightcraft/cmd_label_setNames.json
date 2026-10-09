@@ -1,0 +1,1 @@
+{"name":"cmd_label_setNames","description":"Edit Color Label Names (command `label.setNames`). Params: {names: {red?: name|null, yellow?, green?, blue?, purple?}} — null or empty restores the colour's name.","parameters":{"additionalProperties":true,"type":"object"}}

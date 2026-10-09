@@ -1,0 +1,1 @@
+{"name":"cmd_journal_list","description":"Command Journal (command `journal.list`). Params: {limit?}.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_library_clearFilter","description":"Clear Filters (command `library.clearFilter`). Params: {}. Menu: View.","parameters":{"additionalProperties":true,"type":"object"}}

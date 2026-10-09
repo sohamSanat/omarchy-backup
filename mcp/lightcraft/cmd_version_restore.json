@@ -1,0 +1,1 @@
+{"name":"cmd_version_restore","description":"Restore Version (command `version.restore`). Params: {index}.","parameters":{"additionalProperties":true,"type":"object"}}

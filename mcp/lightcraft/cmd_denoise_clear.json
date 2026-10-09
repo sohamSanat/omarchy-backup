@@ -1,0 +1,1 @@
+{"name":"cmd_denoise_clear","description":"Clear Denoise Cache (command `denoise.clear`). Params: {} → {deleted, bytes} — delete every cached denoised picture of this library (they are made again when wanted).","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_develop_quickAdjust","description":"Quick Develop (command `develop.quickAdjust`). Params: {control: develop control id, delta, ids?} — add `delta` to the control on every target photo (each from its own value; Quick Develop) in one undo step → {changed}.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_stack_setTop","description":"Set as Top of Stack (command `stack.setTop`). Params: {id?} (default: the active photo). Menu: Photo › Stack. Shortcut: Shift+S.","parameters":{"additionalProperties":true,"type":"object"}}

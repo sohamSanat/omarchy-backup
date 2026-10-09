@@ -1,0 +1,1 @@
+{"name":"cmd_filter_savePreset","description":"Save Filter Preset (command `filter.savePreset`). Params: {name} — the current filter (library.filter), saved with the library.","parameters":{"additionalProperties":true,"type":"object"}}

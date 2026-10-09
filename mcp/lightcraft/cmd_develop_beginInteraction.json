@@ -1,0 +1,1 @@
+{"name":"cmd_develop_beginInteraction","description":"Begin Interaction (command `develop.beginInteraction`). Params: {label}.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_library_compact","description":"Optimize Library (command `library.compact`). Params: {}. Menu: File.","parameters":{"additionalProperties":true,"type":"object"}}

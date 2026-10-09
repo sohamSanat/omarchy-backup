@@ -1,0 +1,1 @@
+{"name":"cmd_profiles_list","description":"List Profiles (command `profiles.list`). Params: {} — every profile with its group and favourite flag.","parameters":{"additionalProperties":true,"type":"object"}}

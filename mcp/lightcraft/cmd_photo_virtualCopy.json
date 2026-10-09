@@ -1,0 +1,1 @@
+{"name":"cmd_photo_virtualCopy","description":"Create Virtual Copy (command `photo.virtualCopy`). Params: {ids?, name?} → {ids: [new photo ids]} — a new catalog entry sharing the original file, with independent settings; stacked with its original and named `name` or \"Copy N\". Menu: Photo. Shortcut: Cmd+'.","parameters":{"additionalProperties":true,"type":"object"}}

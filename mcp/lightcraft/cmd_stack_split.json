@@ -1,0 +1,1 @@
+{"name":"cmd_stack_split","description":"Split Stack (command `stack.split`). Params: {id?} — this photo and the ones after it become their own stack. Menu: Photo › Stack.","parameters":{"additionalProperties":true,"type":"object"}}

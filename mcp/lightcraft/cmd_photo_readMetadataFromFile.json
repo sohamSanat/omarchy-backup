@@ -1,0 +1,1 @@
+{"name":"cmd_photo_readMetadataFromFile","description":"Read Metadata from File (command `photo.readMetadataFromFile`). Params: {ids?} — reads each photo's XMP sidecar (or a raw/DNG's embedded XMP): metadata and develop settings, one undo step → {read, failed}. Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

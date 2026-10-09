@@ -1,0 +1,1 @@
+{"name":"cmd_faces_setName","description":"Name Face (command `faces.setName`). Params: {id?, index, name} — name a face region (null or empty clears it); undoable; the sidecar is not touched.","parameters":{"additionalProperties":true,"type":"object"}}

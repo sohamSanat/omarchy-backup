@@ -1,0 +1,1 @@
+{"name":"cmd_mask_invert","description":"Invert Mask (command `mask.invert`). Params: {id?}.","parameters":{"additionalProperties":true,"type":"object"}}

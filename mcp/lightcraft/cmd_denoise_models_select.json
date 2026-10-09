@@ -1,0 +1,1 @@
+{"name":"cmd_denoise_models_select","description":"Choose Denoise Model (command `denoise.models.select`). Params: {id: installed model | null} → {model} — null switches denoise off.","parameters":{"additionalProperties":true,"type":"object"}}

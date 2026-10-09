@@ -1,0 +1,1 @@
+{"name":"cmd_develop_autoBwMix","description":"Auto B\u0026W Mix (command `develop.autoBwMix`). Params: {} — sets the black \u0026 white mix from the photo's colours (and switches to B\u0026W).","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_crop_reset","description":"Reset Crop (command `crop.reset`). Params: {}. Shortcut: Cmd+Alt+R.","parameters":{"additionalProperties":true,"type":"object"}}

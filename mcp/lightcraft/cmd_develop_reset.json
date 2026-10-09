@@ -1,0 +1,1 @@
+{"name":"cmd_develop_reset","description":"Reset Edits (command `develop.reset`). Params: {ids?}. Menu: Photo. Shortcut: Cmd+Shift+R.","parameters":{"additionalProperties":true,"type":"object"}}

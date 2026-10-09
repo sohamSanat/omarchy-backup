@@ -1,0 +1,1 @@
+{"name":"cmd_develop_treatment","description":"Black \u0026 White (command `develop.treatment`). Params: {bw?: bool} (toggles when omitted). Menu: Photo. Shortcut: V.","parameters":{"additionalProperties":true,"type":"object"}}

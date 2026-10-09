@@ -1,0 +1,1 @@
+{"name":"cmd_history_list","description":"List History (command `history.list`). Params: {id?}.","parameters":{"additionalProperties":true,"type":"object"}}

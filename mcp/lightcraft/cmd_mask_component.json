@@ -1,0 +1,1 @@
+{"name":"cmd_mask_component","description":"Edit Mask Component (command `mask.component`). Params: {id?, component: index, action: invert|duplicate|delete|rename|op, name? (rename; empty clears), op?: add|subtract|intersect} — one component of a mask (deleting the last one deletes the mask).","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_faces_models_inspect","description":"Inspect Face Model File (command `faces.models.inspect`). Params: {path} → what a .onnx file is: {kind: known | draft | unsupported, model, assumptions, reason, alreadyInstalled}; installs nothing.","parameters":{"additionalProperties":true,"type":"object"}}

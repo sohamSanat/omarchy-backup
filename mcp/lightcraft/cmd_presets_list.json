@@ -1,0 +1,1 @@
+{"name":"cmd_presets_list","description":"List Presets (command `presets.list`). Params: {}.","parameters":{"additionalProperties":true,"type":"object"}}

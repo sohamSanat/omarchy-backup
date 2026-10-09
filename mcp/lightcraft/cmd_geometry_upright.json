@@ -1,0 +1,1 @@
+{"name":"cmd_geometry_upright","description":"Upright (command `geometry.upright`). Params: {mode: off|auto|guided|level|vertical|full} — analyses the photo (line segments → vanishing points) and stores the correction; run again to update after lens changes.","parameters":{"additionalProperties":true,"type":"object"}}

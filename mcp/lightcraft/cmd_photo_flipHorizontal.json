@@ -1,0 +1,1 @@
+{"name":"cmd_photo_flipHorizontal","description":"Flip Horizontal (command `photo.flipHorizontal`). Params: {ids?}. Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

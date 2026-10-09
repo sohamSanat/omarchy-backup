@@ -1,0 +1,1 @@
+{"name":"cmd_library_selectBy","description":"Select by Flag, Rating or Label (command `library.selectBy`). Params: {flag?: pick|reject|none, rating?: 0..5, ratingOp?: gte|eq|lte (default gte), label?: red|…|none, add?: bool (extend the selection)} — among the photos in view.","parameters":{"additionalProperties":true,"type":"object"}}

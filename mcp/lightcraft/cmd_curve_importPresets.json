@@ -1,0 +1,1 @@
+{"name":"cmd_curve_importPresets","description":"Import Point Curve Presets (command `curve.importPresets`). Params: {path | paths: [file]} — .lccurve JSON files ({format, version, presets: [...]}, an array of presets, or one preset); same-named user presets are replaced → {imported: [name], failed: [[file, error]]}.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_denoise_models_inspect","description":"Inspect Denoise Model (command `denoise.models.inspect`). Params: {path} → model terms from an adjacent manifest; never executes the file.","parameters":{"additionalProperties":true,"type":"object"}}

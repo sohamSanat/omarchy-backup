@@ -1,0 +1,1 @@
+{"name":"cmd_merge_hdr","description":"HDR Merge (command `merge.hdr`). Params: {ids?, align=true, deghost=none|low|medium|high, autoSettings=true, stack=false, preview=false, showOverlay=false, previewPath?}.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_photo_flipVertical","description":"Flip Vertical (command `photo.flipVertical`). Params: {ids?}. Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

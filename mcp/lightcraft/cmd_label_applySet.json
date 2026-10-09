@@ -1,0 +1,1 @@
+{"name":"cmd_label_applySet","description":"Apply Color Label Set (command `label.applySet`). Params: {name} — use a set's label names (undoable).","parameters":{"additionalProperties":true,"type":"object"}}

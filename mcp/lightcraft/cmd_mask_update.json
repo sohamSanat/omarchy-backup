@@ -1,0 +1,1 @@
+{"name":"cmd_mask_update","description":"Update Mask Shape (command `mask.update`). Params: {id?, component?: index (0), shape: MaskShape JSON}.","parameters":{"additionalProperties":true,"type":"object"}}

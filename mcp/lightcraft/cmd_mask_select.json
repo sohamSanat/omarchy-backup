@@ -1,0 +1,1 @@
+{"name":"cmd_mask_select","description":"Select Mask (command `mask.select`). Params: {id|null}.","parameters":{"additionalProperties":true,"type":"object"}}

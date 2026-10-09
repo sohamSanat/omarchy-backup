@@ -1,0 +1,1 @@
+{"name":"cmd_curve_reset","description":"Reset Tone Curve (command `curve.reset`). Params: {channel?: all|point|parametric|master|red|green|blue (default all)} — the active photo's tone curve (or one channel) back to linear.","parameters":{"additionalProperties":true,"type":"object"}}

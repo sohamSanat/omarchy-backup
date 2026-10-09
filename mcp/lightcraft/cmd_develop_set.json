@@ -1,0 +1,1 @@
+{"name":"cmd_develop_set","description":"Set Develop Values (command `develop.set`). Params: {control?: controlId, value?: number, values?: {controlId: number}, ids?: [photo]} — see develop.controls.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_photo_label","description":"Set Color Label (command `photo.label`). Params: {label: red|yellow|green|blue|purple|none, ids?}. Menu: Photo › Set Color Label.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_album_ruleFields","description":"Smart Album Rule Fields (command `album.ruleFields`). Params: {} → [{field, label, kind, ops: [{op, label}], choices?}] for ruleSet rules.","parameters":{"additionalProperties":true,"type":"object"}}

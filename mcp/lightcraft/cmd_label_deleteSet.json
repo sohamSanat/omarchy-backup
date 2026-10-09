@@ -1,0 +1,1 @@
+{"name":"cmd_label_deleteSet","description":"Delete Color Label Set (command `label.deleteSet`). Params: {name} — user sets only.","parameters":{"additionalProperties":true,"type":"object"}}

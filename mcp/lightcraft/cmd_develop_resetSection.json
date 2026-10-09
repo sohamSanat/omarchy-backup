@@ -1,0 +1,1 @@
+{"name":"cmd_develop_resetSection","description":"Reset Section (command `develop.resetSection`). Params: {section: light|curve|color|mixer|grading|effects|vignette|grain|detail|optics|geometry}.","parameters":{"additionalProperties":true,"type":"object"}}

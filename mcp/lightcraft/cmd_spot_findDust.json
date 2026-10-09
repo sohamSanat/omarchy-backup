@@ -1,0 +1,1 @@
+{"name":"cmd_spot_findDust","description":"Find Dust Spots (command `spot.findDust`). Params: {sensitivity?: 0..100 (50), add?: bool (true)} — find sensor-dust spots (small soft dark spots on smooth areas) and add a heal spot on each (one undo step) → {spots: [{x, y, size}], added}.","parameters":{"additionalProperties":true,"type":"object"}}

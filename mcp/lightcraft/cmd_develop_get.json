@@ -1,0 +1,1 @@
+{"name":"cmd_develop_get","description":"Get Develop Settings (command `develop.get`). Params: {id?}.","parameters":{"additionalProperties":true,"type":"object"}}

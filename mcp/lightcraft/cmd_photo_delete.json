@@ -1,0 +1,1 @@
+{"name":"cmd_photo_delete","description":"Delete Photo (command `photo.delete`). Params: {ids?} — moves to Recently Deleted. Menu: Photo. Shortcut: Delete.","parameters":{"additionalProperties":true,"type":"object"}}

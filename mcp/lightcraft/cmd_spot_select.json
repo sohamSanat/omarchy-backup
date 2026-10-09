@@ -1,0 +1,1 @@
+{"name":"cmd_spot_select","description":"Select Spot (command `spot.select`). Params: {index|null}.","parameters":{"additionalProperties":true,"type":"object"}}

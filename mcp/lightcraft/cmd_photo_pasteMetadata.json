@@ -1,0 +1,1 @@
+{"name":"cmd_photo_pasteMetadata","description":"Paste Metadata (command `photo.pasteMetadata`). Params: {ids?, fields?: [title|caption|copyright|copyrightStatus|usageTerms|copyrightUrl|creator|location|keywords] (default: all copied)}. Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

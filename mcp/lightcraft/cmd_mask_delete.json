@@ -1,0 +1,1 @@
+{"name":"cmd_mask_delete","description":"Delete Mask (command `mask.delete`). Params: {id?}.","parameters":{"additionalProperties":true,"type":"object"}}

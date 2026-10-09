@@ -1,0 +1,1 @@
+{"name":"cmd_library_selectNone","description":"Deselect All (command `library.selectNone`). Params: {}. Menu: Edit. Shortcut: Cmd+Shift+A.","parameters":{"additionalProperties":true,"type":"object"}}

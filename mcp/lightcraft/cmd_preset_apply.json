@@ -1,0 +1,1 @@
+{"name":"cmd_preset_apply","description":"Apply Preset (command `preset.apply`). Params: {id: presetId, amount?: 0..200 (percent), ids?}.","parameters":{"additionalProperties":true,"type":"object"}}

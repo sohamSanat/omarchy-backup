@@ -1,0 +1,1 @@
+{"name":"cmd_photo_reject","description":"Flag as Reject (command `photo.reject`). Params: {ids?}. Menu: Photo › Set Flag. Shortcut: X.","parameters":{"additionalProperties":true,"type":"object"}}

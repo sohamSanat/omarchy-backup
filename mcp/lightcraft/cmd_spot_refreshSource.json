@@ -1,0 +1,1 @@
+{"name":"cmd_spot_refreshSource","description":"Refresh Source (command `spot.refreshSource`). Params: {index? (the selected spot)} — picks the next-best source away from the current one.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_photo_rate","description":"Set Rating (command `photo.rate`). Params: {rating: 0..5, ids?, advance?: bool}. Menu: Photo › Set Rating.","parameters":{"additionalProperties":true,"type":"object"}}

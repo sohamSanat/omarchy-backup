@@ -1,0 +1,1 @@
+{"name":"cmd_stack_remove","description":"Remove from Stack (command `stack.remove`). Params: {ids?}. Menu: Photo › Stack.","parameters":{"additionalProperties":true,"type":"object"}}

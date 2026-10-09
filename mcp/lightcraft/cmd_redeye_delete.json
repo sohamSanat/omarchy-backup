@@ -1,0 +1,1 @@
+{"name":"cmd_redeye_delete","description":"Delete Red Eye Correction (command `redeye.delete`). Params: {index}.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_app_gpu","description":"GPU Rendering (command `app.gpu`). Params: {enabled?: bool} — allow/forbid GPU rendering (CPU fallback; LIGHTCRAFT_GPU=0 forbids it for the process); returns {enabled, available, adapter, reason (why the GPU is off), lastFallback (latest render redone on the CPU, and why)}.","parameters":{"additionalProperties":true,"type":"object"}}

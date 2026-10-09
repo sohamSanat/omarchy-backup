@@ -1,0 +1,1 @@
+{"name":"cmd_album_addPhotos","description":"Add to Album (command `album.addPhotos`). Params: {id: albumId, ids?: [photoIds]} (default: selection). Menu: Photo.","parameters":{"additionalProperties":true,"type":"object"}}

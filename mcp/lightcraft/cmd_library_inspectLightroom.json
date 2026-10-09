@@ -1,0 +1,1 @@
+{"name":"cmd_library_inspectLightroom","description":"Inspect Lightroom Catalog (command `library.inspectLightroom`). Params: {path: .lrcat} → {photos, collections, missing, warnings}; read-only, no Lightroom required.","parameters":{"additionalProperties":true,"type":"object"}}

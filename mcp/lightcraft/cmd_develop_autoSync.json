@@ -1,0 +1,1 @@
+{"name":"cmd_develop_autoSync","description":"Auto Sync (command `develop.autoSync`). Params: {on?: bool} (toggles when omitted) — edits to the active photo also change the other selected photos (only the settings that changed; not spot removal / red eye) → {on}. Menu: Edit. Shortcut: Cmd+Alt+Shift+A.","parameters":{"additionalProperties":true,"type":"object"}}

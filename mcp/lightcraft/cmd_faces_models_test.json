@@ -1,0 +1,1 @@
+{"name":"cmd_faces_models_test","description":"Test Face Model (command `faces.models.test`). Params: {id} → {ok, result: {loadMs, embedMs, dimension, checks}} — load an installed recognition model and check it gives sensible faces; needs the recognition runtime.","parameters":{"additionalProperties":true,"type":"object"}}

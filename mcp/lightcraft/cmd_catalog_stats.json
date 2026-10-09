@@ -1,0 +1,1 @@
+{"name":"cmd_catalog_stats","description":"Catalog Statistics (command `catalog.stats`). Params: {}.","parameters":{"additionalProperties":true,"type":"object"}}

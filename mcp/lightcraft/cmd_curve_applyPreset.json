@@ -1,0 +1,1 @@
+{"name":"cmd_curve_applyPreset","description":"Apply Point Curve Preset (command `curve.applyPreset`). Params: {name} — sets the active photo's point curves (all four channels; the parametric curve stays).","parameters":{"additionalProperties":true,"type":"object"}}

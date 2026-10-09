@@ -1,0 +1,1 @@
+{"name":"cmd_label_sets","description":"Color Label Sets (command `label.sets`). Params: {} → {sets: [{name, names: [red, yellow, green, blue, purple], builtin}], current: name|null}.","parameters":{"additionalProperties":true,"type":"object"}}

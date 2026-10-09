@@ -1,0 +1,1 @@
+{"name":"cmd_beforeAfter_setBefore","description":"Set Before (command `beforeAfter.setBefore`). Params: {source: import|current|history|version, index? (history step), name? (version)} — what the before side shows (this session).","parameters":{"additionalProperties":true,"type":"object"}}

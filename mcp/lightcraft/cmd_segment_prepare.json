@@ -1,0 +1,1 @@
+{"name":"cmd_segment_prepare","description":"Prepare AI Masks (command `segment.prepare`). Params: {} — load SAM 3 and analyze the active photo in the background, so Object clicks are instant → {busy}.","parameters":{"additionalProperties":true,"type":"object"}}

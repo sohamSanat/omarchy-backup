@@ -1,0 +1,1 @@
+{"name":"cmd_keyword_rename","description":"Rename Keyword (command `keyword.rename`). Params: {from, to} — on every photo, children included (`a` → `b` renames `a|x` to `b|x`); renaming onto an existing keyword merges them.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_faces_models_remove","description":"Remove Face Model (command `faces.models.remove`). Params: {id} — delete an installed model.","parameters":{"additionalProperties":true,"type":"object"}}

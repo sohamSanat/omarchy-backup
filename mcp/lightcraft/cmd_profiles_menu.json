@@ -1,0 +1,1 @@
+{"name":"cmd_profiles_menu","description":"Profile Menu (command `profiles.menu`). Params: {} — favourites, recent (newest first) and groups.","parameters":{"additionalProperties":true,"type":"object"}}

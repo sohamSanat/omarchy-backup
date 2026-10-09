@@ -1,0 +1,1 @@
+{"name":"cmd_album_rename","description":"Rename Album (command `album.rename`). Params: {id, name}.","parameters":{"additionalProperties":true,"type":"object"}}

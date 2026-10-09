@@ -1,0 +1,1 @@
+{"name":"cmd_develop_sectionEnabled","description":"Toggle Section (command `develop.sectionEnabled`). Params: {section: string, enabled: bool}.","parameters":{"additionalProperties":true,"type":"object"}}

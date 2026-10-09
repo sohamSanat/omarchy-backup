@@ -1,0 +1,1 @@
+{"name":"cmd_pointColor_pick","description":"Add Point Color Sample (command `pointColor.pick`). Params: {x, y} normalized image coords — samples the colour there (max 8); returns {index, lum, chroma, hue}.","parameters":{"additionalProperties":true,"type":"object"}}

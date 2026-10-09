@@ -1,0 +1,1 @@
+{"name":"cmd_filter_deletePreset","description":"Delete Filter Preset (command `filter.deletePreset`). Params: {name}.","parameters":{"additionalProperties":true,"type":"object"}}

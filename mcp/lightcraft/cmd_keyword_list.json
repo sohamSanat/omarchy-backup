@@ -1,0 +1,1 @@
+{"name":"cmd_keyword_list","description":"Keywords (command `keyword.list`). Params: {} → [{name, path, count, children}] keyword tree (`a|b|c` keywords are hierarchical).","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_faces_nameFaces","description":"Name Faces (command `faces.nameFaces`). Params: {faces: [{photo, index}], name} → {named, photos} — name (or, with a null or empty name, clear) many face regions as one undoable step; the sidecar is not touched.","parameters":{"additionalProperties":true,"type":"object"}}

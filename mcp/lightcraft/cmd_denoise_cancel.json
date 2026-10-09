@@ -1,0 +1,1 @@
+{"name":"cmd_denoise_cancel","description":"Cancel Denoise (command `denoise.cancel`). Params: {id?, all?} → {cancelled} — stop the photo being made and/or forget the ones waiting (all of them when `id` is omitted).","parameters":{"additionalProperties":true,"type":"object"}}

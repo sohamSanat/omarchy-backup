@@ -1,0 +1,1 @@
+{"name":"get_develop","description":"The full develop settings JSON of a photo (white balance, light, color, curves, mixer, grading, effects, crop, masks, spots…).","parameters":{"properties":{"id":{"description":"Photo id (default: the active photo). Makes that photo active first.","type":"integer"}},"required":[],"type":"object"}}

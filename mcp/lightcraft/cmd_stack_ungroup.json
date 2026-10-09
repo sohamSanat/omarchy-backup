@@ -1,0 +1,1 @@
+{"name":"cmd_stack_ungroup","description":"Ungroup Stack (command `stack.ungroup`). Params: {ids?}. Menu: Photo › Stack. Shortcut: Cmd+Shift+G.","parameters":{"additionalProperties":true,"type":"object"}}

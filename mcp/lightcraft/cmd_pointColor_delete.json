@@ -1,0 +1,1 @@
+{"name":"cmd_pointColor_delete","description":"Delete Point Color Sample (command `pointColor.delete`). Params: {index}.","parameters":{"additionalProperties":true,"type":"object"}}

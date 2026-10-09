@@ -1,0 +1,1 @@
+{"name":"cmd_develop_controls","description":"List Develop Controls (command `develop.controls`). Params: {section?} — every slider with range, default and current value.","parameters":{"additionalProperties":true,"type":"object"}}

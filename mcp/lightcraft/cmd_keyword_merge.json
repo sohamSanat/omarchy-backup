@@ -1,0 +1,1 @@
+{"name":"cmd_keyword_merge","description":"Merge Keywords (command `keyword.merge`). Params: {from: [keyword], into: keyword} — replaces each `from` keyword (children included) with `into` on every photo.","parameters":{"additionalProperties":true,"type":"object"}}

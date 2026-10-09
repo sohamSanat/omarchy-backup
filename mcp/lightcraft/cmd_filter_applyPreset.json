@@ -1,0 +1,1 @@
+{"name":"cmd_filter_applyPreset","description":"Apply Filter Preset (command `filter.applyPreset`). Params: {name} — replaces the current filter → {photos}.","parameters":{"additionalProperties":true,"type":"object"}}

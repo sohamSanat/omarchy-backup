@@ -1,0 +1,1 @@
+{"name":"cmd_mask_sampleColor","description":"Sample Mask Color (command `mask.sampleColor`). Params: {x, y: normalized image point, add?: bool (⇧: add to the samples, max 5), id?, component?} — the colour range of the selected mask (its first colour-range component) samples the colour there → {samples}.","parameters":{"additionalProperties":true,"type":"object"}}

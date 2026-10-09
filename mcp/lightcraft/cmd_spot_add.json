@@ -1,0 +1,1 @@
+{"name":"cmd_spot_add","description":"Add Remove Spot (command `spot.add`). Params: {mode?: remove|heal|clone, points: [[x,y],…], size?: fraction of long edge, feather?, opacity?, source?: [dx,dy] (default: the best match nearby)} — selects the new spot; returns {index}.","parameters":{"additionalProperties":true,"type":"object"}}

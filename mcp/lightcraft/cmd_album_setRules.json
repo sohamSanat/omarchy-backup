@@ -1,0 +1,1 @@
+{"name":"cmd_album_setRules","description":"Edit Smart Album (command `album.setRules`). Params: {id, rules?: partial Filter merged onto the current rules (null clears a field), replace?: bool, fromView?: bool (use the current view)}.","parameters":{"additionalProperties":true,"type":"object"}}

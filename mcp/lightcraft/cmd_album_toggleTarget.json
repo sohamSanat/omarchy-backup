@@ -1,0 +1,1 @@
+{"name":"cmd_album_toggleTarget","description":"Add to Target Album (command `album.toggleTarget`). Params: {ids?} — B: adds the photos to the target album (the Quick Collection unless one is set), or removes them when they're all in it → {album, added}.","parameters":{"additionalProperties":true,"type":"object"}}

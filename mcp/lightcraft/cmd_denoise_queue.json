@@ -1,0 +1,1 @@
+{"name":"cmd_denoise_queue","description":"Denoise Photos (command `denoise.queue`). Params: {ids?: [photoId], scope?: selected | visible | withAmount, retry?: false} → {added, …status} — make the denoised pictures of raw photos that have none, in the background. `retry` tries photos that failed before.","parameters":{"additionalProperties":true,"type":"object"}}

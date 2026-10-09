@@ -1,0 +1,1 @@
+{"name":"cmd_export_checkTarget","description":"Check Output Path (command `export.checkTarget`). Params: {path} — fails when writing `path` would replace a photo's original (or its XMP sidecar) in the library; front ends call it before saving a render or screenshot to a user-given path → {path}.","parameters":{"additionalProperties":true,"type":"object"}}

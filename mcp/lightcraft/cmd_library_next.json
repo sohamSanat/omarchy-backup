@@ -1,0 +1,1 @@
+{"name":"cmd_library_next","description":"Next Photo (command `library.next`). Params: {}. Shortcut: Right.","parameters":{"additionalProperties":true,"type":"object"}}

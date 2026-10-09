@@ -1,0 +1,1 @@
+{"name":"cmd_photo_allMetadata","description":"All Metadata (command `photo.allMetadata`). Params: {id?} → {exif: [{group, tag, name, value}], xmp: [{name, value}]} — every EXIF / TIFF / GPS tag of the file and its XMP properties.","parameters":{"additionalProperties":true,"type":"object"}}

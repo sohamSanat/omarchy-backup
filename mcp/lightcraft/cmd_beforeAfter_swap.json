@@ -1,0 +1,1 @@
+{"name":"cmd_beforeAfter_swap","description":"Swap Before and After Settings (command `beforeAfter.swap`). Params: {}. Menu: View › Before/After Settings.","parameters":{"additionalProperties":true,"type":"object"}}

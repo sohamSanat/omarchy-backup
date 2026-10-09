@@ -1,0 +1,1 @@
+{"name":"cmd_library_previewProgress","description":"Preview Build Progress (command `library.previewProgress`). Params: {} → {total, done, failed, repaired, running, cancelled, what, error} | null.","parameters":{"additionalProperties":true,"type":"object"}}

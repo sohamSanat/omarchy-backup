@@ -1,0 +1,1 @@
+{"name":"cmd_develop_auto","description":"Auto Settings (command `develop.auto`). Params: {}. Menu: Photo. Shortcut: Shift+A.","parameters":{"additionalProperties":true,"type":"object"}}

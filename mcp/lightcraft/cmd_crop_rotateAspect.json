@@ -1,0 +1,1 @@
+{"name":"cmd_crop_rotateAspect","description":"Rotate Crop Aspect (command `crop.rotateAspect`). Params: {}. Shortcut: X.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_denoise_pump","description":"Denoise Pump (command `denoise.pump`). Params: {pace?: pause | light | normal | full} → {active, running, queued, ready, generation, downloading} — called every frame by the app: takes in finished work and keeps one photo going.","parameters":{"additionalProperties":true,"type":"object"}}

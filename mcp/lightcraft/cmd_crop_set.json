@@ -1,0 +1,1 @@
+{"name":"cmd_crop_set","description":"Set Crop (command `crop.set`). Params: {rect?: [x0,y0,x1,y1] normalized in the straightened frame, angle?: degrees}.","parameters":{"additionalProperties":true,"type":"object"}}

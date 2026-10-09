@@ -1,0 +1,1 @@
+{"name":"cmd_profile_import","description":"Import Profiles (command `profile.import`). Params: {paths: [.cube file, folder or .zip]} — 3D LUTs become creative profiles (Amount 0–200 %; rendered on the CPU) in the profile browser's groups (folder / zip name, else Imported) → {imported: [{id, name, group}], failed}.","parameters":{"additionalProperties":true,"type":"object"}}

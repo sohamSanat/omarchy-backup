@@ -1,0 +1,1 @@
+{"name":"cmd_photo_pick","description":"Flag as Pick (command `photo.pick`). Params: {ids?}. Menu: Photo › Set Flag. Shortcut: P.","parameters":{"additionalProperties":true,"type":"object"}}

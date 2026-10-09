@@ -1,0 +1,1 @@
+{"name":"cmd_merge_panorama","description":"Panorama Merge (command `merge.panorama`). Params: {ids?, projection=auto|spherical|cylindrical|perspective, boundaryWarp=0..100, autoCrop=false, fillEdges=false, autoSettings=true, stack=false, maxMegapixels=40, preview=false, previewPath?}.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_develop_endInteraction","description":"End Interaction (command `develop.endInteraction`). Params: {}.","parameters":{"additionalProperties":true,"type":"object"}}

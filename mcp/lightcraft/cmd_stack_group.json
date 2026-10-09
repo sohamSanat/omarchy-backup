@@ -1,0 +1,1 @@
+{"name":"cmd_stack_group","description":"Group into Stack (command `stack.group`). Params: {ids?, top?: photoId (default: the active photo), collapsed?: bool (default true)} — stacks the photos are already in are merged. Menu: Photo › Stack. Shortcut: Cmd+G.","parameters":{"additionalProperties":true,"type":"object"}}

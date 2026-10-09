@@ -1,0 +1,1 @@
+{"name":"cmd_library_cancelPreviews","description":"Cancel Preview Build (command `library.cancelPreviews`). Params: {}.","parameters":{"additionalProperties":true,"type":"object"}}

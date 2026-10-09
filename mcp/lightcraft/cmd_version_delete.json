@@ -1,0 +1,1 @@
+{"name":"cmd_version_delete","description":"Delete Version (command `version.delete`). Params: {index}.","parameters":{"additionalProperties":true,"type":"object"}}

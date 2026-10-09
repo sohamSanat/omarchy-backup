@@ -1,0 +1,1 @@
+{"name":"cmd_photo_unflag","description":"Unflag (command `photo.unflag`). Params: {ids?}. Menu: Photo › Set Flag. Shortcut: U.","parameters":{"additionalProperties":true,"type":"object"}}

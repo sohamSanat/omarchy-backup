@@ -1,0 +1,1 @@
+{"name":"cmd_develop_wbPick","description":"White Balance Selector (command `develop.wbPick`). Params: {x, y} normalized image coords of a neutral point. Shortcut: W.","parameters":{"additionalProperties":true,"type":"object"}}

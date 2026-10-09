@@ -1,0 +1,1 @@
+{"name":"cmd_develop_wb","description":"White Balance (command `develop.wb`). Params: {mode: asShot|auto|daylight|cloudy|shade|tungsten|fluorescent|flash|custom, temp?, tint?}.","parameters":{"additionalProperties":true,"type":"object"}}

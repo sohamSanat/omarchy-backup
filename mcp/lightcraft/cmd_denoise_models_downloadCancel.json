@@ -1,0 +1,1 @@
+{"name":"cmd_denoise_models_downloadCancel","description":"Cancel Denoise Model Download (command `denoise.models.downloadCancel`). Params: {id} → {discarded} — stop a download, or delete a finished one that was not installed.","parameters":{"additionalProperties":true,"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"cmd_metadata_presets","description":"Metadata Presets (command `metadata.presets`). Params: {} → [{name, fields}].","parameters":{"additionalProperties":true,"type":"object"}}

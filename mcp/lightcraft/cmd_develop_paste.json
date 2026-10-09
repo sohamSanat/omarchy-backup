@@ -1,0 +1,1 @@
+{"name":"cmd_develop_paste","description":"Paste Edit Settings (command `develop.paste`). Params: {ids?, groups?: [settingsGroup] (paste only these of the copied groups)}. Menu: Edit. Shortcut: Cmd+V.","parameters":{"additionalProperties":true,"type":"object"}}

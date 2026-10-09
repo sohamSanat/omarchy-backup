@@ -1,0 +1,1 @@
+{"name":"cmd_stack_moveUp","description":"Move Up in Stack (command `stack.moveUp`). Params: {id?} — one place towards the top. Menu: Photo › Stack.","parameters":{"additionalProperties":true,"type":"object"}}

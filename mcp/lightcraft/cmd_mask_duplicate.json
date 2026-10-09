@@ -1,0 +1,1 @@
+{"name":"cmd_mask_duplicate","description":"Duplicate Mask (command `mask.duplicate`). Params: {id?, invert?: bool (Duplicate and Invert)} — the copy goes right after the original and is selected.","parameters":{"additionalProperties":true,"type":"object"}}

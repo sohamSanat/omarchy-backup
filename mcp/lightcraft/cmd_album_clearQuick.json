@@ -1,0 +1,1 @@
+{"name":"cmd_album_clearQuick","description":"Clear Quick Collection (command `album.clearQuick`). Params: {}.","parameters":{"additionalProperties":true,"type":"object"}}

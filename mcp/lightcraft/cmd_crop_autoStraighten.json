@@ -1,0 +1,1 @@
+{"name":"cmd_crop_autoStraighten","description":"Auto Straighten (command `crop.autoStraighten`). Params: {} — level the horizon (or plumb lines) with the crop angle.","parameters":{"additionalProperties":true,"type":"object"}}
