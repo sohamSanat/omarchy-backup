@@ -220,6 +220,35 @@ function unassign(root, id, cls) {
   return tree
 }
 
+function clearTile(root, id) {
+  var tree = clone(root)
+  var leaf = findLeaf(tree, id)
+  if (!leaf) return root
+  leaf.apps = []
+  return tree
+}
+
+function replace(root, id, app) {
+  var tree = clearTile(root, id)
+  return assign(tree, id, app)
+}
+
+function template(name) {
+  if (name === "two-col") {
+    return { dir: "h", sizes: [0.5, 0.5], children: [newLeaf("t1"), newLeaf("t2")] }
+  }
+  if (name === "three-col") {
+    return { dir: "h", sizes: [0.25, 0.5, 0.25], children: [newLeaf("t1"), newLeaf("t2"), newLeaf("t3")] }
+  }
+  if (name === "main-stack") {
+    return { dir: "h", sizes: [0.65, 0.35], children: [newLeaf("t1"), { dir: "v", sizes: [0.5, 0.5], children: [newLeaf("t2"), newLeaf("t3")] }] }
+  }
+  if (name === "grid") {
+    return { dir: "h", sizes: [0.5, 0.5], children: [{ dir: "v", sizes: [0.5, 0.5], children: [newLeaf("t1"), newLeaf("t2")] }, { dir: "v", sizes: [0.5, 0.5], children: [newLeaf("t3"), newLeaf("t4")] }] }
+  }
+  return newLeaf("t1")
+}
+
 // Every tile's id in reading order, for Tab/arrow navigation.
 function order(root) {
   return leaves(root).map(function(l) { return l.id })

@@ -43,7 +43,7 @@ Item {
   property var borderSpec: Border.surfaceSpec("menu", "border", border, Math.max(1, Style.space(2)))
   property color scrim: Color.menu.scrim
   property color selectedBackground: Color.menu.selectedBackground
-  property color accent: Color.menu.selectedText
+  property color accent: Color.accent
   readonly property int cornerRadius: Style.cornerRadius
   property string fontFamily: Style.font.menuFamily
 
@@ -66,13 +66,15 @@ Item {
 
   property var apps: []
   property bool pickerOpen: false
+  property string pickerMode: "replace" // "replace" or "add"
+  property string pickerFilter: "all" // "all" or "running"
   property string pickerQuery: ""
   property int pickerIndex: 0
 
   readonly property var current: draft.workspaces[String(workspace)] || Model.defaultWorkspace()
   readonly property var geometry: Model.layout(current.root, { x: 0, y: 0, w: canvas.width, h: canvas.height })
   readonly property var selectedTile: Model.findLeaf(current.root, selected)
-  readonly property var pickerApps: filterApps(apps, pickerQuery)
+  readonly property var pickerApps: filterApps(apps, pickerQuery, pickerFilter)
 
   // ---------------------------------------------------------------- shell contract
 
@@ -324,13 +326,21 @@ Item {
     var r = Model.split(root.current.root, root.selected, dir)
     var problem = root.limitProblem(r.root)
     if (problem) { root.status = "Cannot split: " + problem; return }
-    root.editRoot(r.root, r.id)
+    root.editRoot(r.root, r.id, "Split tile " + (dir === "h" ? "beside" : "below"))
   }
 
   function removeSelected() {
-    if (Model.isLeaf(root.current.root)) { root.status = "A blueprint keeps at least one tile"; return }
+    if (Model.isLeaf(root.current.root)) {
+      var leaf = Model.findLeaf(root.current.root, root.selected)
+      if (leaf && leaf.apps.length > 0) {
+        root.clearTileApps(root.selected)
+      } else {
+        root.status = "A blueprint keeps at least one tile"
+      }
+      return
+    }
     var r = Model.remove(root.current.root, root.selected)
-    root.editRoot(r.root, r.id)
+    root.editRoot(r.root, r.id, "Removed tile")
   }
 
   function growSelected(axis, delta) {
@@ -349,7 +359,9 @@ Item {
 
   function assignApp(app) {
     if (!app) return
-    var next = Model.assign(root.current.root, root.selected, app)
+    var next = (root.pickerMode === "replace")
+      ? Model.replace(root.current.root, root.selected, app)
+      : Model.assign(root.current.root, root.selected, app)
     var problem = root.limitProblem(next)
     if (problem) {
       root.status = "Cannot add: " + problem
@@ -357,18 +369,38 @@ Item {
       keys.forceActiveFocus()
       return
     }
-    root.editRoot(next, root.selected, (app.name || app["class"]) + " now opens in this tile")
+    root.editRoot(next, root.selected, (app.name || app["class"]) + " assigned to tile")
     root.pickerOpen = false
     keys.forceActiveFocus()
   }
 
+  function clearTileApps(tileId) {
+    var id = tileId || root.selected
+    var leaf = Model.findLeaf(root.current.root, id)
+    var appName = (leaf && leaf.apps && leaf.apps.length > 0) ? (leaf.apps[0].name || leaf.apps[0]["class"]) : "app"
+    root.editRoot(Model.clearTile(root.current.root, id), id, "Removed " + appName + " from tile")
+  }
+
   function removeApp(tileId, cls) {
-    root.editRoot(Model.unassign(root.current.root, tileId, cls), tileId)
+    root.editRoot(Model.unassign(root.current.root, tileId, cls), tileId, "Removed app from tile")
   }
 
   function removeLastApp() {
     var tile = root.selectedTile
-    if (tile && tile.apps.length > 0) root.removeApp(tile.id, tile.apps[tile.apps.length - 1]["class"])
+    if (tile && tile.apps && tile.apps.length > 0) {
+      if (tile.apps.length === 1) {
+        root.clearTileApps(tile.id)
+      } else {
+        root.removeApp(tile.id, tile.apps[tile.apps.length - 1]["class"])
+      }
+    }
+  }
+
+  function applyTemplate(name) {
+    var tree = Model.template(name)
+    var ws = Model.clone(root.current)
+    ws.root = tree
+    root.commit(ws, Model.order(ws.root)[0], "Applied " + name + " layout")
   }
 
   function toggleFlag(flag) {
@@ -460,14 +492,13 @@ Item {
       return
     }
     if (!ok) {
-      // Keep the edits: they are still in the draft, now marked unsaved again.
       root.dirty = true
       root.closeAfterSave = false
       root.status = "Not saved: " + error
       root.runHelper(configProc, configWatchdog, ["config"])
       return
     }
-    root.status = "Saved and applying"
+    root.status = "Saved and applied to Hyprland"
     if (root.closeAfterSave) {
       root.closeAfterSave = false
       root.dismiss()
@@ -476,8 +507,6 @@ Item {
 
   function requestClose() {
     if (root.pickerOpen) { root.pickerOpen = false; keys.forceActiveFocus(); return }
-    // Closing unloads this overlay and its processes, so wait for the save to be handed
-    // over. A second Esc closes anyway.
     if (root.saving && !root.closeAfterSave) { root.closeAfterSave = true; root.status = "Closing once saved… (Esc again to close now)"; return }
     if (root.saving) { root.dismiss(); return }
     if (root.dirty && !root.confirmDiscard) {
@@ -488,20 +517,45 @@ Item {
     root.dismiss()
   }
 
-  function openPicker() {
+  function openPicker(mode, tileId) {
+    if (tileId) root.selected = tileId
+    var tile = root.selectedTile
+    root.pickerMode = mode ? mode : ((tile && tile.apps && tile.apps.length > 0) ? "replace" : "add")
     root.pickerQuery = ""
     root.pickerIndex = 0
+    root.pickerFilter = "all"
     root.pickerOpen = true
     if (root.apps.length === 0) appsProc.running = true
-    Qt.callLater(function() { pickerSearch.text = ""; pickerSearch.forceActiveFocus() })
+    Qt.callLater(function() {
+      if (pickerSearch) {
+        pickerSearch.text = ""
+        pickerSearch.forceActiveFocus()
+      }
+    })
   }
 
-  function filterApps(list, query) {
+  function filterApps(list, query, filter) {
     var q = String(query || "").trim().toLowerCase()
-    if (!q) return list
-    return list.filter(function(a) {
-      return String(a.name).toLowerCase().indexOf(q) >= 0 || String(a["class"]).toLowerCase().indexOf(q) >= 0
+    var out = list || []
+    if (filter === "running") {
+      out = out.filter(function(a) { return !!a.running })
+    }
+    if (!q) return out
+    return out.filter(function(a) {
+      return String(a.name || "").toLowerCase().indexOf(q) >= 0 || String(a["class"] || "").toLowerCase().indexOf(q) >= 0
     })
+  }
+
+  function isAssignedInCurrent(app) {
+    if (!app || !root.current || !root.current.root) return false
+    var all = Model.leaves(root.current.root)
+    var key = String(app["class"] || "").toLowerCase()
+    for (var i = 0; i < all.length; i++) {
+      for (var a = 0; a < all[i].apps.length; a++) {
+        if (String(all[i].apps[a]["class"] || "").toLowerCase() === key) return true
+      }
+    }
+    return false
   }
 
   // Icons and running state come from the app list; blueprints store only class, name and
@@ -527,8 +581,6 @@ Item {
     var icon = String((info && info.icon) || (app && app.icon) || "")
     var library = root.shell && root.shell.appLibrary
     if (library && typeof library.iconSource === "function") return library.iconSource(icon)
-    // The helper only hands out themed names and absolute paths it has checked are
-    // regular, size-capped image files owned by us under $HOME or by root.
     if (icon.charAt(0) === "/") return Util.fileUrl(icon)
     var themed = icon ? Quickshell.iconPath(icon, true) : ""
     return themed || Quickshell.iconPath("application-x-executable", true)
@@ -614,8 +666,8 @@ Item {
     BorderSurface {
       id: card
       anchors.centerIn: parent
-      width: Math.min(Style.space(1080), panel.width - Style.gapsOut * 4)
-      height: Math.min(Style.space(760), panel.height - Style.gapsOut * 4)
+      width: Math.min(Style.space(1120), panel.width - Style.gapsOut * 4)
+      height: Math.min(Style.space(780), panel.height - Style.gapsOut * 4)
       radius: root.cornerRadius
       color: root.background
       borderSpec: root.borderSpec
@@ -638,26 +690,54 @@ Item {
         anchors.rightMargin: card.contentRightInset
         anchors.bottomMargin: card.contentBottomInset
         anchors.leftMargin: card.contentLeftInset
-        spacing: Style.spacing.lg
+        spacing: Style.spacing.md
 
         // ------------------------------------------------ header
         Item {
+          id: headerRow
           width: parent.width
-          height: Style.space(34)
-
-          Text {
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: "Tile blueprints"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.heading
-          }
+          height: Style.space(38)
 
           Row {
-            anchors.right: parent.right
+            anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.spacing.md
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: "Tile blueprints"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.heading
+              font.weight: Font.DemiBold
+            }
+
+            Rectangle {
+              anchors.verticalCenter: parent.verticalCenter
+              height: Style.space(22)
+              width: wsBadgeText.implicitWidth + Style.spacing.md * 2
+              radius: height / 2
+              color: Util.alpha(root.accent, 0.15)
+              border.width: 1
+              border.color: Util.alpha(root.accent, 0.4)
+
+              Text {
+                id: wsBadgeText
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: "Workspace " + root.workspace
+                color: root.accent
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.weight: Font.DemiBold
+              }
+            }
+          }
+
+          // Center: Workspace Switcher 1-10
+          Row {
+            anchors.centerIn: parent
             spacing: Style.spacing.xs
 
             Repeater {
@@ -667,12 +747,14 @@ Item {
                 required property int index
                 readonly property int number: index + 1
                 readonly property bool active: root.workspace === number
-                width: Style.space(34)
-                height: Style.space(30)
+                width: Style.space(32)
+                height: Style.space(28)
                 radius: root.cornerRadius
-                color: active ? root.selectedBackground : "transparent"
+                color: active ? Util.alpha(root.accent, 0.22) : (wsTabHover.hovered ? Util.alpha(root.foreground, 0.08) : "transparent")
                 border.width: active ? Math.max(1, Style.space(1)) : 0
                 border.color: root.accent
+
+                HoverHandler { id: wsTabHover }
 
                 Text {
                   anchors.centerIn: parent
@@ -681,14 +763,15 @@ Item {
                   color: wsTab.active ? root.accent : root.foreground
                   opacity: wsTab.active || root.workspaceHasBlueprint(wsTab.number) ? 1 : 0.45
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.title
+                  font.pixelSize: Style.font.body
+                  font.weight: wsTab.active ? Font.DemiBold : Font.Normal
                 }
 
                 Rectangle {
                   visible: root.workspaceHasBlueprint(wsTab.number)
                   anchors.horizontalCenter: parent.horizontalCenter
                   anchors.bottom: parent.bottom
-                  anchors.bottomMargin: Style.space(3)
+                  anchors.bottomMargin: Style.space(2)
                   width: Style.space(4); height: width; radius: width / 2
                   color: root.accent
                 }
@@ -701,23 +784,109 @@ Item {
               }
             }
           }
+
+          // Right: Action buttons (Capture, Save, Close)
+          Row {
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.spacing.sm
+
+            // Capture button
+            Rectangle {
+              height: Style.space(30)
+              width: capBtnText.implicitWidth + Style.spacing.lg * 2
+              radius: root.cornerRadius
+              color: capArea.containsMouse ? Util.alpha(root.foreground, 0.12) : Util.alpha(root.foreground, 0.06)
+              border.width: 1
+              border.color: capArea.containsMouse ? Util.alpha(root.foreground, 0.3) : Util.alpha(root.foreground, 0.14)
+
+              Text {
+                id: capBtnText
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: "📷 Capture"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.weight: Font.DemiBold
+              }
+
+              MouseArea {
+                id: capArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: { root.startCapture(); keys.forceActiveFocus() }
+              }
+            }
+
+            // Save & Apply button
+            Rectangle {
+              height: Style.space(30)
+              width: saveBtnText.implicitWidth + Style.spacing.lg * 2
+              radius: root.cornerRadius
+              color: root.dirty ? root.accent : (saveArea.containsMouse ? Util.alpha(root.foreground, 0.14) : Util.alpha(root.foreground, 0.06))
+              border.width: 1
+              border.color: root.dirty ? root.accent : Util.alpha(root.foreground, 0.18)
+
+              Text {
+                id: saveBtnText
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: root.dirty ? "💾 Save & Apply" : "✓ Saved"
+                color: root.dirty ? Color.background : root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.weight: Font.DemiBold
+              }
+
+              MouseArea {
+                id: saveArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: { root.save(); keys.forceActiveFocus() }
+              }
+            }
+
+            // Close button
+            Rectangle {
+              width: Style.space(30); height: width
+              radius: root.cornerRadius
+              color: closeArea.containsMouse ? Util.alpha(Color.urgent, 0.25) : Util.alpha(root.foreground, 0.06)
+              border.width: 1
+              border.color: closeArea.containsMouse ? Color.urgent : Util.alpha(root.foreground, 0.14)
+
+              Text {
+                anchors.centerIn: parent
+                text: "✕"
+                color: closeArea.containsMouse ? Color.urgent : root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.title
+              }
+
+              MouseArea {
+                id: closeArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.requestClose()
+              }
+            }
+          }
         }
 
-        // ------------------------------------------------ canvas + picker
+        // ------------------------------------------------ canvas stage
         Item {
           id: stage
           width: parent.width
-          height: content.height - Style.space(34) - footer.height - content.spacing * 2
+          height: content.height - headerRow.height - footer.height - content.spacing * 2
 
-          readonly property real pickerWidth: root.pickerOpen ? Style.space(300) : 0
           readonly property real aspect: panel.width > 0 && panel.height > 0 ? panel.width / panel.height : 16 / 10
 
           Item {
             id: canvasFrame
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: parent.width - stage.pickerWidth - (root.pickerOpen ? Style.spacing.lg : 0)
+            anchors.fill: parent
 
             Rectangle {
               id: canvas
@@ -725,7 +894,7 @@ Item {
               width: Math.min(parent.width, parent.height * stage.aspect)
               height: width / stage.aspect
               radius: root.cornerRadius
-              color: Util.alpha(root.foreground, 0.04)
+              color: Util.alpha(root.foreground, 0.03)
               border.width: Math.max(1, Style.space(1))
               border.color: Util.alpha(root.foreground, 0.12)
 
@@ -743,9 +912,11 @@ Item {
                   width: Math.max(0, modelData.w - gap * 2)
                   height: Math.max(0, modelData.h - gap * 2)
                   radius: root.cornerRadius
-                  color: isSelected ? root.selectedBackground : Util.alpha(root.foreground, 0.06)
+                  color: isSelected ? Util.alpha(root.accent, 0.08) : Util.alpha(root.foreground, 0.03)
                   border.width: isSelected ? Math.max(2, Style.space(2)) : Math.max(1, Style.space(1))
-                  border.color: isSelected ? root.accent : Util.alpha(root.foreground, 0.18)
+                  border.color: isSelected ? root.accent : Util.alpha(root.foreground, 0.16)
+
+                  HoverHandler { id: tileHover }
 
                   MouseArea {
                     anchors.fill: parent
@@ -753,13 +924,129 @@ Item {
                     onDoubleClicked: { root.selected = tile.modelData.id; root.openPicker() }
                   }
 
-                  // A preview of what Hyprland will do with this tile: one window per app,
-                  // sharing the tile evenly along its longer side.
+                  // Top header bar of tile: dimensions and quick action buttons
+                  Item {
+                    id: tileHeader
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Style.spacing.sm
+                    height: Style.space(24)
+                    z: 10
+
+                    Row {
+                      anchors.left: parent.left
+                      anchors.verticalCenter: parent.verticalCenter
+                      spacing: Style.spacing.xs
+
+                      Rectangle {
+                        visible: tile.isSelected
+                        width: Style.space(6); height: width; radius: width / 2
+                        color: root.accent
+                        anchors.verticalCenter: parent.verticalCenter
+                      }
+
+                      Text {
+                        textFormat: Text.PlainText
+                        text: root.percent(tile.modelData.w, canvas.width) + " × " + root.percent(tile.modelData.h, canvas.height)
+                        color: tile.isSelected ? root.accent : root.foreground
+                        opacity: tile.isSelected ? 0.9 : 0.4
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                        font.weight: tile.isSelected ? Font.DemiBold : Font.Normal
+                      }
+                    }
+
+                    // Quick Tile Actions: Split Beside, Split Below, Delete Tile
+                    Row {
+                      anchors.right: parent.right
+                      anchors.verticalCenter: parent.verticalCenter
+                      spacing: Style.spacing.xs
+                      visible: tileHover.hovered || tile.isSelected
+
+                      // Split beside (|)
+                      Rectangle {
+                        id: btnSplitH
+                        width: Style.space(24); height: width; radius: root.cornerRadius
+                        color: splitHArea.containsMouse ? Util.alpha(root.accent, 0.25) : Util.alpha(root.foreground, 0.08)
+                        border.width: 1
+                        border.color: splitHArea.containsMouse ? root.accent : Util.alpha(root.foreground, 0.16)
+
+                        Text {
+                          anchors.centerIn: parent
+                          text: "◫"
+                          color: splitHArea.containsMouse ? root.accent : root.foreground
+                          font.pixelSize: Style.font.caption
+                        }
+
+                        MouseArea {
+                          id: splitHArea
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: { root.selected = tile.modelData.id; root.splitSelected("h") }
+                        }
+                      }
+
+                      // Split below (-)
+                      Rectangle {
+                        id: btnSplitV
+                        width: Style.space(24); height: width; radius: root.cornerRadius
+                        color: splitVArea.containsMouse ? Util.alpha(root.accent, 0.25) : Util.alpha(root.foreground, 0.08)
+                        border.width: 1
+                        border.color: splitVArea.containsMouse ? root.accent : Util.alpha(root.foreground, 0.16)
+
+                        Text {
+                          anchors.centerIn: parent
+                          text: "⬒"
+                          color: splitVArea.containsMouse ? root.accent : root.foreground
+                          font.pixelSize: Style.font.caption
+                        }
+
+                        MouseArea {
+                          id: splitVArea
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: { root.selected = tile.modelData.id; root.splitSelected("v") }
+                        }
+                      }
+
+                      // Delete tile (X)
+                      Rectangle {
+                        id: btnDeleteTile
+                        visible: !Model.isLeaf(root.current.root)
+                        width: Style.space(24); height: width; radius: root.cornerRadius
+                        color: deleteTileArea.containsMouse ? Util.alpha(Color.urgent, 0.25) : Util.alpha(root.foreground, 0.08)
+                        border.width: 1
+                        border.color: deleteTileArea.containsMouse ? Color.urgent : Util.alpha(root.foreground, 0.16)
+
+                        Text {
+                          anchors.centerIn: parent
+                          text: "🗑"
+                          color: deleteTileArea.containsMouse ? Color.urgent : root.foreground
+                          font.pixelSize: Style.font.caption
+                        }
+
+                        MouseArea {
+                          id: deleteTileArea
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: { root.selected = tile.modelData.id; root.removeSelected() }
+                        }
+                      }
+                    }
+                  }
+
+                  // ---------------- Tile Content (Apps or Empty)
                   Item {
                     id: cards
                     anchors.fill: parent
-                    anchors.margins: Style.spacing.lg
-                    anchors.bottomMargin: Style.spacing.sm + tileFoot.height + Style.spacing.sm
+                    anchors.topMargin: tileHeader.height + Style.spacing.sm
+                    anchors.leftMargin: Style.spacing.md
+                    anchors.rightMargin: Style.spacing.md
+                    anchors.bottomMargin: Style.spacing.md
                     visible: tile.modelData.apps.length > 0
 
                     Repeater {
@@ -770,23 +1057,105 @@ Item {
                         required property var modelData
                         required property int index
                         readonly property var box: root.cardBoxes(cards.width, cards.height, tile.modelData.apps.length)[index]
-                        readonly property int iconSide: Math.max(Style.space(20), Math.min(Style.space(64), Math.min(width, height) * 0.34))
+                        readonly property int iconSide: Math.max(Style.space(24), Math.min(Style.space(64), Math.min(width, height) * 0.32))
 
                         x: box ? box.x : 0
                         y: box ? box.y : 0
                         width: box ? box.w : 0
                         height: box ? box.h : 0
                         radius: root.cornerRadius
-                        color: Util.alpha(root.foreground, tile.isSelected ? 0.10 : 0.06)
-                        border.width: Math.max(1, Style.space(1))
-                        border.color: Util.alpha(root.foreground, cardHover.hovered ? 0.35 : 0.14)
+                        color: Util.alpha(root.background, 0.75)
+                        border.width: 1
+                        border.color: cardHover.hovered ? root.accent : Util.alpha(root.foreground, 0.18)
 
                         HoverHandler { id: cardHover }
 
+                        // Top bar of card: Running indicator & Clear/Remove button
+                        Item {
+                          anchors.left: parent.left
+                          anchors.right: parent.right
+                          anchors.top: parent.top
+                          anchors.margins: Style.spacing.sm
+                          height: Style.space(22)
+
+                          // Running pill
+                          Rectangle {
+                            visible: root.isRunning(card.modelData)
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: Style.space(18)
+                            width: runText.implicitWidth + Style.spacing.sm * 2 + Style.space(8)
+                            radius: height / 2
+                            color: Util.alpha(root.accent, 0.18)
+                            border.width: 1
+                            border.color: root.accent
+
+                            Row {
+                              anchors.centerIn: parent
+                              spacing: Style.spacing.xs
+                              Rectangle {
+                                width: Style.space(5); height: width; radius: width / 2
+                                color: root.accent
+                                anchors.verticalCenter: parent.verticalCenter
+                              }
+                              Text {
+                                id: runText
+                                text: "Running"
+                                color: root.accent
+                                font.family: root.fontFamily
+                                font.pixelSize: Style.font.caption
+                                font.weight: Font.DemiBold
+                              }
+                            }
+                          }
+
+                          // Prominent Remove Button
+                          Rectangle {
+                            id: removeAppBtn
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: Style.space(22)
+                            width: card.width >= Style.space(170) ? remText.implicitWidth + Style.spacing.md * 2 : Style.space(22)
+                            radius: height / 2
+                            color: remArea.containsMouse ? Util.alpha(Color.urgent, 0.35) : Util.alpha(root.foreground, 0.1)
+                            border.width: 1
+                            border.color: remArea.containsMouse ? Color.urgent : Util.alpha(root.foreground, 0.2)
+
+                            Row {
+                              anchors.centerIn: parent
+                              spacing: Style.spacing.xs
+                              Text {
+                                text: "✕"
+                                color: remArea.containsMouse ? Color.urgent : root.foreground
+                                font.family: root.fontFamily
+                                font.pixelSize: Style.font.caption
+                                font.weight: Font.Bold
+                              }
+                              Text {
+                                id: remText
+                                visible: card.width >= Style.space(170)
+                                text: "Remove"
+                                color: remArea.containsMouse ? Color.urgent : root.foreground
+                                font.family: root.fontFamily
+                                font.pixelSize: Style.font.caption
+                              }
+                            }
+
+                            MouseArea {
+                              id: remArea
+                              anchors.fill: parent
+                              hoverEnabled: true
+                              cursorShape: Qt.PointingHandCursor
+                              onClicked: root.removeApp(tile.modelData.id, card.modelData["class"])
+                            }
+                          }
+                        }
+
+                        // Center: Icon, Name, Class
                         Column {
                           anchors.centerIn: parent
                           width: parent.width - Style.spacing.lg * 2
-                          spacing: Style.spacing.sm
+                          spacing: Style.spacing.xs
 
                           Image {
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -802,7 +1171,6 @@ Item {
 
                           Text {
                             width: parent.width
-                            visible: card.height >= Style.space(76)
                             horizontalAlignment: Text.AlignHCenter
                             textFormat: Text.PlainText
                             text: card.modelData.name || card.modelData["class"]
@@ -810,63 +1178,98 @@ Item {
                             color: root.foreground
                             font.family: root.fontFamily
                             font.pixelSize: Style.font.body
+                            font.weight: Font.DemiBold
                           }
 
                           Text {
                             width: parent.width
-                            visible: card.height >= Style.space(110) && card.width >= Style.space(110)
+                            visible: card.height >= Style.space(95)
                             horizontalAlignment: Text.AlignHCenter
                             textFormat: Text.PlainText
                             text: card.modelData["class"]
                             elide: Text.ElideMiddle
                             color: root.foreground
-                            opacity: 0.4
+                            opacity: 0.5
                             font.family: root.fontFamily
                             font.pixelSize: Style.font.caption
                           }
                         }
 
-                        Rectangle {
-                          visible: root.isRunning(card.modelData)
-                          anchors.left: parent.left
-                          anchors.top: parent.top
-                          anchors.margins: Style.spacing.md
-                          width: Style.space(6); height: width; radius: width / 2
-                          color: root.accent
-                        }
+                        // Bottom action buttons: Change App & Share Tile
+                        Row {
+                          anchors.bottom: parent.bottom
+                          anchors.horizontalCenter: parent.horizontalCenter
+                          anchors.bottomMargin: Style.spacing.sm
+                          spacing: Style.spacing.sm
+                          visible: card.height >= Style.space(130)
 
-                        Rectangle {
-                          id: removeButton
-                          visible: cardHover.hovered || tile.isSelected
-                          anchors.right: parent.right
-                          anchors.top: parent.top
-                          anchors.margins: Style.spacing.sm
-                          width: Style.space(22); height: width; radius: width / 2
-                          color: removeArea.containsMouse ? Util.alpha(root.accent, 0.3) : "transparent"
+                          Rectangle {
+                            id: changeAppBtn
+                            height: Style.space(24)
+                            width: changeText.implicitWidth + Style.spacing.md * 2
+                            radius: height / 2
+                            color: changeArea.containsMouse ? Util.alpha(root.accent, 0.25) : Util.alpha(root.foreground, 0.08)
+                            border.width: 1
+                            border.color: changeArea.containsMouse ? root.accent : Util.alpha(root.foreground, 0.2)
 
-                          Text {
-                            anchors.centerIn: parent
-                            textFormat: Text.PlainText
-                            text: "×"
-                            color: root.foreground
-                            opacity: removeArea.containsMouse ? 1 : 0.6
-                            font.family: root.fontFamily
-                            font.pixelSize: Style.font.title
+                            Text {
+                              id: changeText
+                              anchors.centerIn: parent
+                              text: "Change App"
+                              color: changeArea.containsMouse ? root.accent : root.foreground
+                              font.family: root.fontFamily
+                              font.pixelSize: Style.font.caption
+                              font.weight: Font.DemiBold
+                            }
+
+                            MouseArea {
+                              id: changeArea
+                              anchors.fill: parent
+                              hoverEnabled: true
+                              cursorShape: Qt.PointingHandCursor
+                              onClicked: {
+                                root.selected = tile.modelData.id
+                                root.openPicker("replace", tile.modelData.id)
+                              }
+                            }
                           }
 
-                          MouseArea {
-                            id: removeArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.removeApp(tile.modelData.id, card.modelData["class"])
+                          Rectangle {
+                            id: addSecondBtn
+                            visible: tile.modelData.apps.length === 1 && card.width >= Style.space(240)
+                            height: Style.space(24)
+                            width: addSecondText.implicitWidth + Style.spacing.md * 2
+                            radius: height / 2
+                            color: addSecondArea.containsMouse ? Util.alpha(root.accent, 0.25) : Util.alpha(root.foreground, 0.08)
+                            border.width: 1
+                            border.color: addSecondArea.containsMouse ? root.accent : Util.alpha(root.foreground, 0.2)
+
+                            Text {
+                              id: addSecondText
+                              anchors.centerIn: parent
+                              text: "+ Share Tile"
+                              color: addSecondArea.containsMouse ? root.accent : root.foreground
+                              font.family: root.fontFamily
+                              font.pixelSize: Style.font.caption
+                            }
+
+                            MouseArea {
+                              id: addSecondArea
+                              anchors.fill: parent
+                              hoverEnabled: true
+                              cursorShape: Qt.PointingHandCursor
+                              onClicked: {
+                                root.selected = tile.modelData.id
+                                root.openPicker("add", tile.modelData.id)
+                              }
+                            }
                           }
                         }
                       }
                     }
                   }
 
-                  // Empty tile: a target to click.
+                  // Empty tile state: Prominent Add App + Quick Templates
                   Column {
                     anchors.centerIn: parent
                     visible: tile.modelData.apps.length === 0
@@ -874,18 +1277,18 @@ Item {
 
                     Rectangle {
                       anchors.horizontalCenter: parent.horizontalCenter
-                      width: Style.space(44); height: width; radius: width / 2
-                      color: plusArea.containsMouse ? Util.alpha(root.accent, 0.22) : Util.alpha(root.foreground, 0.07)
+                      width: Style.space(48); height: width; radius: width / 2
+                      color: plusArea.containsMouse ? Util.alpha(root.accent, 0.25) : Util.alpha(root.foreground, 0.08)
                       border.width: Math.max(1, Style.space(1))
-                      border.color: tile.isSelected || plusArea.containsMouse ? root.accent : Util.alpha(root.foreground, 0.2)
+                      border.color: tile.isSelected || plusArea.containsMouse ? root.accent : Util.alpha(root.foreground, 0.25)
 
                       Text {
                         anchors.centerIn: parent
-                        textFormat: Text.PlainText
                         text: "+"
-                        color: tile.isSelected ? root.accent : root.foreground
+                        color: tile.isSelected || plusArea.containsMouse ? root.accent : root.foreground
                         font.family: root.fontFamily
-                        font.pixelSize: Style.font.display
+                        font.pixelSize: Style.font.heading
+                        font.bold: true
                       }
 
                       MouseArea {
@@ -893,54 +1296,116 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: { root.selected = tile.modelData.id; root.openPicker() }
+                        onClicked: { root.selected = tile.modelData.id; root.openPicker("replace", tile.modelData.id) }
                       }
                     }
 
-                    Text {
+                    Column {
                       anchors.horizontalCenter: parent.horizontalCenter
-                      visible: tile.height >= Style.space(110)
-                      textFormat: Text.PlainText
-                      text: "Add app"
-                      color: root.foreground
-                      opacity: 0.55
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
-                    }
-                  }
+                      spacing: Style.spacing.xxs
 
-                  Item {
-                    id: tileFoot
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.leftMargin: Style.spacing.lg
-                    anchors.rightMargin: Style.spacing.lg
-                    anchors.bottomMargin: Style.spacing.sm
-                    height: Style.space(16)
+                      Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        textFormat: Text.PlainText
+                        text: "Add Application"
+                        color: root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.body
+                        font.weight: Font.DemiBold
+                      }
 
-                    Text {
-                      anchors.left: parent.left
-                      anchors.verticalCenter: parent.verticalCenter
-                      visible: tile.isSelected && tile.modelData.apps.length > 0 && tile.width >= Style.space(220)
-                      textFormat: Text.PlainText
-                      text: "A  add another app"
-                      color: root.accent
-                      opacity: 0.75
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
+                      Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        visible: tile.height >= Style.space(120)
+                        textFormat: Text.PlainText
+                        text: "Click or press A to choose an app"
+                        color: root.foreground
+                        opacity: 0.5
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                      }
                     }
 
-                    Text {
-                      anchors.right: parent.right
-                      anchors.verticalCenter: parent.verticalCenter
-                      visible: tile.width >= Style.space(90)
-                      textFormat: Text.PlainText
-                      text: root.percent(tile.modelData.w, canvas.width) + " × " + root.percent(tile.modelData.h, canvas.height)
-                      color: root.foreground
-                      opacity: 0.45
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
+                    // Quick Layout Presets when workspace is a lone empty tile
+                    Row {
+                      anchors.horizontalCenter: parent.horizontalCenter
+                      visible: Model.isLeaf(root.current.root) && tile.height >= Style.space(240) && tile.width >= Style.space(380)
+                      spacing: Style.spacing.sm
+
+                      Rectangle {
+                        height: Style.space(26)
+                        width: tpl2Text.implicitWidth + Style.spacing.md * 2
+                        radius: Style.space(13)
+                        color: tpl2Area.containsMouse ? Util.alpha(root.accent, 0.2) : Util.alpha(root.foreground, 0.08)
+                        border.width: 1
+                        border.color: tpl2Area.containsMouse ? root.accent : Util.alpha(root.foreground, 0.18)
+
+                        Text {
+                          id: tpl2Text
+                          anchors.centerIn: parent
+                          text: "◫ 2 Columns"
+                          color: root.foreground
+                          font.family: root.fontFamily
+                          font.pixelSize: Style.font.caption
+                        }
+                        MouseArea {
+                          id: tpl2Area
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: root.applyTemplate("two-col")
+                        }
+                      }
+
+                      Rectangle {
+                        height: Style.space(26)
+                        width: tplMsText.implicitWidth + Style.spacing.md * 2
+                        radius: Style.space(13)
+                        color: tplMsArea.containsMouse ? Util.alpha(root.accent, 0.2) : Util.alpha(root.foreground, 0.08)
+                        border.width: 1
+                        border.color: tplMsArea.containsMouse ? root.accent : Util.alpha(root.foreground, 0.18)
+
+                        Text {
+                          id: tplMsText
+                          anchors.centerIn: parent
+                          text: "◫ Main + Stack"
+                          color: root.foreground
+                          font.family: root.fontFamily
+                          font.pixelSize: Style.font.caption
+                        }
+                        MouseArea {
+                          id: tplMsArea
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: root.applyTemplate("main-stack")
+                        }
+                      }
+
+                      Rectangle {
+                        height: Style.space(26)
+                        width: tpl3Text.implicitWidth + Style.spacing.md * 2
+                        radius: Style.space(13)
+                        color: tpl3Area.containsMouse ? Util.alpha(root.accent, 0.2) : Util.alpha(root.foreground, 0.08)
+                        border.width: 1
+                        border.color: tpl3Area.containsMouse ? root.accent : Util.alpha(root.foreground, 0.18)
+
+                        Text {
+                          id: tpl3Text
+                          anchors.centerIn: parent
+                          text: "3 Columns"
+                          color: root.foreground
+                          font.family: root.fontFamily
+                          font.pixelSize: Style.font.caption
+                        }
+                        MouseArea {
+                          id: tpl3Area
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: root.applyTemplate("three-col")
+                        }
+                      }
                     }
                   }
                 }
@@ -954,7 +1419,7 @@ Item {
                   id: divider
                   required property var modelData
                   readonly property bool across: modelData.dir === "h"
-                  readonly property real grip: Style.space(10)
+                  readonly property real grip: Style.space(12)
 
                   x: across ? modelData.at - grip / 2 : modelData.split.x
                   y: across ? modelData.split.y : modelData.at - grip / 2
@@ -963,11 +1428,11 @@ Item {
 
                   Rectangle {
                     anchors.centerIn: parent
-                    width: divider.across ? Math.max(2, Style.space(2)) : parent.width * 0.3
-                    height: divider.across ? parent.height * 0.3 : Math.max(2, Style.space(2))
-                    radius: Math.max(1, Style.space(1))
+                    width: divider.across ? Math.max(3, Style.space(3)) : parent.width * 0.35
+                    height: divider.across ? parent.height * 0.35 : Math.max(3, Style.space(3))
+                    radius: Math.max(2, Style.space(2))
                     color: root.accent
-                    opacity: dragArea.containsMouse || dragArea.pressed ? 0.9 : 0
+                    opacity: dragArea.containsMouse || dragArea.pressed ? 0.95 : 0
                   }
 
                   MouseArea {
@@ -990,35 +1455,183 @@ Item {
             }
           }
 
-          // ------------------------------------------------ app picker
+          // ------------------------------------------------ Modal App Picker
           Rectangle {
-            id: picker
+            id: pickerBackdrop
             visible: root.pickerOpen
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: stage.pickerWidth
+            anchors.fill: parent
+            color: Qt.rgba(0, 0, 0, 0.55)
+            z: 90
+
+            MouseArea {
+              anchors.fill: parent
+              onClicked: { root.pickerOpen = false; keys.forceActiveFocus() }
+            }
+          }
+
+          BorderSurface {
+            id: pickerModal
+            visible: root.pickerOpen
+            anchors.centerIn: parent
+            width: Math.min(Style.space(480), parent.width - Style.spacing.xl * 2)
+            height: Math.min(Style.space(520), parent.height - Style.spacing.lg * 2)
             radius: root.cornerRadius
-            color: Util.alpha(root.foreground, 0.05)
-            border.width: Math.max(1, Style.space(1))
-            border.color: Util.alpha(root.foreground, 0.12)
+            color: root.background
+            borderSpec: root.borderSpec
+            padding: Style.spacing.lg
+            z: 100
+
+            MouseArea {
+              anchors.fill: parent
+            }
 
             Column {
               anchors.fill: parent
-              anchors.margins: Style.spacing.lg
+              anchors.topMargin: pickerModal.contentTopInset
+              anchors.rightMargin: pickerModal.contentRightInset
+              anchors.bottomMargin: pickerModal.contentBottomInset
+              anchors.leftMargin: pickerModal.contentLeftInset
               spacing: Style.spacing.md
 
-              Rectangle {
+              // Modal Header
+              Item {
                 width: parent.width
                 height: Style.space(32)
+
+                Column {
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.spacing.xxs
+
+                  Text {
+                    textFormat: Text.PlainText
+                    text: root.pickerMode === "replace" ? "Change Application" : (root.selectedTile && root.selectedTile.apps.length > 0 ? "Add App to Shared Tile" : "Choose Application")
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.heading
+                    font.weight: Font.DemiBold
+                  }
+                  Text {
+                    textFormat: Text.PlainText
+                    text: root.pickerMode === "replace" ? "Select an app to open in this tile" : "Choose an app to share this tile"
+                    color: root.foreground
+                    opacity: 0.5
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+
+                // Modal Close button
+                Rectangle {
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: Style.space(26); height: width; radius: width / 2
+                  color: modalCloseArea.containsMouse ? Util.alpha(Color.urgent, 0.25) : Util.alpha(root.foreground, 0.08)
+
+                  Text {
+                    anchors.centerIn: parent
+                    text: "✕"
+                    color: modalCloseArea.containsMouse ? Color.urgent : root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+
+                  MouseArea {
+                    id: modalCloseArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: { root.pickerOpen = false; keys.forceActiveFocus() }
+                  }
+                }
+              }
+
+              // Search & Filter Tabs
+              Row {
+                width: parent.width
+                spacing: Style.spacing.sm
+
+                Rectangle {
+                  id: tabAll
+                  height: Style.space(26)
+                  width: tabAllText.implicitWidth + Style.spacing.md * 2
+                  radius: Style.space(13)
+                  color: root.pickerFilter === "all" ? Util.alpha(root.accent, 0.2) : Util.alpha(root.foreground, 0.06)
+                  border.width: 1
+                  border.color: root.pickerFilter === "all" ? root.accent : Util.alpha(root.foreground, 0.16)
+
+                  Text {
+                    id: tabAllText
+                    anchors.centerIn: parent
+                    text: "All Apps (" + root.apps.length + ")"
+                    color: root.pickerFilter === "all" ? root.accent : root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    font.weight: root.pickerFilter === "all" ? Font.DemiBold : Font.Normal
+                  }
+
+                  MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: { root.pickerFilter = "all"; root.pickerIndex = 0 }
+                  }
+                }
+
+                Rectangle {
+                  id: tabRun
+                  readonly property int runningCount: (function() {
+                    var c = 0
+                    for (var i = 0; i < root.apps.length; i++) if (root.apps[i].running) c++
+                    return c
+                  })()
+                  height: Style.space(26)
+                  width: tabRunText.implicitWidth + Style.spacing.md * 2
+                  radius: Style.space(13)
+                  color: root.pickerFilter === "running" ? Util.alpha(root.accent, 0.2) : Util.alpha(root.foreground, 0.06)
+                  border.width: 1
+                  border.color: root.pickerFilter === "running" ? root.accent : Util.alpha(root.foreground, 0.16)
+
+                  Text {
+                    id: tabRunText
+                    anchors.centerIn: parent
+                    text: "● Running (" + tabRun.runningCount + ")"
+                    color: root.pickerFilter === "running" ? root.accent : root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    font.weight: root.pickerFilter === "running" ? Font.DemiBold : Font.Normal
+                  }
+
+                  MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: { root.pickerFilter = "running"; root.pickerIndex = 0 }
+                  }
+                }
+              }
+
+              // Search Bar
+              Rectangle {
+                width: parent.width
+                height: Style.space(34)
                 radius: root.cornerRadius
                 color: Util.alpha(root.foreground, 0.07)
+                border.width: 1
+                border.color: pickerSearch.activeFocus ? root.accent : Util.alpha(root.foreground, 0.16)
+
+                Text {
+                  anchors.left: parent.left
+                  anchors.leftMargin: Style.spacing.md
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "🔍"
+                  font.pixelSize: Style.font.caption
+                  opacity: 0.6
+                }
 
                 TextInput {
                   id: pickerSearch
                   anchors.fill: parent
-                  anchors.leftMargin: Style.spacing.lg
-                  anchors.rightMargin: Style.spacing.lg
+                  anchors.leftMargin: Style.space(32)
+                  anchors.rightMargin: clearSearchBtn.visible ? Style.space(30) : Style.spacing.md
                   verticalAlignment: TextInput.AlignVCenter
                   color: root.foreground
                   font.family: root.fontFamily
@@ -1031,7 +1644,11 @@ Item {
                     if (event.key === Qt.Key_Escape) { root.pickerOpen = false; keys.forceActiveFocus() }
                     else if (event.key === Qt.Key_Down) { root.pickerIndex = Math.min(count - 1, root.pickerIndex + 1); appList.positionViewAtIndex(root.pickerIndex, ListView.Contain) }
                     else if (event.key === Qt.Key_Up) { root.pickerIndex = Math.max(0, root.pickerIndex - 1); appList.positionViewAtIndex(root.pickerIndex, ListView.Contain) }
-                    else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) root.assignApp(root.pickerApps[root.pickerIndex])
+                    else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                      if (count > 0 && root.pickerIndex >= 0 && root.pickerIndex < count) {
+                        root.assignApp(root.pickerApps[root.pickerIndex])
+                      }
+                    }
                     else return
                     event.accepted = true
                   }
@@ -1041,18 +1658,46 @@ Item {
                     verticalAlignment: Text.AlignVCenter
                     visible: pickerSearch.text === ""
                     textFormat: Text.PlainText
-                    text: "App for this tile…"
+                    text: "Search by app name or class…"
                     color: root.foreground
                     opacity: 0.45
                     font: pickerSearch.font
                   }
                 }
+
+                // Clear button
+                Rectangle {
+                  id: clearSearchBtn
+                  visible: pickerSearch.text !== ""
+                  anchors.right: parent.right
+                  anchors.rightMargin: Style.spacing.sm
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: Style.space(20); height: width; radius: width / 2
+                  color: clearArea.containsMouse ? Util.alpha(root.foreground, 0.2) : "transparent"
+
+                  Text {
+                    anchors.centerIn: parent
+                    text: "✕"
+                    color: root.foreground
+                    font.pixelSize: Style.font.caption
+                    opacity: 0.6
+                  }
+
+                  MouseArea {
+                    id: clearArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: { pickerSearch.text = ""; pickerSearch.forceActiveFocus() }
+                  }
+                }
               }
 
+              // Apps ListView
               ListView {
                 id: appList
                 width: parent.width
-                height: parent.height - Style.space(32) - parent.spacing
+                height: parent.height - Style.space(32) - Style.space(26) - Style.space(34) - parent.spacing * 4
                 clip: true
                 model: root.pickerApps
                 boundsBehavior: Flickable.StopAtBounds
@@ -1061,17 +1706,20 @@ Item {
                   id: appRow
                   required property var modelData
                   required property int index
+                  readonly property bool isSelectedRow: index === root.pickerIndex
                   width: ListView.view.width
-                  height: Style.space(40)
+                  height: Style.space(44)
                   radius: root.cornerRadius
-                  color: index === root.pickerIndex ? root.selectedBackground : "transparent"
+                  color: isSelectedRow ? Util.alpha(root.accent, 0.16) : (rowArea.containsMouse ? Util.alpha(root.foreground, 0.06) : "transparent")
+                  border.width: isSelectedRow ? 1 : 0
+                  border.color: root.accent
 
                   Image {
                     id: appIcon
                     anchors.left: parent.left
-                    anchors.leftMargin: Style.spacing.lg
+                    anchors.leftMargin: Style.spacing.md
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Style.space(24)
+                    width: Style.space(28)
                     height: width
                     sourceSize.width: width * 2
                     sourceSize.height: height * 2
@@ -1083,7 +1731,7 @@ Item {
 
                   Column {
                     anchors.left: appIcon.right
-                    anchors.right: runningDot.left
+                    anchors.right: badgesRow.left
                     anchors.leftMargin: Style.spacing.md
                     anchors.rightMargin: Style.spacing.md
                     anchors.verticalCenter: parent.verticalCenter
@@ -1091,11 +1739,12 @@ Item {
                     Text {
                       width: parent.width
                       textFormat: Text.PlainText
-                      text: appRow.modelData.name
+                      text: appRow.modelData.name || appRow.modelData["class"]
                       elide: Text.ElideRight
-                      color: appRow.index === root.pickerIndex ? root.accent : root.foreground
+                      color: appRow.isSelectedRow ? root.accent : root.foreground
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.body
+                      font.weight: appRow.isSelectedRow ? Font.DemiBold : Font.Normal
                     }
                     Text {
                       width: parent.width
@@ -1109,17 +1758,56 @@ Item {
                     }
                   }
 
-                  Rectangle {
-                    id: runningDot
+                  Row {
+                    id: badgesRow
                     anchors.right: parent.right
-                    anchors.rightMargin: Style.spacing.lg
+                    anchors.rightMargin: Style.spacing.md
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Style.space(6); height: width; radius: width / 2
-                    color: root.accent
-                    opacity: appRow.modelData.running ? 0.9 : 0
+                    spacing: Style.spacing.xs
+
+                    // Running Pill
+                    Rectangle {
+                      visible: !!appRow.modelData.running
+                      height: Style.space(18)
+                      width: runBadgeText.implicitWidth + Style.spacing.sm * 2
+                      radius: height / 2
+                      color: Util.alpha(root.accent, 0.15)
+                      border.width: 1
+                      border.color: root.accent
+
+                      Text {
+                        id: runBadgeText
+                        anchors.centerIn: parent
+                        text: "Running"
+                        color: root.accent
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                        font.weight: Font.DemiBold
+                      }
+                    }
+
+                    // Assigned Pill
+                    Rectangle {
+                      visible: root.isAssignedInCurrent(appRow.modelData)
+                      height: Style.space(18)
+                      width: assignBadgeText.implicitWidth + Style.spacing.sm * 2
+                      radius: height / 2
+                      color: Util.alpha(root.foreground, 0.1)
+
+                      Text {
+                        id: assignBadgeText
+                        anchors.centerIn: parent
+                        text: "In Blueprint"
+                        color: root.foreground
+                        opacity: 0.7
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                      }
+                    }
                   }
 
                   MouseArea {
+                    id: rowArea
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -1159,19 +1847,20 @@ Item {
               textFormat: Text.PlainText
               elide: Text.ElideRight
               text: root.status !== "" ? root.status
-                : (root.dirty ? "Unsaved changes · Ctrl+S saves and applies" : "Workspace " + root.workspace)
+                : (root.dirty ? "Unsaved changes · Ctrl+S saves and applies" : "Workspace " + root.workspace + " blueprint")
               color: root.status !== "" || root.dirty ? root.accent : root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
+              font.weight: Font.DemiBold
             }
 
             Text {
               width: parent.width
               textFormat: Text.PlainText
               elide: Text.ElideRight
-              text: "| split beside · - split below · X remove · Shift+arrows resize · A add app · C capture this workspace · 1–0 workspace"
+              text: "| split beside · - split below · Shift+arrows resize · A change app · Backspace remove app · X delete tile · C capture · 1–0 workspace"
               color: root.foreground
-              opacity: 0.5
+              opacity: 0.55
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
             }

@@ -9,7 +9,7 @@ const assert = require("assert")
 const root = path.resolve(__dirname, "..")
 const source = fs.readFileSync(path.join(root, "BlueprintModel.js"), "utf8").replace(/^\.pragma library\s*$/m, "")
 const ctx = {}
-vm.runInNewContext(source + "\nthis.M = { MIN_SIZE, clone, isLeaf, newLeaf, leaves, nextId, pathTo, nodeAt, findLeaf, normalize, split, remove, grow, moveDivider, assign, unassign, order, layout, neighbour, capture, defaultWorkspace, normalizeFile, appCount, isMeaningful, tileLabel }", ctx)
+vm.runInNewContext(source + "\nthis.M = { MIN_SIZE, clone, isLeaf, newLeaf, leaves, nextId, pathTo, nodeAt, findLeaf, normalize, split, remove, grow, moveDivider, assign, unassign, clearTile, replace, template, order, layout, neighbour, capture, defaultWorkspace, normalizeFile, appCount, isMeaningful, tileLabel }", ctx)
 const M = ctx.M
 
 // vm-context objects carry that context's prototypes; compare plain copies.
@@ -191,6 +191,31 @@ test("isMeaningful ignores an untouched workspace", () => {
 test("tileLabel lists names", () => {
   assert.strictEqual(M.tileLabel({ apps: [app("a", "Alpha"), app("b", "Beta")] }), "Alpha, Beta")
   assert.strictEqual(M.tileLabel({ apps: [] }), "")
+})
+
+test("clearTile empties apps from a leaf", () => {
+  let t = M.assign(M.newLeaf("t1"), "t1", app("foot", "Foot"))
+  assert.strictEqual(t.apps.length, 1)
+  t = M.clearTile(t, "t1")
+  assert.strictEqual(t.apps.length, 0)
+})
+
+test("replace replaces existing apps with a new app", () => {
+  let t = M.assign(M.newLeaf("t1"), "t1", app("foot", "Foot"))
+  t = M.replace(t, "t1", app("code", "Code"))
+  assert.strictEqual(t.apps.length, 1)
+  assert.strictEqual(t.apps[0].class, "code")
+})
+
+test("template returns valid layout trees", () => {
+  const two = M.template("two-col")
+  assert.strictEqual(two.dir, "h")
+  assert.strictEqual(two.children.length, 2)
+  const three = M.template("three-col")
+  assert.strictEqual(three.children.length, 3)
+  const main = M.template("main-stack")
+  assert.strictEqual(main.children.length, 2)
+  assert.strictEqual(main.children[1].dir, "v")
 })
 
 console.log(`${passed} passed, ${failures.length} failed`)
