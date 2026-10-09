@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "appearance": {
+    "colorTheme": "darkest",
+    "highlightColor": "#e75a50",
+    "accessibleContrast": false
+  }
+}

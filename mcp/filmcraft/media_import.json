@@ -1,0 +1,1 @@
+{"name":"media_import","description":"Import media files by absolute path (MP4/MOV, WAV/MP3/FLAC/AIFF/Ogg, PNG/JPEG/…).","parameters":{"$schema":"https://json-schema.org/draft/2020-12/schema","properties":{"text":{"type":"string"}},"required":["text"],"type":"object"}}

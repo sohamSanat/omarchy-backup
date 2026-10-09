@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# FilmCraft launcher wrapper for Omarchy Linux
+# ------------------------------------------------------------------------------
+# 1. Enables loopback control server so Omarchy theme changes update live
+# 2. Exposes FILMCRAFT_THEME_FILE for live dynamic per-theme color customization
+# 3. Supports optional XWayland fallback (FILMCRAFT_FORCE_XWAYLAND=1)
+# ==============================================================================
+
+export FILMCRAFT_CONTROL_PORT="${FILMCRAFT_CONTROL_PORT:-48293}"
+export FILMCRAFT_THEME_FILE="${FILMCRAFT_THEME_FILE:-$HOME/.config/filmcraft/theme.json}"
+
+# Ensure initial theme.json is populated from current Omarchy theme
+if [[ ! -f "$FILMCRAFT_THEME_FILE" ]]; then
+  "$HOME/.local/bin/omarchy-sync-filmcraft" 2>/dev/null || true
+fi
+
+# If XWayland is explicitly forced:
+if [[ -n "${FILMCRAFT_FORCE_XWAYLAND:-}" ]]; then
+  unset WAYLAND_DISPLAY
+fi
+
+exec "$HOME/.local/bin/filmcraft.real" "$@"

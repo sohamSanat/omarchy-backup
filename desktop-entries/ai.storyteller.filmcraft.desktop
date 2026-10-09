@@ -1,0 +1,23 @@
+[Desktop Entry]
+Type=Application
+Name=FilmCraft
+GenericName=Video Editor
+Comment=Edit video, color and sound (Premiere Pro alternative)
+Exec=filmcraft %F
+TryExec=filmcraft
+Icon=ai.storyteller.filmcraft
+Terminal=false
+StartupNotify=true
+StartupWMClass=ai.storyteller.filmcraft
+Categories=AudioVideo;Video;AudioVideoEditing;
+Keywords=video;editor;film;timeline;color;grading;nle;premiere;
+MimeType=application/x-filmcraft;video/mp4;video/quicktime;video/x-matroska;video/webm;audio/wav;audio/x-wav;audio/mpeg;audio/flac;audio/ogg;
+Actions=Wayland;XWayland;
+
+[Desktop Action Wayland]
+Name=Open in Native Wayland
+Exec=env FILMCRAFT_FORCE_WAYLAND=1 filmcraft %F
+
+[Desktop Action XWayland]
+Name=Open in XWayland
+Exec=env FILMCRAFT_FORCE_XWAYLAND=1 filmcraft %F

@@ -1,0 +1,1 @@
+{"name":"ui_type","description":"Live app: type text into the focused field.","parameters":{"$schema":"https://json-schema.org/draft/2020-12/schema","properties":{"text":{"type":"string"}},"required":["text"],"type":"object"}}

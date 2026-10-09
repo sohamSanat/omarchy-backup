@@ -1,0 +1,1 @@
+{"name":"ui_key","description":"Live app: press a key or shortcut (e.g. `Space`, `L`, `Cmd+K`, `Shift+Delete`, `Cmd+Z`).","parameters":{"$schema":"https://json-schema.org/draft/2020-12/schema","properties":{"key":{"description":"Key with optional modifiers, e.g. `Space`, `Cmd+K`, `Shift+Delete`, `I`, `L`.","type":"string"}},"required":["key"],"type":"object"}}

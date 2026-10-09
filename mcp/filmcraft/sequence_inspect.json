@@ -1,0 +1,1 @@
+{"name":"sequence_inspect","description":"The active sequence as JSON: settings, tracks, clips (ids, start/duration in ticks and frames, effects), transitions, markers, in/out, playhead, selection. 254016000000 ticks = 1 second.","parameters":{"properties":{},"type":"object"}}

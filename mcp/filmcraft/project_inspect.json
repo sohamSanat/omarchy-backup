@@ -1,0 +1,1 @@
+{"name":"project_inspect","description":"Project tree (bins and items with ids, types, durations), active sequence, source clip.","parameters":{"properties":{},"type":"object"}}

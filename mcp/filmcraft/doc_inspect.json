@@ -1,0 +1,1 @@
+{"name":"doc_inspect","description":"The project as JSON: the tree (as project_inspect) plus the active sequence (as sequence_inspect; null when there is none).","parameters":{"properties":{},"type":"object"}}
