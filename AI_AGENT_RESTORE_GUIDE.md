@@ -86,7 +86,8 @@ This repository contains the full snapshot of user customizations:
 - **`tiertek.scratchpad-deck`**: Scratchpad deck manager for quick notes and Hyprland scratchpad toggling (`bin/scratchpad-deck`).
 - **`nguyenn.clipboard`**: Clipboard history plugin with custom "Clear attachments" feature and patch.
 - **`reidenxerx.tile-blueprints`**: Dynamic layout blueprint manager bound to `Super + Alt + L`.
-- **`soham.omagent`**: Soham's personal fork/custom command pill overlay assistant running default coding agent with tri-mode routing (`LOCAL`, `WEB`, and `CODE` with background Antigravity harness execution via `omagent-harness-view` and `Ctrl + E`), bound to `Alt + Space`.
+- **`soham.omagent`**: Soham's personal fork/custom command pill overlay assistant running default coding agent with tri-mode routing (`LOCAL`, `WEB`, and `CODE`), live interactive Firstmate steering (`--steer`), bidirectional chat replies (`firstmate reply`), Herdr workspace/tab orchestration, and background Antigravity harness execution with `omagent-harness-view` and `Ctrl + E`, bound to `Alt + Space`.
+- **`pretty.omagen`**: Wallpaper generator and styling plugin enhanced with custom interactive wallpaper browser (`bin/omagen-wallpaper-browser`, `WallpaperBrowserApp.qml`, and `WallpaperBridge.js`).
 - **`io.github.ellion369.omagent`**: Personal AI Assistant with 3-lane multi-intent router (Flash chat, Web search, Herdr coding execution), Nothing Phone PWA intercom bridge, and Quickshell glass HUD overlay. Refactored to `ui_concepts/v1` architecture:
   - Adaptive execution policy (`omagent_core/execution_policy.py`) sizing work envelopes: `needle` (8 tool calls, 10 min), `standard` (24 tool calls, 45 min), and `sword` (64 tool calls, 4 agents, 90 min).
   - Generates 3 structurally unique concept candidates differing across ≥3 design axes (IA, composition, typography, interaction, motion, asset strategy).

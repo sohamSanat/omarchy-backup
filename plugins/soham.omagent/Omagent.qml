@@ -183,21 +183,14 @@ Item {
     root.pushRow("status", "Nothing to copy yet")
   }
 
-  readonly property string pluginDir: manifest && manifest["__sourceDir"]
-    ? String(manifest["__sourceDir"])
-    : Quickshell.env("HOME") + "/.config/omarchy/plugins/soham.omagent"
+  readonly property string pluginDir: decodeURIComponent(Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "").replace(/\/$/, ""))
   readonly property string routerPath: pluginDir + "/omagent-route"
   readonly property string harnessViewerPath: pluginDir + "/omagent-harness-view"
 
   function openHarness() {
-    root.dismiss()
-    var home = Quickshell.env("HOME")
-    var cwd = home + "/Work"
     var appId = "org.omarchy.omagent.harness"
-    Quickshell.execDetached({
-      command: ["omarchy-launch-or-focus-tui", "--app-id=" + appId, root.harnessViewerPath],
-      workingDirectory: cwd
-    })
+    Quickshell.execDetached(["omarchy-launch-or-focus-tui", "--app-id=" + appId, root.harnessViewerPath])
+    root.dismiss()
   }
 
   // A payload may set the mode so a future keybinding can jump straight to
@@ -293,6 +286,13 @@ Item {
     var request = prompt.text.trim()
     if (!request) return
     if (root.busy) {
+      if (root.codeMode) {
+        root.pushRow("you", request)
+        prompt.text = ""
+        root.pushRow("status", "Steering Firstmate…")
+        Quickshell.execDetached([root.routerPath, "--steer", request])
+        return
+      }
       root.pushRow("status", "Still working. Ctrl+C stops it")
       return
     }
@@ -536,6 +536,8 @@ Item {
       ? WlrKeyboardFocus.Exclusive
       : WlrKeyboardFocus.None
 
+    Keys.forwardTo: [prompt]
+
     readonly property int gap: Style.space(12)
     readonly property int surfaceWidth: Math.min(Style.space(440), panel.width - Style.space(32))
     // Always anchored near the top. Centring it while the card was empty made
@@ -722,9 +724,7 @@ Item {
                   root.toggleMode()
                   event.accepted = true
                 } else if (event.key === Qt.Key_E) {
-                  if (root.codeMode) {
-                    root.openHarness()
-                  }
+                  root.openHarness()
                   event.accepted = true
                 } else if (event.key === Qt.Key_Y) {
                   root.copyLast()
@@ -768,9 +768,11 @@ Item {
               ? "Listening…"
               : (root.dictationState === "transcribing"
                 ? "Transcribing…"
-                : (root.hasHistory
-                  ? "Follow up…"
-                  : (root.webMode ? "Ask the web…" : (root.codeMode ? "Ask the agent…" : "Ask from memory…"))))
+                : (root.busy && root.codeMode
+                  ? "Talk to Firstmate… (steer)"
+                  : (root.hasHistory
+                    ? "Follow up…"
+                    : (root.webMode ? "Ask the web…" : (root.codeMode ? "Ask the agent…" : "Ask from memory…")))))
             color: Color.menu.text
             opacity: root.dictationState === "idle" ? 0.44 : 0.72
             font.family: Style.font.menuFamily

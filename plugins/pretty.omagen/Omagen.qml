@@ -147,6 +147,11 @@ Item {
             .toString()
             .replace("file://", "")
     )
+    readonly property string wallpaperBrowserPath: decodeURIComponent(
+        Qt.resolvedUrl("bin/omagen-wallpaper-browser")
+            .toString()
+            .replace("file://", "")
+    )
 
     function triggerShellGlitch(eventName) {
         signalBridge.triggerShellGlitch(eventName)
@@ -386,6 +391,7 @@ Item {
             return
         }
         imagePicker.cancel();
+        wallpaperBrowser.cancel();
         opened = false;
         settingsOpen = false;
         runtimeSetupOpen = false;
@@ -612,6 +618,33 @@ Item {
         errorMessage = "";
         opened = false;
         imagePicker.choose();
+    }
+
+    function chooseWallpaper() {
+        if (sessionBusy || cancelBusy)
+            return;
+
+        errorMessage = "";
+        opened = false;
+        wallpaperBrowser.choose();
+    }
+
+    function stageSourceImage(path) {
+        root.sourceImage = path;
+        if (session.active) {
+            root.opened = true;
+            return;
+        }
+        root.workflowMode = "";
+        root.extraConfigsEnabled = false;
+        wizardController.beginWorkflow(true);
+        demoController.monitor = root.focusedMonitorName();
+        // The image is only staged here. The pre-session wizard owns the
+        // Keep SetupWindow visible until its explicit Continue to
+        // Workflow handoff. No backend session or generation starts here.
+        root.route = "setup";
+        root.livePanelOpen = false;
+        root.opened = true;
     }
 
     function beginSession() {
@@ -969,6 +1002,7 @@ Item {
         if (!wizardController.workflowStepActive)
             return false
         imagePicker.cancel()
+        wallpaperBrowser.cancel()
         wizardController.cancelWorkflow()
         sourceImage = ""
         workflowMode = "fast"
@@ -1137,21 +1171,45 @@ Item {
         executable: root.imagePickerPath
 
         onSelected: function(path) {
-            root.sourceImage = path;
-            if (session.active) {
+            stageSourceImage(path);
+        }
+
+        onCancelled: {
+            if (wizardController.workflowStepActive) {
+                root.route = "setup";
+                root.livePanelOpen = false;
                 root.opened = true;
                 return;
             }
-            root.workflowMode = "";
-            root.extraConfigsEnabled = false;
-            wizardController.beginWorkflow(true);
-            demoController.monitor = root.focusedMonitorName();
-            // The image is only staged here. The pre-session wizard owns the
-            // Keep SetupWindow visible until its explicit Continue to
-            // Workflow handoff. No backend session or generation starts here.
-            root.route = "setup";
-            root.livePanelOpen = false;
             root.opened = true;
+        }
+
+        onFailed: function(message) {
+            root.errorMessage = message;
+            if (wizardController.workflowStepActive) {
+                root.route = "setup";
+                root.livePanelOpen = false;
+                root.opened = true;
+                return;
+            }
+            root.opened = true;
+        }
+    }
+
+    Services.WallpaperBrowserService {
+        id: wallpaperBrowser
+        executable: root.wallpaperBrowserPath
+
+        onSelected: function(path) {
+            if (path === "") {
+                if (wizardController.workflowStepActive) {
+                    root.route = "setup";
+                    root.livePanelOpen = false;
+                }
+                root.opened = true;
+                return;
+            }
+            stageSourceImage(path);
         }
 
         onCancelled: {
@@ -1764,6 +1822,7 @@ Item {
         errorMessage: root.errorMessage
 
         onChooseImageRequested: root.chooseImage()
+        onBrowseWallpapersRequested: root.chooseWallpaper()
         onEditThemeRequested: root.chooseInstalledTheme()
         onAdvancedRuntimeRequested: root.openRuntimeSetup("")
         workflowMode: root.workflowMode

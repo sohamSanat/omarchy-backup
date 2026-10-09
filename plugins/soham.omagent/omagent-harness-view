@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Open and view the background Antigravity harness for Omagent.
+"""Open and view the background Herdr + Firstmate + Antigravity harness for Omagent.
 
 If a background turn is actively executing:
   Streams live progress, step updates, and generated tokens in the terminal.
   As soon as the turn finishes, hands over cleanly to the interactive Antigravity CLI.
 If no turn is currently active:
-  Immediately launches the interactive Antigravity CLI resumed on the conversation.
+  Shows recent task summary and launches the interactive Antigravity CLI resumed on the conversation.
 """
 
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -19,6 +20,9 @@ STATE_DIR = Path.home() / ".local" / "state" / "soham.omagent"
 CONV_FILE = STATE_DIR / "code_conv"
 PID_FILE = STATE_DIR / "live_harness.pid"
 LOG_FILE = STATE_DIR / "live_harness.log"
+TASK_FILE = STATE_DIR / "live_task_id"
+WS_FILE = STATE_DIR / "live_ws_id"
+PANE_FILE = STATE_DIR / "live_pane_id"
 
 
 def work_dir() -> Path:
@@ -26,9 +30,9 @@ def work_dir() -> Path:
     return home_work if home_work.is_dir() else Path.home()
 
 
-def read_conv_id() -> str:
+def read_file(p: Path) -> str:
     try:
-        return CONV_FILE.read_text(errors="ignore").strip()
+        return p.read_text(errors="ignore").strip()
     except OSError:
         return ""
 
@@ -52,7 +56,7 @@ def get_active_pid() -> int | None:
         return None
 
 
-def get_colors() -> tuple[str, str, str, str, str]:
+def get_colors() -> tuple[str, str, str, str, str, str]:
     is_light = False
     try:
         import omarchy_theme
@@ -64,30 +68,49 @@ def get_colors() -> tuple[str, str, str, str, str]:
         reset = "\033[0m"
         bold = "\033[1m"
         accent = "\033[38;5;91m"     # Royal plum
-        muted = "\033[38;5;240m"    # Dark slate
-        text = "\033[38;5;235m"     # Deep charcoal
+        cyan = "\033[38;5;30m"       # Deep teal
+        muted = "\033[38;5;240m"     # Dark slate
+        text = "\033[38;5;235m"      # Deep charcoal
     else:
         reset = "\033[0m"
         bold = "\033[1m"
-        accent = "\033[38;5;183m"   # Soft lavender
-        muted = "\033[38;5;246m"    # Muted gray
-        text = "\033[38;5;253m"     # Light foreground
+        accent = "\033[38;5;183m"    # Soft lavender
+        cyan = "\033[38;5;116m"      # Soft cyan
+        muted = "\033[38;5;246m"     # Muted gray
+        text = "\033[38;5;253m"      # Light foreground
 
-    return reset, bold, accent, muted, text
+    return reset, bold, accent, cyan, muted, text
 
 
 def main() -> int:
     os.chdir(work_dir())
-    reset, bold, accent, muted, text = get_colors()
+    reset, bold, accent, cyan, muted, text = get_colors()
     active_pid = get_active_pid()
-    conv_id = read_conv_id()
+    conv_id = read_file(CONV_FILE)
+    task_id = read_file(TASK_FILE)
+    ws_id = read_file(WS_FILE)
+    pane_id = read_file(PANE_FILE)
+
+    # If running outside Herdr and a Herdr workspace exists, focus it
+    if ws_id and ws_id != "none" and not os.environ.get("HERDR_PANE_ID"):
+        try:
+            subprocess.run(["herdr", "workspace", "focus", ws_id], capture_output=True, timeout=2)
+        except Exception:
+            pass
+
+    sys.stdout.write(f"\n{accent}{bold}✦ Antigravity Harness{reset} {muted}(Herdr + Firstmate + Agy){reset}\n")
+    if ws_id and ws_id != "none":
+        sys.stdout.write(f"  {muted}Herdr Workspace:{reset}  {text}{ws_id} (Omagent){reset}  {muted}Pane:{reset} {text}{pane_id}{reset}\n")
+    if task_id:
+        status_tag = f"{accent}[Under Way]{reset}" if active_pid is not None else f"{muted}[Done]{reset}"
+        sys.stdout.write(f"  {muted}Firstmate Task:{reset}   {text}{task_id}{reset} {status_tag}\n")
+    if conv_id:
+        sys.stdout.write(f"  {muted}Harness Session:{reset}  {cyan}{conv_id}{reset}\n")
+    sys.stdout.write(f"  {muted}Working Dir:{reset}      {text}{work_dir()}{reset}\n")
 
     if active_pid is not None:
-        sys.stdout.write(f"\n{accent}{bold}✦ Antigravity Harness{reset} {muted}(Omagent Session){reset}\n")
-        if conv_id:
-            sys.stdout.write(f"{muted}Session:{reset} {text}{conv_id}{reset}\n")
-        sys.stdout.write(f"{muted}Status:{reset}  {accent}Harness is actively working in background…{reset}\n")
-        sys.stdout.write(f"{muted}{'─' * 60}{reset}\n\n")
+        sys.stdout.write(f"  {muted}Status:{reset}           {accent}Harness is actively working in background…{reset}\n")
+        sys.stdout.write(f"{muted}{'─' * 64}{reset}\n\n")
         sys.stdout.flush()
 
         offset = 0
@@ -115,7 +138,7 @@ def main() -> int:
                 except OSError:
                     pass
 
-        # Drain any final bytes from the log
+        # Drain final bytes
         if LOG_FILE.is_file():
             try:
                 curr_size = LOG_FILE.stat().st_size
@@ -131,7 +154,25 @@ def main() -> int:
         sys.stdout.write(f"\n\n{accent}{bold}✦ Background turn finished.{reset} {muted}Attaching interactive Antigravity CLI…{reset}\n\n")
         sys.stdout.flush()
         time.sleep(0.3)
-        conv_id = read_conv_id()
+        conv_id = read_file(CONV_FILE)
+    else:
+        sys.stdout.write(f"  {muted}Status:{reset}           {muted}Ready for input · Attaching interactive session…{reset}\n")
+        sys.stdout.write(f"{muted}{'─' * 64}{reset}\n\n")
+        sys.stdout.flush()
+
+        # Print recent log lines if available
+        if LOG_FILE.is_file():
+            try:
+                lines = LOG_FILE.read_text(errors="ignore").splitlines()
+                if lines:
+                    recent = lines[-15:]
+                    sys.stdout.write(f"{muted}Recent Activity:{reset}\n")
+                    for l in recent:
+                        sys.stdout.write(f"  {l}\n")
+                    sys.stdout.write(f"\n")
+                    sys.stdout.flush()
+            except OSError:
+                pass
 
     # Hand over to interactive agy CLI
     argv = ["agy"]

@@ -26,10 +26,11 @@ PanelWindow {
     // an image is selected. Session Cancel remains the final action when a
     // session is already active.
     readonly property int actionCount: sourceImage === ""
-        ? (sessionActive ? 3 : 3)
-        : (sessionActive ? 4 : 4)
+        ? (sessionActive ? 4 : 4)
+        : (sessionActive ? 5 : 5)
 
     signal chooseImageRequested()
+    signal browseWallpapersRequested()
     signal editThemeRequested()
     signal advancedRuntimeRequested()
     signal workflowModeSelected(string mode)
@@ -60,13 +61,15 @@ PanelWindow {
         if (cursorIndex === 0)
             chooseImageRequested();
         else if (cursorIndex === 1)
+            browseWallpapersRequested();
+        else if (cursorIndex === 2)
             editThemeRequested();
-        else if (!sessionActive && cursorIndex === 2)
+        else if (!sessionActive && cursorIndex === 3)
             advancedRuntimeRequested();
-        else if (sourceImage !== "" && cursorIndex === (sessionActive ? 2 : 3))
-            continueRequested();
         else if (sessionActive && cursorIndex === actionCount - 1)
             cancelRequested();
+        else if (sourceImage !== "" && cursorIndex === (sessionActive ? 3 : 4))
+            continueRequested();
     }
 
     onActiveChanged: if (active) {
@@ -242,12 +245,24 @@ PanelWindow {
 
                         Button {
                             Layout.fillWidth: true
+                            text: "Browse wallpapers"
+                            iconText: "󰸉"
+                            leftAlign: true
+                            foreground: Color.popups.text
+                            hasCursor: root.cursorIndex === 1
+                            enabled: !root.busy
+                            tooltipText: "Search wallpapers online via Wallpaper Flare"
+                            onClicked: root.browseWallpapersRequested()
+                        }
+
+                        Button {
+                            Layout.fillWidth: true
                             text: "Edit installed theme"
                             iconText: "󰏢"
                             leftAlign: true
                             foreground: Color.popups.text
                             accent: Color.accent
-                            hasCursor: root.cursorIndex === 1
+                            hasCursor: root.cursorIndex === 2
                             enabled: !root.busy
                             onClicked: root.editThemeRequested()
                         }
@@ -259,7 +274,7 @@ PanelWindow {
                             iconText: "󰒓"
                             leftAlign: true
                             foreground: Color.popups.text
-                            hasCursor: root.cursorIndex === 2
+                            hasCursor: root.cursorIndex === 3
                             enabled: !root.busy
                             tooltipText: "Review or enable the optional advanced theme bridge"
                             onClicked: root.advancedRuntimeRequested()
@@ -305,7 +320,7 @@ PanelWindow {
                             accent: Color.accent
                             background: Color.accent
                             bordered: true
-                            hasCursor: root.cursorIndex === (root.sessionActive ? 2 : 3)
+                            hasCursor: root.cursorIndex === (root.sessionActive ? 3 : 4)
                             enabled: !root.busy && !root.cancelBusy
                             onClicked: root.continueRequested()
                         }

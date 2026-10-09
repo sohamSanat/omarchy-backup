@@ -89,14 +89,25 @@ def find_active_workspace_and_panes(cwd=None):
         except Exception:
             pass
 
-    focused_ws = next((w for w in ws_list if w.get("focused")), None)
-    if not focused_ws and ws_list:
-        focused_ws = ws_list[-1]
-    
-    if not focused_ws:
+    ws_id = os.environ.get("HERDR_WORKSPACE_ID")
+    live_ws_file = Path.home() / ".local/state/soham.omagent/live_ws_id"
+    if not ws_id and live_ws_file.is_file():
+        saved = live_ws_file.read_text().strip()
+        if any(w.get("workspace_id") == saved for w in ws_list):
+            ws_id = saved
+    if not ws_id:
+        omagent_ws = next((w for w in ws_list if str(w.get("label") or "").startswith("Omagent")), None)
+        if omagent_ws:
+            ws_id = omagent_ws.get("workspace_id")
+    if not ws_id:
+        focused_ws = next((w for w in ws_list if w.get("focused")), None)
+        if not focused_ws and ws_list:
+            focused_ws = ws_list[-1]
+        ws_id = focused_ws.get("workspace_id") if focused_ws else None
+
+    if not ws_id:
         return None, []
 
-    ws_id = focused_ws.get("workspace_id")
     panes = get_herdr_panes()
     ws_panes = [p for p in panes if p.get("workspace_id") == ws_id]
     return ws_id, ws_panes
@@ -233,7 +244,10 @@ def format_subagent_task_prompt(name: str, role: str, skill_name: str, skill_pat
         f"   - Reinvest saved token headroom into deeper reasoning, edge-case coverage, and flawless implementation.\n"
         f"5. PRUDENT SUB-DELEGATION: You have full authority to spawn peer subagents in Herdr if needed (`firstmate subagent spawn <name> --skill <skill> --task '<task>'`). "
         f"Only spawn subagents when specialized parallel assistance is genuinely required—do not spawn subagents for trivial single steps.\n"
-        f"6. STRUCTURED REPORTING: Deliver clear, concise findings and deliverables back to your supervisor and peer crewmates.\n\n"
+        f"6. STRUCTURED REPORTING: Deliver clear, concise findings and deliverables back to your supervisor and peer crewmates.\n"
+        f"7. SUPREME OPERATOR STEERING DIRECTIVE (PRIORITY 1):\n"
+        f"   The human operator has supreme authority. If you receive a steering directive via prompt, inbox, or supervisor,\n"
+        f"   you MUST prioritize and follow it immediately over all prior tasks or assumptions.\n\n"
         f"[Assigned Task]\n"
         f"{task}"
     )
@@ -358,10 +372,46 @@ def get_registered_meta() -> dict[str, dict]:
             pass
     return entries
 
+def check_and_notify_user_steer():
+    """Checks for unhandled messages in the active Firstmate task inbox and prints a clear alert."""
+    try:
+        live_task_file = Path.home() / ".local/state/soham.omagent/live_task_id"
+        task_id = live_task_file.read_text().strip() if live_task_file.is_file() else None
+        if not task_id:
+            metas = sorted(FM_STATE_DIR.glob("omagent_*.meta"), key=lambda p: p.stat().st_mtime, reverse=True)
+            if metas:
+                task_id = metas[0].stem
+        if not task_id:
+            return
+
+        inbox_dir = FM_STATE_DIR / f"{task_id}.inbox"
+        if not inbox_dir.is_dir():
+            return
+
+        msg_files = sorted(inbox_dir.glob("*.msg"))
+        if not msg_files:
+            return
+
+        print("\n" + "=" * 68)
+        print("★ [LIVE USER STEER FROM HUMAN OPERATOR — PRIORITY 1]")
+        for mf in msg_files:
+            try:
+                raw = mf.read_text("utf-8", errors="ignore")
+                body = raw.split("\n--\n", 1)[-1].strip() if "\n--\n" in raw else raw.strip()
+                print(f"• Operator Directive ({mf.name}): {body}")
+            except Exception:
+                pass
+        print(">> MANDATORY: The human operator requires you to follow this directive immediately.")
+        print(">> Prioritize this over previous instructions. Adjust code and subagents immediately.")
+        print("=" * 68 + "\n")
+    except Exception:
+        pass
+
 def cmd_spawn(args):
+    check_and_notify_user_steer()
     name = args.name
     role = args.role or "crewmate"
-    kind = args.kind or "agy"
+    kind = args.kind or ("opencode" if shutil.which("opencode") else "agy")
     cwd = Path(args.cwd).resolve() if args.cwd else Path.cwd()
 
     ws_id, ws_panes = find_active_workspace_and_panes(cwd=cwd)
@@ -426,11 +476,28 @@ def cmd_spawn(args):
     start_cmd = ["herdr", "agent", "start", name, "--kind", kind, "--pane", new_pane_id]
     if kind == "agy":
         start_cmd.extend(["--", "--dangerously-skip-permissions"])
-    p_start = subprocess.run(start_cmd, capture_output=True, text=True, timeout=25)
-    if p_start.returncode != 0:
-        print(f"Error starting agent '{name}' in pane {new_pane_id}: {p_start.stderr}", file=sys.stderr)
-        subprocess.run(["herdr", "pane", "close", new_pane_id], capture_output=True)
-        sys.exit(1)
+    
+    p_start = None
+    try:
+        p_start = subprocess.run(start_cmd, capture_output=True, text=True, timeout=10)
+    except (subprocess.TimeoutExpired, Exception):
+        p_start = None
+
+    if p_start is None or p_start.returncode != 0:
+        # If agy stalled due to startup dialog, fallback to opencode or pi
+        started = False
+        if shutil.which("opencode"):
+            kind = "opencode"
+            fallback_cmd = ["herdr", "agent", "start", name, "--kind", "opencode", "--pane", new_pane_id]
+            p_fb = subprocess.run(fallback_cmd, capture_output=True, text=True, timeout=12)
+            if p_fb.returncode == 0:
+                started = True
+        if not started and shutil.which("pi"):
+            kind = "pi"
+            fallback_cmd = ["herdr", "agent", "start", name, "--kind", "pi", "--pane", new_pane_id]
+            p_fb2 = subprocess.run(fallback_cmd, capture_output=True, text=True, timeout=12)
+            if p_fb2.returncode == 0:
+                started = True
 
     # 3. Register in Firstmate
     fm_task_id = f"fm_{name}_{int(time.time())}"
@@ -460,6 +527,25 @@ def cmd_prompt_inner(name: str, prompt: str, wait: bool = False, timeout_ms: int
             print(f"[firstmate-subagent] Notice: prompt queued, waiting for agent '{name}' to settle...")
             subprocess.run(["herdr", "agent", "wait", name, "--timeout", str(timeout_ms), "idle", "done"], capture_output=True)
         else:
+            meta_map = get_registered_meta()
+            target_pane = None
+            agents = get_herdr_agents()
+            ag_match = next((a for a in agents if a.get("name") == name or a.get("pane_id") == name), None)
+            if ag_match:
+                target_pane = ag_match.get("pane_id")
+            if not target_pane:
+                for pid, m in meta_map.items():
+                    if m.get("endpoint_task_id", "").startswith(f"fm_{name}_"):
+                        target_pane = pid
+                        break
+            if target_pane:
+                print(f"[firstmate-subagent] Directing prompt directly into pane {target_pane}...")
+                time.sleep(1.2)
+                p_direct = subprocess.run(["herdr", "pane", "run", target_pane, prompt], capture_output=True, text=True)
+                if p_direct.returncode == 0:
+                    if wait:
+                        time.sleep(3.0)
+                    return
             print(f"Error dispatching prompt: {err_msg}", file=sys.stderr)
             sys.exit(1)
 
@@ -469,6 +555,7 @@ def cmd_prompt_inner(name: str, prompt: str, wait: bool = False, timeout_ms: int
         cmd_read_inner(name, lines=60)
 
 def cmd_prompt(args):
+    check_and_notify_user_steer()
     # Check if we should wrap with skill directives
     meta_map = get_registered_meta()
     agents = get_herdr_agents()
@@ -511,9 +598,11 @@ def cmd_read_inner(name: str, lines: int = 60):
                 print(f"----------------------------")
 
 def cmd_read(args):
+    check_and_notify_user_steer()
     cmd_read_inner(args.name, lines=args.lines)
 
 def cmd_list(args):
+    check_and_notify_user_steer()
     agents = get_herdr_agents()
     if not agents:
         print("No active agents found in Herdr.")
@@ -550,6 +639,37 @@ def cmd_list(args):
         role = meta.get("role", "crewmate")
         skill = meta.get("skill", "ce-work")
         print(f"{name:<18} {role:<16} {skill:<18} {status:<10} {pane:<8} {ws:<8}")
+
+def cmd_reply(args):
+    clean = args.message.strip()
+    if not clean:
+        print("Error: reply message cannot be empty", file=sys.stderr)
+        sys.exit(1)
+
+    reply_dir = Path.home() / ".local/state/soham.omagent/replies"
+    reply_dir.mkdir(parents=True, exist_ok=True)
+    ts_nano = int(time.time() * 1000000)
+    rf = reply_dir / f"{ts_nano}.reply"
+    rf.write_text(clean, "utf-8")
+
+    live_log = Path.home() / ".local/state/soham.omagent/live_harness.log"
+    try:
+        with open(live_log, "a", errors="ignore") as f:
+            f.write(f"\n[{time.strftime('%H:%M:%S')}] 💬 [Firstmate -> User]: {clean}\n")
+    except OSError:
+        pass
+
+    live_task_file = Path.home() / ".local/state/soham.omagent/live_task_id"
+    if live_task_file.is_file():
+        try:
+            tid = live_task_file.read_text().strip()
+            if tid:
+                sf = FM_STATE_DIR / f"{tid}.status"
+                sf.write_text(f"working: Replied: {clean[:50]}")
+        except Exception:
+            pass
+
+    print(f"✓ Replied to user: {clean}")
 
 def cmd_skills(args):
     skills = list_available_skills()
@@ -608,6 +728,7 @@ def cmd_skill_read(args):
         sys.exit(1)
 
 def cmd_wait(args):
+    check_and_notify_user_steer()
     print(f"[firstmate-subagent] Waiting for '{args.name}' to reach idle/done (timeout: {args.timeout}ms)...")
     cmd = ["herdr", "agent", "wait", args.name, "--timeout", str(args.timeout), "idle", "done"]
     p = subprocess.run(cmd, capture_output=True, text=True)
@@ -701,6 +822,11 @@ def main():
     p_close = subparsers.add_parser("close", help="Close a subagent's Herdr pane")
     p_close.add_argument("name", help="Name of the subagent to close")
     p_close.set_defaults(func=cmd_close)
+
+    # reply
+    p_reply = subparsers.add_parser("reply", help="Send a live reply message or sitrep directly to the user's Omagent chat shell")
+    p_reply.add_argument("message", help="Message, sitrep, or answer to send to the user")
+    p_reply.set_defaults(func=cmd_reply)
 
     args = parser.parse_args()
     args.func(args)

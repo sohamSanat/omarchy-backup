@@ -5,9 +5,11 @@ copilot = "latest"
 gemini = { version = "latest", allow_builds = ["@github/keytar", "node-pty"] }
 gh = "latest"
 node = "26.7.0"
+"npm:@xai-official/grok" = "latest"
 "npm:playwright" = "latest"
 opencode = "latest"
 pi = "latest"
+python = "3.14.7"
 rust = "stable"
 
 [settings.upgrade]

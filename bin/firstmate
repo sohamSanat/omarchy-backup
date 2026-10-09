@@ -20,6 +20,9 @@ case "${1:-}" in
   subagent|crew)
     exec firstmate-subagent "${@:2}"
     ;;
+  reply)
+    exec firstmate-subagent reply "${@:2}"
+    ;;
   skills)
     exec firstmate-subagent skills "${@:2}"
     ;;

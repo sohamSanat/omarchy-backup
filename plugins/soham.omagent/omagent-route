@@ -864,7 +864,269 @@ CODE_STATE_DIR = Path.home() / ".local" / "state" / "soham.omagent"
 CODE_CONV_FILE = CODE_STATE_DIR / "code_conv"
 CODE_PID_FILE = CODE_STATE_DIR / "live_harness.pid"
 CODE_LOG_FILE = CODE_STATE_DIR / "live_harness.log"
+CODE_TASK_FILE = CODE_STATE_DIR / "live_task_id"
+CODE_WS_FILE = CODE_STATE_DIR / "live_ws_id"
+CODE_PANE_FILE = CODE_STATE_DIR / "live_pane_id"
+CODE_STEER_INBOX = CODE_STATE_DIR / "inbox"
 
+FM_HOME = Path.home() / "firstmate"
+FM_STATE_DIR = FM_HOME / "state"
+FM_DATA_DIR = FM_HOME / "data"
+
+
+def ensure_herdr_server() -> bool:
+    """Ensures herdr server is running, auto-starting it in background if needed."""
+    try:
+        p = subprocess.run(["herdr", "status"], capture_output=True, text=True, timeout=3)
+        if "status: running" in p.stdout:
+            return True
+        if not shutil.which("herdr"):
+            return False
+        subprocess.Popen(
+            ["herdr", "server", "--session", "default"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL, start_new_session=True,
+        )
+        for _ in range(15):
+            time.sleep(0.2)
+            p = subprocess.run(["herdr", "status"], capture_output=True, text=True, timeout=2)
+            if "status: running" in p.stdout:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def setup_herdr_workspace(cwd: Path, task_id: str) -> tuple[str, str, str] | None:
+    """Finds or creates an Omagent Herdr workspace and allocates a tab for the task.
+    Returns (ws_id, tab_id, pane_id) or None if Herdr is unavailable.
+    """
+    if not ensure_herdr_server():
+        return None
+    try:
+        # Check existing workspaces for Omagent
+        p = subprocess.run(["herdr", "workspace", "list"], capture_output=True, text=True, timeout=4)
+        if p.returncode == 0:
+            data = json.loads(p.stdout).get("result", {})
+            workspaces = data.get("workspaces", [])
+            for ws in workspaces:
+                label = str(ws.get("label") or "")
+                if label.startswith("Omagent"):
+                    ws_id = ws.get("workspace_id")
+                    p_tab = subprocess.run(
+                        ["herdr", "tab", "create", "--workspace", ws_id, "--label", f"fm-{task_id}",
+                         "--cwd", str(cwd), "--no-focus"],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    if p_tab.returncode == 0:
+                        res_tab = json.loads(p_tab.stdout).get("result", {})
+                        tab_id = res_tab.get("tab", {}).get("tab_id")
+                        pane_id = res_tab.get("root_pane", {}).get("pane_id")
+                        if tab_id and pane_id:
+                            return ws_id, tab_id, pane_id
+
+        # None found, create fresh workspace
+        p_cr = subprocess.run(
+            ["herdr", "workspace", "create", "--label", "Omagent (Firstmate/Agy)",
+             "--cwd", str(cwd), "--no-focus"],
+            capture_output=True, text=True, timeout=5
+        )
+        if p_cr.returncode == 0:
+            res = json.loads(p_cr.stdout).get("result", {})
+            ws_id = res.get("workspace", {}).get("workspace_id")
+            tab_id = res.get("tab", {}).get("tab_id")
+            pane_id = res.get("root_pane", {}).get("pane_id")
+            if ws_id and tab_id and pane_id:
+                subprocess.run(["herdr", "tab", "rename", tab_id, f"fm-{task_id}"],
+                               capture_output=True, timeout=2)
+                return ws_id, tab_id, pane_id
+    except Exception:
+        pass
+    return None
+
+
+def register_firstmate_task(task_id: str, ws_id: str, tab_id: str, pane_id: str, cwd: Path, prompt: str) -> bool:
+    """Registers the task in Firstmate fleet state and brief records."""
+    try:
+        FM_STATE_DIR.mkdir(parents=True, exist_ok=True)
+        meta_file = FM_STATE_DIR / f"{task_id}.meta"
+        meta_content = (
+            f"backend=herdr\n"
+            f"endpoint_task_id={task_id}\n"
+            f"herdr_session=default\n"
+            f"herdr_workspace_id={ws_id}\n"
+            f"herdr_tab_id={tab_id}\n"
+            f"herdr_pane_id={pane_id}\n"
+            f"window=default:{pane_id}\n"
+            f"project={cwd}\n"
+            f"worktree={cwd}\n"
+            f"harness=agy\n"
+            f"role=coder\n"
+            f"skill=ce-work\n"
+            f"kind=crewmate\n"
+            f"mode=local-only\n"
+            f"yolo=on\n"
+        )
+        meta_file.write_text(meta_content, "utf-8")
+
+        status_file = FM_STATE_DIR / f"{task_id}.status"
+        status_file.write_text("working · source: herdr · Initializing Antigravity harness\n", "utf-8")
+
+        brief_dir = FM_DATA_DIR / task_id
+        brief_dir.mkdir(parents=True, exist_ok=True)
+        brief_file = brief_dir / "brief.md"
+        brief_content = (
+            f"# Firstmate Task: {task_id}\n\n"
+            f"- **Created**: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"- **Harness**: agy (Antigravity)\n"
+            f"- **Backend**: herdr ({ws_id}:{pane_id})\n"
+            f"- **Role**: coder (`ce-work`)\n"
+            f"- **Target Cwd**: `{cwd}`\n\n"
+            f"## Brief\n{prompt}\n"
+        )
+        brief_file.write_text(brief_content, "utf-8")
+        return True
+    except Exception:
+        return False
+
+
+def update_firstmate_status(task_id: str, state: str, detail: str) -> None:
+    try:
+        status_file = FM_STATE_DIR / f"{task_id}.status"
+        status_file.write_text(f"{state} · source: herdr · {detail}\n", "utf-8")
+    except OSError:
+        pass
+
+
+def finalize_firstmate_task(
+    task_id: str,
+    summary: str,
+    created: list[str],
+    modified: list[str],
+    commands: list[str],
+    success: bool = True
+) -> None:
+    try:
+        state = "done" if success else "failed"
+        update_firstmate_status(task_id, state, summary)
+        report_dir = FM_DATA_DIR / task_id
+        report_dir.mkdir(parents=True, exist_ok=True)
+        report_file = report_dir / "report.md"
+        created_str = ", ".join(f"`{f}`" for f in created) if created else "None"
+        modified_str = ", ".join(f"`{f}`" for f in modified) if modified else "None"
+        commands_str = "\n".join(f"- `{c}`" for c in commands) if commands else "None"
+        content = (
+            f"# Firstmate Task Report: {task_id}\n\n"
+            f"- **Outcome**: {'Success' if success else 'Failed'}\n"
+            f"- **Completed**: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"- **Summary**: {summary}\n\n"
+            f"### Deliverables\n"
+            f"- **Created**: {created_str}\n"
+            f"- **Modified**: {modified_str}\n\n"
+            f"### Commands Executed\n{commands_str}\n"
+        )
+        report_file.write_text(content, "utf-8")
+    except OSError:
+        pass
+
+
+def handle_steer(message: str) -> int:
+    """Delivers mid-flight user steering to the active Firstmate task and running harness."""
+    clean_msg = message.strip()
+    if not clean_msg:
+        return 0
+
+    # 1. Enqueue to router inbox so the active running router loop receives and emits it
+    try:
+        CODE_STEER_INBOX.mkdir(parents=True, exist_ok=True)
+        ts_nano = int(time.time() * 1000000)
+        steer_file = CODE_STEER_INBOX / f"{ts_nano}.steer"
+        steer_file.write_text(clean_msg, "utf-8")
+    except OSError:
+        pass
+
+    # 2. Identify the active Firstmate task
+    task_id = ""
+    try:
+        if CODE_TASK_FILE.is_file():
+            task_id = CODE_TASK_FILE.read_text(errors="ignore").strip()
+    except OSError:
+        pass
+
+    if not task_id:
+        try:
+            metas = sorted(FM_STATE_DIR.glob("omagent_*.meta"), key=lambda p: p.stat().st_mtime, reverse=True)
+            if metas:
+                task_id = metas[0].stem
+        except Exception:
+            pass
+
+    # 3. Log to live harness log
+    try:
+        with open(CODE_LOG_FILE, "a", errors="ignore") as f:
+            f.write(f"\n[{time.strftime('%H:%M:%S')}] 💬 [User -> Firstmate]: {clean_msg}\n")
+    except OSError:
+        pass
+
+    # 4. Deliver via Firstmate inbox and ring Herdr endpoint
+    if task_id:
+        try:
+            update_firstmate_status(task_id, "working", f"User steer received: {clip(clean_msg, 60)}")
+        except Exception:
+            pass
+
+        fm_send_bin = FM_HOME / "bin" / "fm-send.sh"
+        env = os.environ.copy()
+        env["FM_HOME"] = str(FM_HOME)
+        if fm_send_bin.is_file() and os.access(fm_send_bin, os.X_OK):
+            subprocess.run([str(fm_send_bin), task_id, clean_msg],
+                           env=env, capture_output=True, timeout=10)
+        elif shutil.which("firstmate"):
+            subprocess.run(["firstmate", "send", task_id, clean_msg],
+                           capture_output=True, timeout=10)
+
+        # Broadcast steer to any active subagents in the same Herdr workspace
+        ws_id = ""
+        try:
+            if CODE_WS_FILE.is_file():
+                ws_id = CODE_WS_FILE.read_text(errors="ignore").strip()
+        except OSError:
+            pass
+
+        if ws_id and ws_id != "none" and FM_STATE_DIR.is_dir():
+            for mf in FM_STATE_DIR.glob("*.meta"):
+                try:
+                    txt = mf.read_text("utf-8", errors="ignore")
+                    if f"herdr_workspace_id={ws_id}" in txt:
+                        sub_task = mf.stem
+                        if sub_task != task_id:
+                            if fm_send_bin.is_file() and os.access(fm_send_bin, os.X_OK):
+                                subprocess.run([str(fm_send_bin), sub_task, clean_msg],
+                                               env=env, capture_output=True, timeout=5)
+                            elif shutil.which("firstmate"):
+                                subprocess.run(["firstmate", "send", sub_task, clean_msg],
+                                               capture_output=True, timeout=5)
+                except Exception:
+                    pass
+
+    # 5. Output JSON status event for caller
+    emit("status", text=f"Delivered to Firstmate · Steer active ({clip(clean_msg, 50)})")
+    return 0
+
+
+def launch_herdr_pane_runner(pane_id: str) -> None:
+    try:
+        p_info = subprocess.run(["herdr", "pane", "process-info", "--pane", pane_id],
+                                capture_output=True, text=True, timeout=2)
+        if p_info.returncode == 0:
+            info = json.loads(p_info.stdout).get("result", {}).get("process_info", {})
+            fg = info.get("foreground_processes", [])
+            if len(fg) <= 1:
+                harness_view = Path.home() / ".config/omarchy/plugins/soham.omagent/omagent-harness-view"
+                subprocess.run(["herdr", "pane", "run", pane_id, str(harness_view)],
+                               capture_output=True, timeout=2)
+    except Exception:
+        pass
 
 
 def work_dir() -> Path:
@@ -943,6 +1205,52 @@ def format_tool_message(tool_name: str, params: dict, state: str = "ACTIVE") -> 
     # 3. Running commands
     elif tool_name in ("run_command", "send_command_input", "execute_browser_javascript"):
         cmd = str(params.get("CommandLine") or params.get("command") or "").strip().strip('"\'')
+        
+        # Detect Firstmate subagent orchestration commands
+        if "firstmate-subagent" in cmd or "firstmate subagent" in cmd or "fm crew" in cmd:
+            if "spawn" in cmd:
+                m_name = re.search(r"spawn\s+([a-zA-Z0-9_\-]+)", cmd)
+                m_skill = re.search(r"--skill\s+([a-zA-Z0-9_\-]+)", cmd)
+                m_role = re.search(r"--role\s+([a-zA-Z0-9_\-]+)", cmd)
+                sub_label = m_name.group(1) if m_name else "crewmate"
+                detail = m_skill.group(1) if m_skill else (m_role.group(1) if m_role else "")
+                suffix = f" ({detail})" if detail else ""
+                if state == "ACTIVE":
+                    return f"Firstmate: Spawning '{sub_label}' subagent{suffix} in Herdr…"
+                return f"Firstmate: '{sub_label}' subagent ready in Herdr"
+            elif "wait" in cmd:
+                m_name = re.search(r"wait\s+([a-zA-Z0-9_\-]+)", cmd)
+                target = m_name.group(1) if m_name else "subagent"
+                if state == "ACTIVE":
+                    return f"Firstmate: Waiting for '{target}' subagent to complete…"
+                return f"Firstmate: '{target}' subagent completed work"
+            elif "read" in cmd:
+                m_name = re.search(r"read\s+([a-zA-Z0-9_\-]+)", cmd)
+                target = m_name.group(1) if m_name else "subagent"
+                if state == "ACTIVE":
+                    return f"Firstmate: Reading output from '{target}' subagent…"
+                return ""
+            elif "prompt" in cmd:
+                m_name = re.search(r"prompt\s+([a-zA-Z0-9_\-]+)", cmd)
+                target = m_name.group(1) if m_name else "subagent"
+                if state == "ACTIVE":
+                    return f"Firstmate: Directing '{target}' subagent…"
+                return ""
+            elif "close" in cmd:
+                m_name = re.search(r"close\s+([a-zA-Z0-9_\-]+)", cmd)
+                target = m_name.group(1) if m_name else "subagent"
+                if state == "ACTIVE":
+                    return f"Firstmate: Closing '{target}' subagent…"
+                return f"Firstmate: Closed '{target}' subagent"
+            elif "reply" in cmd:
+                if state == "ACTIVE":
+                    return "Firstmate: Sending reply to you…"
+                return "Firstmate: Sent reply"
+            elif ".inbox" in cmd or "handled" in cmd or "fm-send" in cmd:
+                if state == "ACTIVE":
+                    return "Firstmate: Reviewing live user steer from inbox…"
+                return "Firstmate: Incorporated user steer"
+
         if state == "ACTIVE":
             if action:
                 return f"{action}: {clip(cmd, 70, collapse=True)}" if cmd else action
@@ -1080,9 +1388,9 @@ def stream(request: str, history: list[dict], mode: str) -> int:
 
     if mode == MODE_CODE:
         if DRY_RUN:
-            emit("agent", name="antigravity", label="Antigravity", model="",
+            emit("agent", name="firstmate-agy", label="Firstmate + Agy (Herdr)", model="Gemini Flash (AGY)",
                  mode=mode, web=False, engine=None, sources=0)
-            emit("status", text="Would run: agy --print <request> --output-format stream-json --dangerously-skip-permissions"
+            emit("status", text="Would run: Herdr workspace + Firstmate registration + agy harness"
                            + (" --conversation <saved-id>" if read_code_conv() else ""))
             emit("done", ok=True, code=0, stopped=False)
             return 0
@@ -1095,9 +1403,70 @@ def stream(request: str, history: list[dict], mode: str) -> int:
             clear_code_conv()
         conv_id = read_code_conv()
 
+        emit("agent", name="firstmate-agy", label="Firstmate + Agy (Herdr)",
+             model="Gemini Flash (AGY)", mode=mode, web=False, engine=None, sources=0)
+        emit("status", text="Initializing Herdr workspace & Firstmate fleet task…")
+
+        task_id = f"omagent_{int(time.time())}"
+        ws_id, tab_id, pane_id = ("none", "none", "none")
+
+        herdr_ok = ensure_herdr_server()
+        if herdr_ok:
+            herdr_info = setup_herdr_workspace(work_dir(), task_id)
+            if herdr_info:
+                ws_id, tab_id, pane_id = herdr_info
+                register_firstmate_task(task_id, ws_id, tab_id, pane_id, work_dir(), request)
+                launch_herdr_pane_runner(pane_id)
+                emit("status", text=f"Herdr workspace ready ({ws_id}) · Task {task_id}")
+
+        try:
+            CODE_STATE_DIR.mkdir(parents=True, exist_ok=True)
+            CODE_TASK_FILE.write_text(task_id)
+            CODE_WS_FILE.write_text(ws_id)
+            CODE_PANE_FILE.write_text(pane_id)
+        except OSError:
+            pass
+
         emit("status", text="Launching Antigravity harness…")
 
-        argv = ["agy", "--print", request, "--output-format", "stream-json",
+        fleet_prompt = (
+            f"[Firstmate Fleet Lead Coordinator]\n"
+            f"You are the First Mate lead coordinator on Omarchy Linux operating in Herdr workspace `{ws_id}` (Firstmate Task `{task_id}`).\n"
+            f"You have full command of Firstmate's multi-agent fleet orchestrator (`firstmate-subagent` CLI in PATH).\n\n"
+            f"★ FLEET ORCHESTRATION & SUBAGENT CAPABILITY:\n"
+            f"You are empowered and expected to spin up specialized subagents in Herdr panes on your whim whenever a task benefits from modular execution, parallel work streams, specialized debugging, or independent adversarial review:\n"
+            f"1. SPAWN A SUBAGENT (via run_command):\n"
+            f"   firstmate-subagent spawn <name> --role <role> --skill <skill> --task '<task>' --wait\n"
+            f"   • Planner / Architect: `--role architect --skill ce-plan` to design architecture, specs, or component boundaries\n"
+            f"   • Implementation Crew: `--role coder --skill ce-work` (e.g. `part-a`, `part-b` in parallel or sequence)\n"
+            f"   • Debugger / Fixer: `--role debugger --skill ce-debug` to diagnose tracebacks, compiler issues, or failing tests\n"
+            f"   • Reviewer / Tester: `--role reviewer --skill ce-code-review` to critique, run tests, and eliminate bugs\n"
+            f"   • Browser / UI QA: `--role qa --skill ce-test-browser` to verify visual rendering\n"
+            f"2. READ / COORDINATE SUBAGENTS:\n"
+            f"   • `firstmate-subagent read <name>` to inspect output\n"
+            f"   • `firstmate-subagent prompt <name> '<instruction>' --wait` to steer ongoing work\n"
+            f"   • `firstmate-subagent list` to view active fleet crewmates in Herdr\n"
+            f"   • `firstmate-subagent close <name>` when finished with that worker\n"
+            f"3. INTEGRATION & COMPLETE PACKAGE:\n"
+            f"   As lead coordinator, ensure all parts integrate cleanly, tests and syntax pass, and everything works as an end-to-end complete package.\n\n"
+            f"★ SUPREME HUMAN OPERATOR AUTHORITY & LIVE FIRSTMATE STEERING:\n"
+            f"The human operator can talk to you and send live steering commands or ask questions at any time while you work.\n"
+            f"All commands from the user hold SUPREME PRIORITY (Priority 1) over all other plans, guidelines, or pre-planned tasks.\n"
+            f"• LIVE REPLIES TO USER:\n"
+            f"  Whenever the user asks a question, requests a sitrep/status update, or sends instructions:\n"
+            f"  YOU MUST REPLY TO THE USER IMMEDIATELY by running:\n"
+            f"  `firstmate-subagent reply \"<your reply / sitrep to the user>\"`\n"
+            f"  This sends your reply directly into the user's Omagent chat shell in real time. Never stay silent without replying!\n"
+            f"• When you receive a live steering directive (via prompt injection or in `/home/soham/firstmate/state/{task_id}.inbox/*.msg`):\n"
+            f"  1. Reply to the user acknowledging their command via `firstmate-subagent reply '...'`.\n"
+            f"  2. STOP conflicting actions immediately and pivot to what the user requested.\n"
+            f"  3. Prompt active subagents (`firstmate-subagent prompt <name> '<instruction>' --wait`) or reassign them to align with the user's directive.\n"
+            f"  4. Execute the directive completely and explicitly confirm in your final summary that the user's instructions were followed.\n\n"
+            f"[User Request]\n"
+            f"{request}"
+        )
+
+        argv = ["agy", "--print", fleet_prompt, "--output-format", "stream-json",
                 "--dangerously-skip-permissions"]
         if conv_id:
             argv += ["--conversation", conv_id]
@@ -1126,7 +1495,10 @@ def stream(request: str, history: list[dict], mode: str) -> int:
             try:
                 CODE_STATE_DIR.mkdir(parents=True, exist_ok=True)
                 CODE_PID_FILE.write_text(str(proc.pid))
-                CODE_LOG_FILE.write_text(f"[{time.strftime('%H:%M:%S')}] Launching Antigravity harness…\n")
+                CODE_LOG_FILE.write_text(
+                    f"[{time.strftime('%H:%M:%S')}] ✦ Firstmate Task {task_id} (Herdr {ws_id}:{pane_id})\n"
+                    f"[{time.strftime('%H:%M:%S')}] Launching Antigravity harness…\n"
+                )
             except OSError:
                 pass
         except OSError as error:
@@ -1138,6 +1510,41 @@ def stream(request: str, history: list[dict], mode: str) -> int:
         created_files: list[str] = []
         modified_files: list[str] = []
         commands_run: list[str] = []
+
+        stop_steer_watcher = False
+
+        def steer_watcher() -> None:
+            reply_dir = Path.home() / ".local/state/soham.omagent/replies"
+            while not stop_steer_watcher:
+                try:
+                    if CODE_STEER_INBOX.is_dir():
+                        for sf in sorted(CODE_STEER_INBOX.glob("*.steer")):
+                            try:
+                                msg = sf.read_text("utf-8", errors="ignore").strip()
+                                sf.unlink(missing_ok=True)
+                                if msg:
+                                    emit_status(f"Firstmate received steer: {clip(msg, 60)}")
+                            except Exception:
+                                pass
+                    if reply_dir.is_dir():
+                        for rf in sorted(reply_dir.glob("*.reply")):
+                            try:
+                                rtext = rf.read_text("utf-8", errors="ignore").strip()
+                                rf.unlink(missing_ok=True)
+                                if rtext:
+                                    emit("text", text=f"\n\n**Firstmate**: {rtext}\n\n")
+                                    emit_status(f"Firstmate replied: {clip(rtext, 60)}")
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+                time.sleep(0.25)
+
+        import threading
+        t_steer = threading.Thread(target=steer_watcher, daemon=True)
+        t_steer.start()
+
+        response_deltas: list[str] = []
 
         try:
             for line in proc.stdout or []:
@@ -1154,11 +1561,12 @@ def stream(request: str, history: list[dict], mode: str) -> int:
                     if new_conv:
                         write_code_conv(new_conv)
                     init_data = ev.get("init") or {}
-                    model_name = str(init_data.get("model") or "")
-                    emit("agent", name="antigravity", label="Antigravity",
+                    model_name = str(init_data.get("model") or "Gemini Flash (AGY)")
+                    emit("agent", name="firstmate-agy", label="Firstmate + Agy (Herdr)",
                          model=model_name,
                          mode=mode, web=False, engine=None, sources=0)
                     emit_status("Antigravity harness launched")
+                    update_firstmate_status(task_id, "working", "Antigravity harness launched")
 
                 elif ev_name == "step_update":
                     su = ev.get("step_update") or {}
@@ -1168,6 +1576,7 @@ def stream(request: str, history: list[dict], mode: str) -> int:
 
                     if stype == "user_input" and state == "DONE":
                         emit_status("Analyzing request & planning steps…")
+                        update_firstmate_status(task_id, "working", "Analyzing request & planning steps")
 
                     elif stype == "tool":
                         tool_name = str(su.get("tool_name") or "tool")
@@ -1190,21 +1599,29 @@ def stream(request: str, history: list[dict], mode: str) -> int:
                             msg = format_tool_message(tool_name, params, state="ACTIVE")
                             if msg:
                                 emit_status(msg)
+                                update_firstmate_status(task_id, "working", msg)
                         elif state == "DONE":
                             tool_name, prev_params = active_tools.pop(step_idx, (tool_name, params))
                             done_params = {**prev_params, **params}
                             msg = format_tool_message(tool_name, done_params, state="DONE")
                             if msg:
                                 emit_status(msg)
+                                update_firstmate_status(task_id, "working", msg)
 
                     elif stype == "agent_response":
                         text_delta = su.get("text_delta")
                         if text_delta:
+                            response_deltas.append(text_delta)
                             try:
                                 with open(CODE_LOG_FILE, "a", errors="ignore") as f:
                                     f.write(text_delta)
                             except OSError:
                                 pass
+                        if state == "DONE" and response_deltas:
+                            accumulated = "".join(response_deltas).strip()
+                            response_deltas = []
+                            if accumulated and "```" not in accumulated and len(accumulated) > 10:
+                                emit("text", text=f"\n\n**Firstmate**: {accumulated}\n\n")
 
                 elif ev_name == "result":
                     emitted_result = True
@@ -1221,10 +1638,18 @@ def stream(request: str, history: list[dict], mode: str) -> int:
                             modified_files=modified_files,
                             commands_run=commands_run,
                         )
+                        finalize_firstmate_task(
+                            task_id, summary, created_files, modified_files, commands_run, success=True
+                        )
                         emit("text", text=summary)
                     else:
-                        emit("error", text=f"Agent returned {result.get('status')}")
+                        fail_msg = f"Agent returned {result.get('status')}"
+                        finalize_firstmate_task(
+                            task_id, fail_msg, created_files, modified_files, commands_run, success=False
+                        )
+                        emit("error", text=fail_msg)
         finally:
+            stop_steer_watcher = True
             ACTIVE_PROC = None
             try:
                 CODE_PID_FILE.unlink(missing_ok=True)
@@ -1232,6 +1657,10 @@ def stream(request: str, history: list[dict], mode: str) -> int:
                     f.write(f"\n[{time.strftime('%H:%M:%S')}] ✦ Turn complete.\n")
             except OSError:
                 pass
+            if not emitted_result:
+                finalize_firstmate_task(
+                    task_id, "Aborted or interrupted", created_files, modified_files, commands_run, success=False
+                )
             proc.wait()
 
         if proc.returncode != 0 and not EMITTED_ERROR:
@@ -1443,6 +1872,9 @@ def main() -> int:
         option = arguments.pop(0)
         if option == "--":
             break
+        elif option == "--steer":
+            msg = " ".join(arguments).strip()
+            return handle_steer(msg)
         elif option == "--mode" and arguments:
             mode = arguments.pop(0)
             if mode not in MODE_RULES:
