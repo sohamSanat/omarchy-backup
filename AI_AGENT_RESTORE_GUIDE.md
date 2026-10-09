@@ -340,27 +340,51 @@ This repository contains the full snapshot of user customizations:
    - **`configs/opencode/opencode.json`**:
      - Permission allowances for `~/Ui-skills/**` and `~/.agents/**`.
 
-25. **Standalone GUI Applications (`apps/`)**:
-   - **`apps/photocraft`**:
-     - PhotoCraft (v0.5.0) layered photo and graphics editor with dynamic per-theme color adaptation, XWayland tilt/pressure support, and Vulkan GPU rendering.
-     - Includes precompiled release archive (`apps/photocraft/build/photocraft-linux-x86_64.tar.xz`), live design tokens patch (`photocraft-theme-unlock.patch`), headless/MCP server (`photocraft-cli`), Freedesktop entry (`desktop-entries/ai.storyteller.photocraft.desktop`), full icon set (`apps/photocraft/icons/hicolor/`), MIME database (`apps/photocraft/mime/ai.storyteller.photocraft.xml`), configurations (`configs/photocraft/`), Omarchy theme hook (`configs/omarchy/hooks/theme-set.d/photocraft-sync.sh`), and one-line restorer (`apps/photocraft/install.sh`).
-   - **`apps/vectorcraft`**:
-     - VectorCraft vector graphics and illustration editor with custom-engineered `LiveTokens` dynamic per-theme color palette hot-reloads and headless automation engine.
-     - Includes precompiled release archive (`apps/vectorcraft/build/vectorcraft-linux-x86_64.tar.xz`), live design tokens patch (`vectorcraft-theme-unlock.patch`), headless CLI / MCP server (`vectorcraft-cli`), Freedesktop entry (`desktop-entries/ai.storyteller.vectorcraft.desktop`), full icon set (`apps/vectorcraft/icons/hicolor/`), configurations (`configs/vectorcraft/`), Omarchy theme hook (`configs/omarchy/hooks/theme-set.d/vectorcraft-sync.sh`), and one-line restorer (`apps/vectorcraft/install.sh`).
-   - **`apps/filmcraft`**:
-     - FilmCraft non-linear video editing workstation with custom-engineered `LiveTokens` dynamic per-theme color palette hot-reloads and headless automation engine.
-     - Includes precompiled release archive (`apps/filmcraft/build/filmcraft-linux-x86_64.tar.xz`), live design tokens patch (`filmcraft-theme-unlock.patch`), headless CLI / MCP server (`filmcraft-cli`), Freedesktop entry (`desktop-entries/ai.storyteller.filmcraft.desktop`), AppStream metainfo (`apps/filmcraft/metainfo/ai.storyteller.filmcraft.metainfo.xml`), full icon set (`apps/filmcraft/icons/hicolor/`), configurations (`configs/filmcraft/`), Omarchy theme hook (`configs/omarchy/hooks/theme-set.d/filmcraft-sync.sh`), 20 Antigravity MCP tool schemas (`mcp/filmcraft/`), and one-line restorer (`apps/filmcraft/install.sh`).
-   - **`apps/pdfcraft`**:
-     - PdfCraft (v0.4.0) PDF workbench with custom-engineered `LiveTokens` dynamic per-theme color palette hot-reloads and headless automation engine.
-     - Includes precompiled release archive (`apps/pdfcraft/build/pdfcraft-linux-x86_64.tar.xz`), live design tokens patch (`pdfcraft-theme-unlock.patch`), headless CLI / MCP server (`pdfcraft-cli`), Freedesktop entry (`desktop-entries/ai.storyteller.pdfcraft.desktop`), AppStream metainfo (`apps/pdfcraft/metainfo/ai.storyteller.pdfcraft.metainfo.xml`), MIME package (`apps/pdfcraft/mime/ai.storyteller.pdfcraft.xml`), full icon set (`apps/pdfcraft/icons/hicolor/`), configurations (`configs/pdfcraft/`), Omarchy theme hook (`configs/omarchy/hooks/theme-set.d/pdfcraft-sync.sh`), 132 Antigravity MCP tool schemas (`mcp/pdfcraft/`), and one-line restorer (`apps/pdfcraft/install.sh`).
-   - **`apps/lightcraft`**:
-     - LightCraft (v0.4.0) non-destructive RAW photo developer and catalog workbench with custom-engineered `LiveTokens` dynamic per-theme color palette hot-reloads and headless automation engine.
-     - Includes precompiled release archive (`apps/lightcraft/build/lightcraft-linux-x86_64.tar.xz`), live design tokens patch (`lightcraft-theme-unlock.patch`), headless CLI / MCP server (`lightcraft-cli`), Freedesktop entry (`desktop-entries/ai.storyteller.lightcraft.desktop`), AppStream metainfo (`apps/lightcraft/metainfo/ai.storyteller.lightcraft.metainfo.xml`), MIME package (`apps/lightcraft/mime/ai.storyteller.lightcraft.xml`), full icon set (`apps/lightcraft/icons/hicolor/`), configurations (`configs/lightcraft/`), Omarchy theme hook (`configs/omarchy/hooks/theme-set.d/lightcraft-sync.sh`), 296 Antigravity MCP tool schemas (`mcp/lightcraft/`), and one-line restorer (`apps/lightcraft/install.sh`).
-   - **`apps/photos-gallery`**:
-     - Modern Windows 11 Fluent Photo Gallery & Vault app with biometric/PIN unlock, non-destructive image adjustments (brightness, contrast, saturation, filters), and EXIF metadata view.
-     - Built with Electron 43. Restored to `~/Projects/photos-gallery`. Launched via `p-gallery.desktop` or `bin/p-gallery` / `bin/photos` / `bin/photo-gallery`. Icon located in `pixmaps/p-gallery.png`.
-   - **`apps/gallery`**:
-     - Minimalist desktop photo viewer restored to `~/Projects/gallery`. Launched via `gallery.desktop` or `bin/gallery`. Icon located in `pixmaps/gallery.png`.
+25. **The Storyteller Craft Application Suite (`apps/`) — Architecture, Theming Engine & Restoration Protocol**:
+   - **Overview of the Suite**:
+     The Craft suite comprises 5 desktop creative tools engineered by Learning Machines LLC / Storyteller (`https://github.com/storytold`), customized specifically for Soham's Omarchy setup:
+     1. **`apps/photocraft` (PhotoCraft v0.5.0)**: Layered raster graphics & photo manipulation workbench (PSD, QOI, PNG, WebP). GPU acceleration via Vulkan.
+     2. **`apps/vectorcraft` (VectorCraft v0.4.0)**: Vector illustration & SVG artwork editor with high-precision Bezier rendering.
+     3. **`apps/filmcraft` (FilmCraft v0.4.0)**: Multi-track non-linear video editing workstation with Lumetri-style scopes, media sequence inspector, and timeline automation.
+     4. **`apps/pdfcraft` (PdfCraft v0.4.0)**: PDF document workbench supporting forms, annotations, digital signatures, bookmarks, OCR, watermarking, and redactions.
+     5. **`apps/lightcraft` (LightCraft v0.4.0)**: Non-destructive RAW camera developer & photo catalog library manager (Lightroom alternative).
+   - **Engineering & Dynamic Theming Architecture**:
+     - **LiveTokens Hot-Reloading (`<app>-theme-unlock.patch`)**:
+       Each application embeds an egui-level theme watcher (`crates/ui-egui/src/theme.rs` and `lib.rs`) that checks its respective `~/.config/<app>/theme.json` every 400ms. If the file modified timestamp changes, `LiveTokens::poll` recalculates the visual tokens and re-renders panels, borders, text, and accent colors without quitting or restarting the application.
+     - **Omarchy Theme Sync Engine (`omarchy-sync-<app>`)**:
+       The synchronization script in `~/.local/bin/omarchy-sync-<app>` is invoked by Omarchy on every theme switch via `~/.config/omarchy/hooks/theme-set.d/<app>-sync.sh`. The script reads `/home/soham/.local/state/omarchy/current/theme/colors.toml`, runs Python perceptual luminance blending (ITU-R BT.601 math), and outputs application-specific JSON color tokens.
+     - **Loopback Control Sockets (`control.json`)**:
+       PdfCraft and PhotoCraft write a loopback IPC descriptor (`~/.config/<app>/control.json`) with an ephemeral port, PID, and auth token. `omarchy-sync-<app>` pings this socket to immediately trigger a frame repaint (`ui.inspect`), ensuring instantaneous visual switching.
+     - **Antigravity Model Context Protocol (MCP)**:
+       Each app features a companion headless CLI (`<app>-cli`) that serves as a stdio Model Context Protocol (MCP) server. Over 450+ tool schemas across the suite are backed up in `mcp/<app>/` and registered into `~/.gemini/antigravity-cli/mcp/`, enabling agents to inspect canvas state, manipulate documents/timelines, and automate renders headlessly.
+   - **Restoration Protocol for AI Agents**:
+     - **Standard Automated Restore**:
+       When executing `./restore.sh`, the installer scripts `apps/<app>/install.sh` are invoked sequentially:
+       1. Extracts precompiled release builds from `apps/<app>/build/<app>-linux-x86_64.tar.xz` into `~/.local/bin/` (`<app>`, `<app>.real`, `<app>-cli`, `omarchy-sync-<app>`).
+       2. Installs Freedesktop desktop entries (`~/.local/share/applications/ai.storyteller.<app>.desktop`) and AppStream metainfo (`~/.local/share/metainfo/ai.storyteller.<app>.metainfo.xml`).
+       3. Installs shared MIME database packages (`~/.local/share/mime/packages/ai.storyteller.<app>.xml`) and runs `update-mime-database`.
+       4. Installs the complete suite of hicolor icons (`16x16` through `512x512` & scalable SVG) and runs `gtk-update-icon-cache`.
+       5. Restores base configurations to `~/.config/<app>/` (`theme.json`, `ui.json`, `app.ron`).
+       6. Installs and makes executable the Omarchy theme hooks in `~/.config/omarchy/hooks/theme-set.d/<app>-sync.sh`.
+       7. Dispatches initial palette synchronization with the currently active Omarchy theme.
+     - **Manual Standalone Restore**:
+       Any individual application can be restored independently by executing:
+       `apps/<app>/install.sh`
+     - **Source Recompilation (Emergency Fallback)**:
+       If the target machine architecture differs or binaries require recompilation:
+       1. Execute `apps/<app>/build.sh`.
+       2. The script clones `https://github.com/storytold/<app>.git` into `~/.cache/src/<app>`.
+       3. Applies `apps/<app>/<app>-theme-unlock.patch` using `git apply`.
+       4. Runs `cargo build --release -p <app> -p <app>-cli`.
+       5. Copies the release binaries into `~/.local/bin/`.
+   - **Verification Checklist for Restoring Agents**:
+     1. Verify all binaries are executable: `which photocraft vectorcraft filmcraft pdfcraft lightcraft`.
+     2. Verify dynamic theming: run `omarchy theme set "Moodpeak"` and confirm that `~/.config/<app>/theme.json` is updated for all 5 apps.
+     3. Verify desktop registration: `gio info ~/.local/share/applications/ai.storyteller.<app>.desktop`.
+     4. If launching in virtualized/nested environments where Wayland lacks hardware EGL, advise using `env <APP>_FORCE_XWAYLAND=1 <app>`.
+   - **Standalone Auxiliary Apps**:
+     - **`apps/photos-gallery`**: Windows 11 Fluent Photo Gallery & Vault app with biometric/PIN unlock, non-destructive image adjustments, and EXIF metadata view (Electron 43). Restored to `~/Projects/photos-gallery` with `p-gallery.desktop` and `bin/p-gallery`.
+     - **`apps/gallery`**: Minimalist desktop photo viewer restored to `~/Projects/gallery` with `gallery.desktop` and `bin/gallery`.
 
 26. **Recent Plugins, Hardware Handlers & Audio/Kimchi Updates**:
    - **`plugins/nguyenn.clipboard/`**:
