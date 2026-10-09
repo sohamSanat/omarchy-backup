@@ -1,0 +1,1 @@
+{"name":"control_call","description":"Bridge mode: call any control-protocol method (docs/control-protocol.md) with raw params.","parameters":{"$schema":"https://json-schema.org/draft/2020-12/schema","properties":{"method":{"description":"Any control-protocol method, e.g. `ui.dialog.open`.","type":"string"},"params":{"default":null}},"required":["method"],"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"doc_select","description":"Make the document at `index` active.","parameters":{"$schema":"https://json-schema.org/draft/2020-12/schema","properties":{"index":{"format":"uint","minimum":0,"type":"integer"}},"required":["index"],"type":"object"}}

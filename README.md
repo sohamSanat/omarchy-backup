@@ -85,6 +85,7 @@ Branch: `main`
 
 ### 5. 🛠️ Utilities, Standalone Apps & System Services
 - **Standalone GUI Applications (`apps/`)**:
+  - `apps/photocraft`: Full application build, dynamic theming engine, and system integration for PhotoCraft (v0.5.0). Includes precompiled release archive (`build/photocraft-linux-x86_64.tar.xz`), live design tokens patch (`photocraft-theme-unlock.patch`), headless/MCP server (`photocraft-cli`), Freedesktop entry (`ai.storyteller.photocraft.desktop`), full icon set (`icons/hicolor/`), MIME database, and instant installer (`apps/photocraft/install.sh`).
   - `apps/photos-gallery`: Windows 11 Fluent Photo Gallery & Vault app with biometric/PIN unlock, image adjustments, and EXIF metadata view (Electron 43). Restored to `~/Projects/photos-gallery` with `p-gallery.desktop` and `bin/p-gallery`.
   - `apps/gallery`: Minimalist desktop photo viewer restored to `~/Projects/gallery` with `gallery.desktop` and `bin/gallery`.
 - **Ghostty Smooth Cursor Shader**: Custom GLSL shader `configs/terminals/ghostty/shaders/cursor_glide.glsl` enabling cubic-eased cell-to-cell cursor gliding with SDF edge antialiasing.
@@ -166,11 +167,12 @@ Self-signed TLS certificates for the Nothing Phone PWA bridge (`~/.config/omagen
 ```
 omarchy-backup/
 ├── agents/                  # AI agent skills, rules, and durable learnings (~/.agents)
-├── apps/                    # Standalone GUI applications (Photos Gallery, Gallery) (~/Projects)
+├── apps/                    # Standalone GUI applications (PhotoCraft, Photos Gallery, Gallery)
 ├── bin/                     # Custom binaries and helper executables (~/.local/bin)
 ├── configs/                 # Dotfiles and application configs (~/.config)
 │   ├── omagent/             # Omagent prompt, mobile PWA web client, and config template
 │   ├── fetch/               # Fetch configuration and Omarchy ASCII branding
+│   ├── photocraft/          # PhotoCraft preferences, egui UI layout, and token schema
 │   ├── hypr/                # Hyprland rules, inputs, look-and-feel, and keybindings
 │   ├── kimchi/              # Kimchi agent harness, model routing, and themes
 │   ├── omarchy/             # Omarchy shell.json, theme templates, and homelab-launcher

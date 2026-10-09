@@ -340,7 +340,10 @@ This repository contains the full snapshot of user customizations:
    - **`configs/opencode/opencode.json`**:
      - Permission allowances for `~/Ui-skills/**` and `~/.agents/**`.
 
-25. **Standalone GUI Applications (`apps/` -> `~/Projects/`)**:
+25. **Standalone GUI Applications (`apps/`)**:
+   - **`apps/photocraft`**:
+     - PhotoCraft (v0.5.0) layered photo and graphics editor with dynamic per-theme color adaptation, XWayland tilt/pressure support, and Vulkan GPU rendering.
+     - Includes precompiled release archive (`apps/photocraft/build/photocraft-linux-x86_64.tar.xz`), live design tokens patch (`photocraft-theme-unlock.patch`), headless/MCP server (`photocraft-cli`), Freedesktop entry (`desktop-entries/ai.storyteller.photocraft.desktop`), full icon set (`apps/photocraft/icons/hicolor/`), MIME database (`apps/photocraft/mime/ai.storyteller.photocraft.xml`), configurations (`configs/photocraft/`), Omarchy theme hook (`configs/omarchy/hooks/theme-set.d/photocraft-sync.sh`), and one-line restorer (`apps/photocraft/install.sh`).
    - **`apps/photos-gallery`**:
      - Modern Windows 11 Fluent Photo Gallery & Vault app with biometric/PIN unlock, non-destructive image adjustments (brightness, contrast, saturation, filters), and EXIF metadata view.
      - Built with Electron 43. Restored to `~/Projects/photos-gallery`. Launched via `p-gallery.desktop` or `bin/p-gallery` / `bin/photos` / `bin/photo-gallery`. Icon located in `pixmaps/p-gallery.png`.

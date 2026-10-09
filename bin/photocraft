@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# PhotoCraft launcher wrapper for Omarchy Linux
+# ------------------------------------------------------------------------------
+# 1. Enables loopback control server so Omarchy theme changes update live
+# 2. Exposes PHOTOCRAFT_THEME_FILE for live dynamic per-theme color customization
+# 3. Unsets WAYLAND_DISPLAY by default so XWayland enables file drag & drop
+#    and pen tablet tilt/pressure. Set PHOTOCRAFT_FORCE_WAYLAND=1 to force Wayland.
+# ==============================================================================
+
+export PHOTOCRAFT_CONTROL_PORT="${PHOTOCRAFT_CONTROL_PORT:-48291}"
+export PHOTOCRAFT_CONTROL_TOKEN_FILE="${PHOTOCRAFT_CONTROL_TOKEN_FILE:-$HOME/.config/photocraft/control.token}"
+export PHOTOCRAFT_THEME_FILE="${PHOTOCRAFT_THEME_FILE:-$HOME/.config/photocraft/theme.json}"
+
+# Ensure token file exists
+if [[ ! -f "$PHOTOCRAFT_CONTROL_TOKEN_FILE" ]]; then
+  mkdir -p "$(dirname "$PHOTOCRAFT_CONTROL_TOKEN_FILE")"
+  python3 -c 'import secrets; print(secrets.token_hex(32))' > "$PHOTOCRAFT_CONTROL_TOKEN_FILE"
+  chmod 600 "$PHOTOCRAFT_CONTROL_TOKEN_FILE"
+fi
+
+# Ensure initial theme.json is populated from current Omarchy theme
+if [[ ! -f "$PHOTOCRAFT_THEME_FILE" ]]; then
+  "$HOME/.local/bin/omarchy-sync-photocraft" 2>/dev/null || true
+fi
+
+if [[ -z "${PHOTOCRAFT_FORCE_WAYLAND:-}" ]]; then
+  unset WAYLAND_DISPLAY
+fi
+
+exec "$HOME/.local/bin/photocraft.real" "$@"

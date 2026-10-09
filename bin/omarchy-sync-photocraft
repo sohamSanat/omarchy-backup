@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# omarchy-sync-photocraft: Dynamic Theme Synchronization Engine for PhotoCraft
+# ------------------------------------------------------------------------------
+# Generates per-theme color tokens directly from Omarchy's active theme palette
+# and updates ~/.config/photocraft/theme.json for instant live hot-reloading.
+# ==============================================================================
+set -euo pipefail
+
+PREFS_DIR="$HOME/.config/photocraft"
+PREFS_FILE="$PREFS_DIR/preferences.json"
+TOKEN_FILE="$PREFS_DIR/control.token"
+THEME_JSON="$PREFS_DIR/theme.json"
+CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+COLORS_TOML="$CURRENT_THEME_DIR/colors.toml"
+
+mkdir -p "$PREFS_DIR"
+
+# 1. Determine colors.toml source
+SPECIFIED_THEME="${1:-}"
+if [[ -n "$SPECIFIED_THEME" && -f "$HOME/.config/omarchy/themes/$SPECIFIED_THEME/colors.toml" ]]; then
+  COLORS_TOML="$HOME/.config/omarchy/themes/$SPECIFIED_THEME/colors.toml"
+elif [[ -n "$SPECIFIED_THEME" && -f "/usr/share/omarchy/themes/$SPECIFIED_THEME/colors.toml" ]]; then
+  COLORS_TOML="/usr/share/omarchy/themes/$SPECIFIED_THEME/colors.toml"
+fi
+
+# Fallback check
+if [[ ! -f "$COLORS_TOML" ]]; then
+  # Try to find any valid colors.toml
+  if [[ -f "$HOME/.local/state/omarchy/current/theme/colors.toml" ]]; then
+    COLORS_TOML="$HOME/.local/state/omarchy/current/theme/colors.toml"
+  fi
+fi
+
+# 2. Run Python palette synthesis
+python3 - <<PY
+import tomllib, json, os
+
+def hex_to_rgb(h):
+    h = h.strip().lstrip('#')
+    if len(h) == 3:
+        h = ''.join(c * 2 for c in h)
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+def rgb_to_hex(r, g, b):
+    return f"#{int(max(0, min(255, round(r)))):02x}{int(max(0, min(255, round(g)))):02x}{int(max(0, min(255, round(b)))):02x}"
+
+def blend(c1, c2, factor):
+    r1, g1, b1 = hex_to_rgb(c1)
+    r2, g2, b2 = hex_to_rgb(c2)
+    return rgb_to_hex(
+        r1 * (1.0 - factor) + r2 * factor,
+        g1 * (1.0 - factor) + g2 * factor,
+        b1 * (1.0 - factor) + b2 * factor
+    )
+
+colors_path = "$COLORS_TOML"
+colors = {}
+if os.path.exists(colors_path):
+    try:
+        with open(colors_path, "rb") as f:
+            colors = tomllib.load(f)
+    except Exception as e:
+        pass
+
+bg = colors.get("background", "#1B1B1B")
+fg = colors.get("foreground", "#efebdc")
+accent = colors.get("accent", colors.get("color4", "#e75a50"))
+c0 = colors.get("color0", bg)
+c8 = colors.get("color8", blend(bg, fg, 0.3))
+c1 = colors.get("color1", "#ef4444")
+c3 = colors.get("color3", "#eab308")
+
+r, g, b = hex_to_rgb(bg)
+lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+is_light = lum > 128
+
+if is_light:
+    dock = bg
+    chrome = blend(bg, "#000000", 0.04)
+    card = blend(bg, "#ffffff", 0.45) if bg != "#ffffff" else "#ffffff"
+    card_border = blend(bg, "#000000", 0.12)
+    field = blend(bg, "#000000", 0.03)
+    field_border = blend(bg, "#000000", 0.18)
+    hover = blend(bg, "#000000", 0.07)
+    pressed = blend(bg, "#000000", 0.14)
+    text = fg
+    text_dim = blend(fg, bg, 0.35)
+    text_faint = blend(fg, bg, 0.60)
+    separator = blend(bg, "#000000", 0.10)
+    tab_strip = blend(bg, "#000000", 0.05)
+    accent_soft = blend(accent, bg, 0.75)
+    row_selected = blend(accent, bg, 0.75)
+    accent_text = "#ffffff"
+else:
+    dock = bg
+    chrome = blend(bg, "#ffffff", 0.04)
+    card = blend(bg, "#ffffff", 0.08)
+    card_border = blend(bg, "#ffffff", 0.14)
+    field = blend(bg, "#ffffff", 0.04)
+    field_border = blend(bg, "#ffffff", 0.18)
+    hover = blend(bg, "#ffffff", 0.12)
+    pressed = blend(bg, "#ffffff", 0.18)
+    text = fg
+    text_dim = blend(fg, bg, 0.35)
+    text_faint = blend(fg, bg, 0.60)
+    separator = blend(bg, "#ffffff", 0.10)
+    tab_strip = blend(bg, "#000000", 0.25)
+    accent_soft = blend(accent, bg, 0.65)
+    row_selected = blend(accent, bg, 0.55)
+    accent_text = "#ffffff"
+
+tokens = {
+    "chrome": chrome,
+    "dock": dock,
+    "card": card,
+    "card_border": card_border,
+    "field": field,
+    "field_border": field_border,
+    "hover": hover,
+    "pressed": pressed,
+    "text": text,
+    "text_dim": text_dim,
+    "text_faint": text_faint,
+    "icon": text,
+    "accent": accent,
+    "accent_soft": accent_soft,
+    "accent_border": accent,
+    "accent_text": accent_text,
+    "separator": separator,
+    "tab_strip": tab_strip,
+    "row_selected": row_selected,
+    "primary_bg": accent,
+    "primary_text": accent_text,
+    "danger": c1,
+    "warning": c3,
+    "radius": 6.0,
+    "radius_sm": 4.0,
+    "radius_lg": 8.0
+}
+
+with open("$THEME_JSON", "w") as out:
+    json.dump(tokens, out, indent=2)
+
+# Update base theme in preferences.json
+base_theme = "studioLight" if is_light else "proMedium"
+prefs_path = "$PREFS_FILE"
+prefs = {}
+if os.path.exists(prefs_path):
+    try:
+        with open(prefs_path, "r") as pf:
+            prefs = json.load(pf)
+    except Exception:
+        pass
+
+if "interface" not in prefs:
+    prefs["interface"] = {}
+prefs["interface"]["theme"] = base_theme
+prefs["interface"]["systemTitleBar"] = True
+
+with open(prefs_path, "w") as pf:
+    json.dump(prefs, pf, indent=2)
+PY
+
+# 3. If PhotoCraft is running on loopback, wake up and apply immediately
+CONTROL_PORT="${PHOTOCRAFT_CONTROL_PORT:-48291}"
+if [[ -f "$TOKEN_FILE" ]] && command -v python3 >/dev/null 2>&1; then
+  python3 - <<PY 2>/dev/null || true
+import socket, json
+
+try:
+    token = open("$TOKEN_FILE").read().strip()
+    s = socket.create_connection(("127.0.0.1", int("$CONTROL_PORT")), timeout=0.3)
+    f = s.makefile("rw")
+    f.write(json.dumps({"id": 1, "method": "auth", "params": {"token": token}}) + "\n")
+    f.flush()
+    f.readline()
+    # Trigger an inspect or redraw to immediately flush live token poll
+    f.write(json.dumps({"id": 2, "method": "ui.inspect", "params": {}}) + "\n")
+    f.flush()
+    f.readline()
+    s.close()
+except Exception:
+    pass
+PY
+fi

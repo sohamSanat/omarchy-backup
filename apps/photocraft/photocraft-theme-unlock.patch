@@ -1,0 +1,59 @@
+diff --git i/Cargo.toml w/Cargo.toml
+index 24b0046..bb7639b 100644
+--- i/Cargo.toml
++++ w/Cargo.toml
+@@ -67,8 +67,8 @@ opt-level = 2
+ opt-level = 1
+ 
+ [profile.release]
+-lto = "thin"
+-codegen-units = 1
++lto = false
++codegen-units = 8
+ 
+ # The browser build (apps/photocraft-web, `data-cargo-profile` in its index.html). Hosts cap the
+ # size of a single file (Cloudflare Pages/Workers: 25 MiB), and the wasm is downloaded on every
+diff --git i/crates/ui-egui/src/lib.rs w/crates/ui-egui/src/lib.rs
+index 19c54c3..2a15bd8 100644
+--- i/crates/ui-egui/src/lib.rs
++++ w/crates/ui-egui/src/lib.rs
+@@ -482,7 +482,7 @@ pub struct PhotocraftApp {
+     pub background_jobs: bool,
+     /// Background job bookkeeping: opening tabs, control replies waiting on a job.
+     pub jobs: jobs_ui::JobsUi,
+-    #[cfg(all(debug_assertions, not(target_arch = "wasm32")))]
++    #[cfg(not(target_arch = "wasm32"))]
+     live_tokens: theme::live::LiveTokens,
+ }
+ 
+@@ -575,7 +575,7 @@ impl PhotocraftApp {
+             stylus: Default::default(),
+             background_jobs: false,
+             jobs: Default::default(),
+-            #[cfg(all(debug_assertions, not(target_arch = "wasm32")))]
++            #[cfg(not(target_arch = "wasm32"))]
+             live_tokens: theme::live::LiveTokens::from_env(),
+         };
+         // Saved preferences (and recovered documents) are in place before the first frame.
+@@ -1041,7 +1041,7 @@ impl eframe::App for PhotocraftApp {
+         self.last_frame_time = now;
+         self.sync_views();
+         self.check_gpu(ctx);
+-        #[cfg(all(debug_assertions, not(target_arch = "wasm32")))]
++        #[cfg(not(target_arch = "wasm32"))]
+         if self.live_tokens.poll(ctx, self.ui.theme) {
+             self.checker = None;
+         }
+diff --git i/crates/ui-egui/src/theme.rs w/crates/ui-egui/src/theme.rs
+index 5d53d96..890cd2c 100644
+--- i/crates/ui-egui/src/theme.rs
++++ w/crates/ui-egui/src/theme.rs
+@@ -701,7 +701,7 @@ mod tests {
+ /// Set `PHOTOCRAFT_THEME_FILE=/path/tokens.json` in a debug build; the file is polled and applied
+ /// on change, so colours, radii and sizes can be tuned without recompiling. Keys are `Tokens` field
+ /// names; values are `"#rrggbb"`, `"#rrggbbaa"` or numbers. Compiled out of release builds.
+-#[cfg(all(debug_assertions, not(target_arch = "wasm32")))]
++#[cfg(not(target_arch = "wasm32"))]
+ pub mod live {
+     use super::Tokens;
+     use egui::Color32;

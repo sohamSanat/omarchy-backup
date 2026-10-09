@@ -1,0 +1,43 @@
+{
+  "dialogs": {
+    "ui.waylandFileDropGuidanceDismissed": true
+  },
+  "interface": {
+    "systemTitleBar": true,
+    "theme": "proMedium"
+  },
+  "panelLayout": {
+    "dock": {
+      "collapsed": [],
+      "heights": {},
+      "order": []
+    },
+    "dockTabs": {
+      "character": 0,
+      "color": 0,
+      "history": 0,
+      "layers": 0,
+      "navigator": 0,
+      "properties": 0
+    },
+    "panels": {
+      "brush_settings": false,
+      "character": false,
+      "color": true,
+      "dock": true,
+      "history": false,
+      "layers": true,
+      "navigator": false,
+      "options_bar": true,
+      "properties": true,
+      "status_bar": true,
+      "toolbar": true,
+      "toolbar_double": false
+    },
+    "workspace": "Essentials"
+  },
+  "performance": {
+    "gpuBackend": "vulkan",
+    "renderingMode": "auto"
+  }
+}

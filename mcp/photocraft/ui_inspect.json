@@ -1,0 +1,1 @@
+{"name":"ui_inspect","description":"Bridge mode: full UI state of the live app (tool, panels, views, dialogs, windows). For the menu tree, call `control_call` with method `ui.menu.list`.","parameters":{"properties":{},"type":"object"}}

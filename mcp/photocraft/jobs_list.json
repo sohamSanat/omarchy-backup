@@ -1,0 +1,1 @@
+{"name":"jobs_list","description":"List background jobs: running ones with progress (0-1), message and elapsed time, then the last few that ended (state done|failed|cancelled with their result or error). Finished jobs are applied first.","parameters":{"properties":{},"type":"object"}}

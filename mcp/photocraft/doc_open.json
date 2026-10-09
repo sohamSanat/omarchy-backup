@@ -1,0 +1,1 @@
+{"name":"doc_open","description":"Open an image or document file and make it active. Returns index, size and import warnings.","parameters":{"$schema":"https://json-schema.org/draft/2020-12/schema","properties":{"path":{"description":"Forward-slash relative path beneath the configured automation read root.","type":"string"}},"required":["path"],"type":"object"}}

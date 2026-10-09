@@ -1,0 +1,1 @@
+{"name":"session_list","description":"List open documents (index, name, size, dirty) and the active index.","parameters":{"properties":{},"type":"object"}}
