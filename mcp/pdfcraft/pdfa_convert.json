@@ -1,0 +1,25 @@
+{
+  "name": "pdfa_convert",
+  "description": "Standards \u25b8 Save as PDF/A: fix what can be fixed for PDF/A-2b or 3b (XMP identification and metadata, an sRGB output intent, forbidden actions and JavaScript, annotation print flags, image interpolation, encryption). Returns what was fixed and what remains (e.g. fonts that aren't embedded). Undoable; save the document to keep it.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "level": {
+        "enum": [
+          "2b",
+          "3b"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

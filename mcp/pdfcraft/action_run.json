@@ -1,0 +1,44 @@
+{
+  "name": "action_run",
+  "description": "Action Wizard: run a built-in action (action: its name) or a list of steps ([{step, arg}], ids from action_list) on each PDF in paths, writing the results into folder under the same names. Returns each file's step log or error.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "action": {
+        "type": "string"
+      },
+      "folder": {
+        "type": "string"
+      },
+      "paths": {
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "steps": {
+        "items": {
+          "properties": {
+            "arg": {
+              "type": "string"
+            },
+            "step": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "step"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "paths",
+      "folder"
+    ],
+    "type": "object"
+  }
+}

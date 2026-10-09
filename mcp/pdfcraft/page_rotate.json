@@ -1,0 +1,47 @@
+{
+  "name": "page_rotate",
+  "description": "Rotate pages by a multiple of 90 degrees (positive is clockwise): the listed pages (default all), filtered like Acrobat's Rotate Pages by subset (all, even, odd page numbers) and orientation (all, landscape, portrait). Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "degrees": {
+        "type": "integer"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "orientation": {
+        "enum": [
+          "all",
+          "landscape",
+          "portrait"
+        ],
+        "type": "string"
+      },
+      "pages": {
+        "description": "1-based page numbers to rotate (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "subset": {
+        "enum": [
+          "all",
+          "even",
+          "odd"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "degrees"
+    ],
+    "type": "object"
+  }
+}

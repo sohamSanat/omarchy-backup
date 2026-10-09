@@ -1,0 +1,40 @@
+{
+  "name": "bookmark_move",
+  "description": "Move a bookmark (with its children) under another parent, or within its level. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "parent": {
+        "description": "New parent (omit for the top level): 1-based positions from the top level, e.g. [2, 1] = the first child of the second bookmark.",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "path": {
+        "description": "The bookmark to move: 1-based positions from the top level, e.g. [2, 1] = the first child of the second bookmark.",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "position": {
+        "description": "1-based position among the new parent's children, counted after the bookmark is removed (default: last).",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc",
+      "path"
+    ],
+    "type": "object"
+  }
+}

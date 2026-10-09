@@ -1,0 +1,20 @@
+{
+  "name": "doc_open",
+  "description": "Open a PDF file and return its document id, page count and whether it can be edited.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "password": {
+        "description": "User or owner password for encrypted files.",
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "path"
+    ],
+    "type": "object"
+  }
+}

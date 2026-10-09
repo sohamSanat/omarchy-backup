@@ -1,0 +1,36 @@
+{
+  "name": "comment_lock",
+  "description": "Lock or unlock a comment (Properties \u25b8 Locked). Locked comments can't be moved, resized, restyled or deleted; their text stays editable. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "id": {
+        "description": "The comment's id (from comment_list).",
+        "type": "string"
+      },
+      "index": {
+        "description": "1-based position on the page, as comment_list reports.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "locked": {
+        "description": "Default true.",
+        "type": "boolean"
+      },
+      "page": {
+        "description": "With `index`, instead of `id`.",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

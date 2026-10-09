@@ -1,0 +1,10 @@
+{
+  "name": "doc_list",
+  "description": "List the open documents with their ids, page counts and unsaved state.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  }
+}

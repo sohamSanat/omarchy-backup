@@ -1,0 +1,23 @@
+{
+  "name": "page_images",
+  "description": "The images a page draws (Edit a PDF): number, box (top-left-origin points), pixel size and resource name.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc",
+      "page"
+    ],
+    "type": "object"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "name": "page_add_text",
+  "description": "Add text as page content (not a comment). Place it with at [x, y] (top-left, points from the top-left of the displayed page) and width (wrap width, default 200), or rect. Newlines start new lines; long lines wrap. Style: font helvetica/times/courier, size, bold, italic, color (#RRGGBB or a name), align left/center/right. It stays editable with content_update. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "align": {
+        "enum": [
+          "left",
+          "center",
+          "right",
+          "justify"
+        ],
+        "type": "string"
+      },
+      "at": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      },
+      "bold": {
+        "type": "boolean"
+      },
+      "color": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "font": {
+        "enum": [
+          "helvetica",
+          "times",
+          "courier"
+        ],
+        "type": "string"
+      },
+      "italic": {
+        "type": "boolean"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "rect": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "size": {
+        "maximum": 500,
+        "minimum": 1,
+        "type": "number"
+      },
+      "text": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "width": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "text"
+    ],
+    "type": "object"
+  }
+}

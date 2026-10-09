@@ -1,0 +1,55 @@
+{
+  "name": "doc_optimize",
+  "description": "Write an optimized copy to `path` (Acrobat's PDF Optimizer). color / gray: { downsample, ppi, above_ppi, compression: jpeg|zip|retain, quality 1\u2013100 } (defaults: downsample to 150 ppi above 225, JPEG 60). Images are measured where pages draw them and replaced only when smaller. discard_*: thumbnails (default true), alternate_images (true), tags, print_settings; flate_unencoded (true); remove_invalid_links and remove_unreferenced_dests (true). discard: Remove Hidden Information categories (metadata, attachments, comments, form-fields, hidden-text, hidden-layers, bookmarks, links-actions-scripts, private-data). Signed documents are refused. The open document is unchanged.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "color": {
+        "type": "object"
+      },
+      "discard": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "discard_alternate_images": {
+        "type": "boolean"
+      },
+      "discard_print_settings": {
+        "type": "boolean"
+      },
+      "discard_tags": {
+        "type": "boolean"
+      },
+      "discard_thumbnails": {
+        "type": "boolean"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "flate_unencoded": {
+        "type": "boolean"
+      },
+      "gray": {
+        "type": "object"
+      },
+      "path": {
+        "type": "string"
+      },
+      "remove_invalid_links": {
+        "type": "boolean"
+      },
+      "remove_unreferenced_dests": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "doc",
+      "path"
+    ],
+    "type": "object"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "doc_import_data",
+  "description": "Import comments and/or field values from an XFDF, FDF, XML, CSV or tab-delimited text file (detected from its content). Comments with the same name are replaced; values go through the form's formats and validation. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "path"
+    ],
+    "type": "object"
+  }
+}

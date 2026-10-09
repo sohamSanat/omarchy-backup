@@ -688,7 +688,7 @@ if [[ -d "${SCRIPT_DIR}/apps" ]]; then
   for app_dir in "${SCRIPT_DIR}/apps"/*; do
     if [[ -d "$app_dir" ]]; then
       app_name="$(basename "$app_dir")"
-      if [[ "$app_name" != "photocraft" && "$app_name" != "vectorcraft" && "$app_name" != "filmcraft" ]]; then
+      if [[ "$app_name" != "photocraft" && "$app_name" != "vectorcraft" && "$app_name" != "filmcraft" && "$app_name" != "pdfcraft" ]]; then
         mkdir -p "${USER_HOME}/Projects/${app_name}"
         cp -a "${app_dir}/." "${USER_HOME}/Projects/${app_name}/"
         echo "  [OK] Restored application: ~/Projects/${app_name}"
@@ -710,6 +710,11 @@ fi
 if [[ -f "${SCRIPT_DIR}/apps/filmcraft/install.sh" ]]; then
   echo "  -> Restoring and installing FilmCraft release build..."
   "${SCRIPT_DIR}/apps/filmcraft/install.sh"
+fi
+
+if [[ -f "${SCRIPT_DIR}/apps/pdfcraft/install.sh" ]]; then
+  echo "  -> Restoring and installing PdfCraft release build..."
+  "${SCRIPT_DIR}/apps/pdfcraft/install.sh"
 fi
 
 if [[ -d "${SCRIPT_DIR}/mcp" ]]; then
@@ -763,6 +768,11 @@ if command -v omarchy >/dev/null 2>&1; then
   if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-filmcraft" ]]; then
     echo "  -> Syncing FilmCraft with active Omarchy theme..."
     "${USER_HOME}/.local/bin/omarchy-sync-filmcraft" 2>/dev/null || true
+  fi
+
+  if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-pdfcraft" ]]; then
+    echo "  -> Syncing PdfCraft with active Omarchy theme..."
+    "${USER_HOME}/.local/bin/omarchy-sync-pdfcraft" 2>/dev/null || true
   fi
 
   echo "  -> Setting font: JetBrainsMono Nerd Font"

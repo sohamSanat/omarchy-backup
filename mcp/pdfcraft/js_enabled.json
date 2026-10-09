@@ -1,0 +1,14 @@
+{
+  "name": "js_enabled",
+  "description": "Preferences \u25b8 JavaScript \u25b8 Enable Acrobat JavaScript: set it with `enabled`, or read it. With JavaScript off, field scripts other than Acrobat's AF calls don't run.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

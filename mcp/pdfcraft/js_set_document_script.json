@@ -1,0 +1,26 @@
+{
+  "name": "js_set_document_script",
+  "description": "Add or replace the document-level JavaScript `name` with `script`, or delete it (script omitted). Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "name": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "script": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "name"
+    ],
+    "type": "object"
+  }
+}

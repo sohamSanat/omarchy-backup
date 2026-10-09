@@ -1,0 +1,24 @@
+{
+  "name": "form_merge_data",
+  "description": "Collect the field values of form data files (FDF, XFDF) or filled-in PDF forms into one CSV file at path: a column per field name, a row per file. Returns the row and column counts.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "path": {
+        "type": "string"
+      },
+      "paths": {
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "required": [
+      "paths",
+      "path"
+    ],
+    "type": "object"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "redact_apply",
+  "description": "Apply the redaction marks (all, or those on pages): text, images, vectors, comments and form fields under them are removed for good and boxes are drawn in their place. A verification pass fails the operation if anything readable remains. Undoable until saved; the saved file no longer contains the content.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "pages": {
+        "description": "1-based page numbers whose marks to apply (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

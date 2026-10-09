@@ -1,0 +1,61 @@
+{
+  "name": "link_edit",
+  "description": "Change a link's rect, destination (url or to_page) or appearance. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "color": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "highlight": {
+        "enum": [
+          "none",
+          "invert",
+          "outline",
+          "inset"
+        ],
+        "type": "string"
+      },
+      "index": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "rect": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "to_page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "url": {
+        "type": "string"
+      },
+      "visible": {
+        "type": "boolean"
+      },
+      "width": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "index"
+    ],
+    "type": "object"
+  }
+}

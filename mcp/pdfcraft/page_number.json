@@ -1,0 +1,48 @@
+{
+  "name": "page_number",
+  "description": "Label a range of pages (e.g. i, ii, iii for front matter, or A-1, A-2 for an appendix). Later pages keep their labels. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "from": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "prefix": {
+        "type": "string"
+      },
+      "start": {
+        "description": "Number of the first page in the range (default 1).",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "style": {
+        "description": "Numbering style (default decimal; none = prefix only).",
+        "enum": [
+          "decimal",
+          "upper-roman",
+          "lower-roman",
+          "upper-alpha",
+          "lower-alpha",
+          "none"
+        ],
+        "type": "string"
+      },
+      "to": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc",
+      "from",
+      "to"
+    ],
+    "type": "object"
+  }
+}

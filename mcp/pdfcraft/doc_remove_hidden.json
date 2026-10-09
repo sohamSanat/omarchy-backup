@@ -1,0 +1,35 @@
+{
+  "name": "doc_remove_hidden",
+  "description": "Remove the listed categories (see doc_hidden_info), or every category when none are listed (Sanitize Document). Form fields are flattened so their values stay visible. The next save rewrites the whole file. Undoable until saved.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "categories": {
+        "items": {
+          "enum": [
+            "metadata",
+            "attachments",
+            "comments",
+            "form-fields",
+            "hidden-text",
+            "hidden-layers",
+            "bookmarks",
+            "links-actions-scripts",
+            "private-data"
+          ],
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

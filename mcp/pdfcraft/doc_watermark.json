@@ -1,0 +1,64 @@
+{
+  "name": "doc_watermark",
+  "description": "Add a watermark to pages: text, or a picture from `file` (an image, or page `file_page` of a PDF) at `scale` of the page (default 0.5); rotated (degrees counter-clockwise, default 45), semi-transparent (opacity 0\u20131, default 0.5), text fitted to the page unless font_size is given, on top unless behind: true. replace: true swaps out existing ones. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "behind": {
+        "type": "boolean"
+      },
+      "color": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "file": {
+        "type": "string"
+      },
+      "file_page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "font_size": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+      },
+      "opacity": {
+        "maximum": 1,
+        "minimum": 0,
+        "type": "number"
+      },
+      "pages": {
+        "description": "1-based page numbers to mark (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "replace": {
+        "type": "boolean"
+      },
+      "rotation": {
+        "type": "number"
+      },
+      "scale": {
+        "exclusiveMinimum": 0,
+        "maximum": 1,
+        "type": "number"
+      },
+      "text": {
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

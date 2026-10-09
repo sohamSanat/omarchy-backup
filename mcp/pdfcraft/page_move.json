@@ -1,0 +1,33 @@
+{
+  "name": "page_move",
+  "description": "Move pages so the first of them lands at position `to` (1-based, counted before the move). Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "pages": {
+        "description": "1-based page numbers to move.",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "to": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc",
+      "pages",
+      "to"
+    ],
+    "type": "object"
+  }
+}

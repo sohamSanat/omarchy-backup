@@ -1,0 +1,242 @@
+diff --git i/Cargo.toml w/Cargo.toml
+index 37f8fe3..02619e1 100644
+--- i/Cargo.toml
++++ w/Cargo.toml
+@@ -82,8 +82,8 @@ opt-level = 2
+ opt-level = 1
+ 
+ [profile.release]
+-lto = "thin"
+-codegen-units = 1
++lto = false
++codegen-units = 8
+ 
+ # Vendored, patched third-party crates (see vendor/README.md). Each patch is meant to go upstream.
+ [patch.crates-io]
+diff --git i/crates/ui-egui/src/lib.rs w/crates/ui-egui/src/lib.rs
+index db6137b..5d6bede 100644
+--- i/crates/ui-egui/src/lib.rs
++++ w/crates/ui-egui/src/lib.rs
+@@ -364,6 +364,8 @@ pub struct PdfCraftApp {
+     /// Resolved colours, including the current OS theme when following the system.
+     pub theme: ThemeKind,
+     pub theme_preference: ThemePreference,
++    #[cfg(not(target_arch = "wasm32"))]
++    pub live_tokens: theme::live::LiveTokens,
+     /// Interface language preference: `auto` (follow the system) or a code from [`i18n::LANGUAGES`].
+     pub language: String,
+     pub dialog: Option<Dialog>,
+@@ -607,6 +609,8 @@ impl PdfCraftApp {
+             comment_prefs: Default::default(),
+             theme: ThemeKind::Light,
+             theme_preference: ThemePreference::Light,
++            #[cfg(not(target_arch = "wasm32"))]
++            live_tokens: theme::live::LiveTokens::from_env(),
+             language: i18n::AUTO.to_string(),
+             dialog: None,
+             update_source: None,
+@@ -1112,6 +1116,10 @@ impl PdfCraftApp {
+ 
+     pub fn set_theme_preference(&mut self, preference: ThemePreference) {
+         self.theme_preference = preference;
++        #[cfg(not(target_arch = "wasm32"))]
++        {
++            self.live_tokens.active_tokens = None;
++        }
+         self.theme = preference.resolve(self.ctx.as_ref().and_then(egui::Context::system_theme), self.theme);
+         if let Some(ctx) = &self.ctx {
+             theme::apply(ctx, self.theme);
+@@ -1126,6 +1134,10 @@ impl PdfCraftApp {
+     }
+ 
+     fn sync_theme(&mut self, ctx: &egui::Context) {
++        #[cfg(not(target_arch = "wasm32"))]
++        if self.live_tokens.active_tokens.is_some() {
++            return;
++        }
+         let kind = self.theme_preference.resolve(ctx.system_theme(), self.theme);
+         if kind != self.theme {
+             self.theme = kind;
+@@ -1576,6 +1588,13 @@ impl eframe::App for PdfCraftApp {
+             egui_extras::install_image_loaders(ctx);
+             theme::install_fonts_for(ctx, hans);
+             self.fonts_hans = hans;
++            #[cfg(not(target_arch = "wasm32"))]
++            self.live_tokens.poll(ctx, &mut self.theme);
++            #[cfg(not(target_arch = "wasm32"))]
++            if self.live_tokens.active_tokens.is_none() {
++                theme::apply(ctx, self.theme);
++            }
++            #[cfg(target_arch = "wasm32")]
+             theme::apply(ctx, self.theme);
+             self.styled = true;
+         } else {
+@@ -1586,6 +1605,8 @@ impl eframe::App for PdfCraftApp {
+                 self.fonts_hans = hans;
+             }
+         }
++        #[cfg(not(target_arch = "wasm32"))]
++        self.live_tokens.poll(ctx, &mut self.theme);
+         self.sync_theme(ctx);
+         // Before taking this frame's drop: the grid must be drawn once with the pointer where
+         // the files were let go before the gap is read.
+diff --git i/crates/ui-egui/src/theme.rs w/crates/ui-egui/src/theme.rs
+index 5b74b64..1c7c333 100644
+--- i/crates/ui-egui/src/theme.rs
++++ w/crates/ui-egui/src/theme.rs
+@@ -225,9 +225,12 @@ pub fn semibold(size: f32) -> FontId {
+ }
+ 
+ pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
++    apply_tokens(ctx, Tokens::for_kind(kind));
++}
++
++pub fn apply_tokens(ctx: &egui::Context, t: Tokens) {
+     // egui must use the same theme for popup/menu styles as our custom chrome.
+-    ctx.set_theme(if kind == ThemeKind::Dark { egui::Theme::Dark } else { egui::Theme::Light });
+-    let t = Tokens::for_kind(kind);
++    ctx.set_theme(if t.dark() { egui::Theme::Dark } else { egui::Theme::Light });
+     ctx.data_mut(|d| d.insert_temp(egui::Id::new("pdfcraft-theme"), t));
+     let mut v = if t.dark() { Visuals::dark() } else { Visuals::light() };
+     v.panel_fill = t.panel;
+@@ -281,6 +284,140 @@ pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
+     });
+ }
+ 
++#[cfg(not(target_arch = "wasm32"))]
++pub mod live {
++    use super::{ThemeKind, Tokens, apply_tokens};
++    use egui::Color32;
++    use std::time::SystemTime;
++
++    #[derive(Default)]
++    pub struct LiveTokens {
++        path: Option<std::path::PathBuf>,
++        stamp: Option<SystemTime>,
++        last_check: f64,
++        pub active_tokens: Option<Tokens>,
++    }
++
++    impl LiveTokens {
++        pub fn from_env() -> Self {
++            let path = std::env::var_os("PDFCRAFT_THEME_FILE")
++                .map(std::path::PathBuf::from)
++                .or_else(|| {
++                    std::env::var_os("HOME")
++                        .map(|h| std::path::PathBuf::from(h).join(".config/pdfcraft/theme.json"))
++                });
++            Self { path, last_check: -1.0, active_tokens: None, stamp: None }
++        }
++
++        /// Poll theme file and re-apply overrides on change.
++        pub fn poll(&mut self, ctx: &egui::Context, kind: &mut ThemeKind) -> bool {
++            let Some(path) = &self.path else { return false };
++            let now = ctx.input(|i| i.time);
++            if self.last_check >= 0.0 && now - self.last_check < 0.4 {
++                ctx.request_repaint_after(std::time::Duration::from_millis(400));
++                return false;
++            }
++            self.last_check = now;
++            ctx.request_repaint_after(std::time::Duration::from_millis(400));
++            let Ok(meta) = std::fs::metadata(path) else { return false };
++            let stamp = meta.modified().ok();
++            if stamp.is_some() && stamp == self.stamp {
++                return false;
++            }
++            self.stamp = stamp;
++            let Ok(text) = std::fs::read_to_string(path) else { return false };
++            match serde_json::from_str::<serde_json::Value>(&text) {
++                Ok(v) => {
++                    let base_kind = if v.get("kind").and_then(|k| k.as_str()) == Some("dark")
++                        || v.get("dark").and_then(|d| d.as_bool()) == Some(true) {
++                        ThemeKind::Dark
++                    } else if v.get("kind").and_then(|k| k.as_str()) == Some("light")
++                        || v.get("dark").and_then(|d| d.as_bool()) == Some(false) {
++                        ThemeKind::Light
++                    } else {
++                        *kind
++                    };
++                    let mut t = Tokens::for_kind(base_kind);
++                    let unknown = apply_overrides(&mut t, &v);
++                    *kind = t.kind;
++                    self.active_tokens = Some(t);
++                    apply_tokens(ctx, t);
++                    log::info!("LiveTokens applied: kind={:?}, chrome={:?}", t.kind, t.chrome);
++                    if !unknown.is_empty() {
++                        log::warn!("unknown token keys: {unknown:?}");
++                    }
++                    ctx.request_repaint();
++                    true
++                }
++                Err(e) => {
++                    log::warn!("theme file: {e}");
++                    false
++                }
++            }
++        }
++    }
++
++    fn color(v: &serde_json::Value) -> Option<Color32> {
++        let s = v.as_str()?.trim_start_matches('#');
++        let b = |i: usize| u8::from_str_radix(s.get(i..i + 2)?, 16).ok();
++        match s.len() {
++            6 => Some(Color32::from_rgb(b(0)?, b(2)?, b(4)?)),
++            8 => Some(Color32::from_rgba_unmultiplied(b(0)?, b(2)?, b(4)?, b(6)?)),
++            _ => None,
++        }
++    }
++
++    /// Apply JSON overrides onto tokens; returns unknown keys.
++    pub fn apply_overrides(t: &mut Tokens, v: &serde_json::Value) -> Vec<String> {
++        let mut unknown = Vec::new();
++        let Some(obj) = v.as_object() else { return unknown };
++        for (k, val) in obj {
++            macro_rules! c {
++                ($($f:ident),*) => {
++                    match k.as_str() {
++                        $(stringify!($f) => { if let Some(c) = color(val) { t.$f = c; } })*
++                        "kind" => {
++                            if let Some(s) = val.as_str() {
++                                t.kind = if s == "dark" { ThemeKind::Dark } else { ThemeKind::Light };
++                            }
++                        }
++                        "dark" => {
++                            if let Some(b) = val.as_bool() {
++                                t.kind = if b { ThemeKind::Dark } else { ThemeKind::Light };
++                            }
++                        }
++                        "radius" => { if let Some(x) = val.as_u64() { t.radius = x as u8; } }
++                        _ => unknown.push(k.clone()),
++                    }
++                };
++            }
++            c!(
++                titlebar,
++                chrome,
++                panel,
++                pasteboard,
++                card,
++                border,
++                divider,
++                text,
++                text_muted,
++                text_faint,
++                icon,
++                hover,
++                pressed,
++                selected,
++                accent,
++                accent_text,
++                accent_soft,
++                field,
++                badge_new,
++                page_shadow
++            );
++        }
++        unknown
++    }
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;

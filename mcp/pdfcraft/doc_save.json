@@ -1,0 +1,26 @@
+{
+  "name": "doc_save",
+  "description": "Save to its own file (an incremental update, which keeps signatures valid) or to a new path (a full rewrite). The write is atomic.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "full": {
+        "description": "Force a full rewrite (or, with false, an incremental update).",
+        "type": "boolean"
+      },
+      "path": {
+        "description": "Save as this file. Omit to save in place.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

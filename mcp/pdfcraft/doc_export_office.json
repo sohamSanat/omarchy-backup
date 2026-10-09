@@ -1,0 +1,22 @@
+{
+  "name": "doc_export_office",
+  "description": "Export a PDF \u25b8 Word (.docx), HTML (.html, one file with images inline) or RTF (.rtf), chosen by path's extension: paragraphs in reading order, headings from larger text, bold and italic, images where they fall, a page break between pages.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "path"
+    ],
+    "type": "object"
+  }
+}

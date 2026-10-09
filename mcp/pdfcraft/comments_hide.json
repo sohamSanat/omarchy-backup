@@ -1,0 +1,22 @@
+{
+  "name": "comments_hide",
+  "description": "Hide or show every comment on the page (fields and links still draw). A view setting: the file doesn't change.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "hidden": {
+        "description": "Default true.",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

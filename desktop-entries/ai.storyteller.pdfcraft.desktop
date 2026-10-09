@@ -1,0 +1,23 @@
+[Desktop Entry]
+Type=Application
+Name=PdfCraft
+GenericName=PDF Editor
+Comment=Read, organize, combine, split and secure PDFs
+Exec=pdfcraft %U
+TryExec=pdfcraft
+Icon=ai.storyteller.pdfcraft
+Terminal=false
+StartupNotify=true
+StartupWMClass=pdfcraft
+Categories=Office;Viewer;Graphics;
+Keywords=pdf;viewer;editor;annotate;sign;forms;merge;split;
+MimeType=application/pdf;
+Actions=Wayland;XWayland;
+
+[Desktop Action Wayland]
+Name=Open in Native Wayland
+Exec=env PDFCRAFT_FORCE_XWAYLAND=0 pdfcraft %U
+
+[Desktop Action XWayland]
+Name=Open with XWayland
+Exec=env PDFCRAFT_FORCE_XWAYLAND=1 pdfcraft %U

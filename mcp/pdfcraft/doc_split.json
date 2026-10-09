@@ -1,0 +1,42 @@
+{
+  "name": "doc_split",
+  "description": "Split into several files written to out_dir: every N pages, before given pages, at top-level bookmarks (bookmarks: true; files named after them), or by file size (max_mb). Files are <name>-partK.pdf.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "before": {
+        "description": "1-based page numbers that start a new part.",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "bookmarks": {
+        "type": "boolean"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "every": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "max_mb": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+      },
+      "out_dir": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "out_dir"
+    ],
+    "type": "object"
+  }
+}

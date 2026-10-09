@@ -1,0 +1,50 @@
+{
+  "name": "measure_snap",
+  "description": "Snap a point to vector paths, endpoints, midpoints or intersections. Coordinates and tolerance are in display points. Bounded extraction reports truncated geometry.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "at": {
+        "description": "[x, y] in points from the top-left of the displayed page.",
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "endpoints": {
+        "type": "boolean"
+      },
+      "intersections": {
+        "type": "boolean"
+      },
+      "midpoints": {
+        "type": "boolean"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "paths": {
+        "type": "boolean"
+      },
+      "tolerance": {
+        "maximum": 10000,
+        "minimum": 0,
+        "type": "number"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "at"
+    ],
+    "type": "object"
+  }
+}

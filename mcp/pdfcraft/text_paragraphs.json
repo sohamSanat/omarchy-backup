@@ -1,0 +1,23 @@
+{
+  "name": "text_paragraphs",
+  "description": "The paragraphs on a page (lines grouped by font, size, alignment and spacing): number, text, its line numbers, box (top-left-origin points), font and size. Use the number with text_edit's paragraph.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc",
+      "page"
+    ],
+    "type": "object"
+  }
+}

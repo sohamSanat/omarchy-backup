@@ -1,0 +1,50 @@
+{
+  "name": "doc_export_images",
+  "description": "Write pages as PNG, JPEG or TIFF files (`<name>_page_<n>.png|jpg|tif`) into a folder, at a resolution (default 150 dpi). JPEG and TIFF are flattened onto white paper. Includes unsaved edits.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "dpi": {
+        "maximum": 1200,
+        "minimum": 18,
+        "type": "number"
+      },
+      "folder": {
+        "type": "string"
+      },
+      "format": {
+        "enum": [
+          "png",
+          "jpeg",
+          "tiff"
+        ],
+        "type": "string"
+      },
+      "pages": {
+        "description": "1-based page numbers to export (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "quality": {
+        "description": "JPEG quality (default 85).",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc",
+      "folder"
+    ],
+    "type": "object"
+  }
+}

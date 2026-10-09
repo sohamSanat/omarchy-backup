@@ -1,0 +1,22 @@
+{
+  "name": "form_actions",
+  "description": "Field Properties \u25b8 Actions: the field's action for each trigger (mouse_up, mouse_down, mouse_enter, mouse_exit, on_focus, on_blur).",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "field": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "field"
+    ],
+    "type": "object"
+  }
+}

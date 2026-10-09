@@ -1,0 +1,32 @@
+{
+  "name": "image_save",
+  "description": "Write one of a page's images to path: JPEG images unchanged, others as PNG (the extension is added when missing).",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "image": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "image",
+      "path"
+    ],
+    "type": "object"
+  }
+}

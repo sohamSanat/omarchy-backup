@@ -1,0 +1,46 @@
+{
+  "name": "stamp_custom",
+  "description": "Stamp a picture: a PDF page (file_page, default 1) or an image file, centred at at [x, y] (points from the top-left of the displayed page) at its natural size, at most 200 pt. name labels it (default: the file name). Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "at": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      },
+      "author": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "file_page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "name": {
+        "type": "string"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "path",
+      "at"
+    ],
+    "type": "object"
+  }
+}

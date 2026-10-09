@@ -1,0 +1,46 @@
+{
+  "name": "form_tab_order",
+  "description": "Set the tab order of pages (default all): row (top to bottom, left to right), column, structure, or annotations (unspecified). Or order tabs manually: `field` with `move` earlier|later moves that field one place on its page. Returns the resulting order of fields. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "field": {
+        "type": "string"
+      },
+      "move": {
+        "enum": [
+          "earlier",
+          "later"
+        ],
+        "type": "string"
+      },
+      "order": {
+        "enum": [
+          "row",
+          "column",
+          "structure",
+          "annotations"
+        ],
+        "type": "string"
+      },
+      "pages": {
+        "description": "1-based page numbers to set (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

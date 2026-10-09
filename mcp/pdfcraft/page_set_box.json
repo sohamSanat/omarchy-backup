@@ -1,0 +1,54 @@
+{
+  "name": "page_set_box",
+  "description": "Set a page box (crop by default; also trim, bleed, art, media) on pages: either margins in points from the media box [left, bottom, right, top], or an absolute rect in points from the top-left of the displayed page. Omit both to reset the box to its default. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "box": {
+        "enum": [
+          "crop",
+          "trim",
+          "bleed",
+          "art",
+          "media"
+        ],
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "margins": {
+        "items": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "pages": {
+        "description": "1-based page numbers to change (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "rect": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

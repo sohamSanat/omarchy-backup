@@ -1,0 +1,182 @@
+{
+  "name": "comment_add",
+  "description": "Add a comment as Acrobat's commenting tools do. Geometry is in points with the origin at the top-left of the displayed page, y down (as in page_render images at 72 dpi and text_find rects). note: `at` [x, y] (icon top-left). stamp: `at` [x, y] (its centre) and `stamp`: approved, completed, confidential, draft, final, for comment, for public release, information only, not approved, not for public release, preliminary results, void, accepted, initial here, rejected, sign here, witness; dynamic: true for the dynamic approved/confidential/received/reviewed/revised stamps with a By \u2026 at \u2026 line. highlight/underline/strikeout/squiggly: `find` (text on the page to mark; every match with all: true) or `quads`. rectangle/oval/textbox: `rect` [x0, y0, x1, y1]. line/arrow: `from`, `to`. ink: `strokes` [[[x, y], \u2026], \u2026]. polygon/cloud/polyline (connected lines): `points` [[x, y], \u2026]. callout: `rect` (its text box), `to` (the point the arrow touches), optional `knee`. caret (inserted text): `at`, the insertion point on the baseline. replace (Replace Text): `find` or `quads` like highlight, `contents` the replacement. attachment: `path` (the file), `at`, optional `icon` (PushPin, Paperclip, Graph, Tag). Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "all": {
+        "description": "Mark every match of `find` on the page, not just the first.",
+        "type": "boolean"
+      },
+      "at": {
+        "description": "[x, y] in points from the top-left of the displayed page.",
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      },
+      "author": {
+        "type": "string"
+      },
+      "color": {
+        "description": "#RRGGBB or a name: yellow, red, orange, green, blue, purple, pink, black, gray, white.",
+        "type": "string"
+      },
+      "contents": {
+        "description": "The comment text (what a text box shows).",
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "dynamic": {
+        "type": "boolean"
+      },
+      "fill": {
+        "description": "#RRGGBB or a name: yellow, red, orange, green, blue, purple, pink, black, gray, white.",
+        "type": "string"
+      },
+      "find": {
+        "description": "Text on the page to mark up (case-insensitive).",
+        "type": "string"
+      },
+      "font_size": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+      },
+      "from": {
+        "description": "[x, y] in points from the top-left of the displayed page.",
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      },
+      "icon": {
+        "description": "note: Comment, Note, Help, Insert, Key, NewParagraph, Paragraph; attachment: PushPin, Paperclip, Graph, Tag.",
+        "type": "string"
+      },
+      "knee": {
+        "description": "[x, y] in points from the top-left of the displayed page.",
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      },
+      "opacity": {
+        "maximum": 1,
+        "minimum": 0,
+        "type": "number"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "path": {
+        "description": "attachment: the file to attach.",
+        "type": "string"
+      },
+      "points": {
+        "items": {
+          "description": "[x, y] in points from the top-left of the displayed page.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "minItems": 2,
+        "type": "array"
+      },
+      "quads": {
+        "items": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 8,
+          "minItems": 8,
+          "type": "array"
+        },
+        "type": "array"
+      },
+      "rect": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "stamp": {
+        "type": "string"
+      },
+      "strokes": {
+        "items": {
+          "items": {
+            "description": "[x, y] in points from the top-left of the displayed page.",
+            "items": {
+              "type": "number"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "type": "array"
+      },
+      "to": {
+        "description": "[x, y] in points from the top-left of the displayed page.",
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      },
+      "type": {
+        "enum": [
+          "note",
+          "highlight",
+          "underline",
+          "strikeout",
+          "squiggly",
+          "replace",
+          "rectangle",
+          "oval",
+          "line",
+          "arrow",
+          "ink",
+          "textbox",
+          "stamp",
+          "polygon",
+          "cloud",
+          "polyline",
+          "callout",
+          "caret",
+          "attachment"
+        ],
+        "type": "string"
+      },
+      "width": {
+        "description": "Line width in points.",
+        "minimum": 0,
+        "type": "number"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "type"
+    ],
+    "type": "object"
+  }
+}

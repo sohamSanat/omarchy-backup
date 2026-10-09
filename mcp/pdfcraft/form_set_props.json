@@ -1,0 +1,107 @@
+{
+  "name": "form_set_props",
+  "description": "Change a field's properties (General and Options tabs): name (renames it), tooltip, read_only, required, multiline, max_length (0 = no limit), options (combo/list items), font_size (0 = auto), rect (position), format, validate, calculate (Acrobat's Format/Validate/Calculate tabs, run natively: values are checked, formatted and recalculated as in Acrobat). Options tab: align (left, center, right), default (the value Reset form restores; for check boxes and radio buttons their on state, \"\" for off), flags { scroll, rich_text, password, file_select, spell_check, comb (needs max_length), sort, editable, multi_select, commit_immediately }, check_style (check boxes and radio buttons: check, circle, cross, diamond, square, star). Only the given ones change. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "align": {
+        "enum": [
+          "left",
+          "center",
+          "right"
+        ],
+        "type": "string"
+      },
+      "appearance": {
+        "description": "Appearance tab: border, fill, text_color (#RRGGBB, a name or \"none\"), width (1 thin, 2 medium, 3 thick), style (solid, dashed, beveled, inset, underline), font (helvetica, times, courier).",
+        "type": "object"
+      },
+      "calculate": {
+        "description": "Calculate tab: {\"op\": \"sum\"|\"product\"|\"average\"|\"min\"|\"max\", \"fields\": [\"a\", \"b\"]}, {\"notation\": \"Price * Qty\"} (simplified field notation), or \"none\"."
+      },
+      "check_style": {
+        "description": "Check boxes and radio buttons: the mark shown when on.",
+        "enum": [
+          "check",
+          "circle",
+          "cross",
+          "diamond",
+          "square",
+          "star"
+        ],
+        "type": "string"
+      },
+      "default": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "field": {
+        "description": "The field's current name.",
+        "type": "string"
+      },
+      "flags": {
+        "additionalProperties": {
+          "type": "boolean"
+        },
+        "type": "object"
+      },
+      "font_size": {
+        "minimum": 0,
+        "type": "number"
+      },
+      "format": {
+        "description": "Format tab: {\"type\": \"number\", \"decimals\": 2, \"currency\": \"$\", \"separator\": 0-4, \"negative\": 0-3}, {\"type\": \"percent\"}, {\"type\": \"date\"|\"time\", \"pattern\": \"mm/dd/yyyy\"}, {\"type\": \"zip\"|\"zip4\"|\"phone\"|\"ssn\"}, {\"type\": \"mask\", \"mask\": \"AA-9999\"}, or \"none\"."
+      },
+      "locked": {
+        "description": "Lock the field's properties (only unlocking is accepted while locked).",
+        "type": "boolean"
+      },
+      "max_length": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "multiline": {
+        "type": "boolean"
+      },
+      "name": {
+        "type": "string"
+      },
+      "options": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "read_only": {
+        "type": "boolean"
+      },
+      "rect": {
+        "description": "Move/resize: points from the top-left of the displayed page.",
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "required": {
+        "type": "boolean"
+      },
+      "tooltip": {
+        "type": "string"
+      },
+      "validate": {
+        "description": "Validate tab: {\"min\": 0, \"max\": 100} (either may be left out) or \"none\"."
+      }
+    },
+    "required": [
+      "doc",
+      "field"
+    ],
+    "type": "object"
+  }
+}

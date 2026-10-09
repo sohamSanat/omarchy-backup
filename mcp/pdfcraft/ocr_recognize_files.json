@@ -1,0 +1,35 @@
+{
+  "name": "ocr_recognize_files",
+  "description": "Scan & OCR \u25b8 Recognize text \u25b8 In multiple files: read every page of each PDF in paths and write the searchable result into folder under the same name (pages that already have text are left alone). Returns, per file, the output path, word count and skipped pages, or the error.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "dpi": {
+        "maximum": 600,
+        "minimum": 72,
+        "type": "number"
+      },
+      "folder": {
+        "type": "string"
+      },
+      "language": {
+        "enum": [
+          "en"
+        ],
+        "type": "string"
+      },
+      "paths": {
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "required": [
+      "paths",
+      "folder"
+    ],
+    "type": "object"
+  }
+}

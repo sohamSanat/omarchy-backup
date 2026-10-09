@@ -1,0 +1,21 @@
+{
+  "name": "doc_close",
+  "description": "Close a document. Fails if it has unsaved changes unless discard_changes is true.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "discard_changes": {
+        "type": "boolean"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

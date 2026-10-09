@@ -1,0 +1,136 @@
+{
+  "name": "doc_print",
+  "description": "Print with Acrobat's Print dialog options, or save the print-ready PDF. pages: a range such as \"1-3, 6, 9-\" (page labels allowed; default all); subset odd/even; reverse. layout: fit (default), actual, shrink, custom (scale %), multiple (per_sheet 2/4/6/9/16, order, border, auto_rotate; cut-stack order arranges single-sided sheets for cutting into piles and stacking left to right, top to bottom, keeping sheet order within each pile; duplex must be off), booklet (booklet_subset both/front/back, binding left/right), poster (scale %, overlap pt, cut_marks). orientation auto/portrait/landscape; comments_forms document / document-and-markups (default) / document-and-stamps / form-fields-only; paper Letter/Legal/Tabloid/A3/A4/A5. Then path (save) or printer (a name or \"default\") with copies, collate, duplex off/long-edge/short-edge, grayscale.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "auto_rotate": {
+        "type": "boolean"
+      },
+      "binding": {
+        "enum": [
+          "left",
+          "right"
+        ],
+        "type": "string"
+      },
+      "booklet_subset": {
+        "enum": [
+          "both",
+          "front",
+          "back"
+        ],
+        "type": "string"
+      },
+      "border": {
+        "type": "boolean"
+      },
+      "collate": {
+        "type": "boolean"
+      },
+      "comments_forms": {
+        "enum": [
+          "document",
+          "document-and-markups",
+          "document-and-stamps",
+          "form-fields-only"
+        ],
+        "type": "string"
+      },
+      "copies": {
+        "maximum": 999,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "cut_marks": {
+        "type": "boolean"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "duplex": {
+        "enum": [
+          "off",
+          "long-edge",
+          "short-edge"
+        ],
+        "type": "string"
+      },
+      "grayscale": {
+        "type": "boolean"
+      },
+      "layout": {
+        "enum": [
+          "fit",
+          "actual",
+          "shrink",
+          "custom",
+          "multiple",
+          "booklet",
+          "poster"
+        ],
+        "type": "string"
+      },
+      "order": {
+        "enum": [
+          "horizontal",
+          "horizontal-reversed",
+          "vertical",
+          "vertical-reversed",
+          "cut-stack"
+        ],
+        "type": "string"
+      },
+      "orientation": {
+        "enum": [
+          "auto",
+          "portrait",
+          "landscape"
+        ],
+        "type": "string"
+      },
+      "overlap": {
+        "minimum": 0,
+        "type": "number"
+      },
+      "pages": {
+        "type": "string"
+      },
+      "paper": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "per_sheet": {
+        "maximum": 256,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "printer": {
+        "type": "string"
+      },
+      "reverse": {
+        "type": "boolean"
+      },
+      "scale": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+      },
+      "subset": {
+        "enum": [
+          "all",
+          "odd",
+          "even"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

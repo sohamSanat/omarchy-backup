@@ -1,0 +1,65 @@
+{
+  "name": "comment_edit",
+  "description": "Change a comment's text, colour, opacity, line width, rectangle (rectangle/oval/text box) or position (`move` [dx, dy] in points). One undo step.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "color": {
+        "description": "#RRGGBB or a name: yellow, red, orange, green, blue, purple, pink, black, gray, white.",
+        "type": "string"
+      },
+      "contents": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "id": {
+        "description": "The comment's id (from comment_list).",
+        "type": "string"
+      },
+      "index": {
+        "description": "1-based position on the page, as comment_list reports.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "move": {
+        "description": "[x, y] in points from the top-left of the displayed page.",
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      },
+      "opacity": {
+        "maximum": 1,
+        "minimum": 0,
+        "type": "number"
+      },
+      "page": {
+        "description": "With `index`, instead of `id`.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "rect": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "width": {
+        "minimum": 0,
+        "type": "number"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

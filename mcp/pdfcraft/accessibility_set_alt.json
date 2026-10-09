@@ -1,0 +1,29 @@
+{
+  "name": "accessibility_set_alt",
+  "description": "Set a figure's alternate text (alt; empty or omitted clears it), or mark it decorative (decorative: true: its content becomes an artifact and the figure leaves the tags). figure is a number from accessibility_figures. Returns the figures. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "alt": {
+        "type": "string"
+      },
+      "decorative": {
+        "type": "boolean"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "figure": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc",
+      "figure"
+    ],
+    "type": "object"
+  }
+}

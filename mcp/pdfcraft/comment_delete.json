@@ -1,0 +1,32 @@
+{
+  "name": "comment_delete",
+  "description": "Delete a comment with its pop-up and replies. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "id": {
+        "description": "The comment's id (from comment_list).",
+        "type": "string"
+      },
+      "index": {
+        "description": "1-based position on the page, as comment_list reports.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "description": "With `index`, instead of `id`.",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "ocr_status",
+  "description": "Whether text recognition is available (its models are installed: run `cargo xtask models` or set PDFCRAFT_MODELS), where it looks for them, and the languages it reads.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  }
+}

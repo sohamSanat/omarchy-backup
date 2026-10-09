@@ -1,0 +1,76 @@
+{
+  "name": "doc_initial_view",
+  "description": "Read or change how the document opens (Document Properties \u25b8 Initial View) and its reading options: navigation (page, bookmarks, pages, attachments, layers), layout (default, single, continuous, two_up, two_up_continuous, two_up_cover, two_up_continuous_cover), magnification (default, actual, fit_page, fit_width, fit_height, fit_visible, or a percentage), page, window options (fit_window, center_window, full_screen, display_title), interface options (hide_menubar, hide_toolbar, hide_window_ui), language and binding (left, right). Only the given ones change; returns the result. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "binding": {
+        "enum": [
+          "left",
+          "right"
+        ],
+        "type": "string"
+      },
+      "center_window": {
+        "type": "boolean"
+      },
+      "display_title": {
+        "type": "boolean"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "fit_window": {
+        "type": "boolean"
+      },
+      "full_screen": {
+        "type": "boolean"
+      },
+      "hide_menubar": {
+        "type": "boolean"
+      },
+      "hide_toolbar": {
+        "type": "boolean"
+      },
+      "hide_window_ui": {
+        "type": "boolean"
+      },
+      "language": {
+        "type": "string"
+      },
+      "layout": {
+        "enum": [
+          "default",
+          "single",
+          "continuous",
+          "two_up",
+          "two_up_continuous",
+          "two_up_cover",
+          "two_up_continuous_cover"
+        ],
+        "type": "string"
+      },
+      "magnification": {},
+      "navigation": {
+        "enum": [
+          "page",
+          "bookmarks",
+          "pages",
+          "attachments",
+          "layers"
+        ],
+        "type": "string"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

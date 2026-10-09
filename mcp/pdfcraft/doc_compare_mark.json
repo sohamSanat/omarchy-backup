@@ -1,0 +1,22 @@
+{
+  "name": "doc_compare_mark",
+  "description": "Add the differences from other (older) to doc (newer) as comments in doc: highlights over replaced (blue) and inserted (green) text, notes where text was deleted (red), authored Compare. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "other": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc",
+      "other"
+    ],
+    "type": "object"
+  }
+}

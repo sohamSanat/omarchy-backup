@@ -1,0 +1,27 @@
+{
+  "name": "doc_remove_marks",
+  "description": "Remove every header and footer, watermark or background PdfCraft (or a compatible tool) added. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "kind": {
+        "enum": [
+          "header_footer",
+          "watermark",
+          "background"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "kind"
+    ],
+    "type": "object"
+  }
+}

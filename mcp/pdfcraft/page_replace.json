@@ -1,0 +1,42 @@
+{
+  "name": "page_replace",
+  "description": "Replace the content of pages with pages of another PDF (same count). Links, comments, form fields and bookmarks on the original pages stay, as in Acrobat. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "from_pages": {
+        "description": "1-based page numbers of the other file, in order (default: its first pages).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "pages": {
+        "description": "1-based page numbers to replace.",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "path": {
+        "description": "A file path (relative to --root when set).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "pages",
+      "path"
+    ],
+    "type": "object"
+  }
+}

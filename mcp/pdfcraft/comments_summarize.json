@@ -1,0 +1,35 @@
+{
+  "name": "comments_summarize",
+  "description": "Make a PDF summarising every comment (number, author, type, date, text, replies), sorted by page, author, date or type.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "open": {
+        "description": "Also open the result as a new document (default: only when out is omitted).",
+        "type": "boolean"
+      },
+      "out": {
+        "description": "File to write. Omit to open the result as a new unsaved document instead.",
+        "type": "string"
+      },
+      "sort": {
+        "enum": [
+          "page",
+          "author",
+          "date",
+          "type"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

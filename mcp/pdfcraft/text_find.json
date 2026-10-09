@@ -1,0 +1,28 @@
+{
+  "name": "text_find",
+  "description": "Find a phrase (case-insensitive, whitespace-normalised) and return each match with its page and line rectangles in points (origin top-left).",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "limit": {
+        "description": "Maximum matches (default 500).",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "query": {
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "query"
+    ],
+    "type": "object"
+  }
+}

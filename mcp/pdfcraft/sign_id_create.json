@@ -1,0 +1,54 @@
+{
+  "name": "sign_id_create",
+  "description": "Create a self-signed digital ID and save it as a password-protected .p12 file (Acrobat: Configure a new digital ID \u25b8 Create a new digital ID \u25b8 Save to file). Default key: 2048-bit RSA, valid 5 years.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "country": {
+        "description": "Two-letter country code.",
+        "type": "string"
+      },
+      "email": {
+        "type": "string"
+      },
+      "key": {
+        "enum": [
+          "rsa2048",
+          "rsa3072",
+          "rsa4096",
+          "p256"
+        ],
+        "type": "string"
+      },
+      "name": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "organization": {
+        "type": "string"
+      },
+      "password": {
+        "minLength": 6,
+        "type": "string"
+      },
+      "path": {
+        "description": "The .p12 file to write.",
+        "type": "string"
+      },
+      "unit": {
+        "type": "string"
+      },
+      "years": {
+        "maximum": 50,
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "name",
+      "password",
+      "path"
+    ],
+    "type": "object"
+  }
+}

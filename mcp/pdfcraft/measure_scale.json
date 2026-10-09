@@ -1,0 +1,73 @@
+{
+  "name": "measure_scale",
+  "description": "Read the scale at a point, or add a rectangular viewport using units_per_point or two calibration points and their real-world distance. Existing measurements retain their original scales. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "at": {
+        "description": "[x, y] in points from the top-left of the displayed page.",
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      },
+      "distance": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "name": {
+        "type": "string"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "points": {
+        "items": {
+          "description": "[x, y] in points from the top-left of the displayed page.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "maxItems": 2048,
+        "minItems": 1,
+        "type": "array"
+      },
+      "precision": {
+        "maximum": 6,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "rect": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "unit": {
+        "type": "string"
+      },
+      "units_per_point": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+      }
+    },
+    "required": [
+      "doc",
+      "page"
+    ],
+    "type": "object"
+  }
+}

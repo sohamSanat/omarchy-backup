@@ -1,0 +1,35 @@
+{
+  "name": "page_add_image",
+  "description": "Add an image file (PNG, JPEG, TIFF, GIF, BMP) as page content: in rect (points from the top-left of the page), or centred at its natural size (shrunk to fit). Undoable; movable with content_update.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      },
+      "rect": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "path"
+    ],
+    "type": "object"
+  }
+}

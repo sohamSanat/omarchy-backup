@@ -1,0 +1,1 @@
+PdfCraft PDF editor. Clean-room reimplementation of Adobe Acrobat in pure Rust. Open a file with doc_open, inspect with doc_info, text_extract, text_find, page_render, edit pages with page_rotate, page_delete, page_move, doc_combine, doc_split, manage bookmarks, forms, annotations, and save with doc_save.

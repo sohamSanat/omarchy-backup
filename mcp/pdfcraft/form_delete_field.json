@@ -1,0 +1,22 @@
+{
+  "name": "form_delete_field",
+  "description": "Delete a form field and all its widgets. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "field": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "field"
+    ],
+    "type": "object"
+  }
+}

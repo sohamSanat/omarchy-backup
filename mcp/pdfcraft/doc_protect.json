@@ -1,0 +1,70 @@
+{
+  "name": "doc_protect",
+  "description": "Encrypt the document (applied by the next doc_save, a full rewrite). open_password is needed to open it. permissions_password is needed to change security and lifts the restrictions given by printing/changes/copy/accessibility; those restrictions (and their defaults) apply only when permissions_password is given. With open_password alone the document is encrypted and everything stays allowed, so passing a restriction without permissions_password is an error. Passwords are never echoed back. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "accessibility": {
+        "description": "Allow screen readers to read the text (needs permissions_password; default true).",
+        "type": "boolean"
+      },
+      "changes": {
+        "description": "Needs permissions_password. Default none.",
+        "enum": [
+          "none",
+          "pages",
+          "fill-sign",
+          "comment-fill-sign",
+          "any-except-extract"
+        ],
+        "type": "string"
+      },
+      "compatibility": {
+        "description": "Default aes-256 (Acrobat X and later).",
+        "enum": [
+          "aes-256",
+          "aes-128",
+          "rc4-128",
+          "rc4-40"
+        ],
+        "type": "string"
+      },
+      "copy": {
+        "description": "Allow copying text and images (needs permissions_password; default false).",
+        "type": "boolean"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "encrypt_metadata": {
+        "description": "Default true.",
+        "type": "boolean"
+      },
+      "open_password": {
+        "description": "Required to open the document. On its own it restricts nothing.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "permissions_password": {
+        "description": "Required to change security; enables printing/changes/copy/accessibility and their defaults.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "printing": {
+        "description": "Needs permissions_password. Default high.",
+        "enum": [
+          "none",
+          "low",
+          "high"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

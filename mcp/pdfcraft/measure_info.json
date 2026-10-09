@@ -1,0 +1,46 @@
+{
+  "name": "measure_info",
+  "description": "Calculate a live distance, perimeter or area, deltas, angle and scale without adding an annotation. Incomplete paths are allowed.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "points": {
+        "items": {
+          "description": "[x, y] in points from the top-left of the displayed page.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "maxItems": 2048,
+        "minItems": 1,
+        "type": "array"
+      },
+      "type": {
+        "enum": [
+          "distance",
+          "perimeter",
+          "area"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "points"
+    ],
+    "type": "object"
+  }
+}

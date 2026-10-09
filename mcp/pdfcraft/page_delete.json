@@ -1,0 +1,28 @@
+{
+  "name": "page_delete",
+  "description": "Delete pages. Undoable until saved.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "pages": {
+        "description": "1-based page numbers to delete.",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "required": [
+      "doc",
+      "pages"
+    ],
+    "type": "object"
+  }
+}

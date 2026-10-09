@@ -1,0 +1,66 @@
+{
+  "name": "redact_mark",
+  "description": "Mark content for redaction (nothing is removed until redact_apply). One of: rect [x0, y0, x1, y1] (points from the top-left of the displayed page) with page; find (text, every match); pattern (phone, email, credit-card, ssn, date: every match, Acrobat's Search & Redact patterns); whole_pages: true. find, pattern and whole_pages work on pages (default all). overlay: text shown on the box once applied; fill: box colour (default black). Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "author": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "fill": {
+        "description": "#RRGGBB or a colour name.",
+        "type": "string"
+      },
+      "find": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "overlay": {
+        "type": "string"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "pages": {
+        "description": "1-based page numbers to search or mark (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "pattern": {
+        "enum": [
+          "phone",
+          "email",
+          "credit-card",
+          "ssn",
+          "date"
+        ],
+        "type": "string"
+      },
+      "rect": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "whole_pages": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

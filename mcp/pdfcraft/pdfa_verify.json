@@ -1,0 +1,26 @@
+{
+  "name": "pdfa_verify",
+  "description": "Standards \u25b8 Verify PDF/A compliance: the PDF/A-2b or 3b rules the document breaks (ISO 19005 clause, message, page, whether Save as PDF/A can fix it), plus what it declares.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "level": {
+        "description": "Default 2b.",
+        "enum": [
+          "2b",
+          "3b"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

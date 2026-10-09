@@ -1,0 +1,54 @@
+{
+  "name": "fill_sign_add",
+  "description": "Fill in a form that has no fields, as Acrobat's Fill & Sign does: type text (`text`, 10 pt), place a check, cross, dot or line, today's date, or a typed signature or initials (`text` drawn in a script font as filled outlines; at is its left edge, centred vertically), at `at` [x, y] in points from the top-left of the page (the text's top-left; a mark's centre). Creates movable, undoable annotations.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "at": {
+        "description": "[x, y] in points from the top-left of the displayed page.",
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      },
+      "author": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "text": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": {
+        "enum": [
+          "text",
+          "check",
+          "cross",
+          "dot",
+          "line",
+          "date",
+          "signature",
+          "initials"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "type",
+      "at"
+    ],
+    "type": "object"
+  }
+}

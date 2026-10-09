@@ -1,0 +1,63 @@
+{
+  "name": "sign_document",
+  "description": "Sign with a digital ID (a .p12/.pfx path, or on macOS a Keychain identity: \"keychain:<common name or fingerprint>\" from sign_keychain_ids) and save the signed file to `out` (signing always saves, as in Acrobat; the document then shows the signed file). Sign an existing empty signature field (`field`), or a new one on `page` at `rect` (omit rect for an invisible signature). certify: no_changes, form_fill or comments makes a certification signature. PAdES B-B, SHA-256 (SHA-384 for P-384 keys).",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "certify": {
+        "enum": [
+          "no_changes",
+          "form_fill",
+          "comments"
+        ],
+        "type": "string"
+      },
+      "contact": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "field": {
+        "type": "string"
+      },
+      "id": {
+        "description": "Path of the digital ID (.p12 / .pfx).",
+        "type": "string"
+      },
+      "location": {
+        "type": "string"
+      },
+      "out": {
+        "description": "Where to save the signed document.",
+        "type": "string"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "password": {
+        "type": "string"
+      },
+      "reason": {
+        "type": "string"
+      },
+      "rect": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      }
+    },
+    "required": [
+      "doc",
+      "id",
+      "out"
+    ],
+    "type": "object"
+  }
+}

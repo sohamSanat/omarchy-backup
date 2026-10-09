@@ -1,0 +1,30 @@
+{
+  "name": "accessibility_fix",
+  "description": "Apply the checker's automatic fix for a rule: primary-language (value: the language, e.g. en-US), title (value: the title; default the current title or file name; also shows it in the title bar) or tab-order (every page tabs in structure order). Returns the rule's new status. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "rule": {
+        "enum": [
+          "primary-language",
+          "title",
+          "tab-order"
+        ],
+        "type": "string"
+      },
+      "value": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "rule"
+    ],
+    "type": "object"
+  }
+}

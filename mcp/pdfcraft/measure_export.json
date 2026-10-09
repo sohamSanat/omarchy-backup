@@ -1,0 +1,23 @@
+{
+  "name": "measure_export",
+  "description": "Atomically write saved measurement values, labels, authors and scale ratios as spreadsheet-safe CSV. Returns how many unsupported measurements were left out.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "out": {
+        "description": "A file path (relative to --root when set).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "out"
+    ],
+    "type": "object"
+  }
+}

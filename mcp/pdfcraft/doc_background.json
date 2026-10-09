@@ -1,0 +1,50 @@
+{
+  "name": "doc_background",
+  "description": "Fill page backgrounds with a colour, or a picture from `file` (an image, or page `file_page` of a PDF) fitted at `scale` (default 1), behind the content. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "color": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "file": {
+        "type": "string"
+      },
+      "file_page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "opacity": {
+        "maximum": 1,
+        "minimum": 0,
+        "type": "number"
+      },
+      "pages": {
+        "description": "1-based page numbers to fill (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "replace": {
+        "type": "boolean"
+      },
+      "scale": {
+        "exclusiveMinimum": 0,
+        "maximum": 1,
+        "type": "number"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "doc_flatten",
+  "description": "Merge comment and/or form field appearances into the page content, so they print and display everywhere but can no longer be edited. Undoable until saved.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "comments": {
+        "description": "Default true.",
+        "type": "boolean"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "fields": {
+        "description": "Default true.",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

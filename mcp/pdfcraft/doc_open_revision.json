@@ -1,0 +1,23 @@
+{
+  "name": "doc_open_revision",
+  "description": "Open saved revision `revision` (1 = the oldest) of a document as a new, unsaved document, to see the file as it was then.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "revision": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc",
+      "revision"
+    ],
+    "type": "object"
+  }
+}

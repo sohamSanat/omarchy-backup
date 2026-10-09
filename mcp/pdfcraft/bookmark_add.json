@@ -1,0 +1,41 @@
+{
+  "name": "bookmark_add",
+  "description": "Add a bookmark that goes to a page, under a parent bookmark (or at the top level), at a position. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "parent": {
+        "description": "Parent bookmark (omit for the top level): 1-based positions from the top level, e.g. [2, 1] = the first child of the second bookmark.",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "position": {
+        "description": "1-based position among the parent's children (default: last).",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "title": {
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "title",
+      "page"
+    ],
+    "type": "object"
+  }
+}

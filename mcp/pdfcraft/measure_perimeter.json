@@ -1,0 +1,46 @@
+{
+  "name": "measure_perimeter",
+  "description": "Add an undoable connected-line length annotation. To include a closing edge, repeat the first point at the end.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "author": {
+        "maxLength": 512,
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "label": {
+        "maxLength": 512,
+        "type": "string"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "points": {
+        "items": {
+          "description": "[x, y] in points from the top-left of the displayed page.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "maxItems": 2048,
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "points"
+    ],
+    "type": "object"
+  }
+}

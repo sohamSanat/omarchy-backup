@@ -1,0 +1,26 @@
+{
+  "name": "doc_set_info",
+  "description": "Set a document information entry such as Title, Author, Subject or Keywords. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "key": {
+        "type": "string"
+      },
+      "value": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "key",
+      "value"
+    ],
+    "type": "object"
+  }
+}

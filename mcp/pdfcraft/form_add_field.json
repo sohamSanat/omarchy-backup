@@ -1,0 +1,79 @@
+{
+  "name": "form_add_field",
+  "description": "Add a form field on a page. type: text, date, checkbox, radio, combo, list, button, image (a picture placeholder; fill it with form_set_image), signature. rect in points from the top-left of the displayed page [x0, y0, x1, y1]. name defaults to Acrobat's next free name (Text1, Check Box1, Group1, Dropdown1, List Box1, Button1, Image1, Signature1, Date1). Radio buttons join the radio group named by group (a new group otherwise) with the export value export. Returns the field's name. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "caption": {
+        "description": "Button label.",
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "editable": {
+        "description": "Combo box accepts typed text.",
+        "type": "boolean"
+      },
+      "export": {
+        "description": "Radio button export value (default Choice1).",
+        "type": "string"
+      },
+      "group": {
+        "description": "Radio group to join.",
+        "type": "string"
+      },
+      "multi_select": {
+        "type": "boolean"
+      },
+      "multiline": {
+        "type": "boolean"
+      },
+      "name": {
+        "type": "string"
+      },
+      "options": {
+        "description": "Combo box / list box items.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "rect": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "type": {
+        "enum": [
+          "text",
+          "date",
+          "checkbox",
+          "radio",
+          "combo",
+          "list",
+          "button",
+          "image",
+          "signature"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "type",
+      "rect"
+    ],
+    "type": "object"
+  }
+}

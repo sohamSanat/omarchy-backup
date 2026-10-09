@@ -1,0 +1,44 @@
+{
+  "name": "ocr_recognize",
+  "description": "Scan & OCR \u25b8 Recognize text: render pages, read the words in them and add them as invisible text over the page image, so scanned pages become searchable and selectable (a searchable image; the image is not changed). Pages that already have text are skipped unless skip_text_pages is false. Returns each page's recognised text, word count or why it was skipped. Needs the OCR models (ocr_status). Undoable as one step.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "dpi": {
+        "description": "Resolution pages are read at (default 300; a scanned page is read at most at its own resolution).",
+        "maximum": 600,
+        "minimum": 72,
+        "type": "number"
+      },
+      "language": {
+        "description": "Document language (default en).",
+        "enum": [
+          "en"
+        ],
+        "type": "string"
+      },
+      "pages": {
+        "description": "1-based page numbers to recognise (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "skip_text_pages": {
+        "description": "Leave pages that already contain text alone (default true).",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

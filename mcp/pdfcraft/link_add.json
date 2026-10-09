@@ -1,0 +1,57 @@
+{
+  "name": "link_add",
+  "description": "Add a link over rect on page that opens url or goes to to_page. Appearance: visible (rectangle), color, width 1-3, highlight none/invert/outline/inset. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "color": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "highlight": {
+        "enum": [
+          "none",
+          "invert",
+          "outline",
+          "inset"
+        ],
+        "type": "string"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "rect": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "to_page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "url": {
+        "type": "string"
+      },
+      "visible": {
+        "type": "boolean"
+      },
+      "width": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "rect"
+    ],
+    "type": "object"
+  }
+}

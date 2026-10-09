@@ -1,0 +1,26 @@
+{
+  "name": "doc_compare_report",
+  "description": "Write the compare summary report (a PDF listing every change) to path.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "other": {
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "other",
+      "path"
+    ],
+    "type": "object"
+  }
+}

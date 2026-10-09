@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# PdfCraft launcher wrapper for Omarchy Linux
+# ------------------------------------------------------------------------------
+# 1. Enables loopback control server so Omarchy theme changes update live
+# 2. Exposes PDFCRAFT_THEME_FILE for live dynamic per-theme color customization
+# 3. Supports optional XWayland fallback (PDFCRAFT_FORCE_XWAYLAND=1)
+# ==============================================================================
+set -euo pipefail
+
+export PDFCRAFT_CONTROL_PORT="${PDFCRAFT_CONTROL_PORT:-48294}"
+export PDFCRAFT_CONTROL_DIR="${PDFCRAFT_CONTROL_DIR:-$HOME/.config/pdfcraft}"
+export PDFCRAFT_CONTROL_FILE="${PDFCRAFT_CONTROL_FILE:-$PDFCRAFT_CONTROL_DIR/control.json}"
+export PDFCRAFT_THEME_FILE="${PDFCRAFT_THEME_FILE:-$HOME/.config/pdfcraft/theme.json}"
+
+mkdir -p "$PDFCRAFT_CONTROL_DIR"
+
+# Ensure initial theme.json is populated from current Omarchy theme
+if [[ ! -f "$PDFCRAFT_THEME_FILE" ]]; then
+  "$HOME/.local/bin/omarchy-sync-pdfcraft" 2>/dev/null || true
+fi
+
+# Optional XWayland fallback
+if [[ "${PDFCRAFT_FORCE_XWAYLAND:-0}" == "1" ]]; then
+  unset WAYLAND_DISPLAY
+fi
+
+# Do not pass --control if running help, version, or if --control is already specified
+for arg in "$@"; do
+  if [[ "$arg" == "--version" || "$arg" == "--help" || "$arg" == "-h" || "$arg" == "--control" ]]; then
+    exec "$HOME/.local/bin/pdfcraft.real" "$@"
+  fi
+done
+
+exec "$HOME/.local/bin/pdfcraft.real" --control "$PDFCRAFT_CONTROL_FILE" "$@"

@@ -1,0 +1,16 @@
+{
+  "name": "command_list",
+  "description": "Every registered PdfCraft command with its menu, shortcut, whether it is enabled now, and the tool that automates it.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

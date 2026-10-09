@@ -1,0 +1,10 @@
+{
+  "name": "printers",
+  "description": "The printers the system's print spooler knows (CUPS on macOS and Linux), with the default marked.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  }
+}

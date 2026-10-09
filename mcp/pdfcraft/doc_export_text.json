@@ -1,0 +1,31 @@
+{
+  "name": "doc_export_text",
+  "description": "Write the reading-order text of pages to a .txt file (pages separated by form feeds).",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "pages": {
+        "description": "1-based page numbers to export (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "path": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "path"
+    ],
+    "type": "object"
+  }
+}

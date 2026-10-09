@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# omarchy-sync-pdfcraft: Dynamic Theme Synchronization Engine for PdfCraft
+# ------------------------------------------------------------------------------
+# Generates per-theme color tokens directly from Omarchy's active theme palette
+# and updates ~/.config/pdfcraft/theme.json for instant live hot-reloading.
+# ==============================================================================
+set -euo pipefail
+
+PREFS_DIR="$HOME/.config/pdfcraft"
+CONTROL_FILE="$PREFS_DIR/control.json"
+THEME_JSON="$PREFS_DIR/theme.json"
+CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+COLORS_TOML="$CURRENT_THEME_DIR/colors.toml"
+
+mkdir -p "$PREFS_DIR"
+
+# 1. Determine colors.toml source
+SPECIFIED_THEME="${1:-}"
+if [[ -n "$SPECIFIED_THEME" && -f "$HOME/.config/omarchy/themes/$SPECIFIED_THEME/colors.toml" ]]; then
+  COLORS_TOML="$HOME/.config/omarchy/themes/$SPECIFIED_THEME/colors.toml"
+elif [[ -n "$SPECIFIED_THEME" && -f "/usr/share/omarchy/themes/$SPECIFIED_THEME/colors.toml" ]]; then
+  COLORS_TOML="/usr/share/omarchy/themes/$SPECIFIED_THEME/colors.toml"
+fi
+
+# Fallback check
+if [[ ! -f "$COLORS_TOML" ]]; then
+  if [[ -f "$HOME/.local/state/omarchy/current/theme/colors.toml" ]]; then
+    COLORS_TOML="$HOME/.local/state/omarchy/current/theme/colors.toml"
+  fi
+fi
+
+# 2. Run Python palette synthesis
+python3 - <<PY
+import tomllib, json, os
+
+def hex_to_rgb(h):
+    h = h.strip().lstrip('#')
+    if len(h) == 3:
+        h = ''.join(c * 2 for c in h)
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+def rgb_to_hex(r, g, b):
+    return f"#{int(max(0, min(255, round(r)))):02x}{int(max(0, min(255, round(g)))):02x}{int(max(0, min(255, round(b)))):02x}"
+
+def blend(c1, c2, factor):
+    r1, g1, b1 = hex_to_rgb(c1)
+    r2, g2, b2 = hex_to_rgb(c2)
+    return rgb_to_hex(
+        r1 * (1.0 - factor) + r2 * factor,
+        g1 * (1.0 - factor) + g2 * factor,
+        b1 * (1.0 - factor) + b2 * factor
+    )
+
+colors_path = "$COLORS_TOML"
+colors = {}
+if os.path.exists(colors_path):
+    try:
+        with open(colors_path, "rb") as f:
+            colors = tomllib.load(f)
+    except Exception:
+        pass
+
+bg = colors.get("background", "#1B1B1B")
+fg = colors.get("foreground", "#efebdc")
+accent = colors.get("accent", colors.get("color4", "#e75a50"))
+c1 = colors.get("color1", "#ef4444")
+c3 = colors.get("color3", "#eab308")
+
+r, g, b = hex_to_rgb(bg)
+lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+is_light = lum > 128
+
+if is_light:
+    # High-contrast light mode adhering to Omarchy theming rules
+    chrome = blend(bg, "#000000", 0.03)
+    panel = bg
+    titlebar = blend(bg, "#000000", 0.06)
+    pasteboard = blend(bg, "#000000", 0.09)
+    card = "#ffffff" if bg != "#ffffff" else blend(bg, "#000000", 0.02)
+    border = blend(bg, "#000000", 0.16)
+    divider = blend(bg, "#000000", 0.10)
+    text = blend(fg, "#000000", 0.70) if fg == bg else fg
+    text_muted = blend(text, bg, 0.40)
+    text_faint = blend(text, bg, 0.60)
+    icon = blend(text, bg, 0.15)
+    hover = blend(bg, "#000000", 0.07)
+    pressed = blend(bg, "#000000", 0.14)
+    selected = blend(accent, bg, 0.75)
+    accent_color = accent
+    accent_text = blend(accent, "#000000", 0.15)
+    accent_soft = blend(accent, bg, 0.80)
+    field = "#ffffff" if bg != "#ffffff" else blend(bg, "#000000", 0.02)
+    badge_new = accent
+    page_shadow = "#00000022"
+else:
+    # Deep, saturated dark mode matching Omarchy themes
+    chrome = blend(bg, "#ffffff", 0.04)
+    panel = bg
+    titlebar = blend(bg, "#000000", 0.18)
+    pasteboard = blend(bg, "#000000", 0.22)
+    card = blend(bg, "#ffffff", 0.08)
+    border = blend(bg, "#ffffff", 0.14)
+    divider = blend(bg, "#ffffff", 0.09)
+    text = fg
+    text_muted = blend(fg, bg, 0.35)
+    text_faint = blend(fg, bg, 0.55)
+    icon = blend(fg, bg, 0.15)
+    hover = blend(bg, "#ffffff", 0.12)
+    pressed = blend(bg, "#ffffff", 0.18)
+    selected = blend(accent, bg, 0.60)
+    accent_color = accent
+    accent_text = blend(accent, "#ffffff", 0.25)
+    accent_soft = blend(accent, bg, 0.70)
+    field = blend(bg, "#000000", 0.15)
+    badge_new = accent
+    page_shadow = "#00000078"
+
+tokens = {
+    "kind": "light" if is_light else "dark",
+    "dark": not is_light,
+    "titlebar": titlebar,
+    "chrome": chrome,
+    "panel": panel,
+    "pasteboard": pasteboard,
+    "card": card,
+    "border": border,
+    "divider": divider,
+    "text": text,
+    "text_muted": text_muted,
+    "text_faint": text_faint,
+    "icon": icon,
+    "hover": hover,
+    "pressed": pressed,
+    "selected": selected,
+    "accent": accent_color,
+    "accent_text": accent_text,
+    "accent_soft": accent_soft,
+    "field": field,
+    "badge_new": badge_new,
+    "page_shadow": page_shadow,
+    "radius": 6
+}
+
+with open("$THEME_JSON", "w") as out:
+    json.dump(tokens, out, indent=2)
+PY
+
+# 3. If PdfCraft is running on loopback, wake up and apply immediately
+if [[ -f "$CONTROL_FILE" ]] && command -v python3 >/dev/null 2>&1; then
+  python3 - <<PY 2>/dev/null || true
+import socket, json, os
+
+try:
+    with open("$CONTROL_FILE") as fp:
+        info = json.load(fp)
+    port = int(info["port"])
+    token = str(info["token"])
+    pid = int(info.get("pid", 0))
+
+    if pid > 0:
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            raise RuntimeError("Process not running")
+
+    s = socket.create_connection(("127.0.0.1", port), timeout=0.3)
+    f = s.makefile("rw")
+    f.write(json.dumps({"id": 1, "method": "auth", "params": {"token": token}}) + "\n")
+    f.flush()
+    f.readline()
+    # Trigger inspect to immediately flush live token poll
+    f.write(json.dumps({"id": 2, "method": "ui.inspect", "params": {}}) + "\n")
+    f.flush()
+    f.readline()
+    s.close()
+except Exception:
+    pass
+PY
+fi

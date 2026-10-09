@@ -1,0 +1,36 @@
+{
+  "name": "page_insert_file",
+  "description": "Insert pages of another PDF so the first becomes page `at`. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "at": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "pages": {
+        "description": "1-based page numbers of the source file (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "path": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "path",
+      "at"
+    ],
+    "type": "object"
+  }
+}

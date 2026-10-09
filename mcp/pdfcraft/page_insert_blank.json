@@ -1,0 +1,31 @@
+{
+  "name": "page_insert_blank",
+  "description": "Insert a blank page so it becomes page `at`. Size defaults to the neighbouring page. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "at": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "height": {
+        "description": "Points.",
+        "type": "number"
+      },
+      "width": {
+        "description": "Points.",
+        "type": "number"
+      }
+    },
+    "required": [
+      "doc",
+      "at"
+    ],
+    "type": "object"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "name": "doc_create",
+  "description": "Create a new, unsaved document and return it like doc_open: `blank` (pages, width, height in points; default 1 US Letter page), `images` (paths of PNG, JPEG, TIFF (every page), GIF or BMP files, one page each at the image's resolution) or `text` (a .txt path, or `text` directly). Save it with doc_save and a path.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "dpi": {
+        "description": "For images: override the embedded resolution without resampling. 72 gives one point per pixel; omit to use each image's resolution (72 when absent).",
+        "maximum": 1200,
+        "minimum": 1,
+        "type": "number"
+      },
+      "from": {
+        "enum": [
+          "blank",
+          "images",
+          "text"
+        ],
+        "type": "string"
+      },
+      "height": {
+        "minimum": 3,
+        "type": "number"
+      },
+      "name": {
+        "description": "Name for the new document (default derived from the source).",
+        "type": "string"
+      },
+      "pages": {
+        "maximum": 10000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      },
+      "paths": {
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "text": {
+        "type": "string"
+      },
+      "width": {
+        "minimum": 3,
+        "type": "number"
+      }
+    },
+    "required": [
+      "from"
+    ],
+    "type": "object"
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "name": "text_edit",
+  "description": "Replace the text of one paragraph (paragraph, from text_paragraphs: rewrapped to the paragraph's width with its line spacing) or one line (line, from text_lines) in place, keeping position, size and colour. For a paragraph, also change its formatting: font (helvetica, times, courier) with bold/italic, size (points), color (#rrggbb), align (left, center, right, justify), underline, line_spacing (\u00d7 size), char_spacing (points) and scale (horizontal, percent), or move it (dx, dy in points; up is +dy) and rewrap it to a new width (points); text may then be omitted. Its own font is reused when it can show every character; otherwise the line is set in Helvetica (the result shows the font used). Text that no available font can show is refused. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "align": {
+        "enum": [
+          "left",
+          "center",
+          "right",
+          "justify"
+        ],
+        "type": "string"
+      },
+      "bold": {
+        "type": "boolean"
+      },
+      "char_spacing": {
+        "description": "Points.",
+        "type": "number"
+      },
+      "color": {
+        "description": "#rrggbb",
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "dx": {
+        "description": "Paragraph only: move right by this many points (negative: left).",
+        "type": "number"
+      },
+      "dy": {
+        "description": "Paragraph only: move up by this many points (negative: down).",
+        "type": "number"
+      },
+      "font": {
+        "enum": [
+          "helvetica",
+          "times",
+          "courier"
+        ],
+        "type": "string"
+      },
+      "italic": {
+        "type": "boolean"
+      },
+      "line": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "line_spacing": {
+        "description": "Multiple of the font size (1.2 is ordinary).",
+        "type": "number"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "paragraph": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "scale": {
+        "description": "Horizontal scale in percent.",
+        "type": "number"
+      },
+      "size": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+      },
+      "text": {
+        "type": "string"
+      },
+      "underline": {
+        "type": "boolean"
+      },
+      "width": {
+        "description": "Paragraph only: rewrap to this width in points (dragging the box's edge).",
+        "type": "number"
+      }
+    },
+    "required": [
+      "doc",
+      "page"
+    ],
+    "type": "object"
+  }
+}

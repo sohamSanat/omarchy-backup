@@ -1,0 +1,32 @@
+{
+  "name": "bookmark_set_page",
+  "description": "Point a bookmark at another page. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "path": {
+        "description": "The bookmark: 1-based positions from the top level, e.g. [2, 1] = the first child of the second bookmark.",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "doc",
+      "path",
+      "page"
+    ],
+    "type": "object"
+  }
+}

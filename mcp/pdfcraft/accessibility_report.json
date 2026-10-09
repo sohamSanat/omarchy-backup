@@ -1,0 +1,46 @@
+{
+  "name": "accessibility_report",
+  "description": "Run the full check and write the accessibility report (HTML) to path; returns the results too. Takes the same options as accessibility_check.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "all": {
+        "type": "boolean"
+      },
+      "categories": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "pages": {
+        "description": "1-based page numbers for the page rules (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "path": {
+        "type": "string"
+      },
+      "rules": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "doc",
+      "path"
+    ],
+    "type": "object"
+  }
+}

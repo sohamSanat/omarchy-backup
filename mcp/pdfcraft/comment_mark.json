@@ -1,0 +1,39 @@
+{
+  "name": "comment_mark",
+  "description": "Mark or unmark a comment with a checkmark (Acrobat: Mark with checkmark), recorded as a private reply. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "author": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "id": {
+        "description": "The comment's id (from comment_list).",
+        "type": "string"
+      },
+      "index": {
+        "description": "1-based position on the page, as comment_list reports.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "marked": {
+        "description": "Default true.",
+        "type": "boolean"
+      },
+      "page": {
+        "description": "With `index`, instead of `id`.",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

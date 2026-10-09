@@ -1,0 +1,26 @@
+{
+  "name": "js_run",
+  "description": "Run Acrobat JavaScript in the document, as the JavaScript console does (or as push button `field`'s Mouse Up script when field is given; on a laid-out XFA form, `field` runs that button's XFA click script instead, which can add and remove rows and show or hide subforms). The form object model is available: this/getField, event, app, util, console, display, color, and the document-level scripts. Field changes and resetForm are applied as one undoable step; returns the script's alerts, console output, requests (print, page, url, submit) and error.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "field": {
+        "description": "Run as this button's Mouse Up event.",
+        "type": "string"
+      },
+      "script": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "script"
+    ],
+    "type": "object"
+  }
+}

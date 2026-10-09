@@ -1,0 +1,79 @@
+{
+  "name": "form_set_actions",
+  "description": "Field Properties \u25b8 Actions: replace the field's actions. Each item: trigger (mouse_up, mouse_down, mouse_enter, mouse_exit, on_focus, on_blur) and one of javascript (source), url, reset (field names; [] for all), menu (Print, NextPage, PrevPage, FirstPage, LastPage), page (1-based), show / hide (field names), submit (URL). Triggers not listed lose their action. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "actions": {
+        "items": {
+          "properties": {
+            "hide": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "javascript": {
+              "type": "string"
+            },
+            "menu": {
+              "type": "string"
+            },
+            "page": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "reset": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "show": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "submit": {
+              "type": "string"
+            },
+            "trigger": {
+              "enum": [
+                "mouse_up",
+                "mouse_down",
+                "mouse_enter",
+                "mouse_exit",
+                "on_focus",
+                "on_blur"
+              ],
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "trigger"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "field": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "field",
+      "actions"
+    ],
+    "type": "object"
+  }
+}

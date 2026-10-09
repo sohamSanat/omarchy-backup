@@ -1,0 +1,28 @@
+{
+  "name": "content_delete",
+  "description": "Delete an added item (page, index from content_list). Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "index": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc",
+      "page",
+      "index"
+    ],
+    "type": "object"
+  }
+}

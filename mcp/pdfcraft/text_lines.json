@@ -1,0 +1,23 @@
+{
+  "name": "text_lines",
+  "description": "The lines of existing text on a page (Edit a PDF \u25b8 Edit text): number, text, box (top-left-origin points), font and size. Use the number with text_edit.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc",
+      "page"
+    ],
+    "type": "object"
+  }
+}

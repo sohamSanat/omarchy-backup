@@ -1,0 +1,30 @@
+{
+  "name": "doc_export_data",
+  "description": "Write comments and/or form data to path; the extension picks the format: .xfdf or .fdf (comments and/or fields), .xml, .csv or .txt (form data). what: all (default), comments, fields.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "path": {
+        "type": "string"
+      },
+      "what": {
+        "enum": [
+          "all",
+          "comments",
+          "fields"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "path"
+    ],
+    "type": "object"
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "name": "doc_header_footer",
+  "description": "Add a header and/or footer to pages. Text boxes: header_left/center/right, footer_left/center/right. Tokens: <<1>> page number, <<n>> page count, <<1 of n>>, <<Page 1 of n>>, <<1/n>>, dates <<m/d/yyyy>> <<yyyy-mm-dd>> <<mmmm d, yyyy>> (and more), Bates <<Bates Number#6#1#PREFIX#SUFFIX>>. replace: true swaps out existing ones (Update). Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "color": {
+        "description": "#RRGGBB or a colour name.",
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "font_size": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+      },
+      "footer_center": {
+        "type": "string"
+      },
+      "footer_left": {
+        "type": "string"
+      },
+      "footer_right": {
+        "type": "string"
+      },
+      "header_center": {
+        "type": "string"
+      },
+      "header_left": {
+        "type": "string"
+      },
+      "header_right": {
+        "type": "string"
+      },
+      "margins": {
+        "description": "Top, bottom, left, right in points (default 36, 36, 72, 72).",
+        "items": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "pages": {
+        "description": "1-based page numbers to mark (default: all).",
+        "items": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "replace": {
+        "type": "boolean"
+      },
+      "start_number": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc"
+    ],
+    "type": "object"
+  }
+}

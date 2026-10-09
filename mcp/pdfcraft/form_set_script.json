@@ -1,0 +1,36 @@
+{
+  "name": "form_set_script",
+  "description": "Field Properties \u25b8 Run custom script: set field's JavaScript for event keystroke, format, validate or calculate (the field's actions; calculated fields join the calculation order) or mouse_up (a button's action). Omit script to remove it. The scripts use Acrobat's object model (event.value, event.rc, getField, util.printf, \u2026) and run when the field changes. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "event": {
+        "enum": [
+          "keystroke",
+          "format",
+          "validate",
+          "calculate",
+          "mouse_up"
+        ],
+        "type": "string"
+      },
+      "field": {
+        "type": "string"
+      },
+      "script": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "field",
+      "event"
+    ],
+    "type": "object"
+  }
+}

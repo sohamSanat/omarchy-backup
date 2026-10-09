@@ -1,0 +1,23 @@
+{
+  "name": "form_fill",
+  "description": "Set several fields at once (one undo step). values maps field names (from form_fields) to: a string for text fields, combo boxes and radio groups (an option), true/false for check boxes, an array of strings for multi-select lists. Appearances are regenerated so every viewer shows the values.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "values": {
+        "description": "Field name \u2192 value.",
+        "type": "object"
+      }
+    },
+    "required": [
+      "doc",
+      "values"
+    ],
+    "type": "object"
+  }
+}

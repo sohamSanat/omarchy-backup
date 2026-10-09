@@ -1,0 +1,28 @@
+{
+  "name": "page_render",
+  "description": "Render one page to a PNG image (default 96 dpi, at most 600).",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "dpi": {
+        "maximum": 600,
+        "minimum": 1,
+        "type": "number"
+      },
+      "page": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "doc",
+      "page"
+    ],
+    "type": "object"
+  }
+}

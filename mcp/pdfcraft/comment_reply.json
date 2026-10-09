@@ -1,0 +1,40 @@
+{
+  "name": "comment_reply",
+  "description": "Add a reply to a comment's thread. Undoable.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "author": {
+        "type": "string"
+      },
+      "doc": {
+        "description": "Document id from doc_open or doc_list.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "id": {
+        "description": "The comment's id (from comment_list).",
+        "type": "string"
+      },
+      "index": {
+        "description": "1-based position on the page, as comment_list reports.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "page": {
+        "description": "With `index`, instead of `id`.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "text": {
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "doc",
+      "text"
+    ],
+    "type": "object"
+  }
+}
