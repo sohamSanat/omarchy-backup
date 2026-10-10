@@ -9,3 +9,5 @@ user_pref("browser.tabs.allow_transparent_browser", true);
 user_pref("xpinstall.signatures.required", false);
 user_pref("extensions.experiments.enabled", true);
 
+user_pref("zen.themes.disable-all", false);
+user_pref("zen.theme.accent-color", "#e75a50");

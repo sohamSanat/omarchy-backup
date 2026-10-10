@@ -309,6 +309,15 @@ if [[ -d "${SCRIPT_DIR}/configs/zen" ]]; then
   if [[ -f "${SCRIPT_DIR}/configs/zen/MODS.md" ]]; then
     cp -a "${SCRIPT_DIR}/configs/zen/MODS.md" "${USER_HOME}/.config/zen/"
   fi
+  if [[ -f "${SCRIPT_DIR}/configs/zen/profiles.ini" ]]; then
+    cp -a "${SCRIPT_DIR}/configs/zen/profiles.ini" "${USER_HOME}/.config/zen/"
+  fi
+  if [[ -f "${SCRIPT_DIR}/configs/zen/installs.ini" ]]; then
+    cp -a "${SCRIPT_DIR}/configs/zen/installs.ini" "${USER_HOME}/.config/zen/"
+  fi
+  if [[ ! -L "${USER_HOME}/.zen" ]]; then
+    ln -nsf "${USER_HOME}/.config/zen" "${USER_HOME}/.zen"
+  fi
   if [[ -d "${SCRIPT_DIR}/configs/zen/native-messaging-hosts" ]]; then
     mkdir -p "${USER_HOME}/.config/zen/native-messaging-hosts"
     cp -a "${SCRIPT_DIR}/configs/zen/native-messaging-hosts/." "${USER_HOME}/.config/zen/native-messaging-hosts/"

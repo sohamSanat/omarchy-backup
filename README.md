@@ -75,7 +75,48 @@ Branch: `main`
 - **Dynamic Theming Engine**: `omarchy theme set` instantly propagates colors across KDE/Qt (`kdeglobals`), GTK 4, terminal emulators (Ghostty, Alacritty, Kitty, Foot), Zen Browser (userChrome, Dark Reader), Brave Origin Browser, VLC Media Player, Obsidian, Foliate, and ytkew.
 - **Universal Theming Library & Environment**: `omarchy_theme.py` (high-contrast palette math ensuring dark text on light themes) and `omarchy-theme-env` CLI for terminal environment variable sync (`OMARCHY_THEME_MODE`, `COLORFGBG`).
 
-### 4. 🌐 Brave Origin Browser Theming Ecosystem
+### 4. 🌐 Zen Browser Dynamic Customization Ecosystem (Primary Workstation Browser)
+
+Zen Browser is Soham's primary daily-driver workstation browser on Omarchy Linux. It is deeply connected to Omarchy's system-level theming pipeline, native Wayland transparency, and Hyprland compositor blur effects.
+
+#### 🧩 Core Architecture & Profile Management
+- **Symlinked Profile Configuration (`~/.zen -> ~/.config/zen`)**: Managed profiles (`agmdnjeb.Default (release)`), `profiles.ini`, `installs.ini`, and `Profile Groups` backed up in [`configs/zen/`](file:///home/soham/omarchy-backup/configs/zen).
+- **Native Wayland Transparency Engine**: Custom `user.js` preferences enforce hardware transparency without canvas glitches:
+  - `zen.widget.linux.transparency: true` & `browser.tabs.allow_transparent_browser: true`
+  - `toolkit.legacyUserProfileCustomizations.stylesheets: true`
+  - `zen.themes.disable-all: false` & dynamic accent synchronization.
+- **Launcher Integration**: Symlinked executable `~/.local/bin/zen -> ~/.local/share/zen/zen` with desktop registration (`zen.desktop`).
+
+#### 🎨 Live Theming & Frosted Glass Mods
+1. **Omarchy Dynamic System Theme (`omarchy-sync-zen`)**:
+   - Compiles template [`configs/omarchy/themed/zen.css.tpl`](file:///home/soham/omarchy-backup/configs/omarchy/themed/zen.css.tpl) into `~/.local/state/omarchy/current/theme/zen.css` using high-contrast perceptual palette synthesis.
+   - Symlinked into `<profile>/chrome/zen-omarchy-theme.css` and imported by `userChrome.css`.
+   - Propagates semantic tokens (`--omarchy-bg`, `--omarchy-fg`, `--omarchy-accent`, `--omarchy-surface`, `--omarchy-border`, `--omarchy-border-subtle`) across the vertical tab bar, URL bar, dialogs, and toolbar in real time.
+   - Automatically dispatched on every theme switch by [`configs/omarchy/hooks/theme-set.d/zen-sync.sh`](file:///home/soham/omarchy-backup/configs/omarchy/hooks/theme-set.d/zen-sync.sh).
+2. **Frosted Glass Default Tab (`omarchy-zen-glass`)**:
+   - Transforms default empty/new tab areas (`about:blank`, `about:newtab`, `about:home`) into transparent frosted glass matching the Ghostty terminal, allowing wallpaper and Hyprland blur to shine through.
+   - Preserves 100% solid opacity and crisp readability for all loaded web pages via strict `@-moz-document` scoping in `userContent.css`.
+   - Template: [`configs/omarchy/themed/zen-content.css.tpl`](file:///home/soham/omarchy-backup/configs/omarchy/themed/zen-content.css.tpl). CLI controller: `omarchy-zen-glass` (`--status`, `--toggle`).
+
+#### 🕶️ Omarchy Dark Reader Integration (`configs/zen/mods/darkreader/`)
+- **Custom-Engineered Browser Extension (`addon@darkreader.org.xpi` v4.9.999.1)**:
+  - Dedicated `omarchy` toggle button in the extension popup with accent glow indicators.
+  - **ITU-R BT.601 Perceptual Luminance Math**: Guarantees dark backgrounds are never misclassified as light mode even on custom palettes, and automatically switches to high-contrast charcoal typography (`#4d2e1a`) on light parchment themes (Akaito `#f3e4cb`).
+  - **Deep Web-App Customization**: Injects tailored CSS variables and selectors for YouTube (fixes masthead, chip clouds, rich grids, mini-guides, reels, and video containers), GitHub (`--bgColor-*`), and Reddit (Shreddit).
+  - Non-destructive state toggling preserving user default settings when Omarchy mode is deactivated.
+
+#### 📦 Pre-Packaged Extensions Suite & Native Messaging
+All essential workstation extensions are backed up as reproducible `.xpi` packages in [`configs/zen/extensions/`](file:///home/soham/omarchy-backup/configs/zen/extensions):
+- **`addon@darkreader.org.xpi`**: Patched Omarchy Dark Reader mod.
+- **`uBlock0@raymondhill.net.xpi`**: uBlock Origin adblocker.
+- **`sponsorBlocker@ajay.app.xpi`**: SponsorBlock automated YouTube segment skipper.
+- **`{762f9885-5a13-4abd-9c77-433dcd38b8fd}.xpi`**: Return YouTube Dislike.
+- **`{60493d8c-aec8-448e-a247-5d2cfa047d69}.xpi`**: Ambient Light for YouTube.
+- **`fdm_ffext2@freedownloadmanager.org.xpi`**: Free Download Manager extension with native messaging host (`native-messaging-hosts/org.freedownloadmanager.fdm5.cnh.json`).
+- **`websiteblocker@wesleybranton.com.xpi`**: Distraction-free website blocker.
+- **Shortcuts & Mod Registry**: Complete keymap mappings in `zen-keyboard-shortcuts.json` and mod specifications in [`MODS.md`](file:///home/soham/omarchy-backup/configs/zen/MODS.md).
+
+### 5. 🌐 Brave Origin Secondary Browser Theming Ecosystem
 - **Transparent NTP Canvas (`~/.config/omarchy/brave-polish/`)**: Unpacked MV3 companion extension that renders the active theme's colors and wallpapers onto a transparent canvas directly over Hyprland.
 - **Theme Templates (`configs/omarchy/themed/`)**: `brave-ntp.css.tpl`, `brave-polish.css.tpl`, `brave-polish.json.tpl`, `brave-manifest.json.tpl`, `brave-global.css.tpl`.
 - **Brave Dark Reader Fork (`configs/omarchy/brave-darkreader/`)**: Full Chromium MV3 port of Zen's Dark Reader mod featuring ITU-R BT.601 perceptual luminance checking and dual-mode color mathematics.
@@ -83,7 +124,7 @@ Branch: `main`
 - **CLI & Automated Hook**: `omarchy-sync-brave` (`--sync`, `--status`) invoked automatically on every theme change via `~/.config/omarchy/hooks/theme-set.d/brave-sync.sh`.
 - **Chromium & Brave Startup Flags**: `configs/chromium-flags.conf`, `configs/brave-origin-nightly-flags.conf` (pre-loads Brave Polish and essential system extensions), and `configs/environment.d/brave.conf`.
 
-### 5. 🎨 The Storyteller Craft Application Suite & Creative Cloud (10 Pro Workstations)
+### 6. 🎨 The Storyteller Craft Application Suite & Creative Cloud (10 Pro Workstations)
 
 The **Storyteller Craft Suite** is Soham's custom-engineered creative and office application ecosystem for Omarchy Linux. Built with Rust, `egui`, and `wgpu`, each application has been specifically patched and extended with deep Omarchy desktop integration, live dynamic per-theme color adaptation, headless AI agent control interfaces via the Model Context Protocol (MCP), and centralized supervision via **CraftCloud**.
 
@@ -195,7 +236,7 @@ For any future AI agent restoring this workflow:
    - Theme sync works: running `omarchy-sync-<app>` cleanly produces `~/.config/<app>/theme.json`.
    - Native Wayland execution works; if running in virtualized/nested environments, use `env <APP>_FORCE_XWAYLAND=1 <app>`.
 
-### 6. 🛠️ Utilities, Standalone Apps & System Services
+### 7. 🛠️ Utilities, Standalone Apps & System Services
 - **Standalone Auxiliary Apps (`apps/`)**:
   - `apps/photos-gallery`: Windows 11 Fluent Photo Gallery & Vault app with biometric/PIN unlock, image adjustments, and EXIF metadata view (Electron 43). Restored to `~/Projects/photos-gallery` with `p-gallery.desktop` and `bin/p-gallery`.
   - `apps/gallery`: Minimalist desktop photo viewer restored to `~/Projects/gallery` with `gallery.desktop` and `bin/gallery`.

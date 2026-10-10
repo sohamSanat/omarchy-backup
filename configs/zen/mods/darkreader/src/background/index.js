@@ -2749,7 +2749,7 @@
         darkColorScheme: "Default",
         immediateModify: false,
         accentColor: "",
-        omarchyThemeActive: false,
+        omarchyThemeActive: true,
         omarchyTokens: null
     };
     const DEFAULT_COLORSCHEME = {
@@ -2810,8 +2810,8 @@
         enableForPDF: true,
         enableForProtectedPages: false,
         enableContextMenus: false,
-        detectDarkTheme: true,
-        omarchyThemeActive: false,
+        detectDarkTheme: false,
+        omarchyThemeActive: true,
         savedNormalTheme: null,
         savedNormalDetectDarkTheme: null
     };
@@ -7017,10 +7017,11 @@
             await _a.onSettingsChanged();
         }
         static async refreshOmarchyThemeIfActive() {
-            if (UserStorage.settings && UserStorage.settings.omarchyThemeActive) {
+            if (UserStorage.settings && UserStorage.settings.omarchyThemeActive !== false) {
                 const tokens = await OmarchyManager.loadTokens();
                 const omarchyTheme = OmarchyManager.buildTheme(tokens, UserStorage.settings.theme);
                 UserStorage.set({
+                    omarchyThemeActive: true,
                     detectDarkTheme: false,
                     theme: {
                         ...UserStorage.settings.theme,

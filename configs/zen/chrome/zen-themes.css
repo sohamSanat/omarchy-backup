@@ -15,85 +15,97 @@
  * NOTE FOR AI AGENTS & DEVELOPERS:
  * - This file ONLY styles Zen Browser's Chrome (UI, tabs, sidebars, toolbars, URL bar).
  * - Webpage contents are strictly untouched.
- * - Variables are populated from the active Omarchy theme's colors.toml.
+ * - Variables are populated dynamically from the active Omarchy theme's colors.toml.
  * ============================================================================== */
 
 :root {
   /* --- Omarchy System Theme Tokens --- */
-  --omarchy-bg: #1E3061;
-  --omarchy-fg: #E8EEFF;
-  --omarchy-accent: #4D8FFF;
-  --omarchy-muted: #6080C0;
-  --omarchy-selection-bg: #4D8FFF;
-  --omarchy-selection-fg: #FFFFFF;
+  --omarchy-bg: #1B1B1B;
+  --omarchy-fg: #efebdc;
+  --omarchy-accent: #e75a50;
+  --omarchy-muted: #817f68;
+  --omarchy-selection-bg: #e75a50;
+  --omarchy-selection-fg: #1B1B1B;
 
   /* Surfaces & Interactivity (blended for perfect contrast in both light and dark modes) */
-  --omarchy-surface: color-mix(in srgb, #E8EEFF 6%, #1E3061);
-  --omarchy-surface-hover: color-mix(in srgb, #E8EEFF 12%, #1E3061);
-  --omarchy-surface-active: color-mix(in srgb, #E8EEFF 18%, #1E3061);
-  --omarchy-border: color-mix(in srgb, #E8EEFF 15%, transparent);
+  --omarchy-surface: color-mix(in srgb, #efebdc 7%, #1B1B1B);
+  --omarchy-surface-hover: color-mix(in srgb, #efebdc 13%, #1B1B1B);
+  --omarchy-surface-active: color-mix(in srgb, #efebdc 20%, #1B1B1B);
+  --omarchy-border: color-mix(in srgb, #efebdc 16%, transparent);
+  --omarchy-border-subtle: color-mix(in srgb, #efebdc 10%, transparent);
 
   /* --- Zen Browser Native Variables --- */
-  --zen-primary-color: #4D8FFF !important;
-  --zen-branding-bg: #1E3061 !important;
-  --zen-branding-bg-reverse: #E8EEFF !important;
+  --zen-primary-color: #e75a50 !important;
+  --zen-branding-bg: #1B1B1B !important;
+  --zen-branding-bg-reverse: #efebdc !important;
+  --zen-branding-dark: #1B1B1B !important;
+  --zen-branding-paper: #1B1B1B !important;
 
   --zen-colors-primary: var(--omarchy-surface) !important;
   --zen-colors-secondary: var(--omarchy-surface-hover) !important;
-  --zen-colors-tertiary: #1E3061 !important;
+  --zen-colors-tertiary: #1B1B1B !important;
   --zen-colors-hover-bg: var(--omarchy-surface-hover) !important;
-  --zen-colors-primary-foreground: #E8EEFF !important;
+  --zen-colors-primary-foreground: #efebdc !important;
   --zen-colors-border: var(--omarchy-border) !important;
-  --zen-colors-border-contrast: #4D8FFF !important;
+  --zen-colors-border-contrast: #e75a50 !important;
   --zen-colors-input-bg: var(--omarchy-surface) !important;
 
-  --zen-dialog-background: #1E3061 !important;
+  --zen-dialog-background: #1B1B1B !important;
   --zen-urlbar-background: var(--omarchy-surface) !important;
+  --zen-urlbar-background-base: #1B1B1B !important;
+  --zen-urlbar-background-transparent: color-mix(in srgb, #1B1B1B 85%, transparent) !important;
   --zen-toolbar-element-bg: var(--omarchy-surface) !important;
   --zen-toolbar-element-bg-hover: var(--omarchy-surface-hover) !important;
+  --zen-selected-bg: var(--omarchy-surface-active) !important;
+  --zen-selected-color: #efebdc !important;
 
   /* Main Browser & Toolbar Canvas */
   --zen-main-browser-background: transparent !important;
   --zen-background-opacity: 0 !important;
-  --zen-main-browser-background-toolbar: #1E3061 !important;
-  --zen-themed-toolbar-bg: #1E3061 !important;
+  --zen-main-browser-background-toolbar: #1B1B1B !important;
+  --zen-themed-toolbar-bg: #1B1B1B !important;
   --zen-themed-toolbar-bg-transparent: transparent !important;
-  --zen-navigator-toolbox-background: #1E3061 !important;
-  --toolbox-bgcolor-inactive: #1E3061 !important;
+  --zen-navigator-toolbox-background: #1B1B1B !important;
+  --toolbox-bgcolor-inactive: #1B1B1B !important;
 
   /* Firefox / Gecko Chrome Tokens */
-  --toolbar-bgcolor: #1E3061 !important;
-  --toolbar-color: #E8EEFF !important;
-  --toolbar-field-color: #E8EEFF !important;
-  --toolbar-field-focus-color: #E8EEFF !important;
+  --toolbar-bgcolor: #1B1B1B !important;
+  --toolbar-color: #efebdc !important;
+  --toolbar-field-color: #efebdc !important;
+  --toolbar-field-focus-color: #efebdc !important;
   --toolbar-field-background-color: var(--omarchy-surface) !important;
-  --toolbarbutton-icon-fill: #E8EEFF !important;
+  --toolbar-field-focus-background-color: var(--omarchy-surface-hover) !important;
+  --toolbarbutton-icon-fill: #efebdc !important;
   --toolbarbutton-hover-background: var(--omarchy-surface-hover) !important;
   --toolbarbutton-active-background: var(--omarchy-surface-active) !important;
-  --lwt-text-color: #E8EEFF !important;
-  --toolbox-textcolor: #E8EEFF !important;
+  --lwt-text-color: #efebdc !important;
+  --toolbox-textcolor: #efebdc !important;
+  --toolbox-textcolor-inactive: var(--omarchy-muted) !important;
+  --color-accent-primary: #e75a50 !important;
+  --button-background-color-primary: #e75a50 !important;
+  --button-primary-hover-bgcolor: color-mix(in srgb, #e75a50 85%, white 15%) !important;
+  --button-primary-active-bgcolor: color-mix(in srgb, #e75a50 80%, black 20%) !important;
+  --button-primary-color: #1B1B1B !important;
 
   /* Tab Selection & Badges */
-  --tab-selected-textcolor: #E8EEFF !important;
+  --tab-selected-textcolor: #efebdc !important;
   --tab-selected-bgcolor: var(--omarchy-surface-active) !important;
   --tab-background-color-hover: var(--omarchy-surface-hover) !important;
-  --zen-selected-bg: var(--omarchy-surface-active) !important;
-  --zen-selected-color: #E8EEFF !important;
 
   /* Sidebar Tokens */
-  --sidebar-background-color: #1E3061 !important;
-  --sidebar-text-color: #E8EEFF !important;
-  --lwt-sidebar-background-color: #1E3061 !important;
-  --lwt-sidebar-text-color: #E8EEFF !important;
+  --sidebar-background-color: #1B1B1B !important;
+  --sidebar-text-color: #efebdc !important;
+  --lwt-sidebar-background-color: #1B1B1B !important;
+  --lwt-sidebar-text-color: #efebdc !important;
 
   /* Popups, Panels, Dialogs */
-  --arrowpanel-background: #1E3061 !important;
-  --arrowpanel-color: #E8EEFF !important;
+  --arrowpanel-background: #1B1B1B !important;
+  --arrowpanel-color: #efebdc !important;
   --arrowpanel-border-color: var(--omarchy-border) !important;
   --panel-separator-color: var(--omarchy-border) !important;
 
   /* Split views & focus outlines */
-  --zen-active-split-outline-color: #4D8FFF !important;
+  --zen-active-split-outline-color: #e75a50 !important;
 }
 
 /* ==============================================================================
@@ -137,14 +149,20 @@ browser[type="content"][transparent="true"] {
 #zen-appcontent-navbar-container,
 #PersonalToolbar,
 hbox#titlebar {
-  background-color: #1E3061 !important;
-  color: #E8EEFF !important;
+  background-color: #1B1B1B !important;
+  color: #efebdc !important;
   border-color: var(--omarchy-border) !important;
+}
+
+/* Compact Mode Toolbar Background */
+.zen-toolbar-background {
+  background-color: #1B1B1B !important;
+  border: 1px solid var(--omarchy-border) !important;
 }
 
 /* Toolbar Buttons & Icons */
 toolbarbutton {
-  color: #E8EEFF !important;
+  color: #efebdc !important;
 }
 
 .toolbarbutton-1:hover {
@@ -152,15 +170,19 @@ toolbarbutton {
 }
 
 .toolbarbutton-icon {
-  fill: #E8EEFF !important;
+  fill: #efebdc !important;
 }
 
-/* URL Bar / Omnibox Styling */
+/* ==============================================================================
+   Search Section / Omnibox / Breakout URL Bar (Ctrl + T & Ctrl + L)
+   ============================================================================== */
+
+/* Normal / Inline URL Bar state */
 #urlbar-container {
-  color: #E8EEFF !important;
+  color: #efebdc !important;
 }
 
-.urlbar-background {
+#urlbar:not([breakout-extend]) .urlbar-background {
   background-color: var(--omarchy-surface) !important;
   border: 1px solid var(--omarchy-border) !important;
   box-shadow: none !important;
@@ -168,58 +190,195 @@ toolbarbutton {
 
 #urlbar:not([breakout-extend]):hover .urlbar-background {
   background-color: var(--omarchy-surface-hover) !important;
-  border-color: color-mix(in srgb, #4D8FFF 40%, var(--omarchy-border)) !important;
+  border-color: color-mix(in srgb, #e75a50 40%, var(--omarchy-border)) !important;
 }
 
-#urlbar[focused="true"] .urlbar-background {
+#urlbar:not([breakout-extend])[focused="true"] .urlbar-background {
   background-color: var(--omarchy-surface) !important;
-  border-color: #4D8FFF !important;
+  border-color: #e75a50 !important;
 }
 
-/* Centered / Floating Search Bar on Empty & New Tabs (Frosted Glass Card) */
-#urlbar[zen-floating-urlbar="true"] .urlbar-background,
-#urlbar[breakout-extend][zen-floating-urlbar="true"] .urlbar-background {
-  background: color-mix(in srgb, #1E3061 75%, transparent) !important;
-  backdrop-filter: blur(24px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(140%) !important;
-  border: 1px solid color-mix(in srgb, #E8EEFF 18%, transparent) !important;
-  box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.12) !important;
+/* Extended / Opened Search Modal (triggered by Ctrl+T, Ctrl+L, or click) */
+#urlbar[breakout-extend],
+#urlbar[breakout],
+#urlbar[open],
+#urlbar[zen-floating-urlbar="true"] {
+  color: #efebdc !important;
+}
+
+/* Modal Card Background Canvas */
+#urlbar[breakout-extend] .urlbar-background,
+#urlbar[open] .urlbar-background,
+#urlbar[zen-floating-urlbar="true"] .urlbar-background {
+  background: color-mix(in srgb, #1B1B1B 94%, #efebdc 6%) !important;
+  background-color: color-mix(in srgb, #1B1B1B 94%, #efebdc 6%) !important;
+  border: 1px solid var(--omarchy-border) !important;
   border-radius: 14px !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--omarchy-border) !important;
+  outline: none !important;
 }
 
+#urlbar[breakout-extend]:hover .urlbar-background,
+#urlbar[open]:hover .urlbar-background,
 #urlbar[zen-floating-urlbar="true"]:hover .urlbar-background {
-  background: color-mix(in srgb, #1E3061 65%, transparent) !important;
-  border-color: color-mix(in srgb, #E8EEFF 28%, transparent) !important;
+  border-color: color-mix(in srgb, #e75a50 40%, var(--omarchy-border)) !important;
 }
 
-#urlbar[zen-floating-urlbar="true"][focused="true"] .urlbar-background {
-  background: color-mix(in srgb, #1E3061 80%, transparent) !important;
-  border-color: #4D8FFF !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, #4D8FFF 40%, transparent), 0 16px 40px 0 rgba(0, 0, 0, 0.5) !important;
+#urlbar[breakout-extend][focused="true"] .urlbar-background,
+#urlbar[open][focused="true"] .urlbar-background {
+  border-color: #e75a50 !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #e75a50 40%, transparent), 0 16px 48px rgba(0, 0, 0, 0.5) !important;
 }
 
+/* Search input container */
+#urlbar[breakout-extend] #urlbar-input-container,
+#urlbar[open] #urlbar-input-container {
+  padding: 6px 12px !important;
+  border-bottom: 1px solid var(--omarchy-border) !important;
+}
+
+/* Input element & placeholder */
+#urlbar-input,
 .urlbar-input {
-  color: #E8EEFF !important;
+  color: #efebdc !important;
+  font-size: 15px !important;
 }
 
+#urlbar-input::placeholder,
 .urlbar-input::placeholder {
-  color: color-mix(in srgb, #E8EEFF 60%, transparent) !important;
-  opacity: 1 !important;
+  color: var(--omarchy-muted) !important;
+  opacity: 0.8 !important;
 }
 
+/* Search icons in input box */
+#identity-box,
+#identity-icon-box {
+  color: #efebdc !important;
+  fill: #efebdc !important;
+}
+
+#identity-icon-box:hover {
+  background-color: var(--omarchy-surface-hover) !important;
+}
+
+/* Search mode indicator badge (e.g. Google, Tab search) */
+#urlbar-search-mode-indicator,
+#urlbar-label-box {
+  background-color: #e75a50 !important;
+  color: #1B1B1B !important;
+  border-radius: 6px !important;
+  padding: 2px 8px !important;
+}
+
+#urlbar-search-mode-indicator-title {
+  color: #1B1B1B !important;
+  font-weight: 600 !important;
+}
+
+/* Results Dropdown View */
 .urlbarView {
-  background-color: #1E3061 !important;
-  color: #E8EEFF !important;
-  border-color: var(--omarchy-border) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #efebdc !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 4px 6px !important;
+}
+
+.urlbarView-body-outer,
+.urlbarView-body-inner {
+  background: transparent !important;
+}
+
+#urlbar-results {
+  padding: 4px 0 !important;
+}
+
+/* Search Result Rows */
+.urlbarView-row {
+  color: #efebdc !important;
+  border-radius: 8px !important;
+  margin: 2px 0 !important;
+  padding: 6px 10px !important;
+  transition: background-color 0.12s ease !important;
+  background-color: transparent !important;
+}
+
+.urlbarView-row:hover {
+  background-color: var(--omarchy-surface-hover) !important;
+  color: #efebdc !important;
+}
+
+.urlbarView-row[selected] {
+  background-color: var(--omarchy-surface-active) !important;
+  border-left: 3px solid #e75a50 !important;
+  color: #efebdc !important;
+}
+
+/* Row Content Typography & Icons */
+.urlbarView-row[selected] .urlbarView-title,
+.urlbarView-row[selected] .urlbarView-title-separator::before {
+  color: #efebdc !important;
+}
+
+.urlbarView-title {
+  color: #efebdc !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.urlbarView-title-separator::before {
+  color: var(--omarchy-muted) !important;
+  opacity: 0.6 !important;
 }
 
 .urlbarView-url {
-  color: #4D8FFF !important;
+  color: #e75a50 !important;
+  font-size: 13px !important;
+  opacity: 0.9 !important;
 }
+
+.urlbarView-action {
+  color: var(--omarchy-muted) !important;
+  font-size: 13px !important;
+}
+
+.urlbarView-favicon {
+  border-radius: 4px !important;
+  fill: #efebdc !important;
+}
+
+.urlbarView-shortcutContent {
+  background-color: var(--omarchy-surface) !important;
+  color: #efebdc !important;
+  border: 1px solid var(--omarchy-border) !important;
+  border-radius: 4px !important;
+}
+
+/* Bottom search engine buttons */
+.search-panel-one-offs-container {
+  border-top: 1px solid var(--omarchy-border) !important;
+  background: transparent !important;
+  padding-block: 4px !important;
+}
+
+.searchbar-engine-one-off-item {
+  color: #efebdc !important;
+  fill: #efebdc !important;
+  border-radius: 6px !important;
+}
+
+.searchbar-engine-one-off-item:hover {
+  background-color: var(--omarchy-surface-hover) !important;
+}
+
+/* ==============================================================================
+   Tabs & Navigation
+   ============================================================================== */
 
 /* Tab Bar items */
 .tabbrowser-tab {
-  color: #E8EEFF !important;
+  color: #efebdc !important;
 }
 
 .tabbrowser-tab:hover:not([selected]) .tab-background {
@@ -230,12 +389,12 @@ toolbarbutton {
 .tabbrowser-tab[visuallyselected] .tab-background,
 .tabbrowser-tab[multiselected] .tab-background {
   background-color: var(--omarchy-surface-active) !important;
-  border-left: 3px solid #4D8FFF !important;
+  border-left: 3px solid #e75a50 !important;
   box-shadow: none !important;
 }
 
 .tabbrowser-tab[selected] .tab-label {
-  color: #E8EEFF !important;
+  color: #efebdc !important;
   font-weight: 600 !important;
 }
 
@@ -244,8 +403,8 @@ toolbarbutton {
 #vertical-tabs-newtab-button,
 #new-tab-button {
   background-color: var(--omarchy-surface) !important;
-  color: #E8EEFF !important;
-  fill: #E8EEFF !important;
+  color: #efebdc !important;
+  fill: #efebdc !important;
   box-shadow: none !important;
 }
 
@@ -253,23 +412,26 @@ toolbarbutton {
 #vertical-tabs-newtab-button:hover,
 #new-tab-button:hover {
   background-color: var(--omarchy-surface-hover) !important;
-  color: #4D8FFF !important;
-  fill: #4D8FFF !important;
+  color: #e75a50 !important;
+  fill: #e75a50 !important;
 }
 
 /* Close Tab Button */
 .tab-close-button {
-  color: #E8EEFF !important;
-  fill: #E8EEFF !important;
+  color: #efebdc !important;
+  fill: #efebdc !important;
 }
 
 .tab-close-button:hover {
-  background-color: color-mix(in srgb, #F06070 25%, transparent) !important;
-  color: #F06070 !important;
-  fill: #F06070 !important;
+  background-color: color-mix(in srgb, #F44336 25%, transparent) !important;
+  color: #F44336 !important;
+  fill: #F44336 !important;
 }
 
-/* Sidebar & Tabs Area */
+/* ==============================================================================
+   Sidebar & Workspaces
+   ============================================================================== */
+
 #sidebar-box,
 #sidebar-header,
 .sidebar-placesTree,
@@ -277,50 +439,52 @@ toolbarbutton {
 #zen-tabbox-wrapper,
 #zen-sidebar-top-buttons,
 #zen-sidebar-foot-buttons {
-  background-color: #1E3061 !important;
-  color: #E8EEFF !important;
+  background-color: #1B1B1B !important;
+  color: #efebdc !important;
 }
 
 #zen-sidebar-top-buttons toolbarbutton,
 #zen-sidebar-foot-buttons toolbarbutton {
-  color: #E8EEFF !important;
-  fill: #E8EEFF !important;
+  color: #efebdc !important;
+  fill: #efebdc !important;
 }
 
 #zen-sidebar-top-buttons toolbarbutton:hover,
 #zen-sidebar-foot-buttons toolbarbutton:hover {
   background-color: var(--omarchy-surface-hover) !important;
-  color: #4D8FFF !important;
-  fill: #4D8FFF !important;
+  color: #e75a50 !important;
+  fill: #e75a50 !important;
 }
 
 /* Workspace switcher */
 #zen-workspaces-button {
   background-color: var(--omarchy-surface) !important;
-  color: #E8EEFF !important;
+  color: #efebdc !important;
   border: 1px solid var(--omarchy-border) !important;
 }
 
 #zen-workspaces-button:hover {
   background-color: var(--omarchy-surface-hover) !important;
-  border-color: #4D8FFF !important;
+  border-color: #e75a50 !important;
 }
 
 .zen-current-workspace-indicator {
-  background-color: #4D8FFF !important;
+  background-color: #e75a50 !important;
 }
 
-/* Findbar */
+/* ==============================================================================
+   Findbar, Toasts & Dialogs
+   ============================================================================== */
+
 findbar {
-  background-color: #1E3061 !important;
-  color: #E8EEFF !important;
+  background-color: #1B1B1B !important;
+  color: #efebdc !important;
   border-top: 1px solid var(--omarchy-border) !important;
 }
 
-/* Toast Notifications */
 #zen-toast-container {
   background-color: var(--omarchy-surface) !important;
-  color: #E8EEFF !important;
+  color: #efebdc !important;
   border: 1px solid var(--omarchy-border) !important;
 }
 
