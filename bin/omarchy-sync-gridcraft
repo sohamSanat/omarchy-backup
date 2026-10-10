@@ -3,13 +3,12 @@
 # omarchy-sync-gridcraft: Dynamic Theme Synchronization Engine for GridCraft
 # ------------------------------------------------------------------------------
 # Generates per-theme color tokens directly from Omarchy's active theme palette
-# and updates ~/.config/gridcraft/ui.json & theme.json for instant live hot-reloading.
+# and updates ~/.config/gridcraft/theme.json for instant live hot-reloading.
 # ==============================================================================
 set -euo pipefail
 
 PREFS_DIR="$HOME/.config/gridcraft"
 UI_FILE="$PREFS_DIR/ui.json"
-PREFS_FILE="$PREFS_DIR/prefs.json"
 THEME_JSON="$PREFS_DIR/theme.json"
 CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
 COLORS_TOML="$CURRENT_THEME_DIR/colors.toml"
@@ -65,8 +64,11 @@ if os.path.exists(colors_path):
 bg = colors.get("background", "#1B1B1B")
 fg = colors.get("foreground", "#efebdc")
 accent = colors.get("accent", colors.get("color4", "#107c41"))
+c0 = colors.get("color0", bg)
 c1 = colors.get("color1", "#ef4444")
 c2 = colors.get("color2", "#107c41")
+c3 = colors.get("color3", "#eab308")
+c4 = colors.get("color4", accent)
 
 r, g, b = hex_to_rgb(bg)
 lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
@@ -74,66 +76,84 @@ is_light = lum > 128
 
 if is_light:
     # High-contrast light mode adhering to Omarchy theming rules
-    window = blend(bg, "#000000", 0.05) if bg == "#ffffff" else bg
-    ribbon = "#ffffff"
-    ribbon_border = blend(bg, "#000000", 0.15)
-    text = "#1e1e1e"
-    text_dim = "#585858"
-    text_disabled = "#8a8a8a"
-    accent_color = "#107c41"
-    accent_dark = "#0b5e31"
-    accent_soft = "#dff1e6"
-    hover = blend(bg, "#000000", 0.08)
+    window = blend(bg, "#000000", 0.04)
+    ribbon = bg if bg != "#ffffff" else "#fafafa"
+    ribbon_border = blend(bg, "#000000", 0.16)
+    
+    # Body text: deep contrast dark charcoal
+    text = blend(fg, "#000000", 0.75) if lum > 200 else fg
+    text_dim = blend(text, bg, 0.40)
+    text_disabled = blend(text, bg, 0.65)
+    
+    accent_color = accent
+    accent_dark = blend(accent, "#000000", 0.25)
+    accent_soft = blend(accent, bg, 0.82)
+    
+    hover = blend(bg, "#000000", 0.07)
     pressed = blend(bg, "#000000", 0.15)
-    separator = blend(bg, "#000000", 0.12)
-    grid_bg = "#ffffff"
-    gridline = blend(bg, "#000000", 0.16)
-    header_bg = blend(bg, "#000000", 0.04)
-    header_text = "#2c2c2c"
+    separator = blend(bg, "#000000", 0.14)
+    
+    grid_bg = blend(bg, "#ffffff", 0.90) if bg != "#ffffff" else "#ffffff"
+    gridline = blend(grid_bg, "#000000", 0.13)
+    header_bg = blend(bg, "#000000", 0.05)
+    header_text = blend(text, "#000000", 0.15)
     header_line = blend(bg, "#000000", 0.20)
-    header_sel_bg = blend(bg, "#000000", 0.12)
+    header_sel_bg = blend(accent, bg, 0.75)
     header_sel_text = accent_color
-    sel_fill = "#107c411c"
+    header_all_bg = blend(accent, bg, 0.85)
+    
+    sel_fill = blend(accent, grid_bg, 0.82)
     sel_border = accent_color
-    input_bg = "#ffffff"
-    input_border = blend(bg, "#000000", 0.24)
-    tab_bar = window
-    tab_active = "#ffffff"
-    status_bar = window
-    cell_text = "#000000"
-    menu_bg = "#ffffff"
+    
+    input_bg = grid_bg
+    input_border = blend(bg, "#000000", 0.22)
+    tab_bar = blend(bg, "#000000", 0.04)
+    tab_active = grid_bg
+    status_bar = blend(bg, "#000000", 0.05)
+    cell_text = text
+    menu_bg = grid_bg
+    shadow = "#00000028"
     danger = c1
 else:
-    # Deep, saturated dark mode
+    # Deep, atmospheric dark mode matching the active Omarchy theme
     window = bg
-    ribbon = blend(bg, "#ffffff", 0.06)
-    ribbon_border = blend(bg, "#ffffff", 0.12)
+    ribbon = blend(bg, "#ffffff", 0.05)
+    ribbon_border = blend(bg, "#ffffff", 0.13)
+    
     text = fg
     text_dim = blend(fg, bg, 0.35)
     text_disabled = blend(fg, bg, 0.60)
-    accent_color = "#5cc587"
-    accent_dark = "#3fa86c"
-    accent_soft = "#234531"
+    
+    accent_color = accent
+    accent_dark = blend(accent, "#000000", 0.25)
+    accent_soft = blend(accent, bg, 0.65)
+    
     hover = blend(bg, "#ffffff", 0.10)
-    pressed = blend(bg, "#ffffff", 0.16)
+    pressed = blend(bg, "#ffffff", 0.18)
     separator = blend(bg, "#ffffff", 0.12)
-    grid_bg = "#ffffff"
-    gridline = "#e1e1e1"
-    header_bg = blend(bg, "#ffffff", 0.05)
-    header_text = "#cccccc"
+    
+    # Atmospheric spreadsheet sheet matching theme tone
+    grid_bg = blend(bg, "#000000", 0.15)
+    gridline = blend(bg, "#ffffff", 0.10)
+    header_bg = blend(bg, "#000000", 0.28)
+    header_text = blend(fg, bg, 0.20)
     header_line = blend(bg, "#ffffff", 0.14)
-    header_sel_bg = blend(bg, "#ffffff", 0.15)
+    header_sel_bg = blend(accent, bg, 0.60)
     header_sel_text = accent_color
-    sel_fill = "#107c4124"
+    header_all_bg = blend(accent, bg, 0.70)
+    
+    sel_fill = blend(accent, grid_bg, 0.75)
     sel_border = accent_color
-    input_bg = blend(bg, "#ffffff", 0.03)
+    
+    input_bg = blend(bg, "#000000", 0.35)
     input_border = blend(bg, "#ffffff", 0.18)
-    tab_bar = bg
-    tab_active = blend(bg, "#ffffff", 0.09)
-    status_bar = bg
-    cell_text = "#000000"
-    menu_bg = blend(bg, "#ffffff", 0.05)
-    danger = "#f1705f"
+    tab_bar = blend(bg, "#000000", 0.25)
+    tab_active = blend(bg, "#ffffff", 0.08)
+    status_bar = blend(bg, "#000000", 0.30)
+    cell_text = fg
+    menu_bg = blend(bg, "#000000", 0.30)
+    shadow = "#0000005a"
+    danger = c1
 
 tokens = {
     "dark": not is_light,
@@ -156,6 +176,7 @@ tokens = {
     "header_line": header_line,
     "header_sel_bg": header_sel_bg,
     "header_sel_text": header_sel_text,
+    "header_all_bg": header_all_bg,
     "sel_fill": sel_fill,
     "sel_border": sel_border,
     "input_bg": input_bg,
@@ -165,6 +186,7 @@ tokens = {
     "status_bar": status_bar,
     "cell_text": cell_text,
     "menu_bg": menu_bg,
+    "shadow": shadow,
     "danger": danger
 }
 
@@ -198,16 +220,10 @@ if command -v python3 >/dev/null 2>&1; then
 import socket, json
 
 try:
-    # Read whether current mode is dark
-    ui_file = "$UI_FILE"
-    is_dark = json.load(open(ui_file)).get("dark", True)
-    s = socket.create_connection(("127.0.0.1", int("$CONTROL_PORT")), timeout=0.4)
+    s = socket.create_connection(("127.0.0.1", int("$CONTROL_PORT")), timeout=0.3)
     f = s.makefile("rw")
-    # Live hot-reload dark mode in running egui app
-    f.write(json.dumps({"id": 1, "method": "ui.set", "params": {"dark": is_dark}}) + "\n")
-    f.flush()
-    f.readline()
-    f.write(json.dumps({"id": 2, "method": "ui.inspect", "params": {}}) + "\n")
+    # Trigger an inspect ping to immediately wake up the egui event loop and poll LiveTokens
+    f.write(json.dumps({"id": 1, "method": "ui.inspect", "params": {}}) + "\n")
     f.flush()
     f.readline()
     s.close()
