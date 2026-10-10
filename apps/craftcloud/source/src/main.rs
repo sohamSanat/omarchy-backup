@@ -11,11 +11,6 @@ use app::CraftCloudApp;
 use eframe::NativeOptions;
 
 fn main() -> eframe::Result<()> {
-    unsafe {
-        // Automatically reap child processes in Linux kernel so they never become defunct/zombies
-        libc::signal(libc::SIGCHLD, libc::SIG_IGN);
-    }
-
     let native_options = NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("CraftCloud — Creative Suite Hub")

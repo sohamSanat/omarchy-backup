@@ -13,6 +13,8 @@ pub struct ProcessInfo {
 
 pub struct ProcessSupervisor;
 
+static RECENT_ALLOCATED_WORKSPACES: std::sync::Mutex<Vec<(i32, std::time::Instant)>> = std::sync::Mutex::new(Vec::new());
+
 impl ProcessSupervisor {
     /// Non-blocking waitpid to reap any terminated child processes
     pub fn reap_zombies() {
@@ -137,14 +139,40 @@ impl ProcessSupervisor {
         false
     }
 
+    pub fn log(msg: &str) {
+        use std::io::Write;
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/craftcloud.log")
+        {
+            let _ = writeln!(file, "[{}] {}", ts, msg);
+        }
+    }
+
     /// Finds the next available free workspace that currently has 0 windows open in it,
-    /// strictly excluding the workspace where CraftCloud itself is running.
+    /// strictly excluding the workspace where CraftCloud itself is running and any occupied workspaces.
     pub fn find_next_free_workspace() -> Option<i32> {
         let current_pid = std::process::id() as i64;
         let mut craftcloud_ws = None;
         let mut occupied = std::collections::HashSet::new();
 
-        // 1. Scan all active windows from Hyprland clients
+        // Workspace 10 is reserved for HEADLESS-1 tablet display per ~/.config/hypr/monitors.lua
+        occupied.insert(10);
+
+        // 1. Account for recently launched workspaces in this session to prevent race conditions
+        if let Ok(mut lock) = RECENT_ALLOCATED_WORKSPACES.lock() {
+            lock.retain(|(_, time)| time.elapsed().as_secs() < 15);
+            for (ws, _) in lock.iter() {
+                occupied.insert(*ws);
+            }
+        }
+
+        // 2. Scan all active windows from Hyprland clients
         if let Ok(output) = Command::new("hyprctl").args(["clients", "-j"]).output() {
             if output.status.success() {
                 if let Ok(val) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
@@ -172,7 +200,7 @@ impl ProcessSupervisor {
             }
         }
 
-        // 2. Scan workspaces list for any workspace that has windows > 0
+        // 3. Scan workspaces list for any workspace that has windows > 0
         if let Ok(output) = Command::new("hyprctl").args(["workspaces", "-j"]).output() {
             if output.status.success() {
                 if let Ok(val) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
@@ -190,13 +218,19 @@ impl ProcessSupervisor {
             }
         }
 
-        // 3. Fallback for base workspace: prioritize detected CraftCloud workspace, else active workspace
+        // 4. Fallback for base workspace: prioritize detected CraftCloud workspace, else active workspace
         let active_id = Self::get_current_workspace_id().unwrap_or(1);
         let base_id = craftcloud_ws.unwrap_or(active_id);
         occupied.insert(base_id);
         occupied.insert(active_id);
 
-        Some(Self::find_next_free_workspace_from(base_id, &occupied))
+        let target = Self::find_next_free_workspace_from(base_id, &occupied);
+        Self::log(&format!(
+            "Workspace allocation: active_id={}, craftcloud_ws={:?}, base_id={}, occupied={:?}, target={}",
+            active_id, craftcloud_ws, base_id, occupied, target
+        ));
+
+        Some(target)
     }
 
     /// Pure helper to compute next free workspace given current ID and occupied IDs
@@ -204,19 +238,19 @@ impl ProcessSupervisor {
         current_id: i32,
         occupied_workspaces: &std::collections::HashSet<i32>,
     ) -> i32 {
-        // Search forward starting from current_id + 1 up to 10
-        for cand in (current_id + 1)..=10 {
+        // Search forward starting from current_id + 1 up to 9 (workspace 10 is reserved for tablet)
+        for cand in (current_id + 1)..=9 {
             if !occupied_workspaces.contains(&cand) {
                 return cand;
             }
         }
         // Wrap around from workspace 1 up to current_id - 1
         for cand in 1..current_id {
-            if !occupied_workspaces.contains(&cand) {
+            if cand != 10 && !occupied_workspaces.contains(&cand) {
                 return cand;
             }
         }
-        // If all 1..10 are occupied, find lowest integer > 10
+        // If all 1..9 are occupied, find lowest integer >= 11
         let mut cand = 11;
         while occupied_workspaces.contains(&cand) {
             cand += 1;
@@ -251,47 +285,55 @@ impl ProcessSupervisor {
         None
     }
 
-    /// Injects dynamic window rules into Hyprland so newly launched application windows
-    /// map directly into `target_ws` upon creation, eliminating same-workspace split-screen.
-    pub fn set_window_workspace_rule(app_id: &str, target_ws: i32) {
-        let lua_code = format!(
-            "local id = \"{app_id}\"; local ws = \"{target_ws}\"; \
-             hl.window_rule({{ match = {{ class = \".*\" .. id .. \".*\" }}, workspace = ws }}); \
-             hl.window_rule({{ match = {{ class = \"ai.storyteller.\" .. id }}, workspace = ws }}); \
-             hl.window_rule({{ match = {{ class = id }}, workspace = ws }})"
-        );
-        let _ = Command::new("hyprctl").args(["eval", &lua_code]).status();
-    }
-
-    /// Switch active workspace via Hyprland Lua dispatcher with legacy fallback
+    /// Switch active workspace via Hyprland Lua dispatcher
     pub fn switch_to_workspace(ws_id: i32) -> bool {
         let lua_eval = format!(
             "return hl.dispatch(hl.dsp.focus({{ workspace = \"{}\" }}))",
             ws_id
         );
-        if let Ok(output) = Command::new("hyprctl").args(["eval", &lua_eval]).output() {
-            if output.status.success() {
+        match Command::new("hyprctl").args(["eval", &lua_eval]).output() {
+            Ok(output) if output.status.success() => {
+                Self::log(&format!("Switched to workspace {} via hyprctl eval", ws_id));
                 return true;
+            }
+            Ok(output) => {
+                Self::log(&format!(
+                    "hyprctl eval failed for ws {} (code {:?}): stdout='{}', stderr='{}'",
+                    ws_id,
+                    output.status.code(),
+                    String::from_utf8_lossy(&output.stdout).trim(),
+                    String::from_utf8_lossy(&output.stderr).trim()
+                ));
+            }
+            Err(e) => {
+                Self::log(&format!("hyprctl eval spawn error for ws {}: {}", ws_id, e));
             }
         }
 
-        let legacy_eval = format!("hl.dsp.focus({{ workspace = \"{}\" }})", ws_id);
-        if let Ok(output) = Command::new("hyprctl").args(["dispatch", &legacy_eval]).output() {
-            if output.status.success() {
+        let lua_repl = format!(
+            "return hl.dispatch(hl.dsp.focus({{ workspace = \"{}\" }}))",
+            ws_id
+        );
+        match Command::new("hyprctl").args(["repl", &lua_repl]).output() {
+            Ok(output) if output.status.success() => {
+                Self::log(&format!("Switched to workspace {} via hyprctl repl", ws_id));
                 return true;
+            }
+            Ok(output) => {
+                Self::log(&format!(
+                    "hyprctl repl failed for ws {} (code {:?}): stdout='{}', stderr='{}'",
+                    ws_id,
+                    output.status.code(),
+                    String::from_utf8_lossy(&output.stdout).trim(),
+                    String::from_utf8_lossy(&output.stderr).trim()
+                ));
+            }
+            Err(e) => {
+                Self::log(&format!("hyprctl repl spawn error for ws {}: {}", ws_id, e));
             }
         }
 
-        let legacy_status = Command::new("hyprctl")
-            .args(["dispatch", "workspace", &ws_id.to_string()])
-            .status();
-
-        if let Ok(s) = legacy_status {
-            if s.success() {
-                return true;
-            }
-        }
-
+        Self::log(&format!("FAILED to switch to workspace {}", ws_id));
         false
     }
 
@@ -299,12 +341,23 @@ impl ProcessSupervisor {
     pub fn ensure_window_on_workspace(pid: u32, app_id: String, target_ws: i32) {
         std::thread::spawn(move || {
             let pid_i64 = pid as i64;
-            for _ in 0..40 {
-                std::thread::sleep(std::time::Duration::from_millis(60));
+            for attempt in 1..=60 {
+                std::thread::sleep(std::time::Duration::from_millis(50));
 
                 let output = match Command::new("hyprctl").args(["clients", "-j"]).output() {
                     Ok(o) if o.status.success() => o,
-                    _ => continue,
+                    Ok(o) => {
+                        if attempt == 1 {
+                            Self::log(&format!("ensure_window: clients -j non-zero: {:?}", o.status.code()));
+                        }
+                        continue;
+                    }
+                    Err(e) => {
+                        if attempt == 1 {
+                            Self::log(&format!("ensure_window: clients -j error: {}", e));
+                        }
+                        continue;
+                    }
                 };
 
                 let val: serde_json::Value = match serde_json::from_slice(&output.stdout) {
@@ -319,9 +372,9 @@ impl ProcessSupervisor {
                         let client_initial_class = client.get("initialClass").and_then(|v| v.as_str()).unwrap_or("");
                         let client_address = client.get("address").and_then(|v| v.as_str()).unwrap_or("");
 
+                        // Strictly match by PID first, or fallback to class only if PID is not available
                         let is_match = client_pid == Some(pid_i64)
-                            || client_class.contains(&app_id)
-                            || client_initial_class.contains(&app_id);
+                            || (client_pid.is_none() && (client_class.contains(&app_id) || client_initial_class.contains(&app_id)));
 
                         if is_match {
                             let current_client_ws = client
@@ -330,18 +383,18 @@ impl ProcessSupervisor {
                                 .and_then(|id| id.as_i64())
                                 .map(|id| id as i32);
 
-                            if current_client_ws != Some(target_ws) {
-                                // Move window via robust Lua script targeting the window's exact address
+                            Self::log(&format!(
+                                "Window found for {} (PID {}): current_ws={:?}, target_ws={}, address={}",
+                                app_id, pid, current_client_ws, target_ws, client_address
+                            ));
+
+                            if current_client_ws != Some(target_ws) && !client_address.is_empty() {
+                                Self::log(&format!(
+                                    "Moving window {} from {:?} to target_ws {}",
+                                    client_address, current_client_ws, target_ws
+                                ));
                                 let lua_move = format!(
-                                    "local wins = hl.get_windows(); \
-                                     for _, w in ipairs(wins) do \
-                                       if (w.address == \"{client_address}\") or (w.class and w.class:find(\"{app_id}\")) or w.pid == {pid} then \
-                                         hl.dispatch(hl.dsp.focus({{ window = \"address:\" .. tostring(w.address) }})); \
-                                         hl.dispatch(hl.dsp.window.move({{ workspace = \"{target_ws}\" }})); \
-                                         hl.dispatch(hl.dsp.focus({{ workspace = \"{target_ws}\" }})); \
-                                         break \
-                                       end \
-                                     end"
+                                    "return hl.dispatch(hl.dsp.window.move({{ window = \"address:{client_address}\", workspace = \"{target_ws}\", follow = true }}))"
                                 );
                                 let _ = Command::new("hyprctl").args(["eval", &lua_move]).status();
                             }
@@ -352,6 +405,7 @@ impl ProcessSupervisor {
                     }
                 }
             }
+            Self::log(&format!("Timed out watching window for {} (PID {})", app_id, pid));
         });
     }
 
@@ -366,10 +420,13 @@ impl ProcessSupervisor {
         // 1. Identify next available free workspace with 0 open windows
         let target_ws = Self::find_next_free_workspace();
 
-        // 2. Pre-configure Hyprland window rule so the window opens into target_ws directly
+        // 2. Switch to target empty workspace before spawning child
         if let Some(ws) = target_ws {
-            Self::set_window_workspace_rule(app_id, ws);
+            if let Ok(mut lock) = RECENT_ALLOCATED_WORKSPACES.lock() {
+                lock.push((ws, std::time::Instant::now()));
+            }
             Self::switch_to_workspace(ws);
+            std::thread::sleep(std::time::Duration::from_millis(80));
         }
 
         let mut cmd = Command::new(binary_path);
@@ -529,11 +586,11 @@ mod tests {
     #[test]
     fn test_find_next_free_workspace_live() {
         let curr_ws = ProcessSupervisor::get_current_workspace_id();
+        let free_ws = ProcessSupervisor::find_next_free_workspace();
+        println!("\n[LIVE WS STATE] Current WS: {:?}, Next Free WS: {:?}", curr_ws, free_ws);
         if let Some(curr) = curr_ws {
-            let free_ws = ProcessSupervisor::find_next_free_workspace();
             assert!(free_ws.is_some());
             let target = free_ws.unwrap();
-            // Crucial requirement: MUST NOT open in the same workspace!
             assert_ne!(target, curr, "Target workspace MUST NOT be the current workspace");
         }
     }
