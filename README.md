@@ -101,6 +101,61 @@ The **Storyteller Craft Suite** is Soham's custom-engineered creative and office
 | **GridCraft** | `0.3.0` | Spreadsheets | Excel alternative in pure Rust, formula engine, charting, XLSX fidelity | `gridcraft.real`, `gridcraft-cli`, `ai.storyteller.gridcraft.desktop` |
 | **DeckCraft** | `0.3.0` | Presentations | PowerPoint alternative in pure Rust, slide transitions, PPTX fidelity | `deckcraft.real`, `deckcraft-cli`, `ai.storyteller.deckcraft.desktop` |
 
+#### 🌟 Workstation Profiles & Deep Capabilities
+
+1. **[CraftCloud](file:///home/soham/omarchy-backup/apps/craftcloud)** (`v0.1.0` — Unified Creative Suite Hub & Command Center):
+   - **Central Launchpad & Supervisor**: Native Rust desktop command center (`eframe`/`egui`/`wgpu`) overseeing all 9 Craft creative tools. Tracks running PIDs, memory usage, and execution states.
+   - **Recent Documents Aggregator**: System-wide discovery scanning for `.pcraft`, `.psd`, `.vectorcraft`, `.filmcraft`, `.ecproj`, `.dng`, `.pdf`, `.docx`, `.xlsx`, and `.pptx` documents, allowing one-click resumption from a single dashboard.
+   - **Quick Tools**: Fast asset format conversions and exports without launching full heavy workspaces.
+   - **Full Source Backup**: Preserved in [`apps/craftcloud/source/`](file:///home/soham/omarchy-backup/apps/craftcloud/source) for independent maintenance and compilation.
+
+2. **[WordCraft](file:///home/soham/omarchy-backup/apps/wordcraft)** (`v0.3.0` — Microsoft Word Alternative):
+   - **Clean-Room Pure Rust**: Clean-room word processing workstation with zero C/C++ office bloat.
+   - **Format Fidelity**: Native round-trip editing for `.docx`, `.docm`, `.dotx`, `.odt`, `.rtf`, `.txt`, `.md`, and `.html`.
+   - **Ribbon & Layout Engine**: Classic tabbed ribbon UI (Home, Insert, Layout, References, Review, View), rich paragraph styles, multi-column sections, footnotes, citations, and table styling.
+   - **Track Changes & Review**: In-line insertion/deletion diff tracking, author color attribution, and threaded document annotations.
+   - **MCP Tools**: 16 tool schemas in [`mcp/wordcraft/`](file:///home/soham/omarchy-backup/mcp/wordcraft) for headless agent inspection, text replacement, and automated document compilation.
+
+3. **[GridCraft](file:///home/soham/omarchy-backup/apps/gridcraft)** (`v0.3.0` — Microsoft Excel Alternative):
+   - **High-Performance Spreadsheet Engine**: Clean-room spreadsheet workstation in pure Rust with topological dependency calculation.
+   - **Excel Formula Compatibility**: 100+ standard formulas (`SUM`, `AVERAGE`, `VLOOKUP`, `INDEX`, `MATCH`, financial, date/time, and logic expressions).
+   - **Data Formats & Charts**: Native `.xlsx`, `.xlsm`, `.csv`, `.tsv` support, in-cell formatting, conditional formatting rules, and embedded chart generation (bar, line, scatter, pie).
+   - **MCP Tools**: 22 tool schemas in [`mcp/gridcraft/`](file:///home/soham/omarchy-backup/mcp/gridcraft) for workbook inspection, range queries, formula evaluation, and table automation.
+
+4. **[EffectCraft](file:///home/soham/omarchy-backup/apps/effectcraft)** (`v0.6.0` — Adobe After Effects Alternative):
+   - **Motion Graphics & VFX Compositor**: Pro visual effects workstation built in pure Rust with 300+ GPU-accelerated effects.
+   - **Graph Editor & Curve Keyframing**: Temporal and spatial Bezier graph editor with sub-frame accuracy, velocity handles, and math expressions.
+   - **Camera & 3D Layers**: 3D layer transforms, point/spot lights, depth-of-field, and motion paths.
+   - **Project Pipeline**: Native `.ecproj`, `.ecprojx`, After Effects `.aep` / JSON project import, and pure-Rust video encoding (H.264, HEVC, ProRes, WebM).
+   - **MCP Tools**: 22 tool schemas in [`mcp/effectcraft/`](file:///home/soham/omarchy-backup/mcp/effectcraft) for layer keyframe scripting, effect parameter adjustment, and frame rendering.
+
+5. **[DeckCraft](file:///home/soham/omarchy-backup/apps/deckcraft)** (`v0.3.0` — Microsoft PowerPoint Alternative):
+   - **Slide Presentation Workstation**: Clean-room PowerPoint-style presentation app in pure Rust with native `.pptx`, `.potx`, `.ppsx` round-trip fidelity.
+   - **Layouts & Smart Shapes**: Master slide layouts, vector shape creation, smart alignment guides, tables, charts, and media embeds.
+   - **Transitions & Timings**: Smooth slide transitions, element animations, and sequence choreography.
+   - **Presenter Display**: Dual-monitor presenter display with speaker notes, elapsed timer HUD, and thumbnail slide sorter.
+   - **MCP Tools**: 24 tool schemas in [`mcp/deckcraft/`](file:///home/soham/omarchy-backup/mcp/deckcraft) for slide creation, text manipulation, and headless slide rendering.
+
+6. **[PhotoCraft](file:///home/soham/omarchy-backup/apps/photocraft)** (`v0.5.0` — Adobe Photoshop Alternative):
+   - **Layered Raster Graphics**: High-fidelity layered image editing, non-destructive layer masks, adjustment layers, blend modes, and retouching.
+   - **Format Engine**: Full support for `.psd`, `.psb`, `.pcraft`, `.png`, `.jpg`, `.webp`, `.qoi`, and `.exr`.
+   - **Hardware Acceleration**: GPU canvas rendering powered by Vulkan and `wgpu`.
+
+7. **[VectorCraft](file:///home/soham/omarchy-backup/apps/vectorcraft)** (`v0.4.0` — Adobe Illustrator Alternative):
+   - **Vector Illustration Workstation**: High-precision Bezier curve editor, multi-artboard canvas, Pathfinder boolean operations, and stroke profiles.
+   - **Vector Pipeline**: Native `.svg`, `.svgz`, `.ai`, `.eps`, `.pdf` vector file import/export.
+
+8. **[FilmCraft](file:///home/soham/omarchy-backup/apps/filmcraft)** (`v0.4.0` — Adobe Premiere Pro Alternative):
+   - **Non-Linear Video Editor (NLE)**: Multi-track video and audio timeline, razor blade splitting, ripple edits, transitions, and audio envelope keyframing.
+   - **Color & Scopes**: Lumetri-style color grading, waveform vectorscopes, histogram analysis, and 3D LUT application.
+
+9. **[LightCraft](file:///home/soham/omarchy-backup/apps/lightcraft)** (`v0.4.0` — Adobe Lightroom Alternative):
+   - **RAW Photo Catalog & Developer**: Non-destructive RAW processing engine (`.dng`, `.arw`, `.cr2`, `.cr3`, `.nef`, `.raf`).
+   - **Smart Studio**: Exposure/white balance calibration, parametric tone curves, AI denoise integration, face recognition clustering, and HDR/panorama merges.
+
+10. **[PdfCraft](file:///home/soham/omarchy-backup/apps/pdfcraft)** (`v0.4.0` — Adobe Acrobat Alternative):
+    - **PDF Manipulation Workstation**: PDF inspection, annotation, interactive form filling, digital signature stamping, OCR extraction, page reordering, and redaction.
+
 #### ⚙️ Unified Engineering Architecture
 1. **LiveTokens Dynamic Theming Engine (`theme-unlock.patch`)**:
    - Each app contains a custom Rust module (`crates/ui-egui/src/theme.rs` & `lib.rs`) introducing `LiveTokens`.
