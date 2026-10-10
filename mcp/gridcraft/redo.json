@@ -1,0 +1,1 @@
+{"name":"redo","description":"Redo the last undone change(s).","parameters":{"additionalProperties":false,"properties":{"steps":{"description":"Number of steps (default 1)","minimum":0,"type":"integer"}},"type":"object"}}

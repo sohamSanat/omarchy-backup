@@ -1,0 +1,1 @@
+{"name":"screenshot","description":"Save a PNG screenshot of the GridCraft window to `path`. Desktop app only (`gridcraft-cli mcp --connect 7979`).","parameters":{"additionalProperties":false,"properties":{"path":{"description":"Output PNG path","type":"string"}},"required":["path"],"type":"object"}}

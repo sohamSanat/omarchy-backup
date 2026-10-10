@@ -1,0 +1,1 @@
+{"name":"get_cell","description":"Details of one cell: computed value and type, formula, display text, raw input, spill range, style, merge, comment and hyperlink.","parameters":{"additionalProperties":false,"properties":{"cell":{"description":"Cell, e.g. \"B7\" or \"Sheet2!C3\"","type":"string"}},"required":["cell"],"type":"object"}}

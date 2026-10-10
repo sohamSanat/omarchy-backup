@@ -1,0 +1,1 @@
+{"name":"new_workbook","description":"Create a new workbook and make it active: blank, or a built-in sample (\"budget\", \"sales\", \"grades\").","parameters":{"additionalProperties":false,"properties":{"sample":{"description":"Sample workbook","enum":["budget","sales","grades"],"type":"string"}},"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"undo","description":"Undo the last change(s) to the active workbook.","parameters":{"additionalProperties":false,"properties":{"steps":{"description":"Number of steps (default 1)","minimum":0,"type":"integer"}},"type":"object"}}

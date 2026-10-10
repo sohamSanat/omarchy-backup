@@ -1,0 +1,1 @@
+{"name":"inspect_workbook","description":"Summary of the active workbook: title, path, dirty flag, sheets (name, used range, cell count, tables, charts, merges, filters, freeze panes), defined names, current selection and active cell, calculation mode and undo/redo history.","parameters":{"additionalProperties":false,"properties":{},"type":"object"}}

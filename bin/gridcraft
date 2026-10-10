@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# GridCraft launcher wrapper for Omarchy Linux
+# ------------------------------------------------------------------------------
+# 1. Enables loopback JSON-lines control server on port 7981 for live automation
+#    and instant Omarchy theme updates
+# 2. Exposes GRIDCRAFT_THEME_FILE for per-theme color customization
+# 3. Unsets WAYLAND_DISPLAY by default so XWayland enables robust spreadsheet
+#    clipboard / drag & drop. Set GRIDCRAFT_FORCE_WAYLAND=1 to force native Wayland.
+# ==============================================================================
+
+export GRIDCRAFT_CONTROL_PORT="${GRIDCRAFT_CONTROL_PORT:-7981}"
+export GRIDCRAFT_CONTROL_TOKEN_FILE="${GRIDCRAFT_CONTROL_TOKEN_FILE:-$HOME/.config/gridcraft/control.token}"
+export GRIDCRAFT_THEME_FILE="${GRIDCRAFT_THEME_FILE:-$HOME/.config/gridcraft/theme.json}"
+
+# Ensure token file exists
+if [[ ! -f "$GRIDCRAFT_CONTROL_TOKEN_FILE" ]]; then
+  mkdir -p "$(dirname "$GRIDCRAFT_CONTROL_TOKEN_FILE")"
+  python3 -c 'import secrets; print(secrets.token_hex(32))' > "$GRIDCRAFT_CONTROL_TOKEN_FILE"
+  chmod 600 "$GRIDCRAFT_CONTROL_TOKEN_FILE"
+fi
+
+# Ensure initial theme & ui.json are populated from current Omarchy theme
+if [[ ! -f "$GRIDCRAFT_THEME_FILE" || ! -f "$HOME/.config/gridcraft/ui.json" ]]; then
+  "$HOME/.local/bin/omarchy-sync-gridcraft" 2>/dev/null || true
+fi
+
+if [[ -z "${GRIDCRAFT_FORCE_WAYLAND:-}" ]]; then
+  unset WAYLAND_DISPLAY
+fi
+
+exec "$HOME/.local/bin/gridcraft.real" "$@"
