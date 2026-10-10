@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# EffectCraft launcher wrapper for Omarchy Linux
+# ------------------------------------------------------------------------------
+# 1. Enables loopback control server so Omarchy theme changes update live
+# 2. Exposes EFFECTCRAFT_THEME_FILE for live dynamic per-theme color customization
+# 3. Supports optional XWayland fallback (EFFECTCRAFT_FORCE_XWAYLAND=1)
+# ==============================================================================
+
+export EFFECTCRAFT_CONTROL_PORT="${EFFECTCRAFT_CONTROL_PORT:-48296}"
+export EFFECTCRAFT_THEME_FILE="${EFFECTCRAFT_THEME_FILE:-$HOME/.config/effectcraft/theme.json}"
+
+# Ensure initial theme is populated from current Omarchy theme
+if [[ ! -f "$EFFECTCRAFT_THEME_FILE" || ! -f "$HOME/.config/effectcraft/prefs.json" ]]; then
+  "$HOME/.local/bin/omarchy-sync-effectcraft" 2>/dev/null || true
+fi
+
+# If XWayland is explicitly forced:
+if [[ -n "${EFFECTCRAFT_FORCE_XWAYLAND:-}" ]]; then
+  unset WAYLAND_DISPLAY
+fi
+
+exec "$HOME/.local/bin/effectcraft.real" "$@"

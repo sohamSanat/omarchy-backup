@@ -1,0 +1,9 @@
+{
+  "name": "screenshot",
+  "description": "Screenshot of the whole WordCraft window (desktop app only).",
+  "parameters": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  }
+}

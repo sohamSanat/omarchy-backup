@@ -1,0 +1,36 @@
+{
+  "name": "add_effect",
+  "description": "Apply an effect to a layer and optionally set its parameters in one undoable call. `effect` is an id (`ec.blur.gaussian`) or After Effects name (`Gaussian Blur`; see list_effects); `values` maps parameter ids to values, e.g. {\"blurriness\": 12}. One undo step; if a value fails, nothing is applied. Returns the instance `path` (`effects/#n`, for set_property / add_keyframe) and its parameters with their paths and current values.",
+  "parameters": {
+    "properties": {
+      "comp": {
+        "description": "Composition item id or name; omit for the active comp.",
+        "type": [
+          "integer",
+          "string"
+        ]
+      },
+      "effect": {
+        "description": "Effect id or name, e.g. `Gaussian Blur`, `Glow`, `Curves`, `ec.color.levels`.",
+        "type": "string"
+      },
+      "layer": {
+        "description": "Layer id (from get_comp), \"#n\" (1-based index from the top) or layer name.",
+        "type": [
+          "integer",
+          "string"
+        ]
+      },
+      "values": {
+        "additionalProperties": true,
+        "description": "Parameter id -> value (ids are in the returned `params` paths), e.g. {\"blurriness\": 12}.",
+        "type": "object"
+      }
+    },
+    "required": [
+      "layer",
+      "effect"
+    ],
+    "type": "object"
+  }
+}

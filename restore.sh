@@ -688,7 +688,7 @@ if [[ -d "${SCRIPT_DIR}/apps" ]]; then
   for app_dir in "${SCRIPT_DIR}/apps"/*; do
     if [[ -d "$app_dir" ]]; then
       app_name="$(basename "$app_dir")"
-      if [[ "$app_name" != "photocraft" && "$app_name" != "vectorcraft" && "$app_name" != "filmcraft" && "$app_name" != "pdfcraft" && "$app_name" != "lightcraft" && "$app_name" != "wordcraft" && "$app_name" != "gridcraft" ]]; then
+      if [[ "$app_name" != "photocraft" && "$app_name" != "vectorcraft" && "$app_name" != "filmcraft" && "$app_name" != "pdfcraft" && "$app_name" != "lightcraft" && "$app_name" != "wordcraft" && "$app_name" != "gridcraft" && "$app_name" != "effectcraft" && "$app_name" != "deckcraft" && "$app_name" != "craftcloud" ]]; then
         mkdir -p "${USER_HOME}/Projects/${app_name}"
         cp -a "${app_dir}/." "${USER_HOME}/Projects/${app_name}/"
         echo "  [OK] Restored application: ~/Projects/${app_name}"
@@ -730,6 +730,21 @@ fi
 if [[ -f "${SCRIPT_DIR}/apps/gridcraft/install.sh" ]]; then
   echo "  -> Restoring and installing GridCraft release build..."
   "${SCRIPT_DIR}/apps/gridcraft/install.sh"
+fi
+
+if [[ -f "${SCRIPT_DIR}/apps/effectcraft/install.sh" ]]; then
+  echo "  -> Restoring and installing EffectCraft release build..."
+  "${SCRIPT_DIR}/apps/effectcraft/install.sh"
+fi
+
+if [[ -f "${SCRIPT_DIR}/apps/deckcraft/install.sh" ]]; then
+  echo "  -> Restoring and installing DeckCraft release build..."
+  "${SCRIPT_DIR}/apps/deckcraft/install.sh"
+fi
+
+if [[ -f "${SCRIPT_DIR}/apps/craftcloud/install.sh" ]]; then
+  echo "  -> Restoring and installing CraftCloud suite hub..."
+  "${SCRIPT_DIR}/apps/craftcloud/install.sh"
 fi
 
 if [[ -d "${SCRIPT_DIR}/mcp" ]]; then
@@ -803,6 +818,16 @@ if command -v omarchy >/dev/null 2>&1; then
   if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-gridcraft" ]]; then
     echo "  -> Syncing GridCraft with active Omarchy theme..."
     "${USER_HOME}/.local/bin/omarchy-sync-gridcraft" 2>/dev/null || true
+  fi
+
+  if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-effectcraft" ]]; then
+    echo "  -> Syncing EffectCraft with active Omarchy theme..."
+    "${USER_HOME}/.local/bin/omarchy-sync-effectcraft" 2>/dev/null || true
+  fi
+
+  if [[ -x "${USER_HOME}/.local/bin/omarchy-sync-deckcraft" ]]; then
+    echo "  -> Syncing DeckCraft with active Omarchy theme..."
+    "${USER_HOME}/.local/bin/omarchy-sync-deckcraft" 2>/dev/null || true
   fi
 
   echo "  -> Setting font: JetBrainsMono Nerd Font"

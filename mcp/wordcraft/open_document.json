@@ -1,0 +1,16 @@
+{
+  "name": "open_document",
+  "description": "Open a .docx, .odt, .rtf, .md, .html, .txt or .json file.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "File path"
+      }
+    },
+    "required": [
+      "path"
+    ]
+  }
+}

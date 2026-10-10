@@ -1,0 +1,22 @@
+{
+  "name": "list_commands",
+  "description": "List engine commands: id, label, menu path, shortcut, `params` doc (e.g. `{name?, width?, height?, frameRate?, duration? (s)}`) and whether it can run now (`why` if not). Every menu item, shortcut and panel gesture maps to one of these ids; run them with execute_command. Narrow with `filter` (e.g. `layer.new`, `keys`, `effect`).",
+  "parameters": {
+    "properties": {
+      "enabled_only": {
+        "description": "Only commands that can run right now.",
+        "type": "boolean"
+      },
+      "filter": {
+        "description": "Only commands whose id or label contains this text (case-insensitive).",
+        "type": "string"
+      },
+      "schemas": {
+        "description": "Also return each command's parameter JSON Schema (`schema`).",
+        "type": "boolean"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

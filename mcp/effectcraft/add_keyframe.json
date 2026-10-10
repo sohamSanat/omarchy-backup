@@ -1,0 +1,67 @@
+{
+  "name": "add_keyframe",
+  "description": "Add keyframes to a property (turns the stopwatch on): one with `time` (+ optional `value`, default the current value) or many with `keys: [{time, value}]`, then optionally set their `interpolation`: linear, bezier, hold, easyEase, easyEaseIn, easyEaseOut. Example: {\"layer\":1,\"path\":\"transform/position\",\"keys\":[{\"time\":0,\"value\":[0,540]},{\"time\":2,\"value\":[1920,540]}],\"interpolation\":\"easyEase\"}.",
+  "parameters": {
+    "properties": {
+      "comp": {
+        "description": "Composition item id or name; omit for the active comp.",
+        "type": [
+          "integer",
+          "string"
+        ]
+      },
+      "interpolation": {
+        "enum": [
+          "linear",
+          "bezier",
+          "hold",
+          "easyEase",
+          "easyEaseIn",
+          "easyEaseOut"
+        ],
+        "type": "string"
+      },
+      "keys": {
+        "description": "Several keys at once.",
+        "items": {
+          "properties": {
+            "time": {
+              "type": "number"
+            },
+            "value": {
+              "description": "Number for 1-D properties (50), array for vectors ([960,540]), \"#rrggbb\" or [r,g,b,a] (0-1) for colours, bool for checkboxes, string for text/menus."
+            }
+          },
+          "required": [
+            "time"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "layer": {
+        "description": "Layer id (from get_comp), \"#n\" (1-based index from the top) or layer name.",
+        "type": [
+          "integer",
+          "string"
+        ]
+      },
+      "path": {
+        "description": "Property path from get_layer: match ids joined by `/`, `#n` for the nth child, or `@uid`. E.g. `transform/position`, `transform/opacity`, `transform/scale`, `transform/rotation`, `effects/#1/blurriness`, `masks/#1/feather`, `@57`.",
+        "type": "string"
+      },
+      "time": {
+        "description": "Key time in seconds (layer time).",
+        "type": "number"
+      },
+      "value": {
+        "description": "Number for 1-D properties (50), array for vectors ([960,540]), \"#rrggbb\" or [r,g,b,a] (0-1) for colours, bool for checkboxes, string for text/menus."
+      }
+    },
+    "required": [
+      "layer",
+      "path"
+    ],
+    "type": "object"
+  }
+}

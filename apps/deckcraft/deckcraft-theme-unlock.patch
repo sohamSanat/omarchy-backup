@@ -1,0 +1,215 @@
+diff --git i/Cargo.toml w/Cargo.toml
+index e3b6fde..06a486a 100644
+--- i/Cargo.toml
++++ w/Cargo.toml
+@@ -88,6 +88,6 @@ opt-level = 1
+ 
+ [profile.release]
+ opt-level = 3
+-lto = "thin"
+-codegen-units = 16
++lto = false
++codegen-units = 8
+ debug = 0
+diff --git i/crates/ui-egui/src/lib.rs w/crates/ui-egui/src/lib.rs
+index 35d9caa..f3d6ae2 100644
+--- i/crates/ui-egui/src/lib.rs
++++ w/crates/ui-egui/src/lib.rs
+@@ -205,6 +205,8 @@ pub struct SlideApp {
+     pub(crate) notes_buf: (u64, usize, String),
+     /// Thumbnail pane drag (slide index, current drop index).
+     pub(crate) thumb_drag: Option<(usize, usize)>,
++    #[cfg(not(target_arch = "wasm32"))]
++    pub live_tokens: theme::live::LiveTokens,
+ }
+ 
+ impl SlideApp {
+@@ -239,6 +241,8 @@ impl SlideApp {
+             quit_confirmed: false,
+             notes_buf: (0, usize::MAX, String::new()),
+             thumb_drag: None,
++            #[cfg(not(target_arch = "wasm32"))]
++            live_tokens: theme::live::LiveTokens::from_env(),
+         }
+     }
+ 
+@@ -523,6 +527,10 @@ impl SlideApp {
+         } else {
+             self.fonts_ready = true;
+         }
++        #[cfg(not(target_arch = "wasm32"))]
++        if self.live_tokens.poll(ctx, &mut self.ui.brightness) {
++            self.restyle = false;
++        }
+         if self.restyle {
+             theme::apply(ctx, &theme::Tokens::for_brightness(self.ui.brightness));
+             self.restyle = false;
+diff --git i/crates/ui-egui/src/theme.rs w/crates/ui-egui/src/theme.rs
+index 0016714..e4703c7 100644
+--- i/crates/ui-egui/src/theme.rs
++++ w/crates/ui-egui/src/theme.rs
+@@ -108,12 +108,18 @@ impl Tokens {
+         }
+     }
+     pub fn get(ctx: &egui::Context) -> Self {
++        #[cfg(not(target_arch = "wasm32"))]
++        if let Some(t) = ctx.data(|d| d.get_temp::<Tokens>(egui::Id::new("deckcraft_tokens"))) {
++            return t;
++        }
+         if ctx.global_style().visuals.dark_mode { Self::dark() } else { Self::light() }
+     }
+ }
+ 
+ /// Apply tokens to egui's style.
+ pub fn apply(ctx: &egui::Context, t: &Tokens) {
++    #[cfg(not(target_arch = "wasm32"))]
++    ctx.data_mut(|d| d.insert_temp(egui::Id::new("deckcraft_tokens"), *t));
+     let mut v = if t.dark { Visuals::dark() } else { Visuals::light() };
+     v.panel_fill = t.chrome;
+     v.window_fill = t.card;
+@@ -192,3 +198,145 @@ pub fn font(size: f32) -> egui::FontId {
+ pub fn to_color32(c: deckcraft_color::Rgba) -> Color32 {
+     Color32::from_rgba_unmultiplied(c.r, c.g, c.b, c.a)
+ }
++
++#[cfg(not(target_arch = "wasm32"))]
++pub mod live {
++    use super::{apply, Brightness, Tokens};
++    use egui::Color32;
++    use std::time::SystemTime;
++
++    #[derive(Default)]
++    pub struct LiveTokens {
++        path: Option<std::path::PathBuf>,
++        stamp: Option<SystemTime>,
++        last_check: f64,
++        pub active_tokens: Option<Tokens>,
++    }
++
++    impl LiveTokens {
++        pub fn from_env() -> Self {
++            let path = std::env::var_os("DECKCRAFT_THEME_FILE")
++                .map(std::path::PathBuf::from)
++                .or_else(|| {
++                    std::env::var_os("HOME")
++                        .map(|h| std::path::PathBuf::from(h).join(".config/deckcraft/theme.json"))
++                });
++            Self {
++                path,
++                stamp: None,
++                last_check: -1.0,
++                active_tokens: None,
++            }
++        }
++
++        pub fn poll(&mut self, ctx: &egui::Context, brightness: &mut Brightness) -> bool {
++            let Some(path) = &self.path else { return false };
++            let now = ctx.input(|i| i.time);
++            if self.last_check >= 0.0 && now - self.last_check < 0.4 {
++                ctx.request_repaint_after(std::time::Duration::from_millis(400));
++                return false;
++            }
++            self.last_check = now;
++            ctx.request_repaint_after(std::time::Duration::from_millis(400));
++            let Ok(meta) = std::fs::metadata(path) else { return false };
++            let stamp = meta.modified().ok();
++            if stamp.is_some() && stamp == self.stamp {
++                return false;
++            }
++            self.stamp = stamp;
++            let Ok(text) = std::fs::read_to_string(path) else { return false };
++            match serde_json::from_str::<serde_json::Value>(&text) {
++                Ok(v) => {
++                    let base_brightness = if v.get("kind").and_then(|k| k.as_str()) == Some("dark")
++                        || v.get("dark").and_then(|d| d.as_bool()) == Some(true)
++                    {
++                        Brightness::Dark
++                    } else if v.get("kind").and_then(|k| k.as_str()) == Some("light")
++                        || v.get("dark").and_then(|d| d.as_bool()) == Some(false)
++                    {
++                        Brightness::Light
++                    } else {
++                        *brightness
++                    };
++                    let mut t = Tokens::for_brightness(base_brightness);
++                    let unknown = apply_overrides(&mut t, &v);
++                    *brightness = if t.dark { Brightness::Dark } else { Brightness::Light };
++                    self.active_tokens = Some(t);
++                    apply(ctx, &t);
++                    log::info!("DeckCraft LiveTokens applied: dark={}, chrome={:?}", t.dark, t.chrome);
++                    if !unknown.is_empty() {
++                        log::warn!("unknown token keys: {unknown:?}");
++                    }
++                    ctx.request_repaint();
++                    true
++                }
++                Err(e) => {
++                    log::warn!("DeckCraft theme file error: {e}");
++                    false
++                }
++            }
++        }
++    }
++
++    fn color(v: &serde_json::Value) -> Option<Color32> {
++        let s = v.as_str()?.trim_start_matches('#');
++        let b = |i: usize| u8::from_str_radix(s.get(i..i + 2)?, 16).ok();
++        match s.len() {
++            6 => Some(Color32::from_rgb(b(0)?, b(2)?, b(4)?)),
++            8 => Some(Color32::from_rgba_unmultiplied(b(0)?, b(2)?, b(4)?, b(6)?)),
++            _ => None,
++        }
++    }
++
++    pub fn apply_overrides(t: &mut Tokens, v: &serde_json::Value) -> Vec<String> {
++        let mut unknown = Vec::new();
++        let Some(obj) = v.as_object() else { return unknown };
++        for (k, val) in obj {
++            macro_rules! c {
++                ($($f:ident),*) => {
++                    match k.as_str() {
++                        $(stringify!($f) => { if let Some(c) = color(val) { t.$f = c; } })*
++                        "dark" => {
++                            if let Some(b) = val.as_bool() {
++                                t.dark = b;
++                            }
++                        }
++                        "kind" => {
++                            if let Some(s) = val.as_str() {
++                                t.dark = s == "dark";
++                            }
++                        }
++                        _ => unknown.push(k.clone()),
++                    }
++                };
++            }
++            c!(
++                chrome,
++                card,
++                card_border,
++                canvas,
++                text,
++                text_dim,
++                text_faint,
++                border,
++                separator,
++                hover,
++                pressed,
++                selected,
++                accent,
++                accent_text,
++                contextual,
++                selection,
++                handle_fill,
++                handle_stroke,
++                guide,
++                caret,
++                text_selection,
++                field_bg,
++                shadow
++            );
++        }
++        unknown
++    }
++}
++

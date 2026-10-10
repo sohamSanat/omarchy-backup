@@ -1,0 +1,1 @@
+{"name":"type_text","description":"Type text into the text being edited (or into the selected shape).","parameters":{"properties":{"text":{"description":"Text","type":"string"}},"required":["text"],"type":"object"}}

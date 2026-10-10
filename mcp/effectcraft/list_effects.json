@@ -1,0 +1,14 @@
+{
+  "name": "list_effects",
+  "description": "The effect registry: id, After Effects name, category, GPU and 32-bpc support. Narrow with `filter` (id, name or category text). Apply with add_effect.",
+  "parameters": {
+    "properties": {
+      "filter": {
+        "description": "Only effects whose id, name or category contains this text.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

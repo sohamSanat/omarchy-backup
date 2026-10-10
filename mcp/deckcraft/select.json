@@ -1,0 +1,1 @@
+{"name":"select","description":"Select shapes by id (formatting commands then act on them).","parameters":{"properties":{"ids":{"items":{"type":"integer"},"type":"array"}},"required":["ids"],"type":"object"}}

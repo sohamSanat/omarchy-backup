@@ -1,0 +1,23 @@
+[Desktop Entry]
+Type=Application
+Name=EffectCraft
+GenericName=Motion Graphics & VFX Compositor
+Comment=Motion graphics, animation and visual effects (After Effects alternative)
+Exec=effectcraft %F
+TryExec=effectcraft
+Icon=ai.storyteller.effectcraft
+Terminal=false
+StartupNotify=true
+StartupWMClass=ai.storyteller.effectcraft
+Categories=AudioVideo;Video;AudioVideoEditing;
+Keywords=motion;graphics;animation;compositor;effects;keyframe;vfx;aftereffects;
+MimeType=application/x-effectcraft;video/mp4;video/quicktime;video/x-matroska;video/webm;image/png;image/jpeg;image/x-exr;
+Actions=Wayland;XWayland;
+
+[Desktop Action Wayland]
+Name=Open in Native Wayland
+Exec=env EFFECTCRAFT_FORCE_WAYLAND=1 effectcraft %F
+
+[Desktop Action XWayland]
+Name=Open in XWayland
+Exec=env EFFECTCRAFT_FORCE_XWAYLAND=1 effectcraft %F

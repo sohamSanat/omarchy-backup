@@ -1,0 +1,1 @@
+{"name":"go_to_slide","description":"Make a slide current (shape commands act on the current slide).","parameters":{"properties":{"index":{"description":"Slide index","minimum":0,"type":"integer"}},"required":["index"],"type":"object"}}

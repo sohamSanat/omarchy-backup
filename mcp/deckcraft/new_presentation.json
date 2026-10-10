@@ -1,0 +1,1 @@
+{"name":"new_presentation","description":"Start a new presentation (one title slide). Optional theme: DeckCraft, Harbor, Ember, Meadow, Nocturne, Paper, Coral Reef, Slate.","parameters":{"properties":{"blank":{"description":"No first slide","type":"boolean"},"theme":{"description":"Theme name","type":"string"}},"type":"object"}}

@@ -1,0 +1,1 @@
+{"name":"inspect_slide","description":"One slide's shapes with ids, kinds, boxes [x,y,w,h], placeholder types, text, fills, tables, charts; plus background, transition, animations, notes.","parameters":{"properties":{"index":{"description":"Slide index (default: current)","minimum":0,"type":"integer"}},"type":"object"}}

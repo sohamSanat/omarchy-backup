@@ -1,0 +1,14 @@
+{
+  "name": "save_project",
+  "description": "Save the project to its current file, or to `path` (Save As, .ecproj).",
+  "parameters": {
+    "properties": {
+      "path": {
+        "description": "Destination .ecproj path (Save As).",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

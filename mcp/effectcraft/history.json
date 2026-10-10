@@ -1,0 +1,17 @@
+{
+  "name": "history",
+  "description": "The branching undo history (History panel): without arguments lists every state {index, id, label, parent, depth (0 = working line, >0 = branch), current, future}; undoing and then editing keeps the undone states as a branch. With `goto` (an index or id from the listing) jumps to that state, on any branch, without losing the others.",
+  "parameters": {
+    "properties": {
+      "goto": {
+        "description": "State index or id to jump to (edit.history.goto).",
+        "type": [
+          "integer",
+          "string"
+        ]
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

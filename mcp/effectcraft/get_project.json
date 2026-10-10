@@ -1,0 +1,9 @@
+{
+  "name": "get_project",
+  "description": "Project overview: file path, dirty flag, bit depth, every item (id, name, type Composition/Footage/Solid/Folder, size, duration, layer count), the active comp id, current time (s), selected layers and the undo stack.",
+  "parameters": {
+    "properties": {},
+    "required": [],
+    "type": "object"
+  }
+}

@@ -32,5 +32,13 @@ echo "  -> Installing binaries to ~/.local/bin/..."
 mkdir -p "${HOME}/.local/bin"
 cp -a "${BUILD_DIR}/target/release/gridcraft" "${HOME}/.local/bin/gridcraft.real"
 cp -a "${BUILD_DIR}/target/release/gridcraft-cli" "${HOME}/.local/bin/gridcraft-cli"
+if [[ -f "${SCRIPT_DIR}/../../bin/gridcraft" ]]; then
+  cp -a "${SCRIPT_DIR}/../../bin/gridcraft" "${HOME}/.local/bin/gridcraft"
+  chmod +x "${HOME}/.local/bin/gridcraft"
+fi
+if [[ -f "${SCRIPT_DIR}/../../bin/omarchy-sync-gridcraft" ]]; then
+  cp -a "${SCRIPT_DIR}/../../bin/omarchy-sync-gridcraft" "${HOME}/.local/bin/omarchy-sync-gridcraft"
+  chmod +x "${HOME}/.local/bin/omarchy-sync-gridcraft"
+fi
 
 echo "==> [OK] Build complete! Run apps/gridcraft/install.sh to finalize desktop integration."

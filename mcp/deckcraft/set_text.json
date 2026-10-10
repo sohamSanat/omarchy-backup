@@ -1,0 +1,1 @@
+{"name":"set_text","description":"Replace a shape's text (keeps its first run's formatting). Leading tabs set bullet levels.","parameters":{"properties":{"id":{"description":"Shape id (from inspect_slide)","minimum":0,"type":"integer"},"text":{"description":"New text","type":"string"}},"required":["id","text"],"type":"object"}}

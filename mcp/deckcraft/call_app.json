@@ -1,0 +1,1 @@
+{"name":"call_app","description":"Call any control-channel method (ui.click, ui.set, ui.dialog.*, ui.inspect…). Desktop app only (`deckcraft-cli mcp --connect PORT`).","parameters":{"properties":{"method":{"description":"Method","type":"string"},"params":{"type":"object"}},"required":["method"],"type":"object"}}

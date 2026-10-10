@@ -1,0 +1,9 @@
+{
+  "name": "inspect_document",
+  "description": "Structure: blocks with text, styles, formatting runs, lists, tables, sections, parts, selection, pages.",
+  "parameters": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  }
+}

@@ -1,0 +1,1 @@
+{"name":"select_tool","description":"Pick the pointer tool: select, textBox, shape (with preset), pen, highlighter, eraser — or a preset name.","parameters":{"properties":{"preset":{"description":"Shape preset for the shape tool","type":"string"},"tool":{"description":"Tool name","type":"string"}},"required":["tool"],"type":"object"}}

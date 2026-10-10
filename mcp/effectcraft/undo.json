@@ -1,0 +1,14 @@
+{
+  "name": "undo",
+  "description": "Undo the last `steps` edits (default 1). Returns the remaining undo stack.",
+  "parameters": {
+    "properties": {
+      "steps": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

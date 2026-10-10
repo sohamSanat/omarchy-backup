@@ -1,0 +1,16 @@
+{
+  "name": "describe_command",
+  "description": "One command in full: id, label, menu path, shortcut, the `params` doc, a JSON Schema of its parameters (`schema`: properties, required, additionalProperties) and whether it can run now (`why` if not). Use before execute_command when unsure of the parameters; execute_command rejects unknown keys.",
+  "parameters": {
+    "properties": {
+      "command": {
+        "description": "Command id, e.g. `layer.newText`.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "command"
+    ],
+    "type": "object"
+  }
+}

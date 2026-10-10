@@ -1,0 +1,35 @@
+{
+  "name": "get_property",
+  "description": "Read one property: type, value at `time` (comp seconds; default the current time), whether it is animated, its keyframes (time, value, in/out interpolation) and expression.",
+  "parameters": {
+    "properties": {
+      "comp": {
+        "description": "Composition item id or name; omit for the active comp.",
+        "type": [
+          "integer",
+          "string"
+        ]
+      },
+      "layer": {
+        "description": "Layer id (from get_comp), \"#n\" (1-based index from the top) or layer name.",
+        "type": [
+          "integer",
+          "string"
+        ]
+      },
+      "path": {
+        "description": "Property path from get_layer: match ids joined by `/`, `#n` for the nth child, or `@uid`. E.g. `transform/position`, `transform/opacity`, `transform/scale`, `transform/rotation`, `effects/#1/blurriness`, `masks/#1/feather`, `@57`.",
+        "type": "string"
+      },
+      "time": {
+        "description": "Comp time in seconds.",
+        "type": "number"
+      }
+    },
+    "required": [
+      "layer",
+      "path"
+    ],
+    "type": "object"
+  }
+}

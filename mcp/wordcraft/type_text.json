@@ -1,0 +1,20 @@
+{
+  "name": "type_text",
+  "description": "Type at the caret (replacing the selection). Use \\n for line breaks, or paragraphs: true to split lines into paragraphs.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "description": "Text to insert"
+      },
+      "paragraphs": {
+        "type": "boolean",
+        "description": "Split lines into paragraphs"
+      }
+    },
+    "required": [
+      "text"
+    ]
+  }
+}

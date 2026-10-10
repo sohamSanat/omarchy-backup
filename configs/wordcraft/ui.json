@@ -1,0 +1,19 @@
+{
+  "tab": "Home",
+  "backstage": false,
+  "backstagePage": "home",
+  "ribbonCollapsed": false,
+  "recent": [],
+  "dark": true,
+  "navTab": "headings",
+  "showDiscord": true,
+  "author": "WordCraft User",
+  "window": {
+    "position": null,
+    "width": 1280.0,
+    "height": 800.0,
+    "maximized": true,
+    "monitor": null
+  },
+  "language": "auto"
+}

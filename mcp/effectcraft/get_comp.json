@@ -1,0 +1,17 @@
+{
+  "name": "get_comp",
+  "description": "A composition: id, name, size, frame rate, duration, work area, background and its layers top to bottom (id, index, name, type, in/out/start seconds, blend mode, parent, track matte, switches). Layer ids feed get_layer, get_property/set_property and commands.",
+  "parameters": {
+    "properties": {
+      "comp": {
+        "description": "Composition item id or name; omit for the active comp.",
+        "type": [
+          "integer",
+          "string"
+        ]
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

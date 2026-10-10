@@ -1,0 +1,1 @@
+{"name":"save_presentation","description":"Save the active presentation (.deckcraft or .pptx by extension).","parameters":{"properties":{"path":{"description":"File path (optional when it was opened from a file)","type":"string"}},"type":"object"}}

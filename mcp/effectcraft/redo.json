@@ -1,0 +1,14 @@
+{
+  "name": "redo",
+  "description": "Redo `steps` undone edits (default 1).",
+  "parameters": {
+    "properties": {
+      "steps": {
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

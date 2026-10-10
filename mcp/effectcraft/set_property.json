@@ -1,0 +1,42 @@
+{
+  "name": "set_property",
+  "description": "Set a property. Without `time`: sets the static value (or a key at the current time if already animated). With `time`: adds/replaces a keyframe there, turning the stopwatch on. `expression` sets an After Effects-style JS expression (\"\" removes it). Returns the property as get_property does. Examples: {\"layer\":3,\"path\":\"transform/opacity\",\"value\":50}; {\"layer\":\"Title\",\"path\":\"transform/position\",\"value\":[200,540],\"time\":0}; {\"layer\":3,\"path\":\"transform/rotation\",\"expression\":\"time*90\"}.",
+  "parameters": {
+    "properties": {
+      "comp": {
+        "description": "Composition item id or name; omit for the active comp.",
+        "type": [
+          "integer",
+          "string"
+        ]
+      },
+      "expression": {
+        "description": "Expression text; empty string removes the expression.",
+        "type": "string"
+      },
+      "layer": {
+        "description": "Layer id (from get_comp), \"#n\" (1-based index from the top) or layer name.",
+        "type": [
+          "integer",
+          "string"
+        ]
+      },
+      "path": {
+        "description": "Property path from get_layer: match ids joined by `/`, `#n` for the nth child, or `@uid`. E.g. `transform/position`, `transform/opacity`, `transform/scale`, `transform/rotation`, `effects/#1/blurriness`, `masks/#1/feather`, `@57`.",
+        "type": "string"
+      },
+      "time": {
+        "description": "Keyframe time in seconds (layer time; equals comp time unless the layer is offset/stretched).",
+        "type": "number"
+      },
+      "value": {
+        "description": "Number for 1-D properties (50), array for vectors ([960,540]), \"#rrggbb\" or [r,g,b,a] (0-1) for colours, bool for checkboxes, string for text/menus."
+      }
+    },
+    "required": [
+      "layer",
+      "path"
+    ],
+    "type": "object"
+  }
+}

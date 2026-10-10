@@ -340,23 +340,28 @@ This repository contains the full snapshot of user customizations:
    - **`configs/opencode/opencode.json`**:
      - Permission allowances for `~/Ui-skills/**` and `~/.agents/**`.
 
-25. **The Storyteller Craft Application Suite (`apps/`) — Architecture, Theming Engine & Restoration Protocol**:
-   - **Overview of the Suite**:
-     The Craft suite comprises 5 desktop creative tools engineered by Learning Machines LLC / Storyteller (`https://github.com/storytold`), customized specifically for Soham's Omarchy setup:
-     1. **`apps/photocraft` (PhotoCraft v0.5.0)**: Layered raster graphics & photo manipulation workbench (PSD, QOI, PNG, WebP). GPU acceleration via Vulkan.
-     2. **`apps/vectorcraft` (VectorCraft v0.4.0)**: Vector illustration & SVG artwork editor with high-precision Bezier rendering.
-     3. **`apps/filmcraft` (FilmCraft v0.4.0)**: Multi-track non-linear video editing workstation with Lumetri-style scopes, media sequence inspector, and timeline automation.
-     4. **`apps/pdfcraft` (PdfCraft v0.4.0)**: PDF document workbench supporting forms, annotations, digital signatures, bookmarks, OCR, watermarking, and redactions.
-     5. **`apps/lightcraft` (LightCraft v0.4.0)**: Non-destructive RAW camera developer & photo catalog library manager (Lightroom alternative).
+25. **The Storyteller Craft Application Suite & Creative Cloud (`apps/`) — Architecture, Theming Engine & Restoration Protocol**:
+   - **Overview of the Suite (10 Workstations & Hub)**:
+     The Craft suite comprises 9 standalone creative & productivity workstations engineered by Learning Machines LLC / Storyteller (`https://github.com/storytold`) plus **CraftCloud**, a bespoke native Creative Suite Hub / Command Center developed by Soham in pure Rust:
+     1. **`apps/craftcloud` (CraftCloud v0.1.0)**: Centralized creative suite command center & process supervisor (Adobe Creative Cloud alternative). Features real-time process monitoring, live recent files aggregator (`.pcraft`, `.psd`, `.vectorcraft`, `.filmcraft`, `.ecproj`, `.dng`, `.pdf`, `.docx`, `.xlsx`, `.pptx`), quick file format tools, and single-click launchpad.
+     2. **`apps/photocraft` (PhotoCraft v0.5.0)**: Layered raster graphics & photo manipulation workbench (PSD, QOI, PNG, WebP). GPU acceleration via Vulkan.
+     3. **`apps/vectorcraft` (VectorCraft v0.4.0)**: Vector illustration & SVG artwork editor with high-precision Bezier rendering and artboard export.
+     4. **`apps/filmcraft` (FilmCraft v0.4.0)**: Multi-track non-linear video editing workstation with Lumetri-style scopes, media sequence inspector, and timeline automation.
+     5. **`apps/effectcraft` (EffectCraft v0.6.0)**: Professional motion graphics & VFX compositing workstation (After Effects alternative). 300+ effects, graph editor, 3D camera compositing, expressions, and pure-Rust video encoding.
+     6. **`apps/lightcraft` (LightCraft v0.4.0)**: Non-destructive RAW camera developer & photo catalog library manager (Lightroom alternative). AI denoise, face clustering, exposure/tone curves, and panorama/HDR merges.
+     7. **`apps/pdfcraft` (PdfCraft v0.4.0)**: PDF document workbench supporting forms, annotations, digital signatures, bookmarks, OCR, watermarking, and redactions.
+     8. **`apps/wordcraft` (WordCraft v0.3.0)**: Clean-room Microsoft Word alternative in pure Rust: ribbon UI, styles, tables, track changes, references, mail merge, and native DOCX/ODT fidelity.
+     9. **`apps/gridcraft` (GridCraft v0.3.0)**: Clean-room Microsoft Excel alternative in pure Rust: formula engine, charting, pivot tables, and native XLSX fidelity.
+     10. **`apps/deckcraft` (DeckCraft v0.3.0)**: Clean-room Microsoft PowerPoint alternative in pure Rust: slide layouts, shape creation, animations, presenter notes, and native PPTX fidelity.
    - **Engineering & Dynamic Theming Architecture**:
      - **LiveTokens Hot-Reloading (`<app>-theme-unlock.patch`)**:
        Each application embeds an egui-level theme watcher (`crates/ui-egui/src/theme.rs` and `lib.rs`) that checks its respective `~/.config/<app>/theme.json` every 400ms. If the file modified timestamp changes, `LiveTokens::poll` recalculates the visual tokens and re-renders panels, borders, text, and accent colors without quitting or restarting the application.
      - **Omarchy Theme Sync Engine (`omarchy-sync-<app>`)**:
        The synchronization script in `~/.local/bin/omarchy-sync-<app>` is invoked by Omarchy on every theme switch via `~/.config/omarchy/hooks/theme-set.d/<app>-sync.sh`. The script reads `/home/soham/.local/state/omarchy/current/theme/colors.toml`, runs Python perceptual luminance blending (ITU-R BT.601 math), and outputs application-specific JSON color tokens.
-     - **Loopback Control Sockets (`control.json`)**:
-       PdfCraft and PhotoCraft write a loopback IPC descriptor (`~/.config/<app>/control.json`) with an ephemeral port, PID, and auth token. `omarchy-sync-<app>` pings this socket to immediately trigger a frame repaint (`ui.inspect`), ensuring instantaneous visual switching.
+     - **Loopback Control Sockets (`control.json` / Ephemeral Ports)**:
+       Craft applications write loopback IPC descriptors (`~/.config/<app>/control.json`) or listen on dedicated loopback ports. `omarchy-sync-<app>` connects to these sockets to immediately trigger a frame repaint (`ui.inspect`), ensuring instantaneous visual switching across all open windows.
      - **Antigravity Model Context Protocol (MCP)**:
-       Each app features a companion headless CLI (`<app>-cli`) that serves as a stdio Model Context Protocol (MCP) server. Over 450+ tool schemas across the suite are backed up in `mcp/<app>/` and registered into `~/.gemini/antigravity-cli/mcp/`, enabling agents to inspect canvas state, manipulate documents/timelines, and automate renders headlessly.
+       Each app features a companion headless CLI (`<app>-cli`) that serves as a stdio Model Context Protocol (MCP) server. Over 550+ tool schemas across the suite are backed up in `mcp/<app>/` and registered into `~/.gemini/antigravity-cli/mcp/`, enabling agents to inspect canvas state, manipulate documents/timelines/spreadsheets/slides, and automate renders headlessly.
    - **Restoration Protocol for AI Agents**:
      - **Standard Automated Restore**:
        When executing `./restore.sh`, the installer scripts `apps/<app>/install.sh` are invoked sequentially:
@@ -364,7 +369,7 @@ This repository contains the full snapshot of user customizations:
        2. Installs Freedesktop desktop entries (`~/.local/share/applications/ai.storyteller.<app>.desktop`) and AppStream metainfo (`~/.local/share/metainfo/ai.storyteller.<app>.metainfo.xml`).
        3. Installs shared MIME database packages (`~/.local/share/mime/packages/ai.storyteller.<app>.xml`) and runs `update-mime-database`.
        4. Installs the complete suite of hicolor icons (`16x16` through `512x512` & scalable SVG) and runs `gtk-update-icon-cache`.
-       5. Restores base configurations to `~/.config/<app>/` (`theme.json`, `ui.json`, `app.ron`).
+       5. Restores base configurations to `~/.config/<app>/` (`theme.json`, `ui.json`, `prefs.json`).
        6. Installs and makes executable the Omarchy theme hooks in `~/.config/omarchy/hooks/theme-set.d/<app>-sync.sh`.
        7. Dispatches initial palette synchronization with the currently active Omarchy theme.
      - **Manual Standalone Restore**:
@@ -373,13 +378,13 @@ This repository contains the full snapshot of user customizations:
      - **Source Recompilation (Emergency Fallback)**:
        If the target machine architecture differs or binaries require recompilation:
        1. Execute `apps/<app>/build.sh`.
-       2. The script clones `https://github.com/storytold/<app>.git` into `~/.cache/src/<app>`.
+       2. The script clones `https://github.com/storytold/<app>.git` into `~/.cache/src/<app>` (or restores from `apps/<app>/source` for CraftCloud).
        3. Applies `apps/<app>/<app>-theme-unlock.patch` using `git apply`.
        4. Runs `cargo build --release -p <app> -p <app>-cli`.
        5. Copies the release binaries into `~/.local/bin/`.
    - **Verification Checklist for Restoring Agents**:
-     1. Verify all binaries are executable: `which photocraft vectorcraft filmcraft pdfcraft lightcraft`.
-     2. Verify dynamic theming: run `omarchy theme set "Moodpeak"` and confirm that `~/.config/<app>/theme.json` is updated for all 5 apps.
+     1. Verify all binaries are executable: `which craftcloud photocraft vectorcraft filmcraft effectcraft lightcraft pdfcraft wordcraft gridcraft deckcraft`.
+     2. Verify dynamic theming: run `omarchy theme set "Moodpeak"` and confirm that `~/.config/<app>/theme.json` is updated for all running apps.
      3. Verify desktop registration: `gio info ~/.local/share/applications/ai.storyteller.<app>.desktop`.
      4. If launching in virtualized/nested environments where Wayland lacks hardware EGL, advise using `env <APP>_FORCE_XWAYLAND=1 <app>`.
    - **Standalone Auxiliary Apps**:

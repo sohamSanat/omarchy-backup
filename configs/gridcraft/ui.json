@@ -1,5 +1,9 @@
 {
   "dark": true,
-  "formula_bar": true,
-  "ribbon_tab": "Home"
+  "ribbonTab": "Home",
+  "ribbonCollapsed": false,
+  "formulaBar": true,
+  "formulaBarExpanded": false,
+  "statusBar": true,
+  "recent": []
 }

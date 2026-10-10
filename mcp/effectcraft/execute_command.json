@@ -1,0 +1,21 @@
+{
+  "name": "execute_command",
+  "description": "Run any engine command by id with JSON params; edits are undoable. Examples: comp.new {\"name\":\"Main\",\"width\":1920,\"height\":1080,\"frameRate\":30,\"duration\":5}; layer.newText {\"text\":\"Hello\",\"size\":120,\"fill\":\"#ffffff\"} (returns {\"layer\":id}); layer.newSolid {\"color\":\"#3366ff\"}; layer.newShape; effect.apply {\"layer\":3,\"effect\":\"Gaussian Blur\"}; time.set {\"time\":2.5}; layer.select {\"layers\":[3]}. Layers are referenced by id, \"#n\" or name; times are seconds.",
+  "parameters": {
+    "properties": {
+      "command": {
+        "description": "Command id, e.g. `comp.new`, `layer.newText`, `effect.apply` (see list_commands).",
+        "type": "string"
+      },
+      "params": {
+        "additionalProperties": true,
+        "description": "Command parameters as documented by list_commands.",
+        "type": "object"
+      }
+    },
+    "required": [
+      "command"
+    ],
+    "type": "object"
+  }
+}

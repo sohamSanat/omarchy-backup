@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Name=CraftCloud
+GenericName=Creative Suite Hub
+Comment=Unified Creative Suite Command Center for Craft Apps (Adobe Creative Cloud Alternative)
+Exec=craftcloud
+TryExec=craftcloud
+Icon=ai.storyteller.craftcloud
+Terminal=false
+StartupNotify=true
+StartupWMClass=ai.storyteller.craftcloud
+Categories=Graphics;AudioVideo;Office;
+Keywords=craft;creative;cloud;suite;photocraft;vectorcraft;filmcraft;lightcraft;pdfcraft;adobe;hub;
+Actions=Wayland;
+
+[Desktop Action Wayland]
+Name=Open in Native Wayland
+Exec=craftcloud

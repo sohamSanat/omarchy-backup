@@ -1,0 +1,32 @@
+{
+  "name": "batch",
+  "description": "Run several commands in order; stops at the first error unless keepGoing.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "commands": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string"
+            },
+            "params": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "command"
+          ]
+        }
+      },
+      "keepGoing": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "commands"
+    ]
+  }
+}

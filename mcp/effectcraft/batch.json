@@ -1,0 +1,38 @@
+{
+  "name": "batch",
+  "description": "Run several engine commands in one call as ONE undo step (engine.batch). Later steps can use earlier results: a string param \"$N\" or \"$N.key\" is step N's result (1-based), e.g. create a layer, then key and style it: {\"steps\":[{\"command\":\"layer.newText\",\"params\":{\"text\":\"Hi\",\"name\":\"Title\"}},{\"command\":\"prop.addKey\",\"params\":{\"layer\":\"$1.layer\",\"path\":\"transform/opacity\",\"time\":0,\"value\":0}},{\"command\":\"effect.apply\",\"params\":{\"layer\":\"$1.layer\",\"effect\":\"Glow\"}}]}. Returns {steps, results}. If a step fails the whole batch is rolled back (unless atomic: false) and the error names the step.",
+  "parameters": {
+    "properties": {
+      "atomic": {
+        "description": "Roll everything back when a step fails (default true).",
+        "type": "boolean"
+      },
+      "label": {
+        "description": "Undo step name (default Batch).",
+        "type": "string"
+      },
+      "steps": {
+        "items": {
+          "properties": {
+            "command": {
+              "type": "string"
+            },
+            "params": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "steps"
+    ],
+    "type": "object"
+  }
+}

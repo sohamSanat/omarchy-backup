@@ -1,0 +1,185 @@
+use std::path::PathBuf;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AppCategory {
+    All,
+    Design,
+    Photography,
+    Video,
+    Document,
+}
+
+impl AppCategory {
+    pub fn label(&self) -> &'static str {
+        match self {
+            AppCategory::All => "All Apps",
+            AppCategory::Design => "Graphic Design & Art",
+            AppCategory::Photography => "Photography",
+            AppCategory::Video => "Video & Audio",
+            AppCategory::Document => "Documents & PDF",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+#[allow(dead_code)]
+pub struct CraftApp {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub tagline: &'static str,
+    pub role: &'static str,
+    pub description: &'static str,
+    pub category: AppCategory,
+    pub version: &'static str,
+    pub binary_path: PathBuf,
+    pub real_binary_name: &'static str,
+    pub wm_class: &'static str,
+    pub file_extensions: &'static [&'static str],
+    pub icon_uri: &'static str,
+    pub icon_bytes: &'static [u8],
+}
+
+impl CraftApp {
+    pub fn all() -> Vec<CraftApp> {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/home/soham".to_string());
+        let bin_dir = PathBuf::from(home).join(".local/bin");
+
+        vec![
+            CraftApp {
+                id: "photocraft",
+                name: "PhotoCraft",
+                tagline: "Photoshop Alternative",
+                role: "Layered Raster & PSD Editor",
+                description: "Pro raster graphics editor with non-destructive layer stacks, retouching, blend modes, masks, and native PSD/PSB fidelity.",
+                category: AppCategory::Design,
+                version: "v0.5.0",
+                binary_path: bin_dir.join("photocraft"),
+                real_binary_name: "photocraft.real",
+                wm_class: "photocraft",
+                file_extensions: &[".pcraft", ".psd", ".psb", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp", ".exr"],
+                icon_uri: "bytes://icons/photocraft.png",
+                icon_bytes: include_bytes!("../assets/icons/photocraft.png"),
+            },
+            CraftApp {
+                id: "vectorcraft",
+                name: "VectorCraft",
+                tagline: "Illustrator Alternative",
+                role: "Vector Graphics & Illustration",
+                description: "Precision vector illustration workstation with Bezier curves, multiple artboards, Pathfinder ops, typography, and SVG/AI pipelines.",
+                category: AppCategory::Design,
+                version: "v0.5.0",
+                binary_path: bin_dir.join("vectorcraft"),
+                real_binary_name: "vectorcraft.real",
+                wm_class: "ai.storyteller.vectorcraft",
+                file_extensions: &[".vectorcraft", ".svg", ".svgz", ".ai", ".eps", ".pdf"],
+                icon_uri: "bytes://icons/vectorcraft.png",
+                icon_bytes: include_bytes!("../assets/icons/vectorcraft.png"),
+            },
+            CraftApp {
+                id: "filmcraft",
+                name: "FilmCraft",
+                tagline: "Premiere Pro Alternative",
+                role: "Timeline Video NLE & Color",
+                description: "High-performance multi-track video editing timeline, razor tool, audio tracks, keyframes, LUT grading, and sequence export.",
+                category: AppCategory::Video,
+                version: "v0.4.0",
+                binary_path: bin_dir.join("filmcraft"),
+                real_binary_name: "filmcraft.real",
+                wm_class: "ai.storyteller.filmcraft",
+                file_extensions: &[".filmcraft", ".mp4", ".mov", ".mkv", ".webm", ".wav", ".flac"],
+                icon_uri: "bytes://icons/filmcraft.png",
+                icon_bytes: include_bytes!("../assets/icons/filmcraft.png"),
+            },
+            CraftApp {
+                id: "effectcraft",
+                name: "EffectCraft",
+                tagline: "After Effects Alternative",
+                role: "Motion Graphics & VFX Compositor",
+                description: "Pro motion graphics, visual effects, 300+ effects, keyframing, graph editor, 3D cameras, expressions, and pure-Rust video encoding.",
+                category: AppCategory::Video,
+                version: "v0.6.0",
+                binary_path: bin_dir.join("effectcraft"),
+                real_binary_name: "effectcraft.real",
+                wm_class: "ai.storyteller.effectcraft",
+                file_extensions: &[".ecproj", ".ecprojx", ".aep", ".json", ".mp4", ".mov", ".mkv", ".webm", ".exr"],
+                icon_uri: "bytes://icons/effectcraft.png",
+                icon_bytes: include_bytes!("../assets/icons/effectcraft.png"),
+            },
+            CraftApp {
+                id: "lightcraft",
+                name: "LightCraft",
+                tagline: "Lightroom Alternative",
+                role: "RAW Photo Library & Developer",
+                description: "Non-destructive RAW photo develop studio and catalog with exposure, tone curves, AI denoise, face clustering, and HDR/panorama merges.",
+                category: AppCategory::Photography,
+                version: "v0.4.0",
+                binary_path: bin_dir.join("lightcraft"),
+                real_binary_name: "lightcraft.real",
+                wm_class: "ai.storyteller.lightcraft",
+                file_extensions: &[".dng", ".arw", ".cr2", ".cr3", ".nef", ".raf", ".orf", ".jpg", ".jpeg", ".tif"],
+                icon_uri: "bytes://icons/lightcraft.png",
+                icon_bytes: include_bytes!("../assets/icons/lightcraft.png"),
+            },
+            CraftApp {
+                id: "pdfcraft",
+                name: "PdfCraft",
+                tagline: "Acrobat Alternative",
+                role: "PDF Document Editor & Forms",
+                description: "Fast PDF manipulation workstation: inspect, annotate, sign, merge, split, extract, fill forms, and secure document pages.",
+                category: AppCategory::Document,
+                version: "v0.4.0",
+                binary_path: bin_dir.join("pdfcraft"),
+                real_binary_name: "pdfcraft.real",
+                wm_class: "pdfcraft",
+                file_extensions: &[".pdf"],
+                icon_uri: "bytes://icons/pdfcraft.png",
+                icon_bytes: include_bytes!("../assets/icons/pdfcraft.png"),
+            },
+            CraftApp {
+                id: "wordcraft",
+                name: "WordCraft",
+                tagline: "Microsoft Word Alternative",
+                role: "Document Design & Word Processor",
+                description: "Clean-room reimplementation of Microsoft Word in pure Rust: ribbon UI, styles, tables, track changes, references, mail merge, and native DOCX/ODT fidelity.",
+                category: AppCategory::Document,
+                version: "v0.3.0",
+                binary_path: bin_dir.join("wordcraft"),
+                real_binary_name: "wordcraft.real",
+                wm_class: "ai.storyteller.wordcraft",
+                file_extensions: &[".docx", ".docm", ".dotx", ".doc", ".odt", ".rtf", ".txt", ".md", ".html"],
+                icon_uri: "bytes://icons/wordcraft.png",
+                icon_bytes: include_bytes!("../assets/icons/wordcraft.png"),
+            },
+            CraftApp {
+                id: "gridcraft",
+                name: "GridCraft",
+                tagline: "Excel Alternative",
+                role: "Spreadsheets & Data Analysis",
+                description: "Clean-room Excel-style spreadsheet workstation in pure Rust: formula engine, charting, pivot tables, and native XLSX fidelity.",
+                category: AppCategory::Document,
+                version: "v0.3.0",
+                binary_path: bin_dir.join("gridcraft"),
+                real_binary_name: "gridcraft.real",
+                wm_class: "ai.storyteller.gridcraft",
+                file_extensions: &[".xlsx", ".xlsm", ".csv", ".tsv", ".txt"],
+                icon_uri: "bytes://icons/gridcraft.png",
+                icon_bytes: include_bytes!("../assets/icons/gridcraft.png"),
+            },
+            CraftApp {
+                id: "deckcraft",
+                name: "DeckCraft",
+                tagline: "PowerPoint Alternative",
+                role: "Presentations & Slide Shows",
+                description: "Clean-room PowerPoint-style presentation workstation in pure Rust: slide layouts, animations, transitions, presenter notes, and native PPTX fidelity.",
+                category: AppCategory::Document,
+                version: "v0.3.0",
+                binary_path: bin_dir.join("deckcraft"),
+                real_binary_name: "deckcraft.real",
+                wm_class: "ai.storyteller.deckcraft",
+                file_extensions: &[".deckcraft", ".pptx", ".potx", ".ppsx"],
+                icon_uri: "bytes://icons/deckcraft.png",
+                icon_bytes: include_bytes!("../assets/icons/deckcraft.png"),
+            },
+        ]
+    }
+}

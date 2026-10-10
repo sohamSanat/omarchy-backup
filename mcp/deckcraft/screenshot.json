@@ -1,0 +1,1 @@
+{"name":"screenshot","description":"Screenshot of the whole DeckCraft window (UI included). Desktop app only (`deckcraft-cli mcp --connect PORT`).","parameters":{"properties":{},"type":"object"}}

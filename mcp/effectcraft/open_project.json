@@ -1,0 +1,20 @@
+{
+  "name": "open_project",
+  "description": "Open a project: `path` to an .ecproj file, `demo: true` for the built-in demo project, or `new: true` for an empty project. Returns the project overview.",
+  "parameters": {
+    "properties": {
+      "demo": {
+        "type": "boolean"
+      },
+      "new": {
+        "type": "boolean"
+      },
+      "path": {
+        "description": "Path of an .ecproj file.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}

@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# omarchy-sync-effectcraft: Dynamic Theme Synchronization Engine for EffectCraft
+# ------------------------------------------------------------------------------
+# Generates per-theme color tokens directly from Omarchy's active theme palette
+# and updates ~/.config/effectcraft/prefs.json & theme.json for instant live hot-reloading.
+# ==============================================================================
+set -euo pipefail
+
+PREFS_DIR="$HOME/.config/effectcraft"
+THEME_JSON="$PREFS_DIR/theme.json"
+PREFS_FILE="$PREFS_DIR/prefs.json"
+CURRENT_THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+COLORS_TOML="$CURRENT_THEME_DIR/colors.toml"
+
+mkdir -p "$PREFS_DIR"
+
+# 1. Determine colors.toml source
+SPECIFIED_THEME="${1:-}"
+if [[ -n "$SPECIFIED_THEME" && -f "$HOME/.config/omarchy/themes/$SPECIFIED_THEME/colors.toml" ]]; then
+  COLORS_TOML="$HOME/.config/omarchy/themes/$SPECIFIED_THEME/colors.toml"
+elif [[ -n "$SPECIFIED_THEME" && -f "/usr/share/omarchy/themes/$SPECIFIED_THEME/colors.toml" ]]; then
+  COLORS_TOML="/usr/share/omarchy/themes/$SPECIFIED_THEME/colors.toml"
+fi
+
+# Fallback check
+if [[ ! -f "$COLORS_TOML" ]]; then
+  if [[ -f "$HOME/.local/state/omarchy/current/theme/colors.toml" ]]; then
+    COLORS_TOML="$HOME/.local/state/omarchy/current/theme/colors.toml"
+  fi
+fi
+
+# 2. Run Python palette synthesis
+python3 - <<PY
+import tomllib, json, os
+
+def hex_to_rgb(h):
+    h = h.strip().lstrip('#')
+    if len(h) == 3:
+        h = ''.join(c * 2 for c in h)
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+def rgb_to_hex(r, g, b):
+    return f"#{int(max(0, min(255, round(r)))):02x}{int(max(0, min(255, round(g)))):02x}{int(max(0, min(255, round(b)))):02x}"
+
+def blend(c1, c2, factor):
+    r1, g1, b1 = hex_to_rgb(c1)
+    r2, g2, b2 = hex_to_rgb(c2)
+    return rgb_to_hex(
+        r1 * (1.0 - factor) + r2 * factor,
+        g1 * (1.0 - factor) + g2 * factor,
+        b1 * (1.0 - factor) + b2 * factor
+    )
+
+colors_path = "$COLORS_TOML"
+colors = {}
+if os.path.exists(colors_path):
+    try:
+        with open(colors_path, "rb") as f:
+            colors = tomllib.load(f)
+    except Exception:
+        pass
+
+bg = colors.get("background", "#1B1B1B")
+fg = colors.get("foreground", "#efebdc")
+accent = colors.get("accent", colors.get("color4", "#e75a50"))
+c1 = colors.get("color1", "#ef4444")
+c2 = colors.get("color2", "#22c55e")
+c3 = colors.get("color3", "#eab308")
+
+r, g, b = hex_to_rgb(bg)
+lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+is_light = lum > 128
+
+if is_light:
+    app_bg = blend(bg, "#000000", 0.08)
+    header_bg = blend(bg, "#000000", 0.05)
+    panel_bg = bg
+    tab_bg = blend(bg, "#000000", 0.03)
+    tab_text = blend(fg, bg, 0.45)
+    tab_text_active = fg
+    focus = accent
+    accent_hover = blend(accent, "#000000", 0.12)
+    text = fg
+    text_dim = blend(fg, bg, 0.35)
+    text_faint = blend(fg, bg, 0.60)
+    icon = blend(fg, bg, 0.20)
+    icon_active = accent
+    hover = blend(bg, "#000000", 0.08)
+    pressed = blend(bg, "#000000", 0.15)
+    field_bg = "#ffffff" if bg != "#ffffff" else blend(bg, "#000000", 0.03)
+    field_border = blend(bg, "#000000", 0.22)
+    separator = blend(bg, "#000000", 0.12)
+    row_alt = blend(bg, "#000000", 0.03)
+    row_selected = blend(accent, bg, 0.75)
+    hot_text = accent
+    tl_bg = blend(bg, "#000000", 0.07)
+    tl_ruler_bg = blend(bg, "#000000", 0.05)
+    tl_ruler_tick = blend(fg, bg, 0.50)
+    tl_ruler_text = blend(fg, bg, 0.35)
+    cti = accent
+    work_area = blend(bg, "#000000", 0.15)
+    cache_green = c2
+    cache_blue = accent
+    keyframe = blend(fg, bg, 0.40)
+    keyframe_selected = accent
+    pasteboard = blend(bg, "#000000", 0.12)
+    timecode = accent
+    danger = c1
+    warning = c3
+    theme_kind = "light"
+else:
+    app_bg = blend(bg, "#000000", 0.35)
+    header_bg = blend(bg, "#000000", 0.15)
+    panel_bg = bg
+    tab_bg = blend(bg, "#000000", 0.18)
+    tab_text = blend(fg, bg, 0.40)
+    tab_text_active = fg
+    focus = accent
+    accent_hover = blend(accent, "#ffffff", 0.15)
+    text = fg
+    text_dim = blend(fg, bg, 0.35)
+    text_faint = blend(fg, bg, 0.60)
+    icon = blend(fg, bg, 0.25)
+    icon_active = accent
+    hover = blend(bg, "#ffffff", 0.10)
+    pressed = blend(bg, "#ffffff", 0.18)
+    field_bg = blend(bg, "#000000", 0.25)
+    field_border = blend(bg, "#ffffff", 0.15)
+    separator = blend(bg, "#ffffff", 0.10)
+    row_alt = blend(bg, "#ffffff", 0.04)
+    row_selected = blend(accent, bg, 0.60)
+    hot_text = accent
+    tl_bg = blend(bg, "#000000", 0.16)
+    tl_ruler_bg = blend(bg, "#000000", 0.12)
+    tl_ruler_tick = blend(fg, bg, 0.45)
+    tl_ruler_text = blend(fg, bg, 0.30)
+    cti = accent
+    work_area = blend(bg, "#000000", 0.30)
+    cache_green = c2
+    cache_blue = accent
+    keyframe = blend(fg, bg, 0.30)
+    keyframe_selected = accent
+    pasteboard = blend(bg, "#000000", 0.25)
+    timecode = accent
+    danger = c1
+    warning = c3
+    theme_kind = "dark" if lum > 25 else "darker"
+
+tokens = {
+    "dark": not is_light,
+    "kind": theme_kind,
+    "app_bg": app_bg,
+    "header_bg": header_bg,
+    "panel_bg": panel_bg,
+    "tab_bg": tab_bg,
+    "tab_text": tab_text,
+    "tab_text_active": tab_text_active,
+    "focus": focus,
+    "accent": accent,
+    "accent_hover": accent_hover,
+    "text": text,
+    "text_dim": text_dim,
+    "text_faint": text_faint,
+    "icon": icon,
+    "icon_active": icon_active,
+    "hover": hover,
+    "pressed": pressed,
+    "field_bg": field_bg,
+    "field_border": field_border,
+    "separator": separator,
+    "row_alt": row_alt,
+    "row_selected": row_selected,
+    "hot_text": hot_text,
+    "tl_bg": tl_bg,
+    "tl_ruler_bg": tl_ruler_bg,
+    "tl_ruler_tick": tl_ruler_tick,
+    "tl_ruler_text": tl_ruler_text,
+    "cti": cti,
+    "work_area": work_area,
+    "cache_green": cache_green,
+    "cache_blue": cache_blue,
+    "keyframe": keyframe,
+    "keyframe_selected": keyframe_selected,
+    "pasteboard": pasteboard,
+    "timecode": timecode,
+    "danger": danger,
+    "warning": warning
+}
+
+with open("$THEME_JSON", "w") as out:
+    json.dump(tokens, out, indent=2)
+
+# Update prefs.json
+prefs_path = "$PREFS_FILE"
+prefs = {}
+if os.path.exists(prefs_path):
+    try:
+        with open(prefs_path, "r") as pf:
+            prefs = json.load(pf)
+    except Exception:
+        pass
+
+if "appearance" not in prefs:
+    prefs["appearance"] = {}
+prefs["appearance"]["theme"] = theme_kind
+prefs["appearance"]["brightness"] = 0.0
+prefs["appearance"]["useGradients"] = True
+
+if "grids" not in prefs:
+    prefs["grids"] = {}
+prefs["grids"]["guideColor"] = accent
+
+prefs["version"] = prefs.get("version", 2)
+
+with open(prefs_path, "w") as pf:
+    json.dump(prefs, pf, indent=2)
+PY
+
+# 3. If EffectCraft is running on loopback, wake up and apply immediately
+CONTROL_PORT="${EFFECTCRAFT_CONTROL_PORT:-48296}"
+if command -v python3 >/dev/null 2>&1; then
+  python3 - <<PY 2>/dev/null || true
+import socket, json
+
+try:
+    s = socket.create_connection(("127.0.0.1", int("$CONTROL_PORT")), timeout=0.3)
+    f = s.makefile("rw")
+    # Load synthesized theme
+    with open("$THEME_JSON", "r") as tj:
+        tok = json.load(tj)
+    kind = tok.get("kind", "dark")
+    # Send theme change to live app
+    f.write(json.dumps({"method": "ui.set", "params": {"theme": kind}}) + "\n")
+    f.flush()
+    f.readline()
+    s.close()
+except Exception:
+    pass
+PY
+fi

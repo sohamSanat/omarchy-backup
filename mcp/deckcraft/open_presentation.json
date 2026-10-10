@@ -1,0 +1,1 @@
+{"name":"open_presentation","description":"Open a .deckcraft or .pptx file by path.","parameters":{"properties":{"path":{"description":"File path","type":"string"}},"required":["path"],"type":"object"}}

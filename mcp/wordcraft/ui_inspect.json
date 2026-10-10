@@ -1,0 +1,9 @@
+{
+  "name": "ui_inspect",
+  "description": "UI state: tab, panes, dialog, page rectangles on screen, caret (desktop app only).",
+  "parameters": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  }
+}

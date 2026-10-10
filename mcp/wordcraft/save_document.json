@@ -1,0 +1,14 @@
+{
+  "name": "save_document",
+  "description": "Save (format from the extension: docx, pdf, odt, rtf, html, md, txt, png).",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "File path; omit to save in place"
+      }
+    },
+    "required": []
+  }
+}

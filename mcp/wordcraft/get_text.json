@@ -1,0 +1,9 @@
+{
+  "name": "get_text",
+  "description": "Plain text of the document body.",
+  "parameters": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  }
+}

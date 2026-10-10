@@ -1,0 +1,1 @@
+{"name":"list_commands","description":"Every command (id, label, ribbon/menu place, shortcut, parameter summary, whether it is enabled now). Filter by a substring of id or label.","parameters":{"properties":{"filter":{"description":"Substring of the id or label, e.g. `format.` or `slide`","type":"string"}},"type":"object"}}

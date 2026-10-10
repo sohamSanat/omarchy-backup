@@ -1,0 +1,25 @@
+{
+  "name": "key",
+  "description": "Press a key with modifiers (desktop app only), e.g. {key:\"B\", cmd:true}.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "key": {
+        "type": "string",
+        "description": "Key name"
+      },
+      "shift": {
+        "type": "boolean"
+      },
+      "alt": {
+        "type": "boolean"
+      },
+      "cmd": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "key"
+    ]
+  }
+}

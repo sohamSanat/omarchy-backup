@@ -1,0 +1,14 @@
+{
+  "name": "list_commands",
+  "description": "Every WordCraft command: id, label, ribbon location, shortcut and params. Filter with query.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Case-insensitive filter on id/label/location"
+      }
+    },
+    "required": []
+  }
+}

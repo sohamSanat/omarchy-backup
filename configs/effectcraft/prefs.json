@@ -1,0 +1,336 @@
+{
+  "version": 2,
+  "general": {
+    "language": "system",
+    "undoLevels": 32,
+    "pathPointSize": 5,
+    "showToolTips": true,
+    "createLayersAtCompStart": true,
+    "switchesAffectNestedComps": true,
+    "defaultSpatialLinear": false,
+    "preserveConstantVertexCount": true,
+    "syncTimeRelatedItems": true,
+    "expressionPickWhipCompact": true,
+    "createSplitLayersAbove": false,
+    "useSystemColorPicker": false,
+    "recentItems": 10
+  },
+  "startup": {
+    "showHomeOnLaunch": true,
+    "showHomeOnOpenProject": false,
+    "offerCrashRecovery": true,
+    "windowGraphics": "gl"
+  },
+  "project": {
+    "useTemplate": false,
+    "templatePath": ""
+  },
+  "autoSave": {
+    "enabled": true,
+    "intervalMinutes": 20,
+    "maxVersions": 5,
+    "location": "nextToProject",
+    "folder": "",
+    "saveOnRenderStart": false
+  },
+  "composition": {
+    "motionPath": "keyframes",
+    "motionPathSeconds": 15.0,
+    "motionPathKeyframes": 15,
+    "showRenderingProgress": true,
+    "hardwareAcceleratePanels": true
+  },
+  "previews": {
+    "adaptiveResolutionLimit": "1/8",
+    "showInternalWireframes": false,
+    "cacheFramesWhenIdle": false,
+    "fastPreviews": false,
+    "zoomQuality": "moreAccurate",
+    "showGpuInfo": false,
+    "displayProfile": "srgb"
+  },
+  "appearance": {
+    "theme": "dark",
+    "brightness": 0.0,
+    "useLabelColorForHandles": true,
+    "useLabelColorForTabs": true,
+    "cycleMaskColors": true,
+    "useGradients": true,
+    "inWindowMenuBarMac": false
+  },
+  "grids": {
+    "gridColor": "#7a9cff",
+    "gridSpacing": 100.0,
+    "gridSubdivisions": 4,
+    "gridStyle": "lines",
+    "proportionalHorizontal": 4,
+    "proportionalVertical": 4,
+    "guideColor": "#e75a50",
+    "guideStyle": "lines",
+    "actionSafe": 10.0,
+    "titleSafe": 20.0
+  },
+  "labels": [
+    {
+      "name": "Red",
+      "color": "#b53838"
+    },
+    {
+      "name": "Yellow",
+      "color": "#e4d84c"
+    },
+    {
+      "name": "Aqua",
+      "color": "#a9cbc7"
+    },
+    {
+      "name": "Pink",
+      "color": "#e5bcc9"
+    },
+    {
+      "name": "Lavender",
+      "color": "#a9a9ca"
+    },
+    {
+      "name": "Peach",
+      "color": "#e7c19e"
+    },
+    {
+      "name": "Sea Foam",
+      "color": "#b3c7b3"
+    },
+    {
+      "name": "Blue",
+      "color": "#677de0"
+    },
+    {
+      "name": "Green",
+      "color": "#4aa44c"
+    },
+    {
+      "name": "Purple",
+      "color": "#8e2c9a"
+    },
+    {
+      "name": "Orange",
+      "color": "#e8920d"
+    },
+    {
+      "name": "Brown",
+      "color": "#7f452a"
+    },
+    {
+      "name": "Fuchsia",
+      "color": "#f46dd6"
+    },
+    {
+      "name": "Cyan",
+      "color": "#3da2a5"
+    },
+    {
+      "name": "Sandstone",
+      "color": "#a89677"
+    },
+    {
+      "name": "Dark Green",
+      "color": "#1e401e"
+    }
+  ],
+  "type": {
+    "textEngine": "latin",
+    "fontPreview": true,
+    "recentFonts": 10,
+    "fontNamesInEnglish": false
+  },
+  "import": {
+    "stillFootage": "compLength",
+    "stillSeconds": 5.0,
+    "sequenceFps": 30.0,
+    "reportMissingFrames": true,
+    "unlabeledAlpha": "ask",
+    "dragImportAs": "footage"
+  },
+  "export": {
+    "defaultOutputFolder": "",
+    "segmentSequences": false,
+    "segmentSequenceFiles": 700,
+    "segmentMovies": false,
+    "segmentMovieMb": 1024,
+    "appendBitsToName": false
+  },
+  "audio": {
+    "outputDevice": "",
+    "outputLeft": 1,
+    "outputRight": 2,
+    "previewSampleRate": 48000
+  },
+  "disk": {
+    "diskCacheEnabled": true,
+    "diskCacheMaxGb": 100,
+    "diskCacheFolder": "",
+    "mediaCacheFolder": "",
+    "conformedMediaFolder": ""
+  },
+  "memory": {
+    "ramReservedGb": 6,
+    "layerCacheMb": 1024,
+    "mediaCacheMb": 1024,
+    "previewCacheMb": 3072,
+    "reduceCacheWhenLow": true
+  },
+  "video": {
+    "enableOutput": false,
+    "device": "",
+    "outputDuringPlayback": true,
+    "mirrorOnMonitor": true,
+    "disableWhenBackground": false
+  },
+  "threeD": {
+    "defaultRenderer": "classic",
+    "showReferenceAxes": true,
+    "extendedViewer": false,
+    "realtimeShadows": true
+  },
+  "scripting": {
+    "allowScriptsWriteFiles": false,
+    "warnExecutingFiles": true,
+    "enableJsDebugger": false,
+    "editorFontSize": 13,
+    "syntaxHighlighting": true,
+    "lineNumbers": true,
+    "autoComplete": true,
+    "bracketMatching": true,
+    "wordWrap": false,
+    "errorBanner": true
+  },
+  "roto": {
+    "model": "classical"
+  },
+  "face": {
+    "model": "classical"
+  },
+  "recentProjects": [],
+  "recentFootage": [],
+  "recentPresets": [],
+  "recentFonts": [],
+  "preview": {
+    "current": "spacebar",
+    "spacebar": {
+      "includeVideo": true,
+      "includeAudio": true,
+      "includeOverlays": true,
+      "includeLayerControls": false,
+      "loop": true,
+      "cacheBeforePlayback": false,
+      "range": "workAreaExtended",
+      "preRoll": 2.0,
+      "postRoll": 2.0,
+      "playFrom": "currentTime",
+      "frameRate": null,
+      "skip": 0,
+      "resolution": "auto",
+      "customResolution": 2,
+      "fullScreen": false,
+      "playCachedFrames": true,
+      "moveTimeToPreviewTime": true
+    },
+    "shiftSpacebar": {
+      "includeVideo": true,
+      "includeAudio": true,
+      "includeOverlays": true,
+      "includeLayerControls": false,
+      "loop": true,
+      "cacheBeforePlayback": false,
+      "range": "workAreaExtended",
+      "preRoll": 2.0,
+      "postRoll": 2.0,
+      "playFrom": "currentTime",
+      "frameRate": null,
+      "skip": 1,
+      "resolution": "auto",
+      "customResolution": 2,
+      "fullScreen": false,
+      "playCachedFrames": true,
+      "moveTimeToPreviewTime": true
+    },
+    "numpad0": {
+      "includeVideo": true,
+      "includeAudio": true,
+      "includeOverlays": true,
+      "includeLayerControls": false,
+      "loop": true,
+      "cacheBeforePlayback": false,
+      "range": "workArea",
+      "preRoll": 2.0,
+      "postRoll": 2.0,
+      "playFrom": "rangeStart",
+      "frameRate": null,
+      "skip": 0,
+      "resolution": "auto",
+      "customResolution": 2,
+      "fullScreen": false,
+      "playCachedFrames": true,
+      "moveTimeToPreviewTime": true
+    },
+    "shiftNumpad0": {
+      "includeVideo": true,
+      "includeAudio": true,
+      "includeOverlays": true,
+      "includeLayerControls": false,
+      "loop": true,
+      "cacheBeforePlayback": false,
+      "range": "workArea",
+      "preRoll": 2.0,
+      "postRoll": 2.0,
+      "playFrom": "rangeStart",
+      "frameRate": null,
+      "skip": 1,
+      "resolution": "half",
+      "customResolution": 2,
+      "fullScreen": false,
+      "playCachedFrames": true,
+      "moveTimeToPreviewTime": true
+    },
+    "altNumpad0": {
+      "includeVideo": false,
+      "includeAudio": true,
+      "includeOverlays": true,
+      "includeLayerControls": false,
+      "loop": true,
+      "cacheBeforePlayback": false,
+      "range": "workArea",
+      "preRoll": 2.0,
+      "postRoll": 2.0,
+      "playFrom": "rangeStart",
+      "frameRate": null,
+      "skip": 0,
+      "resolution": "auto",
+      "customResolution": 2,
+      "fullScreen": false,
+      "playCachedFrames": true,
+      "moveTimeToPreviewTime": true
+    }
+  },
+  "customRgb": {
+    "name": "My Custom RGB",
+    "red": [
+      0.64,
+      0.33
+    ],
+    "green": [
+      0.3,
+      0.6
+    ],
+    "blue": [
+      0.15,
+      0.06
+    ],
+    "white": [
+      0.3127,
+      0.329
+    ],
+    "gamma": 2.2,
+    "srgbCurve": false,
+    "icc": ""
+  }
+}

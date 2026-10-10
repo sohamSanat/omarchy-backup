@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# WordCraft launcher wrapper for Omarchy Linux
+# ------------------------------------------------------------------------------
+# 1. Enables loopback control server (default port 7981) for live automation & MCP
+# 2. Exposes WORDCRAFT_THEME_FILE for live dynamic per-theme color customization
+# 3. Native Wayland by default; set WORDCRAFT_FORCE_XWAYLAND=1 to force XWayland.
+# 4. Ensures GPU backend preference is set cleanly for Intel Iris Xe Mesa.
+# ==============================================================================
+set -euo pipefail
+
+export WORDCRAFT_CONTROL_PORT="${WORDCRAFT_CONTROL_PORT:-7981}"
+export WORDCRAFT_CONFIG_DIR="${WORDCRAFT_CONFIG_DIR:-$HOME/.config/wordcraft}"
+export WORDCRAFT_THEME_FILE="${WORDCRAFT_THEME_FILE:-$WORDCRAFT_CONFIG_DIR/theme.json}"
+
+mkdir -p "$WORDCRAFT_CONFIG_DIR"
+
+# Ensure initial theme.json is populated from current Omarchy theme
+if [[ ! -f "$WORDCRAFT_THEME_FILE" ]]; then
+  "$HOME/.local/bin/omarchy-sync-wordcraft" 2>/dev/null || true
+fi
+
+# Optional graphics backend override (default to Vulkan for Iris Xe)
+if [[ -z "${WORDCRAFT_GPU_BACKEND:-}" && -z "${WGPU_BACKEND:-}" ]]; then
+  export WGPU_BACKEND="vulkan"
+fi
+
+# Optional XWayland fallback
+if [[ "${WORDCRAFT_FORCE_XWAYLAND:-0}" == "1" ]]; then
+  unset WAYLAND_DISPLAY
+fi
+
+# Do not pass --control if running help, version, or if --control is already specified
+for arg in "$@"; do
+  if [[ "$arg" == "--version" || "$arg" == "--help" || "$arg" == "-h" || "$arg" == "--control" ]]; then
+    exec "$HOME/.local/bin/wordcraft.real" "$@"
+  fi
+done
+
+exec "$HOME/.local/bin/wordcraft.real" --control "$WORDCRAFT_CONTROL_PORT" "$@"

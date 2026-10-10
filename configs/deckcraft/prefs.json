@@ -1,0 +1,11 @@
+{
+  "snapToGrid": true,
+  "gridSpacing": 6.0,
+  "smartGuides": true,
+  "duplicateOffset": 12.0,
+  "autocorrect": true,
+  "smartQuotes": true,
+  "author": "Presenter",
+  "undoLimit": 500,
+  "recoveryMinutes": 1.0
+}

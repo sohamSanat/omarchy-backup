@@ -83,18 +83,23 @@ Branch: `main`
 - **CLI & Automated Hook**: `omarchy-sync-brave` (`--sync`, `--status`) invoked automatically on every theme change via `~/.config/omarchy/hooks/theme-set.d/brave-sync.sh`.
 - **Chromium & Brave Startup Flags**: `configs/chromium-flags.conf`, `configs/brave-origin-nightly-flags.conf` (pre-loads Brave Polish and essential system extensions), and `configs/environment.d/brave.conf`.
 
-### 5. 🎨 The Storyteller Craft Application Suite (PhotoCraft, VectorCraft, FilmCraft, PdfCraft, LightCraft)
+### 5. 🎨 The Storyteller Craft Application Suite & Creative Cloud (10 Pro Workstations)
 
-The **Storyteller Craft Suite** is Soham's custom-engineered creative application ecosystem for Omarchy Linux. Built with Rust, `egui`, and `wgpu`, each application has been specifically patched and extended with deep Omarchy desktop integration, live dynamic per-theme color adaptation, and headless AI agent control interfaces via the Model Context Protocol (MCP).
+The **Storyteller Craft Suite** is Soham's custom-engineered creative and office application ecosystem for Omarchy Linux. Built with Rust, `egui`, and `wgpu`, each application has been specifically patched and extended with deep Omarchy desktop integration, live dynamic per-theme color adaptation, headless AI agent control interfaces via the Model Context Protocol (MCP), and centralized supervision via **CraftCloud**.
 
 #### 🧰 Suite Applications & Roles
 | Application | Version | Category | Role & Upstream Base | Artifacts & Binaries |
 | :--- | :--- | :--- | :--- | :--- |
+| **CraftCloud** | `0.1.0` | Suite Hub | Creative Cloud command center, process supervisor, unified recent files | `craftcloud`, `ai.storyteller.craftcloud.desktop` |
 | **PhotoCraft** | `0.5.0` | Raster Graphics | Layered photo editing, PSD/QOI engine, Vulkan GPU acceleration | `photocraft.real`, `photocraft-cli`, `ai.storyteller.photocraft.desktop` |
 | **VectorCraft** | `0.4.0` | Vector Graphics | Scalable vector illustration, SVG editor, precision Bezier curves | `vectorcraft.real`, `vectorcraft-cli`, `ai.storyteller.vectorcraft.desktop` |
 | **FilmCraft** | `0.4.0` | Video Editing | Multi-track non-linear video editing workstation, Lumetri scopes | `filmcraft.real`, `filmcraft-cli`, `ai.storyteller.filmcraft.desktop` |
-| **PdfCraft** | `0.4.0` | Document Workbench | PDF forms, digital signing, annotations, redaction, OCR, export | `pdfcraft.real`, `pdfcraft-cli`, `ai.storyteller.pdfcraft.desktop` |
+| **EffectCraft** | `0.6.0` | Motion Graphics | After Effects alternative, 300+ VFX, graph editor, 3D camera compositing | `effectcraft.real`, `effectcraft-cli`, `ai.storyteller.effectcraft.desktop` |
 | **LightCraft** | `0.4.0` | RAW Photo Catalog | Non-destructive RAW developer, library organizer (Lightroom alternative) | `lightcraft.real`, `lightcraft-cli`, `ai.storyteller.lightcraft.desktop` |
+| **PdfCraft** | `0.4.0` | Document Workbench | PDF forms, digital signing, annotations, redaction, OCR, export | `pdfcraft.real`, `pdfcraft-cli`, `ai.storyteller.pdfcraft.desktop` |
+| **WordCraft** | `0.3.0` | Document Processor | Microsoft Word alternative in pure Rust, ribbon UI, styles, DOCX/ODT | `wordcraft.real`, `wordcraft-cli`, `ai.storyteller.wordcraft.desktop` |
+| **GridCraft** | `0.3.0` | Spreadsheets | Excel alternative in pure Rust, formula engine, charting, XLSX fidelity | `gridcraft.real`, `gridcraft-cli`, `ai.storyteller.gridcraft.desktop` |
+| **DeckCraft** | `0.3.0` | Presentations | PowerPoint alternative in pure Rust, slide transitions, PPTX fidelity | `deckcraft.real`, `deckcraft-cli`, `ai.storyteller.deckcraft.desktop` |
 
 #### ⚙️ Unified Engineering Architecture
 1. **LiveTokens Dynamic Theming Engine (`theme-unlock.patch`)**:
@@ -104,26 +109,31 @@ The **Storyteller Craft Suite** is Soham's custom-engineered creative applicatio
 2. **Omarchy Synchronization Layer (`omarchy-sync-<app>`)**:
    - High-contrast Python palette math reads `/home/soham/.local/state/omarchy/current/theme/colors.toml` and synthesizes 20–37 semantic surface tokens tailored to that application's visual hierarchy.
    - Automatically dispatched by Omarchy theme-set hooks: `~/.config/omarchy/hooks/theme-set.d/<app>-sync.sh`.
-   - On running instances, the sync script connects to the app's loopback control socket (`~/.config/<app>/control.json`) to trigger an immediate frame flush for zero-latency repainting.
+   - On running instances, the sync script connects to the app's loopback control socket (`~/.config/<app>/control.json` or ephemeral port) to trigger an immediate frame flush for zero-latency repainting.
 3. **Headless Automation & Antigravity MCP Integration**:
    - Each app ships with a companion CLI binary (`<app>-cli`) supporting headless rendering, batch operations, format conversion, and stdio Model Context Protocol (MCP) server mode.
-   - Over **450+ tool schemas** are backed up in `mcp/` and registered into Antigravity (`~/.gemini/antigravity-cli/mcp/`) allowing AI agents to inspect projects, manipulate layers/timelines/forms, and export media programmatically.
+   - Over **550+ tool schemas** are backed up in `mcp/` and registered into Antigravity (`~/.gemini/antigravity-cli/mcp/`) allowing AI agents to inspect projects, manipulate layers/timelines/spreadsheets/slides, and export media programmatically.
 4. **Compact Release Bundling & Git Compatibility**:
-   - Full release binaries (~60MB–80MB each) are stripped (`strip --strip-unneeded`) and compressed with multi-threaded `xz -9 -T0` into `apps/<app>/build/<app>-linux-x86_64.tar.xz`.
-   - Every archive is strictly under **31 MB** (well below GitHub's 50MB warning threshold and 100MB hard limit), enabling lightning-fast cloning and zero-compilation recovery.
+   - Full release binaries (~30MB–100MB each) are stripped (`strip --strip-unneeded`) and compressed with multi-threaded `xz -9 -T0` into `apps/<app>/build/<app>-linux-x86_64.tar.xz`.
+   - Every archive is strictly under **43 MB** (well below GitHub's 50MB warning threshold and 100MB hard limit), enabling lightning-fast cloning and zero-compilation recovery.
 
 #### 🤖 AI Agent Restoration Playbook
 For any future AI agent restoring this workflow:
-1. **Automated Recovery**: Running `./restore.sh` automatically invokes all five `apps/<app>/install.sh` scripts, registers desktop shortcuts, installs MIME databases, generates icon caches, places theme hooks, and performs an initial palette synchronization.
+1. **Automated Recovery**: Running `./restore.sh` automatically invokes all 10 `apps/<app>/install.sh` scripts, registers desktop shortcuts, installs MIME databases, generates icon caches, places theme hooks, and performs an initial palette synchronization.
 2. **Standalone Installation**: Any Craft app can be restored independently at any time:
    ```bash
+   apps/craftcloud/install.sh
    apps/photocraft/install.sh
    apps/vectorcraft/install.sh
    apps/filmcraft/install.sh
-   apps/pdfcraft/install.sh
+   apps/effectcraft/install.sh
    apps/lightcraft/install.sh
+   apps/pdfcraft/install.sh
+   apps/wordcraft/install.sh
+   apps/gridcraft/install.sh
+   apps/deckcraft/install.sh
    ```
-3. **Building from Source**: If re-compilation is ever required, run `apps/<app>/build.sh`. This clones the upstream repository (`https://github.com/storytold/<app>.git`), applies the verified `apps/<app>/<app>-theme-unlock.patch`, builds release targets via `cargo build --release -p <app> -p <app>-cli`, and installs the resulting binaries.
+3. **Building from Source**: If re-compilation is ever required, run `apps/<app>/build.sh`. This clones the upstream repository (`https://github.com/storytold/<app>.git`) or accesses the backed-up source in `apps/<app>/source`, applies the verified `apps/<app>/<app>-theme-unlock.patch`, builds release targets via `cargo build --release -p <app> -p <app>-cli`, and installs the resulting binaries.
 4. **Verification Gates**:
    - Binaries exist in `~/.local/bin/` (`<app>`, `<app>.real`, `<app>-cli`, `omarchy-sync-<app>`) and are executable (`chmod +x`).
    - Desktop entry is recognized by `update-desktop-database ~/.local/share/applications`.
@@ -213,7 +223,7 @@ Self-signed TLS certificates for the Nothing Phone PWA bridge (`~/.config/omagen
 ```
 omarchy-backup/
 ├── agents/                  # AI agent skills, rules, and durable learnings (~/.agents)
-├── apps/                    # Standalone GUI applications (PhotoCraft, VectorCraft, FilmCraft, PdfCraft, LightCraft, Photos Gallery, Gallery)
+├── apps/                    # Standalone GUI applications (CraftCloud, PhotoCraft, VectorCraft, FilmCraft, EffectCraft, LightCraft, PdfCraft, WordCraft, GridCraft, DeckCraft, Photos Gallery, Gallery)
 ├── bin/                     # Custom binaries and helper executables (~/.local/bin)
 ├── configs/                 # Dotfiles and application configs (~/.config)
 │   ├── omagent/             # Omagent prompt, mobile PWA web client, and config template
@@ -221,8 +231,12 @@ omarchy-backup/
 │   ├── photocraft/          # PhotoCraft preferences, egui UI layout, and token schema
 │   ├── vectorcraft/         # VectorCraft UI preferences and real-time token schema
 │   ├── filmcraft/           # FilmCraft preferences and real-time video token schema
-│   ├── pdfcraft/            # PdfCraft preferences, UI state, and real-time token schema
+│   ├── effectcraft/         # EffectCraft composition preferences and motion token schema
 │   ├── lightcraft/          # LightCraft UI state, RAW library settings, and token schema
+│   ├── pdfcraft/            # PdfCraft preferences, UI state, and real-time token schema
+│   ├── wordcraft/           # WordCraft document preferences, ribbon UI, and token schema
+│   ├── gridcraft/           # GridCraft spreadsheet preferences and token schema
+│   ├── deckcraft/           # DeckCraft presentation preferences and token schema
 │   ├── hypr/                # Hyprland rules, inputs, look-and-feel, and keybindings
 │   ├── kimchi/              # Kimchi agent harness, model routing, and themes
 │   ├── omarchy/             # Omarchy shell.json, theme templates, and homelab-launcher

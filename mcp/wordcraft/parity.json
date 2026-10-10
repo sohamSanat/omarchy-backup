@@ -1,0 +1,9 @@
+{
+  "name": "parity",
+  "description": "WordCraft's command coverage of the word-processor feature catalog.",
+  "parameters": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  }
+}

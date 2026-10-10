@@ -1,0 +1,14 @@
+{
+  "name": "new_document",
+  "description": "Start a document: blank, sample, letter, resume or report.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "template": {
+        "type": "string",
+        "description": "blank|sample|letter|resume|report"
+      }
+    },
+    "required": []
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "script_ui",
+  "description": "Drive ScriptUI windows that scripts opened (dialogs, palettes, dockable panels). action `list` (default): open windows; `get`: a window's control tree (type, name, text, value, checked, items, selection, bounds); `click`: press a button / toggle a checkbox / pick a radio button; `set`: type text, move a slider, pick a list item (index or text); `close`: close a window (`result` for a dialog's show(), default 2 = Cancel). Controls by id, \"#id\", properties.name or text. A dialog's script resumes when the dialog closes.",
+  "parameters": {
+    "properties": {
+      "action": {
+        "enum": [
+          "list",
+          "get",
+          "click",
+          "set",
+          "close"
+        ],
+        "type": "string"
+      },
+      "result": {
+        "description": "For `close`: what the dialog's show() returns.",
+        "type": "integer"
+      },
+      "value": {
+        "description": "For `set`: text, number, bool, item index or item text."
+      },
+      "widget": {
+        "description": "Control id, \"#id\", properties.name or text.",
+        "type": [
+          "integer",
+          "string"
+        ]
+      },
+      "window": {
+        "description": "Window id or title (optional when one is open).",
+        "type": [
+          "integer",
+          "string"
+        ]
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+}
