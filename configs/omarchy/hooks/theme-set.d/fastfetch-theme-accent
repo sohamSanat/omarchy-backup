@@ -52,7 +52,10 @@ import sys, re
 path, n = sys.argv[1], sys.argv[2]
 s = open(path).read()
 s2, count = re.subn(r'"keyColor"\s*:\s*"[^"]*"', f'"keyColor": "38;5;{n}"', s)
-if count and s2 != s:
-    open(path, 'w').write(s2)
+logo_repl = f'''"color": {{\n      "1": "38;5;{n}",\n      "2": "38;5;223"\n    }}'''
+s3, lcount = re.subn(r'"logo"\s*:\s*\{([^}]*)"color"\s*:\s*\{[^}]*\}([^}]*)\}', r'"logo": {\1' + logo_repl + r'\2}', s2)
+final_s = s3 if lcount else s2
+if final_s != s:
+    open(path, 'w').write(final_s)
 print(f'fastfetch-theme-accent: updated {count} keyColors to 38;5;{n}')
 EOF

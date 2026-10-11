@@ -639,6 +639,9 @@ fi
 if [[ -f "${USER_HOME}/.no-mistakes/bin/no-mistakes" ]]; then
   ln -nsf "${USER_HOME}/.no-mistakes/bin/no-mistakes" "${USER_HOME}/.local/bin/no-mistakes"
 fi
+if [[ -f "${USER_HOME}/.local/bin/fastfetch-arch-anim" ]]; then
+  ln -nsf "${USER_HOME}/.local/bin/fastfetch-arch-anim" "${USER_HOME}/.local/bin/fastfetch"
+fi
 
 echo ""
 echo "==> Step 9: Restoring custom libraries..."

@@ -1,0 +1,210 @@
+diff --git c/fetch.c w/fetch.c
+index 58099c0..1abc7af 100644
+--- c/fetch.c
++++ w/fetch.c
+@@ -76,6 +76,14 @@ static void get_term_size(int *rows, int *cols) {
+     if (ws.ws_col > 0)
+       *cols = ws.ws_col;
+   }
++  if (*rows == 0) {
++    const char *env_rows = getenv("LINES");
++    if (env_rows) *rows = atoi(env_rows);
++  }
++  if (*cols == 0) {
++    const char *env_cols = getenv("COLUMNS");
++    if (env_cols) *cols = atoi(env_cols);
++  }
+ }
+ 
+ #define ANIM_WIDTH 60
+@@ -548,8 +556,12 @@ static int load_logo_file(void) {
+     return 0;
+   snprintf(path, sizeof(path), "%s/.config/fetch/logo.txt", home);
+   FILE *fp = fopen(path, "r");
+-  if (!fp)
+-    return 0;
++  if (!fp) {
++    snprintf(path, sizeof(path), "%s/.config/omarchy/branding/about.txt", home);
++    fp = fopen(path, "r");
++    if (!fp)
++      return 0;
++  }
+ 
+   char buf[512];
+   while (logo_rows < MAX_LOGO_ROWS && fgets(buf, sizeof(buf), fp)) {
+@@ -896,7 +908,8 @@ static int field_line[F_COUNT]; // line index for each field (-1 if not shown)
+ static int current_field = -1;  // which field is currently being gathered
+ static int field_count = 0;
+ static int is_refresh_pass = 0;     // 1 during the animation refresh tick
+-static char label_color[16] = "35"; // default magenta
++static char label_color[32] = "35"; // default magenta
++static int config_label_color_set = 0;
+ static int config_height = 0;       // 0 = auto (match info lines)
+ static float size_scale = 1.0f;
+ static float config_speed = 0.0f; // 0 = use flag/default
+@@ -991,6 +1004,7 @@ static void load_config(void) {
+ 
+     // Check for key=value settings
+     if (strncmp(line, "label_color=", 12) == 0) {
++      config_label_color_set = 1;
+       char *val = line + 12;
+       strip_inline_hint(val);
+       // Accept color names or numbers
+@@ -3450,6 +3464,34 @@ static void append_gtk_pair(char *dst, size_t dstsz, const char *gtk2,
+   append_tagged(dst, dstsz, gtk3, "GTK3");
+ }
+ 
++static void load_omarchy_theme_env(void) {
++  if (getenv("OMARCHY_THEME_NAME") && getenv("OMARCHY_THEME_ACCENT"))
++    return;
++  const char *home = getenv("HOME");
++  if (!home) return;
++  char env_path[512];
++  snprintf(env_path, sizeof(env_path), "%s/.local/state/omarchy/theme-mode.env", home);
++  FILE *fp = fopen(env_path, "r");
++  if (!fp) return;
++  char line[256];
++  while (fgets(line, sizeof(line), fp)) {
++    char *p = line;
++    while (*p == ' ' || *p == '\t') p++;
++    if (strncmp(p, "export ", 7) == 0) p += 7;
++    char *eq = strchr(p, '=');
++    if (!eq) continue;
++    *eq = '\0';
++    char *key = p;
++    char *val = eq + 1;
++    while (*val == '"' || *val == '\'') val++;
++    int vlen = strlen(val);
++    while (vlen > 0 && (val[vlen-1] == '\n' || val[vlen-1] == '\r' || val[vlen-1] == '"' || val[vlen-1] == '\''))
++      val[--vlen] = '\0';
++    setenv(key, val, 0);
++  }
++  fclose(fp);
++}
++
+ static void gather_theme(void) {
+ #ifdef __APPLE__
+   char style[64] = "";
+@@ -3466,6 +3508,20 @@ static void gather_theme(void) {
+   else
+     add_info("Theme", "Light");
+ #else
++  load_omarchy_theme_env();
++  const char *omarchy_theme = getenv("OMARCHY_THEME_NAME");
++  if (omarchy_theme && omarchy_theme[0]) {
++    const char *mode = getenv("OMARCHY_THEME_MODE");
++    if (mode && mode[0]) {
++      char cap_mode[16];
++      snprintf(cap_mode, sizeof(cap_mode), "%s", mode);
++      cap_mode[0] = toupper((unsigned char)cap_mode[0]);
++      add_info("Theme", "%s (%s)", omarchy_theme, cap_mode);
++    } else {
++      add_info("Theme", "%s", omarchy_theme);
++    }
++    return;
++  }
+   char qt[64] = "", gtk2[64] = "", gtk3[64] = "", out[256] = "";
+   qt_theme(qt, sizeof(qt));
+   read_gtk2_setting("gtk-theme-name", gtk2, sizeof(gtk2));
+@@ -3514,8 +3570,41 @@ static void gather_font(void) {
+   font_pt_format(gtk3, sizeof(gtk3));
+   append_tagged(out, sizeof(out), qt, "Qt");
+   append_gtk_pair(out, sizeof(out), gtk2, gtk3);
+-  if (out[0])
++  if (out[0]) {
+     add_info("Font", "%s", out);
++  } else {
++    const char *home = getenv("HOME");
++    if (home) {
++      char cfg[512];
++      snprintf(cfg, sizeof(cfg), "%s/.config/ghostty/config", home);
++      FILE *fp = fopen(cfg, "r");
++      if (fp) {
++        char line[256];
++        char fam[128] = "", sz[32] = "";
++        while (fgets(line, sizeof(line), fp)) {
++          if (strncmp(line, "font-family =", 13) == 0) {
++            char *v = line + 13;
++            while (*v == ' ' || *v == '"') v++;
++            char *end = v + strlen(v) - 1;
++            while (end > v && (*end == '\n' || *end == '\r' || *end == ' ' || *end == '"')) *end-- = '\0';
++            strncpy(fam, v, sizeof(fam) - 1);
++          } else if (strncmp(line, "font-size =", 11) == 0) {
++            char *v = line + 11;
++            while (*v == ' ') v++;
++            char *end = v + strlen(v) - 1;
++            while (end > v && (*end == '\n' || *end == '\r' || *end == ' ')) *end-- = '\0';
++            strncpy(sz, v, sizeof(sz) - 1);
++          }
++        }
++        fclose(fp);
++        if (fam[0]) {
++          if (sz[0]) snprintf(out, sizeof(out), "%s (%spt)", fam, sz);
++          else snprintf(out, sizeof(out), "%s", fam);
++          add_info("Font", "%s", out);
++        }
++      }
++    }
++  }
+ #endif
+ }
+ 
+@@ -3939,6 +4028,31 @@ static void set_distro_colors(const char *distro) {
+   } else if (strcasecmp(distro, "macos") == 0) {
+     color_outer = "\033[1;36m";
+     color_inner = "\033[1;37m";
++  } else if (strcasecmp(distro, "omarchy") == 0) {
++    load_omarchy_theme_env();
++    const char *mode = getenv("OMARCHY_THEME_MODE");
++    int is_light = mode && strcmp(mode, "light") == 0;
++    static char omarchy_outer[64] = "\033[1;32m";
++    static char omarchy_inner[64] = "\033[1;37m";
++
++    const char *accent = getenv("OMARCHY_THEME_ACCENT");
++    if (accent && *accent) {
++      if (*accent == '#') accent++;
++      int r, g, b;
++      if (sscanf(accent, "%02x%02x%02x", &r, &g, &b) == 3) {
++        if (is_light) {
++          r = (r * 2) / 3;
++          g = (g * 2) / 3;
++          b = (b * 2) / 3;
++        }
++        snprintf(omarchy_outer, sizeof(omarchy_outer), "\033[38;2;%d;%d;%dm", r, g, b);
++      }
++    } else {
++      snprintf(omarchy_outer, sizeof(omarchy_outer), is_light ? "\033[38;5;28m" : "\033[1;32m");
++    }
++    snprintf(omarchy_inner, sizeof(omarchy_inner), is_light ? "\033[38;5;235m" : "\033[1;37m");
++    color_outer = omarchy_outer;
++    color_inner = omarchy_inner;
+   }
+ }
+ 
+@@ -4205,6 +4319,26 @@ int main(int argc, char **argv) {
+ 
+   if (distro[0])
+     set_distro_colors(distro);
++  if (!config_label_color_set && strcasecmp(distro, "omarchy") == 0) {
++    load_omarchy_theme_env();
++    const char *mode = getenv("OMARCHY_THEME_MODE");
++    int is_light = mode && strcmp(mode, "light") == 0;
++    const char *accent = getenv("OMARCHY_THEME_ACCENT");
++    if (accent && *accent) {
++      if (*accent == '#') accent++;
++      int r, g, b;
++      if (sscanf(accent, "%02x%02x%02x", &r, &g, &b) == 3) {
++        if (is_light) {
++          r = (r * 2) / 3;
++          g = (g * 2) / 3;
++          b = (b * 2) / 3;
++        }
++        snprintf(label_color, sizeof(label_color), "38;2;%d;%d;%d", r, g, b);
++      }
++    } else {
++      snprintf(label_color, sizeof(label_color), is_light ? "38;5;28" : "32");
++    }
++  }
+   if (config_logo_outer[0])
+     color_outer = config_logo_outer;
+   if (config_logo_inner[0])

@@ -274,8 +274,14 @@ For any future AI agent restoring this workflow:
 - **`cmf-buds-mode`**: CLI utility controlling Active Noise Cancellation modes for Nothing CMF Buds.
 - **`omarchy-dictionary-lookup` (`Super + D`)**: Fast dictionary popup for active text selections with automatic clipboard and primary selection extraction.
 - **`omarchy-sync-vlc`**: Dynamically writes 4-stop slider gradient and dark/light palette into `~/.config/vlc/vlcrc`.
-- **Fastfetch Enhancements**: `fastfetch-arch-anim` (smooth spinning Arch ASCII animation) and `fastfetch-theme-accent` (theme accent mapper).
-- **`fetch`**: Ultra-fast C/ASCII 3D donut spinning system info fetcher with Omarchy profile.
+- **Fastfetch 3D Revolution & Dynamic Theme Shader (`fastfetch-arch-anim`, `fastfetch`)**:
+  - `~/.local/bin/fastfetch` symlinked directly to `fastfetch-arch-anim` (`bin/fastfetch-arch-anim`).
+  - Python 3 engine rendering a true 3D horizontal revolution of the Arch Linux logo about its vertical axis: front face with Omarchy theme gradient, edge-on specular metallic glint, and back face with horizontal geometry mirroring and deep ambient shadow.
+  - In-place rendering: system info text is painted once; only the 45-character logo column updates in-place for 100% flicker-free animation. Automatic passthrough for pipes, scripts, and non-tty runs.
+  - `configs/omarchy/hooks/theme-set.d/fastfetch-theme-accent` & `bin/fastfetch-theme-accent`: Dynamic theme hook mapping active Omarchy accent to xterm-256 and synchronizing key colors and two-tone logo colors in `configs/fastfetch/config.jsonc`.
+- **Custom Animated `fetch` (C / ASCII 3D Spinning System Fetcher)**:
+  - High-performance compiled C binary in `bin/fetch` with configuration in `configs/fetch/config` and Omarchy branding in `configs/fetch/logo.txt`.
+  - Continuous real-time 3D rotation with ASCII shading ramp (`spin=y`, `depth=0.35`, `size=0.85`), automatic Ghostty terminal font detection, and dynamic Omarchy theme/accent integration (`load_omarchy_theme_env`). Full upstream C patch preserved in `meta/patches/fetch.patch`.
 - **Wayland Idle Inhibitors**: `omarchy-wayland-inhibit` (compiled C Wayland protocol client) and `omarchy-video-idle-inhibit` (MPRIS and PipeWire audio stream daemon with screensaver lock-guard).
 - **Sunshine & Tablet Mode Streaming**: `bin/tablet-mode` and `configs/sunshine/` enabling zero-latency wireless streaming and virtual display scaling to Redmi Pad SE via `HEADLESS-1` (1200x2000 90° portrait or 2000x1200 landscape).
 - **EasyEffects Audio Ecosystem & Navbar Switcher**: Full integration including `plugins/soham.easyeffects/` (with `purge-preset.sh`, stock baseline protection, mouse-wheel scrolling, and modal confirmation), all 6 curated IEM Equalizer presets in `configs/easyeffects/output/` (Diablo, Daybreak, Nightfall, Maestro Mini, Nightingale, Tangzu Wan'er Stock), hardware routing autoload rules in `configs/easyeffects/autoload/output/`, database configurations in `configs/easyeffects/db/`, autostart entry `configs/autostart/easyeffects.desktop`, and systemd service `configs/systemd/user/easyeffects.service`.

@@ -1,173 +1,406 @@
-#!/usr/bin/env bash
-# fastfetch-arch-anim: show fastfetch with a continuously spinning Arch logo.
-# The logo rotates on its vertical axis (spinning-coin effect) beside the
-# system info until you press any key or Ctrl+C, which lands on static fastfetch.
-#
-# How it stays smooth: the info text is painted ONCE and never touched again.
-# Each frame only rewrites the small logo cells in place (cursor addressing),
-# so there is no full-screen clear, no flicker, and no color leakage.
-#
-# Color rule: the LOGO is always pure white. ONLY the info text carries
-# color — key colors come from ~/.config/fastfetch/config.jsonc, which a
-# theme-set hook keeps in sync with the Omarchy theme accent.
-#
-# Env knobs:
-#   FASTFETCH_NO_ANIM=1       skip animation, print plain fastfetch
-#   FASTFETCH_ANIM_DELAY=0.06 seconds per frame (default 0.06)
-#   FASTFETCH_ANIM_FRAMES=N   spin only N frames, then print static (default: forever)
-#   FASTFETCH_LOGO_COLOR=N    fixed 0-255 color for the logo (default: pure
-#                             white, the "white logo" look)
-# Any CLI args are passed through to fastfetch for the info columns, and
-# `fastfetch --logo none`-style / non-tty use skips the animation.
+#!/usr/bin/env python3
+"""
+fastfetch-arch-anim: show fastfetch with a continuously animated 360-degree
+rotating Arch logo shaded dynamically with the current Omarchy theme colors.
 
-REAL_FF="$(command -v fastfetch)"
-FF_ARGS=("$@")
+The logo performs a true 3D horizontal revolution about its vertical axis:
+  * Front face (0° to 90°, 270° to 360°): full theme gradient with 3D curvature lighting.
+  * Edge-on (near 90° and 270°): brilliant specular metallic glint.
+  * Back face (90° to 270°): horizontally mirrored geometry with deep ambient shadow shading.
 
-passthrough() { command "$REAL_FF" "${FF_ARGS[@]}"; }
+In-place rendering: info text is printed once; only the 45-character logo column
+is updated in place. Zero flicker, no jarring alternate-screen jumps.
+"""
 
-# Never animate when piped, or for machine-readable / help output.
-if [[ -n "${FASTFETCH_NO_ANIM:-}" || ! -t 1 ]]; then
-  passthrough
-  exit $?
-fi
-for a in "${FF_ARGS[@]}"; do
-  case "$a" in
-    --json*|--format*|--gen-config*|-h|--help|-v|--version*|--list-*|--print-*|-j) passthrough; exit $? ;;
-    --logo*|-l|--file*|--data*|--raw|--sixel|--kitty*|--iterm|--chafa*) passthrough; exit $? ;;
-  esac
-done
+import math
+import os
+import re
+import select
+import signal
+import subprocess
+import sys
+import termios
+import time
+import tty
 
-# Arch logo, same shape as fastfetch's builtin "arch".
-LOGO=(
-"                    -\`"
-"                   .o+\`"
-"                  \`ooo/"
-"                 \`+oooo:"
-"                \`+oooooo:"
-"                -+oooooo+:"
-"              \`/:-:++oooo+:"
-"             \`/++++/+++++++:"
-"            \`/++++++++++++++:"
-"           \`/+++ooooooooooooo/\`"
-"          ./ooosssso++osssssso+\`"
-"         .oossssso-\`\`\`\`/ossssss+\`"
-"        -osssssso.      :ssssssso."
-"       :osssssss/        osssso+++."
-"      /ossssssss/        +ssssooo/-"
-"    \`/ossssso+/:-        -:/+osssso+-"
-"   \`+sso+:-\`                 \`.-/+oso:"
-"  \`++:.                           \`-/+/"
-"  .\`                                 \`/"
-)
-PAD_TOP=2
-PAD_LEFT=2
-GAP=6
+# Real Fastfetch binary
+REAL_FF = "/usr/bin/fastfetch"
+FF_ARGS = sys.argv[1:]
 
-DELAY="${FASTFETCH_ANIM_DELAY:-0.06}"
-LIMIT="${FASTFETCH_ANIM_FRAMES:-}" # empty = spin forever, any key/Ctrl+C lands on static
-if [[ "${FASTFETCH_LOGO_COLOR:-}" =~ ^[0-9]+$ ]]; then
-  LC_ON=$'\e[38;5;'"${FASTFETCH_LOGO_COLOR}"$'m'; LC_OFF=$'\e[0m'
-else
-  LC_ON=$'\e[97m'; LC_OFF=$'\e[0m' # pure white logo
-fi
-
-# --pipe false: keep key colors even though INFO is captured through a pipe.
-mapfile -t INFO < <(command "$REAL_FF" --logo none --pipe false "${FF_ARGS[@]}" 2>/dev/null)
-[[ "${#INFO[@]}" -eq 0 ]] && { passthrough; exit $?; }
-
-# Build padded logo block.
-BLOCK=()
-for ((i = 0; i < PAD_TOP; i++)); do BLOCK+=(""); done
-for line in "${LOGO[@]}"; do BLOCK+=("$(printf '%*s%s' "$PAD_LEFT" "" "$line")"); done
-
-WIDTH=0
-for line in "${BLOCK[@]}"; do ((${#line} > WIDTH)) && WIDTH=${#line}; done
-WIDTH=$((WIDTH + GAP))
-
-ROWS=${#INFO[@]}
-((${#BLOCK[@]} > ROWS)) && ROWS=${#BLOCK[@]}
-
-# Rows that actually contain logo ink (blank rows are never touched).
-LROWS=()
-for ((r = 0; r < ${#BLOCK[@]}; r++)); do
-  [[ -n "${BLOCK[r]}" ]] && LROWS+=("$r")
-done
-
-# One full revolution around the logo's vertical axis, as integer |cos|
-# percentages (bash has no floating point, so the table is precomputed).
-# PCT=100 -> full width, PCT=0 -> edge-on (1-char flash).
-PCT=(100 99 97 92 87 79 71 61 50 38 26 13 0 13 26 38 50 61 71 79 87 92 97 99 100 99 97 92 87 79 71 61 50 38 26 13 0 13 26 38 50 61 71 79 87 92 97 99)
-NFRAMES=${#PCT[@]}
-
-# Precompute every logo cell once (only 13 unique widths): each cell is a
-# fixed-WIDTH string, so frames overwrite the full column and leave nothing.
-declare -A CELL
-for pct in $(printf '%s\n' "${PCT[@]}" | sort -nu); do
-  for r in "${LROWS[@]}"; do
-    logo="${BLOCK[r]}"
-    L=${#logo}
-    w=$(( (L * pct + 50) / 100 ))
-    (( w < 1 )) && w=1
-    if (( w <= 2 )); then # edge-on: show ink, not padding space
-      trimmed="${logo#"${logo%%[![:space:]]*}"}"
-      scaled="${trimmed:0:1}"
-      (( w == 2 )) && scaled+="$scaled"
-    else
-      scaled=""
-      for ((x = 0; x < w; x++)); do
-        src=$(( (x * L) / w ))
-        scaled+=${logo:src:1}
-      done
-    fi
-    lead=$(( (WIDTH - w) / 2 ))
-    trail=$(( WIDTH - w - lead ))
-    CELL["$pct,$r"]="$(printf '%*s%s%*s' "$lead" "" "$scaled" "$trail" "")"
-  done
-done
-BLANK="$(printf '%*s' "$WIDTH" "")"
-
-# Animation runs on the terminal's alternate screen, then we return to the
-# main screen and print the static fastfetch exactly once — so the logo
-# can never appear twice, regardless of terminal width or wrapping.
-tput smcup 2>/dev/null || { passthrough; exit $?; }
-tput civis 2>/dev/null
-tput rmam 2>/dev/null # no linewrap while animating
-restore() { tput smam 2>/dev/null; tput rmcup 2>/dev/null; tput cnorm 2>/dev/null; }
-land() { # back on the main screen, single static print
-  trap - EXIT INT TERM HUP
-  restore
-  command "$REAL_FF" "${FF_ARGS[@]}"
-  exit ${1:-0}
+PASSTHROUGH_FLAGS = {
+    "-h", "--help", "-v", "--version", "-j", "--raw", "--sixel", "--iterm", "--chafa",
 }
-trap restore EXIT
-trap 'land 130' INT TERM HUP
 
-# Paint everything once, top-aligned like normal fastfetch output.
-printf '\e[H'
-for ((r = 0; r < ROWS; r++)); do
-  if [[ -n "${BLOCK[$r]:-}" ]]; then
-    printf '%s%s%s%s\n' "$LC_ON" "${CELL["100,$r"]}" "$LC_OFF" "${INFO[$r]:-}"
-  else
-    printf '%s%s\n' "$BLANK" "${INFO[$r]:-}"
-  fi
-done
+def passthrough():
+    try:
+        os.execv(REAL_FF, [REAL_FF] + FF_ARGS)
+    except Exception:
+        sys.exit(1)
 
-# Spin: only the logo cells move. Info text is never redrawn.
-f=0
-while :; do
-  i=$((f % NFRAMES))
-  pct=${PCT[i]}
-  for r in "${LROWS[@]}"; do
-    printf '\e[%d;1H%s%s%s' "$((r + 1))" "$LC_ON" "${CELL["$pct,$r"]}" "$LC_OFF"
-  done
-  f=$((f + 1))
-  if [[ -n "$LIMIT" ]] && (( f >= LIMIT )); then break; fi
-  if [[ -t 0 ]]; then
-    # Frame delay doubles as quit-on-any-key (Ctrl+C works too via trap).
-    if IFS= read -rsn1 -t "$DELAY" _key 2>/dev/null; then break; fi
-  else
-    sleep "$DELAY"
-  fi
-done
+# Pass through immediately for pipes, non-tty, or help/machine-readable flags
+if not sys.stdout.isatty() or os.environ.get("FASTFETCH_NO_ANIM"):
+    passthrough()
 
-land 0
+for arg in FF_ARGS:
+    if arg in PASSTHROUGH_FLAGS or arg.startswith(("--json", "--format", "--gen-config", "--list-", "--print-", "--logo", "-l", "--file", "--data", "--kitty")):
+        passthrough()
+
+# ---------------------------------------------------------
+# 1. Arch logo ASCII geometry
+# ---------------------------------------------------------
+LOGO = [
+"                    -`",
+"                   .o+`",
+"                  `ooo/",
+"                 `+oooo:",
+"                `+oooooo:",
+"                -+oooooo+:",
+"              `/:-:++oooo+:",
+"             `/++++/+++++++:",
+"            `/++++++++++++++:",
+"           `/+++ooooooooooooo/`",
+"          ./ooosssso++osssssso+`",
+"         .oossssso-````/ossssss+`",
+"        -osssssso.      :ssssssso.",
+"       :osssssss/        osssso+++.",
+"      /ossssssss/        +ssssooo/-",
+"    `/ossssso+/:-        -:/+osssso+-",
+"   `+sso+:-`                 `.-/+oso:",
+"  `++:.                           `-/+/",
+"  .`                                 `/"
+]
+
+X_CENTER = 20.0
+PAD_TOP = 2
+PAD_LEFT = 2
+COL_WIDTH = 45 # Exact character width of fastfetch builtin arch logo column
+
+MIRROR_MAP = {
+    '/': '\\', '\\': '/',
+    '(': ')', ')': '(',
+    '<': '>', '>': '<',
+    '[': ']', ']': '[',
+    '{': '}', '}': '{',
+    '`': "'", "'": "`",
+}
+
+# ---------------------------------------------------------
+# 2. Color math and theme detection
+# ---------------------------------------------------------
+def hex_to_rgb(h):
+    h = h.strip().lstrip('#')
+    if len(h) == 3:
+        h = ''.join(c * 2 for c in h)
+    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+def lerp(c1, c2, t):
+    t = max(0.0, min(1.0, t))
+    return (
+        int(c1[0] + t * (c2[0] - c1[0])),
+        int(c1[1] + t * (c2[1] - c1[1])),
+        int(c1[2] + t * (c2[2] - c1[2])),
+    )
+
+def scale_rgb(c, f):
+    f = max(0.12, min(1.6, f))
+    if f <= 1.0:
+        return (int(c[0] * f), int(c[1] * f), int(c[2] * f))
+    else:
+        u = f - 1.0
+        return (
+            int(c[0] + u * (255 - c[0])),
+            int(c[1] + u * (255 - c[1])),
+            int(c[2] + u * (255 - c[2])),
+        )
+
+def load_theme_palette():
+    # Read active Omarchy theme
+    theme_name = os.environ.get("OMARCHY_THEME_NAME", "harbordark")
+    env_file = os.path.expanduser("~/.local/state/omarchy/theme-mode.env")
+    if os.path.exists(env_file):
+        try:
+            for line in open(env_file):
+                m = re.match(r'export\s+([A-Za-z0-9_]+)="?([^"\n]+)"?', line)
+                if m:
+                    k, v = m.groups()
+                    os.environ.setdefault(k, v)
+            theme_name = os.environ.get("OMARCHY_THEME_NAME", theme_name)
+        except Exception:
+            pass
+
+    candidates = [
+        os.path.expanduser(f"~/.config/omarchy/themes/{theme_name}/colors.toml"),
+        os.path.expanduser(f"~/.config/omarchy/themes/{theme_name.lower()}/colors.toml"),
+        f"/usr/share/omarchy/themes/{theme_name}/colors.toml",
+        f"/usr/share/omarchy/themes/{theme_name.lower()}/colors.toml",
+    ]
+
+    toml_colors = {}
+    for cand in candidates:
+        if os.path.exists(cand):
+            try:
+                for line in open(cand):
+                    m = re.match(r'([A-Za-z0-9_]+)\s*=\s*"([^"]+)"', line)
+                    if m:
+                        toml_colors[m.group(1)] = m.group(2)
+                break
+            except Exception:
+                pass
+
+    accent_hex = toml_colors.get("accent", os.environ.get("OMARCHY_THEME_ACCENT", "#e75a50"))
+    fg_hex = toml_colors.get("foreground", os.environ.get("OMARCHY_THEME_FG", "#efebdc"))
+    bg_hex = toml_colors.get("background", os.environ.get("OMARCHY_THEME_BG", "#1B1B1B"))
+    c1_hex = toml_colors.get("color1", accent_hex)
+    c4_hex = toml_colors.get("color4", accent_hex)
+    c7_hex = toml_colors.get("color7", toml_colors.get("color3", fg_hex))
+
+    return {
+        "accent": hex_to_rgb(accent_hex),
+        "high": hex_to_rgb(fg_hex),
+        "bg": hex_to_rgb(bg_hex),
+        "deep": hex_to_rgb(c1_hex),
+        "rose": hex_to_rgb(c4_hex),
+        "gold": hex_to_rgb(c7_hex),
+    }
+
+# ---------------------------------------------------------
+# 3. Precompute 360-degree rotation frames
+# ---------------------------------------------------------
+def precompute_frames(palette, num_frames=48):
+    c_accent = palette["accent"]
+    c_high = palette["high"]
+    c_bg = palette["bg"]
+    c_deep = palette["deep"]
+    c_rose = palette["rose"]
+    c_gold = palette["gold"]
+
+    frames = []
+    rst = "\033[0m"
+
+    for i in range(num_frames):
+        theta_deg = (i * 360.0) / num_frames
+        theta = math.radians(theta_deg)
+        cos_t = math.cos(theta)
+        sin_t = math.sin(theta)
+        is_front = (cos_t >= 0)
+        w_factor = abs(cos_t)
+
+        grid_char = [[" " for _ in range(COL_WIDTH)] for _ in range(len(LOGO))]
+        grid_color = [[None for _ in range(COL_WIDTH)] for _ in range(len(LOGO))]
+
+        if w_factor < 0.08:
+            # Specular metallic edge glint when rotating edge-on
+            glint_t = 1.0 - (w_factor / 0.08)
+            edge_col = lerp(c_accent, (255, 255, 255), glint_t)
+            col_idx = int(round(X_CENTER + PAD_LEFT))
+            for r, line in enumerate(LOGO):
+                if line.strip():
+                    ch = "·" if r <= 1 else ("|" if r in [17, 18] else "│")
+                    grid_char[r][col_idx] = ch
+                    grid_color[r][col_idx] = edge_col
+        else:
+            for r, line in enumerate(LOGO):
+                v_ratio = r / float(len(LOGO) - 1)
+
+                # Vertical color gradient across active theme shades
+                if v_ratio < 0.18:
+                    base_c = lerp(c_high, c_gold, v_ratio / 0.18)
+                elif v_ratio < 0.55:
+                    base_c = lerp(c_gold, c_accent, (v_ratio - 0.18) / 0.37)
+                elif v_ratio < 0.82:
+                    base_c = lerp(c_accent, c_rose, (v_ratio - 0.55) / 0.27)
+                else:
+                    base_c = lerp(c_rose, c_deep, (v_ratio - 0.82) / 0.18)
+
+                for x, ch in enumerate(line):
+                    if ch == ' ':
+                        continue
+                    x_rel = x - X_CENTER
+                    x_proj = (X_CENTER + PAD_LEFT) + x_rel * cos_t
+                    col = int(round(x_proj))
+                    if not (0 <= col < COL_WIDTH):
+                        continue
+
+                    target_ch = ch if is_front else MIRROR_MAP.get(ch, ch)
+
+                    if is_front:
+                        # 3D surface curvature lighting
+                        light = 0.65 + 0.35 * cos_t - 0.18 * sin_t * (x_rel / 18.0)
+                        ch_color = base_c
+                        if target_ch in 'os' and r >= 10:
+                            ch_color = lerp(ch_color, c_gold, 0.45)
+                        col_val = scale_rgb(ch_color, light)
+                    else:
+                        # Authentic 3D back-face shadow with relief
+                        light = 0.30 + 0.25 * w_factor + 0.12 * sin_t * (x_rel / 18.0)
+                        dark_shadow = lerp(base_c, c_bg, 0.68)
+                        if target_ch in 'os' and r >= 10:
+                            dark_shadow = lerp(dark_shadow, c_rose, 0.35)
+                        col_val = scale_rgb(dark_shadow, light)
+
+                    grid_char[r][col] = target_ch
+                    grid_color[r][col] = col_val
+
+        # Encode frame lines with optimized ANSI sequences
+        frame_lines = []
+        for r in range(len(LOGO)):
+            out = []
+            curr_c = None
+            for c in range(COL_WIDTH):
+                ch = grid_char[r][c]
+                col_rgb = grid_color[r][c]
+                if ch == ' ' or col_rgb is None:
+                    if curr_c is not None:
+                        out.append(rst)
+                        curr_c = None
+                    out.append(' ')
+                else:
+                    ansi = f"\033[38;2;{col_rgb[0]};{col_rgb[1]};{col_rgb[2]}m"
+                    if ansi != curr_c:
+                        out.append(ansi)
+                        curr_c = ansi
+                    out.append(ch)
+            if curr_c is not None:
+                out.append(rst)
+            frame_lines.append("".join(out))
+        frames.append(frame_lines)
+
+    return frames
+
+# ---------------------------------------------------------
+# 4. Main interactive animation loop
+# ---------------------------------------------------------
+def main():
+    # Capture system info columns once
+    try:
+        proc = subprocess.run([REAL_FF, "--logo", "none", "--pipe", "false"] + FF_ARGS, capture_output=True, text=True)
+        info_lines = proc.stdout.splitlines()
+    except Exception:
+        passthrough()
+
+    if not info_lines:
+        passthrough()
+
+    palette = load_theme_palette()
+    num_frames = 48 # Silky smooth 48 frames for full 360° rotation
+    frames = precompute_frames(palette, num_frames)
+
+    delay = float(os.environ.get("FASTFETCH_ANIM_DELAY", "0.040"))
+    anim_loops = os.environ.get("FASTFETCH_ANIM_LOOPS") or os.environ.get("FASTFETCH_LOOPS")
+    max_loops = int(anim_loops) if anim_loops and anim_loops.isdigit() else None
+    if os.environ.get("FASTFETCH_ONCE"):
+        max_loops = 1
+
+    total_rows = max(len(info_lines), len(LOGO) + PAD_TOP)
+    blank_logo = " " * COL_WIDTH
+
+    # Setup terminal cbreak mode for clean non-blocking input
+    old_stdin_settings = None
+    if sys.stdin.isatty():
+        try:
+            old_stdin_settings = termios.tcgetattr(sys.stdin.fileno())
+            # Flush any unread keypresses before entering cbreak
+            termios.tcflush(sys.stdin.fileno(), termios.TCIFLUSH)
+            tty.setcbreak(sys.stdin.fileno())
+        except Exception:
+            old_stdin_settings = None
+
+    def cleanup():
+        if old_stdin_settings:
+            try:
+                termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_stdin_settings)
+            except Exception:
+                pass
+        # Show cursor and reset attributes
+        sys.stdout.write("\033[?25h\033[0m")
+        sys.stdout.flush()
+
+    def sig_handler(sig, frame):
+        cleanup()
+        sys.exit(130 if sig == signal.SIGINT else 0)
+
+    signal.signal(signal.SIGINT, sig_handler)
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGHUP, sig_handler)
+
+    # Hide cursor while animating
+    sys.stdout.write("\033[?25l")
+
+    # In-place paint: render initial frame + info text directly onto the screen
+    init_frame = frames[0]
+    out_lines = []
+    for r in range(total_rows):
+        if PAD_TOP <= r < PAD_TOP + len(LOGO):
+            logo_part = init_frame[r - PAD_TOP]
+        else:
+            logo_part = blank_logo
+        info_part = info_lines[r] if r < len(info_lines) else ""
+        out_lines.append(f"{logo_part}{info_part}\n")
+
+    sys.stdout.write("".join(out_lines))
+    # Save bottom cursor position
+    sys.stdout.write("\0337") # Save cursor (DEC)
+    sys.stdout.flush()
+
+    frame_idx = 0
+    loop_count = 0
+    start_time = time.time()
+
+    try:
+        while True:
+            frame_idx = (frame_idx + 1) % num_frames
+            if frame_idx == 0:
+                loop_count += 1
+                if max_loops is not None and loop_count >= max_loops:
+                    # Final resting frame (front face)
+                    break
+
+            current_frame = frames[frame_idx]
+
+            # In-place update: move cursor up from bottom to redraw ONLY logo rows
+            buf = []
+            for r_idx in range(len(LOGO)):
+                row_from_bottom = total_rows - (PAD_TOP + r_idx)
+                buf.append(f"\033[{row_from_bottom}A\033[1G{current_frame[r_idx]}")
+                # Restore to bottom
+                buf.append(f"\033[{row_from_bottom}B")
+
+            # Restore saved cursor position at bottom
+            buf.append("\0338")
+            sys.stdout.write("".join(buf))
+            sys.stdout.flush()
+
+            # Non-blocking keypress check (ignore during the first 0.12s to prevent bounce)
+            if old_stdin_settings and (time.time() - start_time > 0.12):
+                rlist, _, _ = select.select([sys.stdin], [], [], delay)
+                if rlist:
+                    try:
+                        sys.stdin.read(1)
+                    except Exception:
+                        pass
+                    break
+            else:
+                time.sleep(delay)
+
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    except Exception:
+        pass
+
+    # Finish cleanly: redraw front face as static rest pose, restore cursor
+    try:
+        front_frame = frames[0]
+        buf = []
+        for r_idx in range(len(LOGO)):
+            row_from_bottom = total_rows - (PAD_TOP + r_idx)
+            buf.append(f"\033[{row_from_bottom}A\033[1G{front_frame[r_idx]}\033[{row_from_bottom}B")
+        buf.append("\0338")
+        sys.stdout.write("".join(buf))
+    except Exception:
+        pass
+
+    cleanup()
+    sys.exit(0)
+
+if __name__ == "__main__":
+    main()
