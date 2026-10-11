@@ -58,8 +58,8 @@
           "id": "jkoestinger.vpn"
         },
         {
-          "id": "bhanu.omavideos",
           "audioOnly": true,
+          "id": "bhanu.omavideos",
           "trim": false,
           "trimEnd": "",
           "trimStart": ""
@@ -92,7 +92,7 @@
       ]
     },
     "position": "top",
-    "transparent": false
+    "transparent": true
   },
   "cloneSourceRestores": [
     "krall.switchboard",

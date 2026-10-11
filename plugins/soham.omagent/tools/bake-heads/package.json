@@ -1,0 +1,21 @@
+{
+  "name": "robot-bake",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bundle": "esbuild entry.jsx --bundle --format=iife --outfile=bundle.js --loader:.jsx=jsx --jsx=automatic",
+    "bake": "node bake.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.63.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "robot-heads": "^0.3.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2"
+  },
+  "allowScripts": {
+    "esbuild@0.24.2": true
+  }
+}

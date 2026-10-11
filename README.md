@@ -22,6 +22,18 @@ Branch: `main`
   - Features real one-shot probe verification, pool auto-pruning, and a runtime pane watchdog that sends resume signals on rate limits or triggers mid-run model switches.
 - **Mandatory Anti-One-Shot 5-Phase Lifecycle & Visual QA**:
   - Requires implementation, visual verification (`omagent-screenshot <target> preview.png`), sibling peer review in Herdr, UI butter optimization (`ce-ui-optimize`), and clean delivery.
+- **Cute Animated Robot-Head Status Indicator (`AgentHead.qml`)**:
+  - Embedded live in the command overlay card header (`plugins/soham.omagent/AgentHead.qml`).
+  - Offline-baked from the [robot-heads](https://github.com/fayazara/robot-heads) library into 24fps looping frame sequences across dark (`Harbordark`) and light (`Quattrocento-light`) desktop themes.
+  - Dynamically mirrors the fleet's real-time execution phase via coarse `robot` states emitted by `omagent-route`:
+    - `idle`: Calm breathing porthole when idle or settled.
+    - `thinking`: Rotating radar/processing animation during request analysis, Herdr workspace setup, and Antigravity harness initialization.
+    - `searching`: Scanning radar beam when searching code or web sources.
+    - `working`: Active gear progress animation while executing edits, tools, tests, and streaming diffs.
+    - `happy`: Joyful celebration bounce upon task completion, with automatic 60s settle back to idle.
+    - `error`: Warning frown / alert state on API errors, failed tool calls, or crashes.
+  - Zero-runtime GPU overhead: plays as lightweight Qt pixmap textures without WebGL/canvas/browser processes; pauses automatically when the overlay is hidden or under `OMAGENT_STILL_HEAD=1` / reduced-motion.
+  - Includes offline baking suite (`plugins/soham.omagent/tools/bake-heads/`) with deterministic clocking, JSX entry, theme palettes, and shape switching (`circle`, `hexagon`, `square`, `rectangle`).
 - **Uncapped Multi-Agent Fleet Orchestration (`firstmate-subagent`)**:
   - Directs parallel specialist crewmates across 2x2 Herdr tiling panes (`firstmate subagent spawn/prompt/list/close`) bound to Compound Engineering skill workflows.
   - Grants every subagent on-demand autonomy to invoke any of the 33 Compound Engineering skills (`firstmate skills`, `firstmate skill-read`).
@@ -255,7 +267,7 @@ For any future AI agent restoring this workflow:
 - **`omarchy-pretty-screenshot` (`Print`)**: Beautiful window/desktop screenshot tool with wallpaper and gradient frames (`plugins/ricardosuman.pretty-screenshot`).
 - **Visual Workspace Switcher Snapshot Engine**: `plugins/reomarchy.workspace-switcher` with `scripts/capture-previews.sh` utilizing grim to take static PNG snapshots per monitor before overlay summoning, eliminating heavy live screencopy lag.
 - **`omarchy-dictate` (`Super + H`, `Super + Alt + V`)**: Primary Google Gemini 3.5 Transcribe dictation engine with Voxtype Aura HUD integration, local Whisper fallback, and direct wtype text injection.
-- **`soham.omagent`**: Custom command pill overlay assistant (`Alt + Space`) with tri-mode routing (`LOCAL`, `WEB`, `CODE`), live interactive Firstmate steering (`--steer`), bidirectional chat replies (`firstmate reply`), Herdr workspace/tab orchestration, and background Antigravity harness execution with `omagent-harness-view` terminal streaming and seamless CLI handover via `Ctrl + E`.
+- **`soham.omagent`**: Custom command pill overlay assistant (`Alt + Space`) with tri-mode routing (`LOCAL`, `WEB`, `CODE`), cute animated robot-head status indicator (`AgentHead.qml`), live interactive Firstmate steering (`--steer`), bidirectional chat replies (`firstmate reply`), Herdr workspace/tab orchestration, isolated Treehouse worktree allocation, and background Antigravity harness execution with `omagent-harness-view` terminal streaming and seamless CLI handover via `Ctrl + E`.
 - **`pretty.omagen`**: Wallpaper generator and styling plugin enhanced with custom interactive wallpaper browser (`bin/omagen-wallpaper-browser`, `WallpaperBrowserApp.qml`, and `WallpaperBridge.js`).
 - **`omagent-agent-status`**: CLI session watcher polling and formatting the latest actions and status from active Antigravity/Omagent sessions.
 - **`omarchy-fix-fingerprint`**: FPC 10a5:9200 fingerprint controller setup, udev persistence, and suspend/resume reset hook.

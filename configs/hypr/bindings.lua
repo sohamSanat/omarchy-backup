@@ -45,6 +45,10 @@ o.bind("SUPER + M", "YouTube Music", { tui = "ytkew", focus = true })
 -- Dictionary
 o.bind("SUPER + D", "Look up selection in dictionary", "omarchy-dictionary-lookup")
 
+-- CraftCloud: Creative Suite Hub (Adobe Creative Cloud Alternative)
+hl.unbind("SUPER + CTRL + C")
+o.bind("SUPER + CTRL + C", "CraftCloud", { launch = "craftcloud", focus = "craftcloud" })
+
 
 -- Workspace Switcher: begin
 do

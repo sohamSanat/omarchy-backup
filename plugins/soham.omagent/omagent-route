@@ -121,6 +121,33 @@ def emit(kind: str, **fields: object) -> None:
     print(json.dumps({"kind": kind, **fields}), flush=True)
 
 
+ROBOT_STATE = ""
+
+
+def robot_state(state: str) -> None:
+    """Emit the overlay's coarse robot-head state, only when it changes.
+
+    The head animates by discrete state, so a stream of same-phase status lines
+    must produce exactly one robot line.
+    """
+    global ROBOT_STATE
+    if state == ROBOT_STATE:
+        return
+    ROBOT_STATE = state
+    emit("robot", state=state)
+
+
+def robot_state_for_status(text: str) -> str:
+    """Map a code-mode status line onto the head's state vocabulary."""
+    low = text.lower()
+    if "searching code" in low or "searching web" in low or "searching codebase" in low:
+        return "searching"
+    if ("analyzing request" in low or "initializing herdr" in low
+            or "checking treehouse" in low or "launching antigravity" in low):
+        return "thinking"
+    return "working"
+
+
 def clip(text: str, limit: int, *, collapse: bool = False) -> str:
     text = " ".join(str(text).split()) if collapse else str(text).strip()
     return text if len(text) <= limit else text[: limit - 1] + "…"
@@ -1215,9 +1242,15 @@ def format_tool_message(tool_name: str, params: dict, state: str = "ACTIVE") -> 
                 sub_label = m_name.group(1) if m_name else "crewmate"
                 detail = m_skill.group(1) if m_skill else (m_role.group(1) if m_role else "")
                 suffix = f" ({detail})" if detail else ""
+                is_shared = "--shared" in cmd or "--no-isolate" in cmd
+                loc = " (shared)" if is_shared else " in Treehouse worktree"
                 if state == "ACTIVE":
-                    return f"Firstmate: Spawning '{sub_label}' subagent{suffix} in Herdr…"
+                    return f"Firstmate: Spawning '{sub_label}' subagent{suffix}{loc} in Herdr…"
                 return f"Firstmate: '{sub_label}' subagent ready in Herdr"
+            elif "treehouse" in cmd or "status" in cmd:
+                if state == "ACTIVE":
+                    return "Firstmate: Checking Treehouse worktree pool…"
+                return "Firstmate: Checked Treehouse worktrees"
             elif "wait" in cmd:
                 m_name = re.search(r"wait\s+([a-zA-Z0-9_\-]+)", cmd)
                 target = m_name.group(1) if m_name else "subagent"
@@ -1380,6 +1413,8 @@ def stream(request: str, history: list[dict], mode: str) -> int:
     if not key and mode == "local":
         emit("error", text="No API key. Add geminiKey to "
                            f"{config_path()} or set OMAGENT_GEMINI_KEY.")
+        if mode == MODE_CODE:
+            robot_state("error")
         emit("done", ok=False, code=1, stopped=False)
         return 1
 
@@ -1392,10 +1427,13 @@ def stream(request: str, history: list[dict], mode: str) -> int:
                  mode=mode, web=False, engine=None, sources=0)
             emit("status", text="Would run: Herdr workspace + Firstmate registration + agy harness"
                            + (" --conversation <saved-id>" if read_code_conv() else ""))
+            robot_state("thinking")
             emit("done", ok=True, code=0, stopped=False)
+            robot_state("happy")
             return 0
         if shutil.which("agy") is None and shutil.which("antigravity") is None:
             emit("error", text="agy/antigravity not installed. Choose one with: omarchy default agent <name>")
+            robot_state("error")
             emit("done", ok=False, code=1, stopped=False)
             return 1
         if not history:
@@ -1406,6 +1444,7 @@ def stream(request: str, history: list[dict], mode: str) -> int:
         emit("agent", name="firstmate-agy", label="Firstmate + Agy (Herdr)",
              model="Gemini Flash (AGY)", mode=mode, web=False, engine=None, sources=0)
         emit("status", text="Initializing Herdr workspace & Firstmate fleet task…")
+        robot_state("thinking")
 
         task_id = f"omagent_{int(time.time())}"
         ws_id, tab_id, pane_id = ("none", "none", "none")
@@ -1449,6 +1488,12 @@ def stream(request: str, history: list[dict], mode: str) -> int:
             f"   • `firstmate-subagent close <name>` when finished with that worker\n"
             f"3. INTEGRATION & COMPLETE PACKAGE:\n"
             f"   As lead coordinator, ensure all parts integrate cleanly, tests and syntax pass, and everything works as an end-to-end complete package.\n\n"
+            f"★ TREEHOUSE GIT WORKTREE ISOLATION:\n"
+            f"In git repositories, subagents spawned via `firstmate-subagent spawn` automatically receive an isolated git worktree via Treehouse by default.\n"
+            f"• Subagents work completely independently without collisions: no merge conflicts while editing, no locked test databases, no build artifact races.\n"
+            f"• If a subagent only needs read access or should share the root directory without branching, pass `--shared`.\n"
+            f"• Inspect active Treehouse worktrees anytime with `firstmate-subagent treehouse` or `treehouse status`.\n"
+            f"• When you run `firstmate-subagent close <name>`, the subagent's leased Treehouse worktree is automatically cleaned and returned to the pool.\n\n"
             f"★ SUPREME HUMAN OPERATOR AUTHORITY & LIVE FIRSTMATE STEERING:\n"
             f"The human operator can talk to you and send live steering commands or ask questions at any time while you work.\n"
             f"All commands from the user hold SUPREME PRIORITY (Priority 1) over all other plans, guidelines, or pre-planned tasks.\n"
@@ -1481,6 +1526,9 @@ def stream(request: str, history: list[dict], mode: str) -> int:
             if clean and clean != last_status:
                 last_status = clean
                 emit("status", text=clean)
+                # Every code-mode status funnels through here, so it is the one
+                # seam that classifies the head for the streaming phase.
+                robot_state(robot_state_for_status(clean))
                 try:
                     with open(CODE_LOG_FILE, "a", errors="ignore") as f:
                         f.write(f"[{time.strftime('%H:%M:%S')}] • {clean}\n")
@@ -1503,6 +1551,7 @@ def stream(request: str, history: list[dict], mode: str) -> int:
                 pass
         except OSError as error:
             emit("error", text=f"Cannot start agy: {error}")
+            robot_state("error")
             emit("done", ok=False, code=1, stopped=False)
             return 1
 
@@ -1648,6 +1697,7 @@ def stream(request: str, history: list[dict], mode: str) -> int:
                             task_id, fail_msg, created_files, modified_files, commands_run, success=False
                         )
                         emit("error", text=fail_msg)
+                        robot_state("error")
         finally:
             stop_steer_watcher = True
             ACTIVE_PROC = None
@@ -1665,13 +1715,22 @@ def stream(request: str, history: list[dict], mode: str) -> int:
 
         if proc.returncode != 0 and not EMITTED_ERROR:
             emit("error", text=f"agy exited {proc.returncode}")
+            robot_state("error")
             emit("done", ok=False, code=proc.returncode or 1, stopped=False)
             return proc.returncode or 1
         if not emitted_result:
             emit("error", text="agy produced no result event")
+            robot_state("error")
+            emit("done", ok=False, code=1, stopped=False)
+            return 1
+        if EMITTED_ERROR:
+            # An error already reached the user mid-run (a failed result, an
+            # eligibility failure). Reporting success now would replace the
+            # error face with a celebration, so close as failed and hold error.
             emit("done", ok=False, code=1, stopped=False)
             return 1
         emit("done", ok=True, code=0, stopped=False)
+        robot_state("happy")
         return 0
 
 

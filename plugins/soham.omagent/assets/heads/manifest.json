@@ -1,0 +1,51 @@
+{
+  "generatedBy": "tools/bake-heads",
+  "shape": "circle",
+  "dt": 0.041666666666666664,
+  "frames": 48,
+  "cols": 8,
+  "states": {
+    "idle": {
+      "frameW": 116,
+      "frameH": 164,
+      "cols": 8,
+      "rows": 6,
+      "frames": 48
+    },
+    "thinking": {
+      "frameW": 116,
+      "frameH": 164,
+      "cols": 8,
+      "rows": 6,
+      "frames": 48
+    },
+    "searching": {
+      "frameW": 116,
+      "frameH": 164,
+      "cols": 8,
+      "rows": 6,
+      "frames": 48
+    },
+    "working": {
+      "frameW": 116,
+      "frameH": 164,
+      "cols": 8,
+      "rows": 6,
+      "frames": 48
+    },
+    "happy": {
+      "frameW": 116,
+      "frameH": 164,
+      "cols": 8,
+      "rows": 6,
+      "frames": 48
+    },
+    "error": {
+      "frameW": 116,
+      "frameH": 164,
+      "cols": 8,
+      "rows": 6,
+      "frames": 48
+    }
+  }
+}

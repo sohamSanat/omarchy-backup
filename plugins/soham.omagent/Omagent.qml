@@ -15,6 +15,7 @@ Item {
   property string dictationState: "idle"
 
   property string runState: "idle"
+  property string robotState: "idle"
   property string mode: "local"
   property bool sawAgent: false
   property bool sawError: false
@@ -311,6 +312,9 @@ Item {
     root.runStartedAt = Date.now()
     root.elapsedMs = 0
     root.runState = "running"
+    // Claim the head immediately. Without this a held `error` from the previous
+    // run lingers until the router's first robot event arrives.
+    root.setRobotState("thinking")
 
     var argv = [root.routerPath, "--mode", root.mode]
     if (history !== "[]") argv = argv.concat(["--history", history])
@@ -345,6 +349,8 @@ Item {
     } else if (kind === "done") {
       root.markElapsed()
       root.runState = event.stopped ? "stopped" : (event.ok ? "done" : "failed")
+    } else if (kind === "robot") {
+      root.setRobotState(String(event.state || "idle"))
     } else if (kind === "error") {
       root.sawError = true
       root.pushRow("error", event.text)
@@ -355,6 +361,13 @@ Item {
 
   function markElapsed() {
     if (root.runStartedAt > 0) root.elapsedMs = Date.now() - root.runStartedAt
+  }
+
+  /** The overlay's own reset point: the router only emits states during a run. */
+  function setRobotState(state) {
+    root.robotState = state
+    if (state === "happy") settleTimer.restart()
+    else settleTimer.stop()
   }
 
   function finish(code) {
@@ -372,10 +385,14 @@ Item {
       if (root.expectedStop) {
         root.runState = "stopped"
         root.pushRow("status", "Stopped")
+        // A cancelled run has no emotion; do not leave the head working forever.
+        root.setRobotState("idle")
       } else {
         root.pushRow("error", "Router exited unexpectedly (code " + code + ")")
         root.sawError = true
         root.runState = "failed"
+        // The router died without saying why; that is still an error face.
+        root.setRobotState("error")
       }
     }
     var wasStopped = root.expectedStop || root.runState === "stopped"
@@ -417,6 +434,8 @@ Item {
     root.sawAgent = false
     root.sawError = false
     root.runState = "idle"
+    root.robotState = "idle"
+    settleTimer.stop()
     root.followTail = true
     root.priorTokens = 0
     root.priorCost = 0
@@ -487,6 +506,16 @@ Item {
     printErrors: false
     onLoaded: root.restore(text())
     onLoadFailed: root.restored = true
+  }
+
+  // Holds the celebratory pose long enough to read, then returns to idle so the
+  // head is not animating while nothing is happening.
+  Timer {
+    id: settleTimer
+    interval: 60000
+    onTriggered: {
+      if (root.robotState === "happy") root.robotState = "idle"
+    }
   }
 
   Process {
@@ -924,12 +953,21 @@ Item {
         Item {
           id: header
           width: parent.width
-          height: Style.space(20)
+          height: Style.space(70)
 
           Row {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(8)
+
+            AgentHead {
+              id: agentHead
+              anchors.verticalCenter: parent.verticalCenter
+              state: root.robotState
+              // Plays in every state, including idle. The hidden-pause is handled
+              // by `visible`, which goes false when the card has no entries.
+              animate: root.opened
+            }
 
             Text {
               text: root.model !== "" ? root.model : "Gemini"
