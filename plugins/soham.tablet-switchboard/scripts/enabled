@@ -1,0 +1,5 @@
+#!/bin/bash
+# Exit 0 when Tablet Switchboard is the active menu
+config="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json"
+[[ -f "$config" ]] || exit 1
+exec jq -e '((.plugins // []) | any(.id == "soham.tablet-switchboard")) and (((.disabledPlugins // []) | index("soham.tablet-switchboard")) | not)' "$config" >/dev/null

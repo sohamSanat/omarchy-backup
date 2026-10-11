@@ -1,0 +1,14 @@
+#!/bin/bash
+# Feature flag: flip between Tablet Switchboard and Switchboard / default menu
+set -euo pipefail
+dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+id="soham.tablet-switchboard"
+if "$dir/enabled"; then
+  omarchy-plugin-disable "$id"
+  omarchy-plugin-enable "krall.switchboard"
+  omarchy-notification-send -g 󰕰 "Tablet Switchboard off" "Switched back to standard Switchboard."
+else
+  omarchy-plugin-disable "krall.switchboard" || true
+  omarchy-plugin-enable "$id"
+  omarchy-notification-send -g 󰕰 "Tablet Switchboard on" "SUPER+SPACE now opens Tablet Switchboard."
+fi

@@ -1,0 +1,32 @@
+[general]
+poll_interval_secs = 2
+dry_run = false
+enable_notifications = true
+log_actions = true
+
+[memory]
+min_available_ram_mb = 800
+min_available_ram_percent = 12.0
+psi_memory_avg10_threshold = 25.0
+single_process_rss_limit_mb = 3500
+
+[cpu]
+cpu_hog_threshold_percent = 75.0
+sustained_ticks = 4
+
+[escalation]
+throttle_action = "renice"
+nice_level = 15
+kill_signal = "sigterm"
+escalate_to_sigkill = true
+grace_period_secs = 3
+
+[whitelist]
+protect_active_window = true
+protect_child_processes_of_whitelisted = true
+processes = [
+    "steam",
+    "gamescope",
+    "obs",
+    "ffmpeg",
+]

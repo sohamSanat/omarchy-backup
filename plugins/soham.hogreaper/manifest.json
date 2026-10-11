@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "soham.hogreaper",
+  "name": "HogReaper",
+  "version": "1.0.0",
+  "author": "Soham",
+  "description": "Zero-overhead RAM and CPU hardware governor shield for Omarchy",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "HogReaper",
+    "description": "Live RAM & CPU pressure governor with interactive dashboard and instant hog reaper",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

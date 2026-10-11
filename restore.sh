@@ -473,6 +473,11 @@ if [[ -d "${SCRIPT_DIR}/configs/fetch" ]]; then
   cp -a "${SCRIPT_DIR}/configs/fetch/config" "${USER_HOME}/.config/fetch/" 2>/dev/null || true
   ln -nsf "${USER_HOME}/.config/omarchy/branding/about.txt" "${USER_HOME}/.config/fetch/logo.txt"
 fi
+if [[ -d "${SCRIPT_DIR}/configs/hogreaper" ]]; then
+  echo "  -> Restoring HogReaper configuration..."
+  mkdir -p "${USER_HOME}/.config/hogreaper"
+  cp -a "${SCRIPT_DIR}/configs/hogreaper/." "${USER_HOME}/.config/hogreaper/" 2>/dev/null || true
+fi
 if [[ -d "${SCRIPT_DIR}/configs/omagent" ]]; then
   echo "  -> Restoring Omagent AI assistant configurations & mobile web PWA..."
   mkdir -p "${USER_HOME}/.config/omagent/ssl" "${USER_HOME}/.local/state/omagent/sessions"
@@ -700,7 +705,7 @@ if [[ -d "${SCRIPT_DIR}/apps" ]]; then
   for app_dir in "${SCRIPT_DIR}/apps"/*; do
     if [[ -d "$app_dir" ]]; then
       app_name="$(basename "$app_dir")"
-      if [[ "$app_name" != "photocraft" && "$app_name" != "vectorcraft" && "$app_name" != "filmcraft" && "$app_name" != "pdfcraft" && "$app_name" != "lightcraft" && "$app_name" != "wordcraft" && "$app_name" != "gridcraft" && "$app_name" != "effectcraft" && "$app_name" != "deckcraft" && "$app_name" != "craftcloud" ]]; then
+      if [[ "$app_name" != "photocraft" && "$app_name" != "vectorcraft" && "$app_name" != "filmcraft" && "$app_name" != "pdfcraft" && "$app_name" != "lightcraft" && "$app_name" != "wordcraft" && "$app_name" != "gridcraft" && "$app_name" != "effectcraft" && "$app_name" != "deckcraft" && "$app_name" != "craftcloud" && "$app_name" != "hogreaper" ]]; then
         mkdir -p "${USER_HOME}/Projects/${app_name}"
         cp -a "${app_dir}/." "${USER_HOME}/Projects/${app_name}/"
         echo "  [OK] Restored application: ~/Projects/${app_name}"
@@ -759,6 +764,11 @@ if [[ -f "${SCRIPT_DIR}/apps/craftcloud/install.sh" ]]; then
   "${SCRIPT_DIR}/apps/craftcloud/install.sh"
 fi
 
+if [[ -f "${SCRIPT_DIR}/apps/hogreaper/install.sh" ]]; then
+  echo "  -> Restoring and installing HogReaper hardware governor..."
+  "${SCRIPT_DIR}/apps/hogreaper/install.sh"
+fi
+
 if [[ -d "${SCRIPT_DIR}/mcp" ]]; then
   echo "  -> Restoring Antigravity MCP servers..."
   mkdir -p "${USER_HOME}/.gemini/antigravity-cli/mcp"
@@ -775,7 +785,7 @@ echo "==> Step 11: Applying customizations and restarting components..."
 if command -v systemctl >/dev/null 2>&1; then
   echo "  -> Reloading systemd user daemon and enabling user services..."
   systemctl --user daemon-reload 2>/dev/null || true
-  systemctl --user enable easyeffects.service omagent-crash-watch.service omagent-mobile-bridge.service 2>/dev/null || true
+  systemctl --user enable easyeffects.service omagent-crash-watch.service omagent-mobile-bridge.service hogreaper.service 2>/dev/null || true
 fi
 
 if command -v omarchy >/dev/null 2>&1; then

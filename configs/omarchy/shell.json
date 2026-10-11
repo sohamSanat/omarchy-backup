@@ -32,7 +32,10 @@
         },
         {
           "id": "soham.pocket-left",
-          "members": "io.github.weedwhitesandwine.obsiduous, soham.easyeffects, soham.agents, io.github.enovara.teach-voxtype, tiertek.scratchpad-deck"
+          "members": "soham.hogreaper, io.github.weedwhitesandwine.obsiduous, soham.easyeffects, soham.agents, io.github.enovara.teach-voxtype, tiertek.scratchpad-deck"
+        },
+        {
+          "id": "soham.hogreaper"
         },
         {
           "id": "io.github.weedwhitesandwine.obsiduous"
@@ -95,14 +98,14 @@
     "transparent": true
   },
   "cloneSourceRestores": [
-    "krall.switchboard",
     "soham.lock",
-    "nguyenn.clipboard"
+    "nguyenn.clipboard",
+    "soham.tablet-switchboard"
   ],
   "disabledPlugins": [
-    "omarchy.menu",
     "omarchy.lock",
-    "omarchy.clipboard"
+    "omarchy.clipboard",
+    "omarchy.menu"
   ],
   "idle": {
     "lock": 750,
@@ -111,9 +114,6 @@
   "plugins": [
     {
       "id": "nav-guide"
-    },
-    {
-      "id": "krall.switchboard"
     },
     {
       "id": "pretty.omagen"
@@ -153,6 +153,12 @@
     },
     {
       "id": "soham.omagent"
+    },
+    {
+      "id": "soham.hogreaper"
+    },
+    {
+      "id": "soham.tablet-switchboard"
     }
   ],
   "version": 1

@@ -73,7 +73,7 @@ Branch: `main`
 
 ### 3. 🎨 Visual Experience, Bar & Theming Pipeline
 - **Theme Collection**: 16 curated themes (`moodpeak` [Active], `nous` [Light research], `sakura-mochi`, `aetheria`, `akaito`, `amekoji`, `artzen`, `city-783`, `harbor`, `harbordark`, `omagen1`, `omarchy_signature`, `quattrocento-light`, `synthetica`).
-- **Floating Bar**: 37 modular plugins in `plugins/` (`nav-guide` [enhanced Super+K context-aware shortcuts teacher], `io.github.ef-code.omarchy-flow` [low-latency Gemini voice dictation], `soham.easyeffects` [navbar IEM EQ switcher & bypass toggle], `soham.pocket-left` [tuck-away widget dock for left bar], `krall.switchboard` [Raycast intelligence launcher], `io.github.ellion369.omagent`, `io.github.i12bp8.fmhy-deck`, `akshit.island`, `io.github.enovara.teach-voxtype`, `tiertek.scratchpad-deck`, `nguyenn.clipboard` [custom attachment cleaner], `reidenxerx.tile-blueprints`, `reomarchy.workspace-switcher`, `ricardosuman.pretty-screenshot`, `tristonarmstrong.dictionary`, `bhanu.omavideos`, `soham.power`, `mryll.printbar`, `mahmoodkhalil57.qrgen`, `io.github.ricky.whatsapp`, etc.).
+- **Floating Bar**: 39 modular plugins in `plugins/` (`soham.hogreaper` [zero-overhead RAM/CPU hardware governor & dashboard], `soham.tablet-switchboard` [tablet Raycast launcher & quicklinks dock], `nav-guide` [enhanced Super+K context-aware shortcuts teacher], `io.github.ef-code.omarchy-flow` [low-latency Gemini voice dictation], `soham.easyeffects` [navbar IEM EQ switcher & bypass toggle], `soham.pocket-left` [tuck-away widget dock for left bar], `krall.switchboard` [Raycast intelligence launcher], `soham.omagent`, `io.github.ellion369.omagent`, `io.github.i12bp8.fmhy-deck`, `akshit.island`, `io.github.enovara.teach-voxtype`, `tiertek.scratchpad-deck`, `nguyenn.clipboard` [custom attachment cleaner], `reidenxerx.tile-blueprints`, `reomarchy.workspace-switcher`, `ricardosuman.pretty-screenshot`, `tristonarmstrong.dictionary`, `bhanu.omavideos`, `soham.power`, `mryll.printbar`, `mahmoodkhalil57.qrgen`, `io.github.ricky.whatsapp`, etc.).
 - **Switchboard Launcher v2 (`krall.switchboard`)**:
   - **Raycast-Like Intelligence Engine (`RaycastSearch.js`)**:
     - **Math Calculator**: Live expression evaluation (`=`), base conversions (`255 to hex`, `10 to bin`, `oct`), percentages (`15% of 80`), scientific functions (`sqrt`, `sin`, `log`, `pow`).
@@ -292,7 +292,12 @@ For any future AI agent restoring this workflow:
 - **Agy Command Watcher**: `bin/agy-ting-watcher` tailing logs to emit audio chimes upon background command completion (CPU-optimized polling).
 - **Wayscrollshot & IPv4 Library**: `bin/wayscrollshot` paired with `lib/force_ipv4.so` (`lib/force_ipv4.c`) for reliable full-page scrolling Wayland screenshots over IPv4 networks.
 - **Screensaver Launcher**: `omarchy-launch-screensaver` with intelligent audio and stay-awake inhibition.
-- **Systemd User Units**: Daemons for EasyEffects, Omagent mobile bridge, crash monitor, video inhibitor, WhatsApp bridge, and cleanup timers.
+- **HogReaper Zero-Overhead Hardware Governor & Plugin (`bin/hogreaper`, `plugins/soham.hogreaper`)**:
+  - Custom Rust hardware governor daemon and CLI monitor safeguard the desktop against thrashing, memory runaway, and frozen processes with a tiny sub-1MB footprint and 0.0% idle CPU.
+  - Microsecond Hyprland IPC socket check protects foreground active windows, shells, and coding agents from throttling or termination.
+  - Quickshell navbar widget (`BarWidget.qml`) and interactive dashboard (`Panel.qml`) with real-time RAM/SWAP gauges, PSI memory/CPU meters, active window tracking, one-click hog termination (`kill-hogs`), top dashboard, and daemon service controls.
+  - Full source preserved in [`apps/hogreaper/source/`](file:///home/soham/omarchy-backup/apps/hogreaper/source), precompiled binary in [`bin/hogreaper`](file:///home/soham/omarchy-backup/bin/hogreaper), user config in `configs/hogreaper/config.toml`, and systemd service in `configs/systemd/user/hogreaper.service`.
+- **Systemd User Units**: Daemons for EasyEffects, Omagent mobile bridge, crash monitor, video inhibitor, WhatsApp bridge, HogReaper, and cleanup timers.
 
 ---
 

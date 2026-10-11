@@ -1,0 +1,17 @@
+[Unit]
+Description=HogReaper Zero-Overhead Hardware Governor
+Documentation=https://github.com/omarchy/hogreaper
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/home/soham/.local/bin/hogreaper daemon
+Restart=always
+RestartSec=3
+Nice=-5
+MemoryHigh=50M
+MemoryMax=80M
+CPUWeight=100
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,46 @@
+#!/bin/bash
+CACHE_FILE="/tmp/omarchy-tablet-status-cache"
+if [[ -f "$CACHE_FILE" ]]; then
+  age=$(( $(date +%s) - $(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0) ))
+  if (( age < 15 )); then
+    cat "$CACHE_FILE"
+    exit 0
+  fi
+fi
+
+# Returns battery percentage and wifi name for tablet status bar
+battery=""
+if [[ -d /sys/class/power_supply/BAT0 ]]; then
+  cap=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo "")
+  status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo "")
+  if [[ -n "$cap" ]]; then
+    if [[ "$status" == "Charging" ]]; then
+      battery="⚡ ${cap}%"
+    else
+      battery="󰁹 ${cap}%"
+    fi
+  fi
+elif [[ -d /sys/class/power_supply/BAT1 ]]; then
+  cap=$(cat /sys/class/power_supply/BAT1/capacity 2>/dev/null || echo "")
+  if [[ -n "$cap" ]]; then
+    battery="󰁹 ${cap}%"
+  fi
+fi
+
+# WiFi status
+wifi="ONLINE"
+if command -v nmcli >/dev/null 2>&1; then
+  active_con=$(nmcli -t -f TYPE,NAME c show --active 2>/dev/null | grep -E '^802-11-wireless' | cut -d: -f2 | head -n1 || true)
+  if [[ -n "$active_con" ]]; then
+    wifi="󰤨 $active_con"
+  else
+    eth_con=$(nmcli -t -f TYPE,NAME c show --active 2>/dev/null | grep -E '^802-3-ethernet' | cut -d: -f2 | head -n1 || true)
+    if [[ -n "$eth_con" ]]; then
+      wifi="󰈀 ETH"
+    fi
+  fi
+fi
+
+out=$(printf 'battery\t%s\nwifi\t%s\n' "${battery:-AC 100%}" "${wifi}")
+echo "$out" > "$CACHE_FILE" 2>/dev/null || true
+echo "$out"
