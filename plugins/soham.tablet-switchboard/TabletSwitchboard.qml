@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
+import QtQuick.Effects
 import qs.Commons
 import qs.Ui
 import "MenuModel.js" as MenuModel
@@ -37,6 +38,25 @@ Item {
 
   // --------------------------------------------------------------- lifecycle
 
+  function resetToCleanState() {
+    root.filterText = ""
+    root.textCursorPos = 0
+    root.activeMenu = "apps"
+    root.navStack = []
+    root.selectedIndex = 0
+    root.cursorActive = true
+    if (typeof gridFlick !== "undefined" && gridFlick) gridFlick.contentY = 0
+    root.mode = "menu"
+    root.dmenuPrompt = ""
+    root.dmenuOptions = []
+    root.selectionFile = ""
+    root.doneFile = ""
+    root.deleteConfirmOpen = false
+    root.deleteTarget = null
+    root.ensureAppRows()
+    root.rebuildDisplay(true)
+  }
+
   function open(payloadJson) {
     var payload = ({})
     try { payload = JSON.parse(payloadJson || "{}") } catch (e) { payload = ({}) }
@@ -46,10 +66,14 @@ Item {
     if (payload.mode === "select" || payload.mode === "input") {
       root.openDmenu(payload)
     } else {
+      root.resetToCleanState()
       var initial = payload.initialMenu || payload.menu
-      if (initial === "control" || initial === "settings") initial = "root"
-      else if (!initial || initial === "root") initial = "apps"
-      root.openRoute(initial)
+      if (initial && initial !== "root" && initial !== "apps") {
+        if (initial === "control" || initial === "settings") initial = "root"
+        root.openRoute(initial)
+      } else {
+        root.openExistingMenu("apps")
+      }
       if (payload.query || payload.filter) {
         root.setFilter(String(payload.query || payload.filter))
       }
@@ -79,8 +103,14 @@ Item {
   function statusReport() {
     return JSON.stringify({
       opened: root.opened,
+      isClosing: root.isClosing,
+      openProgress: root.openProgress,
       rowsLoaded: root.rowsLoaded,
       activeMenu: root.activeMenu,
+      filterText: root.filterText,
+      selectedIndex: root.selectedIndex,
+      textCursorPos: root.textCursorPos,
+      navStackCount: root.navStack ? root.navStack.length : 0,
       displayCount: displayModel.count,
       itemOrderCount: root.itemOrder ? root.itemOrder.length : 0,
       cardWidth: root.cardWidth,
@@ -171,8 +201,106 @@ Item {
   property var defaultMenuItems: []
   property var userMenuItems: []
   property bool opened: false
+  property bool isClosing: false
+  property real openProgress: 0.0
+
+  readonly property real offscreenDistance: (panel && panel.height > 200)
+    ? Math.round((panel.height + root.cardHeight + Style.space(12)) / 2 + Style.space(72))
+    : Style.space(900)
+
+  readonly property real slideOffsetY: Math.round(root.offscreenDistance * (1.0 - root.openProgress))
+
+  NumberAnimation {
+    id: openSlideAnim
+    target: root
+    property: "openProgress"
+    to: 1.0
+    duration: 360
+    easing.type: Easing.OutCubic
+    onFinished: {
+      root.isClosing = false
+    }
+  }
+
+  NumberAnimation {
+    id: closeSlideAnim
+    target: root
+    property: "openProgress"
+    to: 0.0
+    duration: 250
+    easing.type: Easing.InQuad
+    onFinished: {
+      root.isClosing = false
+      root.finishDismiss()
+    }
+  }
+
+  Timer {
+    id: deferredRefreshTimer
+    interval: 420
+    repeat: false
+    onTriggered: {
+      if (!root.opened) return
+      if (root.activeMenu !== "apps") root.evaluateGuards()
+      root.pickTip()
+      root.loadQuickLinks()
+      root.loadExchangeRates()
+      root.invalidateVolatileProvider(root.activeMenu)
+      root.loadProviderForMenu(root.activeMenu)
+      root.loadKeybinds(false)
+      root.loadStatus()
+    }
+  }
+
+  function startOpenAnimation() {
+    closeSlideAnim.stop()
+    root.isClosing = false
+    if (root.openProgress >= 0.999 && !openSlideAnim.running) {
+      root.openProgress = 1.0
+      return
+    }
+    openSlideAnim.stop()
+    openSlideAnim.from = root.openProgress
+    openSlideAnim.to = 1.0
+    var distanceRemaining = Math.max(0.0, 1.0 - root.openProgress)
+    openSlideAnim.duration = Math.max(120, Math.round(360 * distanceRemaining))
+    openSlideAnim.start()
+  }
+
+  function startCloseAnimation() {
+    deferredRefreshTimer.stop()
+    openSlideAnim.stop()
+    root.isClosing = true
+    if (root.openProgress <= 0.001 && !closeSlideAnim.running) {
+      root.openProgress = 0.0
+      root.isClosing = false
+      root.finishDismiss()
+      return
+    }
+    closeSlideAnim.stop()
+    closeSlideAnim.from = root.openProgress
+    closeSlideAnim.to = 0.0
+    var distanceRemaining = Math.max(0.0, root.openProgress)
+    closeSlideAnim.duration = Math.max(100, Math.round(250 * distanceRemaining))
+    closeSlideAnim.start()
+  }
+
+  function finishDismiss() {
+    root.resetToCleanState()
+  }
+
+  function dismissMenu() {
+    if (!root.opened && !root.isClosing) return
+    root.opened = false
+    if (root.dmenuActive) root.finishRequest(null)
+    root.startCloseAnimation()
+  }
   property string mode: "menu"
   readonly property bool dmenuActive: mode === "select" || mode === "input"
+  readonly property bool isPhoneMode: root.dmenuActive || (root.activeMenu !== "apps" && root.activeMenu !== "root")
+  onIsPhoneModeChanged: {
+    root.rebuildDisplay()
+  }
   property string dmenuPrompt: ""
   property var dmenuOptions: []
   property string selectionFile: ""
@@ -181,7 +309,7 @@ Item {
   property int dmenuMaxHeight: 0
   property bool requestActive: false
   property bool rowsLoaded: false
-  property string activeMenu: "root"
+  property string activeMenu: "apps"
   property string filterText: ""
   property int selectedIndex: 0
   property bool cursorActive: false
@@ -329,7 +457,7 @@ Item {
 
   Timer {
     interval: 1000
-    running: root.opened
+    running: root.opened && !openSlideAnim.running && !closeSlideAnim.running
     repeat: true
     onTriggered: root.clockString = Qt.formatDateTime(new Date(), "HH:mm • ddd, MMM d")
   }
@@ -337,22 +465,40 @@ Item {
   readonly property bool detailRows: root.dmenuActive ? root.dmenuHasDetail : root.filterText.trim().length > 0
   property bool dmenuHasDetail: false
   readonly property int tileHeight: {
+    if (root.isPhoneMode) return root.detailRows ? Style.space(64) : Style.space(56)
     if (root.dmenuActive) return root.detailRows ? root.detailTileHeight : root.baseTileHeight
-    if (root.activeMenu === "apps" && !root.filterText.trim()) return Style.space(84)
+    if (root.activeMenu === "apps" && !root.filterText.trim()) return Style.space(80)
     if (root.activeMenu === "root" && !root.filterText.trim()) return Style.space(64)
     if (root.filterText.trim().length > 0) return Style.space(68)
     return root.detailRows ? Style.space(68) : Style.space(52)
   }
   readonly property int tileGap: {
-    if (root.activeMenu === "apps" && !root.filterText.trim()) return Style.space(10)
+    if (root.isPhoneMode) return Style.space(8)
+    if (root.activeMenu === "apps" && !root.filterText.trim()) return Style.space(8)
     if (root.activeMenu === "root" && !root.filterText.trim()) return Style.space(12)
     return Style.space(10)
   }
 
-  property int cardWidth: root.dmenuActive ? Math.min(Style.space(root.dmenuWidth), panel.width - Style.gapsOut * 2) : Math.min(Style.space(940), panel.width - Style.gapsOut * 2)
+  readonly property int targetCardWidth: root.isPhoneMode
+    ? Math.min(Style.space(390), (panel && panel.width > 300 ? panel.width : 1280) - Style.gapsOut * 2)
+    : Math.min(Style.space(940), (panel && panel.width > 300 ? panel.width : 1280) - Style.gapsOut * 2)
+
+  readonly property int targetCardHeight: root.isPhoneMode
+    ? Math.min(Style.space(690), (panel && panel.height > 300 ? panel.height : 800) - Style.space(40))
+    : Math.min(Style.space(590), (panel && panel.height > 300 ? panel.height : 800) - Style.gapsOut * 2)
+
+  property int cardWidth: targetCardWidth
+  property int cardHeight: targetCardHeight
+
+  Behavior on cardWidth {
+    NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+  }
+  Behavior on cardHeight {
+    NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+  }
+
   readonly property int chromeHeight: contentMargin * 2 + tabletBarHeight + contentSpacing + headerHeight + contentSpacing + searchHeight
     + (root.mode === "input" ? 0 : contentSpacing) + contentSpacing + footerHeight
-  readonly property int cardHeight: root.dmenuActive ? Math.min(root.chromeHeight + root.gridHeight, panel.height - Style.gapsOut * 2) : Math.min(Style.space(610), panel.height - Style.gapsOut * 2)
   readonly property int availableGridHeight: Math.max(root.baseTileHeight, root.cardHeight - root.chromeHeight - (contentMargin * 2))
   readonly property int gridHeight: root.mode === "input" ? 0
     : (displayModel.count === 0 ? root.emptyHeight : Math.min(root.gridContentHeight, root.availableGridHeight))
@@ -361,7 +507,7 @@ Item {
 
   function finishRequest(selection) {
     if (!root.requestActive || !root.doneFile) {
-      root.opened = false
+      root.dismissMenu()
       return
     }
 
@@ -618,13 +764,17 @@ Item {
     keybindsProc.running = true
   }
 
+  property string lastKeybindsRaw: ""
+
   function applyKeybinds(text) {
+    if (text === root.lastKeybindsRaw) return
+    root.lastKeybindsRaw = text
     var parsed = Keybinds.parseRecords(text)
     root.binds = parsed.binds
     root.bindDefaults = parsed.defaults
     root.rebuildShortcutIndexes()
     root.pickTip()
-    if (root.opened) root.rebuildDisplay()
+    if (root.opened && root.activeMenu !== "apps") root.rebuildDisplay()
   }
 
   function rebuildShortcutIndexes() {
@@ -659,6 +809,7 @@ Item {
   ListModel { id: dividerModel }
 
   function columnsFor(rows) {
+    if (root.isPhoneMode) return 1
     if (root.dmenuActive) return 1
     if (root.mode === "input") return 1
     if (root.activeMenu === "apps" && !root.filterText.trim()) return 6
@@ -966,8 +1117,6 @@ Item {
 
   function runCommand(kind, action) {
     applySerial = requestSerial
-    opened = false
-    filterText = ""
     if (kind === "run") {
       Util.execDetached("omarchy-launch-terminal bash -c " + Util.shellQuote('eval "$1"; exec "${SHELL:-bash}"') + " _ " + Util.shellQuote(action))
     } else {
@@ -975,24 +1124,23 @@ Item {
       if (path === "~" || path.indexOf("~/") === 0) path = Quickshell.env("HOME") + path.slice(1)
       Util.execDetached("xdg-open " + Util.shellQuote(path))
     }
+    root.dismissMenu()
   }
 
   function openUrl(url) {
     applySerial = requestSerial
-    opened = false
-    filterText = ""
     Util.execDetached("xdg-open " + Util.shellQuote(url))
+    root.dismissMenu()
   }
 
   function copyToClipboard(text, label, detail, icon) {
     applySerial = requestSerial
-    opened = false
-    filterText = ""
     Util.execDetached("printf %s " + Util.shellQuote(text) + " | wl-copy")
     var glyph = (icon && icon.length > 0) ? icon : "󰃬"
     var title = "Copied to clipboard"
     var msg = (label && label.length > 0) ? label : text
     Util.execDetached("omarchy-notification-send -g " + Util.shellQuote(glyph) + " " + Util.shellQuote(title) + " " + Util.shellQuote(msg))
+    root.dismissMenu()
   }
 
   function currentSearchGlyph() {
@@ -1007,8 +1155,8 @@ Item {
     var r = displayModel.get(root.selectedIndex)
     var top = r.cellY
     var bottom = r.cellY + root.tileHeight
-    // Keep a sliver of the neighbouring row visible so the fold reads as one.
-    var reach = Math.round(root.tileHeight * 0.4)
+    // Keep a sliver of the neighbouring row visible so the fold reads as one (in lists only).
+    var reach = (root.columns > 2) ? 0 : Math.round(root.tileHeight * 0.4)
     var maxY = Math.max(0, gridFlick.contentHeight - gridFlick.height)
     if (bottom + reach > gridFlick.contentY + gridFlick.height)
       gridFlick.contentY = Math.min(bottom + reach - gridFlick.height, maxY)
@@ -1167,9 +1315,8 @@ Item {
       var appId = row.appId
       var label = row.label
       applySerial = requestSerial
-      opened = false
-      filterText = ""
       if (root.appLibrary) root.appLibrary.launch(appId, label)
+      root.dismissMenu()
     } else if (row.kind === "url") {
       root.openUrl(row.action)
     } else if (row.kind === "copy") {
@@ -1213,33 +1360,20 @@ Item {
 
   function applyDmenuSelection(value) {
     applySerial = requestSerial
-    opened = false
-    filterText = ""
     root.finishRequest(value)
+    root.dismissMenu()
   }
 
   function applySelected(id, action) {
     if (!id) { cancel(); return }
     applySerial = requestSerial
-    opened = false
-    filterText = ""
     root.runAction(action)
-    Qt.callLater(function() {
-      if (root.activeMenu !== "apps" || root.lastRenderedFilter !== "") {
-        root.activeMenu = "apps"
-        root.rebuildDisplay()
-      }
-    })
+    root.dismissMenu()
   }
 
   function cancel() {
     if (root.dmenuActive) root.finishRequest(null)
-    opened = false
-    if (root.filterText !== "" || root.activeMenu !== "apps") {
-      filterText = ""
-      activeMenu = "apps"
-      root.rebuildDisplay()
-    }
+    root.dismissMenu()
   }
 
   function openExistingMenu(initialMenu) {
@@ -1249,32 +1383,21 @@ Item {
     selectionFile = ""
     doneFile = ""
     var targetMenu = root.item(initialMenu) ? initialMenu : "apps"
-    var sameMenu = (root.activeMenu === targetMenu && root.filterText === "" && displayModel.count > 0 && root.lastRenderedMenu === targetMenu && root.lastRenderedFilter === "")
     activeMenu = targetMenu
     navStack = []
     filterText = ""
+    textCursorPos = 0
     selectedIndex = 0
     cursorActive = true
-    gridFlick.contentY = 0
-    root.disarmPointer()
-    root.evaluateGuards()
+    if (typeof gridFlick !== "undefined" && gridFlick) gridFlick.contentY = 0
     root.ensureAppRows()
     opened = true
+    keyCatcher.forceActiveFocus()
+    root.startOpenAnimation()
 
-    if (!sameMenu) {
-      rebuildDisplay()
-    }
+    rebuildDisplay(true)
 
-    Qt.callLater(function() {
-      root.pickTip()
-      root.loadQuickLinks()
-      root.loadExchangeRates()
-      root.invalidateVolatileProvider(activeMenu)
-      root.loadProviderForMenu(activeMenu)
-      root.loadKeybinds(false)
-      root.loadStatus()
-      keyCatcher.forceActiveFocus()
-    })
+    deferredRefreshTimer.restart()
   }
 
   function openDmenu(payload) {
@@ -1296,6 +1419,7 @@ Item {
     root.disarmPointer()
     opened = true
     rebuildDisplay()
+    root.startOpenAnimation()
 
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
@@ -1339,6 +1463,10 @@ Item {
   }
 
   function launchDockApp(appId) {
+    if (appId === "menus") {
+      root.openRoute("root")
+      return
+    }
     root.cancel()
     if (appId === "terminal") {
       Util.execDetached("omarchy-launch-terminal")
@@ -1348,14 +1476,13 @@ Item {
       Util.execDetached("uwsm-app -- gtk-launch io.github.lgse.Strata.desktop || xdg-open " + Util.shellQuote(Quickshell.env("HOME")))
     } else if (appId === "editor") {
       Util.execDetached("omarchy-launch-terminal bash -c 'nvim; exec \"${SHELL:-bash}\"'")
-    } else if (appId === "menus") {
-      root.openRoute("root")
     }
   }
 
   function footerHint() {
     if (root.mode === "input") return "⏎ confirm   esc cancel"
-    if (root.dmenuActive) return "type to filter   ↑↓ move   ⏎ select   esc cancel"
+    if (root.dmenuActive) return "↑↓ move   ⏎ select   esc cancel"
+    if (root.isPhoneMode) return "↑↓ move   ⏎ select   esc back"
     if (root.filterText.charAt(0) === "!") return "⏎ run in terminal   esc clear"
     if (root.isMathMode) return "←→ cursor   ⏎ copy to clipboard   esc clear"
     if (root.filterText) return "↑↓←→ move   ⏎ open   esc clear"
@@ -1365,7 +1492,7 @@ Item {
   }
 
   function tipText() {
-    if (root.dmenuActive || !root.tip) return ""
+    if (root.isPhoneMode || root.dmenuActive || !root.tip) return ""
     return "󰛨 " + root.tip.pretty + " → " + root.tip.description
   }
 
@@ -1374,6 +1501,7 @@ Item {
     if (root.dmenuActive) return "Filter " + root.dmenuPrompt.toLowerCase() + "…"
     if (root.activeMenu === "apps") return "Search applications, files (~), commands (!)..."
     var active = root.item(root.activeMenu)
+    if (root.isPhoneMode) return active ? "Filter " + (active.title || active.label).toLowerCase() + "…" : "Filter items…"
     return (root.activeMenu === "root" || !active) ? "Search applications & system menus..." : "Search " + (active.title || active.label)
   }
 
@@ -1449,7 +1577,7 @@ Item {
     id: resultProc
     onExited: {
       if (root.applySerial === root.requestSerial)
-        root.opened = false
+        root.dismissMenu()
     }
   }
 
@@ -1701,10 +1829,9 @@ Item {
 
   function summonFmhyDeck(action) {
     applySerial = requestSerial
-    opened = false
-    filterText = ""
     var q = (action === "fmhy-panel" || !action) ? "" : action
     Util.execDetached("qs ipc -n -p /usr/share/omarchy/shell call io.github.i12bp8.fmhy-deck search " + Util.shellQuote(q))
+    root.dismissMenu()
   }
 
   // ------------------------------------------------------------------ guards
@@ -1729,7 +1856,7 @@ Item {
       root.checkedResults = ({})
       return
     }
-    guardProc.command = ["bash", "-lc", script]
+    guardProc.command = ["bash", "-c", script]
     guardProc.running = true
   }
 
@@ -1761,10 +1888,40 @@ Item {
         if (tag === "w") nextWhen[id] = value
         else if (tag === "c") nextChecked[id] = value
       }
+      var changed = false
+      for (var kw in nextWhen) {
+        if (root.whenResults[kw] !== nextWhen[kw]) { changed = true; break }
+      }
+      if (!changed) {
+        for (var kc in nextChecked) {
+          if (root.checkedResults[kc] !== nextChecked[kc]) { changed = true; break }
+        }
+      }
       root.whenResults = nextWhen
       root.checkedResults = nextChecked
-      if (root.opened) root.rebuildDisplay()
+      if (changed && root.opened && root.activeMenu !== "apps") {
+        root.rebuildDisplay()
+      }
       if (root.guardsPending) Qt.callLater(function() { root.evaluateGuards() })
+    }
+  }
+
+  // Permanent icon memory cache: pre-warms all app icon textures in background threads
+  // so they are NEVER evicted from RAM/GPU cache even after 10+ minutes of idle.
+  Item {
+    visible: false
+    width: 0
+    height: 0
+    Repeater {
+      model: root.cachedAppDefaultRows
+      delegate: Image {
+        required property var modelData
+        source: modelData && modelData.appIcon ? (modelData.appIcon.indexOf("://") >= 0 ? modelData.appIcon : (root.appLibrary ? root.appLibrary.iconSource(modelData.appIcon) : "")) : ""
+        sourceSize.width: Style.space(32) * Screen.devicePixelRatio
+        sourceSize.height: Style.space(32) * Screen.devicePixelRatio
+        cache: true
+        asynchronous: true
+      }
     }
   }
 
@@ -1772,167 +1929,855 @@ Item {
 
   PanelWindow {
     id: panel
-    visible: root.opened && root.rowsLoaded
+    visible: (root.opened || root.isClosing || root.openProgress > 0.001) && root.rowsLoaded
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
     WlrLayershell.namespace: "omarchy-menu"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
 
     // Dimmed desktop scrim
     Rectangle {
       anchors.fill: parent
       color: root.scrim
+      opacity: root.openProgress
     }
 
     MouseArea {
       anchors.fill: parent
+      enabled: root.opened && !root.isClosing
       onClicked: root.cancel()
     }
 
-    // Tablet Device Container
+    // Tablet / Phone Device Container
     Item {
       id: tabletContainer
-      width: root.cardWidth
-      height: Math.min(root.cardHeight, panel.height - Style.gapsOut * 2)
-      anchors.centerIn: parent
+      readonly property int targetChassisDepthX: root.isPhoneMode ? Style.space(8) : Style.space(18)
+      readonly property int targetChassisDepthY: root.isPhoneMode ? Style.space(6) : Style.space(12)
+      readonly property int targetChassisRadius: root.isPhoneMode ? Style.space(36) : Style.space(26)
 
-      // Prevent clicks inside the tablet from dismissing
+      property int chassisDepthX: targetChassisDepthX
+      property int chassisDepthY: targetChassisDepthY
+      property int chassisRadius: targetChassisRadius
+
+      Behavior on chassisDepthX { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+      Behavior on chassisDepthY { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+      Behavior on chassisRadius { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+
+      readonly property int frontWidth: root.cardWidth
+      readonly property int frontHeight: Math.min(root.cardHeight, panel.height - Style.gapsOut * 2)
+
+      // Dynamic theme-adaptive physical device materials
+      readonly property color chassisBaseColor: Qt.tint(root.background, Util.alpha(root.foreground, 0.18))
+      readonly property color chassisSideWallColor: Qt.tint(root.background, Util.alpha(root.foreground, 0.28))
+      readonly property color chassisShadeColor: Qt.tint(root.background, Util.alpha(root.foreground, 0.08))
+      readonly property color chassisChamfer: Util.alpha(root.foreground, 0.48)
+
+      width: frontWidth + chassisDepthX
+      height: frontHeight + chassisDepthY
+      anchors.horizontalCenter: parent.horizontalCenter
+      y: Math.round((panel.height - height) / 2) + root.slideOffsetY
+
+      // Organic depth scale: subtle 4% elevation lift as it glides from bottom to center
+      scale: 0.96 + (0.04 * root.openProgress)
+      transformOrigin: Item.Center
+
+      // Seamless edge dissolve from 0.0 at threshold to 1.0 solid by mid-flight
+      opacity: Math.min(1.0, root.openProgress * 2.0)
+
+      // Hardware-accelerated GPU offscreen layer caching
+      layer.enabled: true
+      layer.smooth: true
+
+      // Dynamic 3D Gadget Orientation (adapts between landscape tablet and vertical phone)
+      readonly property real targetAngleX: root.isPhoneMode ? 3.0 : 4.5
+      readonly property real targetAngleY: root.isPhoneMode ? -4.5 : -8.0
+      readonly property real targetAngleZ: root.isPhoneMode ? -2.0 : -5.5
+
+      property real rotAngleX: targetAngleX
+      property real rotAngleY: targetAngleY
+      property real rotAngleZ: targetAngleZ
+
+      Behavior on rotAngleX { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+      Behavior on rotAngleY { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+      Behavior on rotAngleZ { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+
+      // 3D Perspective Rotation Transform
+      transform: [
+        Rotation {
+          origin.x: tabletContainer.width / 2
+          origin.y: tabletContainer.height / 2
+          axis.x: 1; axis.y: 0; axis.z: 0
+          angle: tabletContainer.rotAngleX
+        },
+        Rotation {
+          origin.x: tabletContainer.width / 2
+          origin.y: tabletContainer.height / 2
+          axis.x: 0; axis.y: 1; axis.z: 0
+          angle: tabletContainer.rotAngleY
+        },
+        Rotation {
+          origin.x: tabletContainer.width / 2
+          origin.y: tabletContainer.height / 2
+          axis.x: 0; axis.y: 0; axis.z: 1
+          angle: tabletContainer.rotAngleZ
+        }
+      ]
+
+      // Prevent clicks inside the tablet container from dismissing
       MouseArea {
         anchors.fill: parent
+        enabled: root.opened && !root.isClosing
         onClicked: {}
       }
 
-      // 1. Layered Realistic Ambient Drop Shadows
-      // 1. Optimized Ambient Drop Shadow
+      // -------------------------------------------------------------
+      // 1. 3D Floating Ambient Drop Shadows (Multi-stage Depth Occlusion)
+      // -------------------------------------------------------------
+      // Deep diffuse ambient blur (floating suspension)
       Rectangle {
-        anchors.fill: parent
-        anchors.margins: -Style.space(12)
-        radius: Style.space(38)
+        x: tabletContainer.chassisDepthX + (root.isPhoneMode ? Style.space(2) : Style.space(14))
+        y: tabletContainer.chassisDepthY + (root.isPhoneMode ? Style.space(3) : Style.space(20))
+        width: tabletContainer.frontWidth
+        height: tabletContainer.frontHeight
+        radius: tabletContainer.chassisRadius + (root.isPhoneMode ? Style.space(2) : Style.space(12))
         color: "#000000"
-        opacity: 0.55
+        opacity: root.isPhoneMode ? 0.35 : 0.62
+        z: -3
       }
 
-      // 2. Physical Hardware Buttons (Hardware Notches)
-      // Top Power Button Notch
+      // Medium direct projection shadow
       Rectangle {
-        visible: !root.dmenuActive
-        width: Style.space(52)
-        height: Style.space(4)
-        radius: Style.space(2)
-        color: Qt.tint(root.background, Util.alpha(root.foreground, 0.08))
-        border.color: Util.alpha(root.foreground, 0.20)
-        border.width: 1
-        anchors.bottom: parent.top
-        anchors.right: parent.right
-        anchors.rightMargin: Style.space(72)
+        x: tabletContainer.chassisDepthX + (root.isPhoneMode ? Style.space(1) : Style.space(6))
+        y: tabletContainer.chassisDepthY + (root.isPhoneMode ? Style.space(1) : Style.space(9))
+        width: tabletContainer.frontWidth
+        height: tabletContainer.frontHeight
+        radius: tabletContainer.chassisRadius + (root.isPhoneMode ? Style.space(1) : Style.space(6))
+        color: "#000000"
+        opacity: root.isPhoneMode ? 0.40 : 0.70
+        z: -2
       }
 
-      // Top Volume Buttons
+      // Close contact occlusion shadow under chassis edge
       Rectangle {
-        visible: !root.dmenuActive
-        width: Style.space(38)
-        height: Style.space(4)
-        radius: Style.space(2)
-        color: Qt.tint(root.background, Util.alpha(root.foreground, 0.08))
-        border.color: Util.alpha(root.foreground, 0.20)
-        border.width: 1
-        anchors.bottom: parent.top
-        anchors.left: parent.left
-        anchors.leftMargin: Style.space(64)
-      }
-      Rectangle {
-        visible: !root.dmenuActive
-        width: Style.space(38)
-        height: Style.space(4)
-        radius: Style.space(2)
-        color: Qt.tint(root.background, Util.alpha(root.foreground, 0.08))
-        border.color: Util.alpha(root.foreground, 0.20)
-        border.width: 1
-        anchors.bottom: parent.top
-        anchors.left: parent.left
-        anchors.leftMargin: Style.space(110)
+        x: tabletContainer.chassisDepthX + (root.isPhoneMode ? 0 : Style.space(2))
+        y: tabletContainer.chassisDepthY + (root.isPhoneMode ? 0 : Style.space(3))
+        width: tabletContainer.frontWidth
+        height: tabletContainer.frontHeight
+        radius: tabletContainer.chassisRadius + (root.isPhoneMode ? 0 : Style.space(2))
+        color: "#000000"
+        opacity: root.isPhoneMode ? 0.50 : 0.80
+        z: -1
       }
 
-      // 3. Tablet Titanium Chassis (Outer Frame)
+      // -------------------------------------------------------------
+      // 2. 3D Extruded Unibody Chassis Body (Concentric Precision Extrusion)
+      // -------------------------------------------------------------
+      // 24 concentric slices stacked from back to front along the 3D extrusion vector.
+      // Every slice shares the exact same frontWidth, frontHeight, and chassisRadius.
+      // This mathematically guarantees 100% continuous curvature across all 4 corners,
+      // eliminating any bulging, seams, or mismatched corner radii.
+      Item {
+        id: unibodyChassisExtrusion
+        anchors.fill: parent
+        z: 2
+        layer.enabled: true
+        layer.smooth: true
+
+        Repeater {
+          model: 48
+          Rectangle {
+            // index 0 is deepest back slice (t = 1.0), index 47 is closest front slice (t = 0.0)
+            readonly property real t: (47 - index) / 47.0
+            x: tabletContainer.chassisDepthX * t
+            y: tabletContainer.chassisDepthY * t
+            width: tabletContainer.frontWidth
+            height: tabletContainer.frontHeight
+            radius: tabletContainer.chassisRadius
+
+            gradient: Gradient {
+              orientation: Gradient.Horizontal
+              // Left side / bottom-left: ambient shadow
+              GradientStop {
+                position: 0.0
+                color: Qt.tint(tabletContainer.chassisShadeColor, Util.alpha("#000000", 0.60))
+              }
+              // Center bottom: smooth metallic midtone
+              GradientStop {
+                position: 0.70
+                color: Qt.tint(tabletContainer.chassisSideWallColor, Util.alpha(tabletContainer.chassisShadeColor, 0.35))
+              }
+              // Right side / bottom-right: crisp metallic highlight catching key light
+              GradientStop {
+                position: 1.0
+                color: Qt.lighter(tabletContainer.chassisSideWallColor, 1.15)
+              }
+            }
+
+            // Precision CNC rear chamfer outline on the deepest back slice (index 0)
+            border.color: index === 0 ? Util.alpha(tabletContainer.chassisChamfer, 0.45) : "transparent"
+            border.width: index === 0 ? 1.0 : 0
+          }
+        }
+      }
+
+      // -------------------------------------------------------------
+      // 3. Bottom Wall Hardware Features (Volume, Power, Dock)
+      // -------------------------------------------------------------
+      Item {
+        id: bottomHardwareFeatures
+        visible: !root.isPhoneMode
+        x: 0
+        y: tabletContainer.frontHeight
+        width: tabletContainer.frontWidth
+        height: tabletContainer.chassisDepthY
+        z: 6
+
+        // 3a. Smart Connector / Magnetic Accessory Dock (Center)
+        Rectangle {
+          id: bottomSmartDock
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.verticalCenter: parent.verticalCenter
+          width: Style.space(88)
+          height: Style.space(3.2)
+          radius: Style.space(1.6)
+          color: Util.alpha(root.foreground, 0.12)
+          border.color: Util.alpha(root.foreground, 0.24)
+          border.width: 0.6
+
+          Row {
+            anchors.centerIn: parent
+            spacing: Style.space(14)
+            Repeater {
+              model: 3
+              Rectangle {
+                width: Style.space(3.6)
+                height: Style.space(3.6)
+                radius: Style.space(1.8)
+                color: Util.alpha(root.selectedText, 0.95)
+                border.color: "#05070a"
+                border.width: 0.6
+              }
+            }
+          }
+        }
+
+        // 3b. Volume Rocker Button (Volume Up / Down)
+        Rectangle {
+          id: bottomVolumeRocker
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.right: bottomPowerButton.left
+          anchors.rightMargin: Style.space(22)
+          width: Style.space(68)
+          height: Style.space(4.2)
+          radius: Style.space(2.1)
+          color: Qt.tint(root.background, Util.alpha(root.foreground, 0.36))
+          border.color: Util.alpha(root.foreground, 0.52)
+          border.width: 0.8
+
+          // Center separation slit between + and -
+          Rectangle {
+            anchors.centerIn: parent
+            width: 1
+            height: parent.height * 0.7
+            color: Util.alpha(root.foreground, 0.40)
+          }
+
+          // Volume Plus (+) indicator bar
+          Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(14)
+            width: Style.space(6)
+            height: 1.2
+            radius: 0.6
+            color: Util.alpha(root.foreground, 0.65)
+          }
+
+          // Volume Minus (-) indicator bar
+          Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(14)
+            width: Style.space(6)
+            height: 1.2
+            radius: 0.6
+            color: Util.alpha(root.foreground, 0.65)
+          }
+        }
+
+        // 3c. Power / Sleep Button
+        Rectangle {
+          id: bottomPowerButton
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.right: parent.right
+          anchors.rightMargin: Style.space(120)
+          width: Style.space(38)
+          height: Style.space(4.2)
+          radius: Style.space(2.1)
+          color: Qt.tint(root.background, Util.alpha(root.foreground, 0.36))
+          border.color: Util.alpha(root.foreground, 0.52)
+          border.width: 0.8
+
+          // Tactile ridge highlight
+          Rectangle {
+            anchors.centerIn: parent
+            width: Style.space(8)
+            height: 1.2
+            radius: 0.6
+            color: Util.alpha(root.foreground, 0.75)
+          }
+        }
+
+        // 3d. SIM / Tray Eject Pinhole
+        Rectangle {
+          anchors.verticalCenter: parent.verticalCenter
+          x: Style.space(120)
+          width: Style.space(2.8)
+          height: Style.space(2.8)
+          radius: Style.space(1.4)
+          color: "#020305"
+          border.color: Util.alpha(root.foreground, 0.35)
+          border.width: 0.7
+        }
+
+        // 3e. Bottom Antenna Band Polymer Isolation Seams
+        Rectangle {
+          x: Style.space(70)
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          width: 1.5
+          color: Util.alpha(root.foreground, 0.35)
+        }
+        Rectangle {
+          x: parent.width - Style.space(70)
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          width: 1.5
+          color: Util.alpha(root.foreground, 0.35)
+        }
+      }
+
+      // -------------------------------------------------------------
+      // 4. Tablet Right Side Wall Hardware Features (Charging Port & Speakers)
+      // -------------------------------------------------------------
+      Item {
+        id: rightHardwareFeatures
+        visible: !root.isPhoneMode
+        x: tabletContainer.frontWidth
+        y: 0
+        width: tabletContainer.chassisDepthX
+        height: tabletContainer.frontHeight
+        z: 6
+
+        // 4a. Precision Center USB-C / Thunderbolt Port (Vertical)
+        Rectangle {
+          id: rightUsbPort
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.verticalCenter: parent.verticalCenter
+          width: Style.space(7.2)
+          height: Style.space(34)
+          radius: Style.space(3.6)
+          color: "#030407"
+          border.color: Util.alpha(tabletContainer.chassisChamfer, 0.90)
+          border.width: 1.0
+
+          // Inner rim chamfer highlight
+          Rectangle {
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            width: 1
+            height: parent.height * 0.65
+            color: Util.alpha(root.foreground, 0.40)
+          }
+
+          // Port interior depth cavity
+          Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1.0
+            radius: Style.space(2.6)
+            color: "#010204"
+
+            // Central metallic contact tongue (vertical gold/titanium)
+            Rectangle {
+              anchors.centerIn: parent
+              width: Style.space(2.2)
+              height: Style.space(18)
+              radius: 1.1
+              color: Util.alpha(root.selectedText, 0.95)
+
+              // Micro contact pin stripes
+              Column {
+                anchors.centerIn: parent
+                spacing: Style.space(2.4)
+                Repeater {
+                  model: 5
+                  Rectangle {
+                    width: Style.space(1.4)
+                    height: Style.space(1.1)
+                    color: "#241804"
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // 4b. Precision Pentalobe / Torx Security Chassis Screws
+        // Top Screw
+        Rectangle {
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.bottom: rightUsbPort.top
+          anchors.bottomMargin: Style.space(16)
+          width: Style.space(4.2)
+          height: Style.space(4.2)
+          radius: Style.space(2.1)
+          color: "#05070a"
+          border.color: Util.alpha(root.foreground, 0.48)
+          border.width: 0.8
+
+          Rectangle {
+            anchors.centerIn: parent
+            width: 1.4
+            height: 1.4
+            radius: 0.7
+            color: Util.alpha(root.foreground, 0.85)
+          }
+        }
+
+        // Bottom Screw
+        Rectangle {
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.top: rightUsbPort.bottom
+          anchors.topMargin: Style.space(16)
+          width: Style.space(4.2)
+          height: Style.space(4.2)
+          radius: Style.space(2.1)
+          color: "#05070a"
+          border.color: Util.alpha(root.foreground, 0.48)
+          border.width: 0.8
+
+          Rectangle {
+            anchors.centerIn: parent
+            width: 1.4
+            height: 1.4
+            radius: 0.7
+            color: Util.alpha(root.foreground, 0.85)
+          }
+        }
+
+        // 4c. Top Stereo Acoustic Speaker Array (Vertical Circular Grill Holes)
+        Column {
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.bottom: rightUsbPort.top
+          anchors.bottomMargin: Style.space(38)
+          spacing: Style.space(5.5)
+
+          Repeater {
+            model: 5
+            Rectangle {
+              width: Style.space(4.5)
+              height: Style.space(4.5)
+              radius: Style.space(2.25)
+              color: "#030406"
+              border.color: Util.alpha(root.foreground, 0.40)
+              border.width: 0.7
+
+              Rectangle {
+                anchors.centerIn: parent
+                width: Style.space(2.2)
+                height: Style.space(2.2)
+                radius: 1.1
+                color: "#06090e"
+              }
+            }
+          }
+        }
+
+        // 4d. Bottom Stereo Acoustic Speaker Array (Vertical Circular Grill Holes)
+        Column {
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.top: rightUsbPort.bottom
+          anchors.topMargin: Style.space(38)
+          spacing: Style.space(5.5)
+
+          Repeater {
+            model: 5
+            Rectangle {
+              width: Style.space(4.5)
+              height: Style.space(4.5)
+              radius: Style.space(2.25)
+              color: "#030406"
+              border.color: Util.alpha(root.foreground, 0.40)
+              border.width: 0.7
+
+              Rectangle {
+                anchors.centerIn: parent
+                width: Style.space(2.2)
+                height: Style.space(2.2)
+                radius: 1.1
+                color: "#06090e"
+              }
+            }
+          }
+        }
+
+        // 4e. Studio Mic Pinhole
+        Rectangle {
+          anchors.horizontalCenter: parent.horizontalCenter
+          y: Style.space(110)
+          width: Style.space(2.8)
+          height: Style.space(2.8)
+          radius: Style.space(1.4)
+          color: "#020305"
+          border.color: Util.alpha(root.foreground, 0.35)
+          border.width: 0.7
+        }
+
+        // 4f. Right Antenna Band Polymer Isolation Seams
+        Rectangle {
+          y: Style.space(56)
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 1.5
+          color: Util.alpha(root.foreground, 0.35)
+        }
+        Rectangle {
+          y: parent.height - Style.space(56)
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 1.5
+          color: Util.alpha(root.foreground, 0.35)
+        }
+      }
+
+      // -------------------------------------------------------------
+      // 4b. Phone Bottom Wall Hardware (USB-C & Stereo Speakers)
+      // -------------------------------------------------------------
+      Item {
+        id: phoneBottomHardwareFeatures
+        visible: root.isPhoneMode
+        x: 0
+        y: tabletContainer.frontHeight
+        width: tabletContainer.frontWidth
+        height: tabletContainer.chassisDepthY
+        z: 6
+
+        // Phone Center USB-C Port
+        Rectangle {
+          id: phoneUsbPort
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.verticalCenter: parent.verticalCenter
+          width: Style.space(20)
+          height: Style.space(3.2)
+          radius: Style.space(1.6)
+          color: "#030407"
+          border.color: Util.alpha(tabletContainer.chassisChamfer, 0.90)
+          border.width: 0.8
+
+          // Metallic tongue
+          Rectangle {
+            anchors.centerIn: parent
+            width: Style.space(10)
+            height: Style.space(1.2)
+            radius: 0.6
+            color: Util.alpha(root.selectedText, 0.90)
+          }
+        }
+
+        // Left Speaker Array
+        Row {
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.right: phoneUsbPort.left
+          anchors.rightMargin: Style.space(16)
+          spacing: Style.space(4)
+
+          Repeater {
+            model: 3
+            Rectangle {
+              width: Style.space(2.6)
+              height: Style.space(2.6)
+              radius: Style.space(1.3)
+              color: "#030406"
+              border.color: Util.alpha(root.foreground, 0.38)
+              border.width: 0.6
+            }
+          }
+        }
+
+        // Right Speaker Array
+        Row {
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.left: phoneUsbPort.right
+          anchors.leftMargin: Style.space(16)
+          spacing: Style.space(4)
+
+          Repeater {
+            model: 3
+            Rectangle {
+              width: Style.space(2.6)
+              height: Style.space(2.6)
+              radius: Style.space(1.3)
+              color: "#030406"
+              border.color: Util.alpha(root.foreground, 0.38)
+              border.width: 0.6
+            }
+          }
+        }
+
+        // Mic Pinhole
+        Rectangle {
+          anchors.verticalCenter: parent.verticalCenter
+          x: Style.space(32)
+          width: Style.space(2.4)
+          height: Style.space(2.4)
+          radius: Style.space(1.2)
+          color: "#020305"
+          border.color: Util.alpha(root.foreground, 0.30)
+          border.width: 0.6
+        }
+      }
+
+      // -------------------------------------------------------------
+      // 4c. Phone Right Side Wall Hardware (Power / Side Button)
+      // -------------------------------------------------------------
+      Item {
+        id: phoneRightHardwareFeatures
+        visible: root.isPhoneMode
+        x: tabletContainer.frontWidth
+        y: 0
+        width: tabletContainer.chassisDepthX
+        height: tabletContainer.frontHeight
+        z: 6
+
+        // Power / Lock button
+        Rectangle {
+          anchors.horizontalCenter: parent.horizontalCenter
+          y: Style.space(140)
+          width: Style.space(4.0)
+          height: Style.space(62)
+          radius: Style.space(2.0)
+          color: Qt.tint(root.background, Util.alpha(root.foreground, 0.38))
+          border.color: Util.alpha(root.foreground, 0.52)
+          border.width: 0.8
+
+          Rectangle {
+            anchors.centerIn: parent
+            width: 1.2
+            height: Style.space(16)
+            radius: 0.6
+            color: Util.alpha(root.foreground, 0.65)
+          }
+        }
+
+        // SIM Tray Pinhole
+        Rectangle {
+          anchors.horizontalCenter: parent.horizontalCenter
+          y: Style.space(240)
+          width: Style.space(2.4)
+          height: Style.space(2.4)
+          radius: Style.space(1.2)
+          color: "#020305"
+          border.color: Util.alpha(root.foreground, 0.32)
+          border.width: 0.6
+        }
+
+        // Antenna Bands
+        Rectangle {
+          y: Style.space(55)
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 1.4
+          color: Util.alpha(root.foreground, 0.32)
+        }
+        Rectangle {
+          y: parent.height - Style.space(55)
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 1.4
+          color: Util.alpha(root.foreground, 0.32)
+        }
+      }
+
+      // -------------------------------------------------------------
+      // 4d. Phone Left Side Rail Hardware (Action & Volume Buttons)
+      // -------------------------------------------------------------
+      Item {
+        id: phoneLeftHardwareFeatures
+        visible: root.isPhoneMode
+        x: 0
+        y: 0
+        width: 1
+        height: tabletContainer.frontHeight
+        z: 6
+
+        // Action Button
+        Rectangle {
+          anchors.right: parent.left
+          anchors.rightMargin: -1
+          y: Style.space(96)
+          width: Style.space(3.2)
+          height: Style.space(22)
+          radius: Style.space(1.6)
+          color: Qt.tint(root.background, Util.alpha(root.foreground, 0.36))
+          border.color: Util.alpha(root.foreground, 0.50)
+          border.width: 0.8
+        }
+
+        // Volume Up Button
+        Rectangle {
+          anchors.right: parent.left
+          anchors.rightMargin: -1
+          y: Style.space(132)
+          width: Style.space(3.2)
+          height: Style.space(42)
+          radius: Style.space(1.6)
+          color: Qt.tint(root.background, Util.alpha(root.foreground, 0.36))
+          border.color: Util.alpha(root.foreground, 0.50)
+          border.width: 0.8
+        }
+
+        // Volume Down Button
+        Rectangle {
+          anchors.right: parent.left
+          anchors.rightMargin: -1
+          y: Style.space(186)
+          width: Style.space(3.2)
+          height: Style.space(42)
+          radius: Style.space(1.6)
+          color: Qt.tint(root.background, Util.alpha(root.foreground, 0.36))
+          border.color: Util.alpha(root.foreground, 0.50)
+          border.width: 0.8
+        }
+      }
+
+      // -------------------------------------------------------------
+      // 5. Tablet Titanium Chassis (Front Face)
+      // -------------------------------------------------------------
       Rectangle {
         id: tabletChassis
-        anchors.fill: parent
-        radius: Style.space(28)
-        color: Qt.tint(root.background, Util.alpha(root.foreground, 0.04))
-        border.color: Util.alpha(root.foreground, 0.16)
+        x: 0
+        y: 0
+        width: tabletContainer.frontWidth
+        height: tabletContainer.frontHeight
+        radius: tabletContainer.chassisRadius
+        color: tabletContainer.chassisBaseColor
+        border.color: tabletContainer.chassisChamfer
         border.width: 1.5
+        z: 10
 
         // Inner metallic chamfer line
         Rectangle {
           anchors.fill: parent
           anchors.margins: 1
-          radius: Style.space(27)
+          radius: tabletContainer.chassisRadius - 1
           color: "transparent"
-          border.color: Util.alpha(root.foreground, 0.08)
+          border.color: Util.alpha(root.foreground, 0.15)
           border.width: 1
         }
 
-        // 4. Uniform Tablet Display Bezel (Obsidian Glass)
+        // Phone Top Bezel Earpiece Speaker Slit
+        Rectangle {
+          id: phoneEarpieceSpeaker
+          visible: root.isPhoneMode
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.top: parent.top
+          anchors.topMargin: Style.space(4.2)
+          width: Style.space(52)
+          height: Style.space(3.2)
+          radius: Style.space(1.6)
+          color: "#05070a"
+          border.color: Util.alpha(root.foreground, 0.25)
+          border.width: 0.6
+          z: 25
+        }
+
+        // -----------------------------------------------------------
+        // 6. Uniform Tablet Display Bezel (Obsidian Glass)
+        // -----------------------------------------------------------
         Rectangle {
           id: tabletBezel
           anchors.fill: parent
-          anchors.margins: root.dmenuActive ? Style.space(6) : Style.space(14)
-          radius: Style.space(18)
-          color: Qt.darker(root.background, 1.45)
+          anchors.margins: root.isPhoneMode ? Style.space(9) : Style.space(13)
+          radius: tabletContainer.chassisRadius - (root.isPhoneMode ? Style.space(9) : Style.space(13))
+          color: Qt.darker(root.background, 1.55)
 
-          // Top Camera Pinhole Sensor (centered in top bezel margin)
+          // ---------------------------------------------------------
+          // Landscape Camera Notch / Dynamic Island on Left Bezel Edge
+          // Protrudes into the screen like modern tablets/smartphones
+          // ---------------------------------------------------------
           Item {
             id: cameraModule
-            visible: !root.dmenuActive
-            width: Style.space(12)
-            height: Style.space(12)
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: -Style.space(10)
-            z: 30
+            visible: !root.isPhoneMode
+            width: Style.space(18)
+            height: Style.space(62)
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(4)
+            anchors.verticalCenter: parent.verticalCenter
+            z: 40
 
-            // Outer sensor housing
+            // Notch Housing
             Rectangle {
-              anchors.centerIn: parent
-              width: Style.space(10)
-              height: Style.space(10)
-              radius: Style.space(5)
-              color: Qt.darker(root.background, 1.65)
-              border.color: Util.alpha(root.foreground, 0.12)
-              border.width: 1
+              anchors.fill: parent
+              radius: Style.space(9)
+              color: "#080b10"
+              border.color: Util.alpha(root.foreground, 0.28)
+              border.width: 1.2
 
-              // Camera lens reflection
-              Rectangle {
+              Column {
                 anchors.centerIn: parent
-                width: Style.space(4)
-                height: Style.space(4)
-                radius: Style.space(2)
-                color: "#182230"
+                spacing: Style.space(6)
 
-                // Lens specular highlight glint
+                // Front camera sensor
                 Rectangle {
-                  x: 0.5
-                  y: 0.5
-                  width: Style.space(1.5)
-                  height: Style.space(1.5)
-                  radius: 0.75
-                  color: Util.alpha(root.selectedText, 0.60)
-                  opacity: 0.85
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  width: Style.space(9)
+                  height: Style.space(9)
+                  radius: Style.space(4.5)
+                  color: "#0c1322"
+                  border.color: Util.alpha(root.foreground, 0.24)
+                  border.width: 0.8
+
+                  // Sapphire lens reflection
+                  Rectangle {
+                    anchors.centerIn: parent
+                    width: Style.space(5)
+                    height: Style.space(5)
+                    radius: Style.space(2.5)
+                    color: "#162842"
+
+                    // Specular glint
+                    Rectangle {
+                      x: 0.8; y: 0.8
+                      width: Style.space(1.6)
+                      height: Style.space(1.6)
+                      radius: 0.8
+                      color: Util.alpha(root.selectedText, 0.85)
+                    }
+                  }
+                }
+
+                // Ambient light sensor pinhole
+                Rectangle {
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  width: Style.space(3.5)
+                  height: Style.space(3.5)
+                  radius: Style.space(1.75)
+                  color: "#05070a"
+                }
+
+                // Acoustic mic / speaker slit
+                Rectangle {
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  width: Style.space(2.6)
+                  height: Style.space(16)
+                  radius: Style.space(1.3)
+                  color: "#05070a"
+                  border.color: Util.alpha(root.foreground, 0.16)
+                  border.width: 0.5
                 }
               }
-            }
-
-            // Ambient light sensor
-            Rectangle {
-              anchors.verticalCenter: parent.verticalCenter
-              anchors.left: parent.right
-              anchors.leftMargin: Style.space(14)
-              width: Style.space(4)
-              height: Style.space(4)
-              radius: Style.space(2)
-              color: Qt.darker(root.background, 1.8)
             }
           }
 
@@ -1940,51 +2785,82 @@ Item {
           Rectangle {
             id: tabletScreen
             anchors.fill: parent
-            radius: Style.space(15)
+            radius: tabletBezel.radius
+            color: Qt.darker(root.background, 1.45)
             border.color: Util.alpha(root.foreground, 0.14)
             border.width: 1
 
-            // 5a. Authentic Desktop Wallpaper from Omarchy Theme (hardware downscaled)
-            Image {
-              id: tabletWallpaper
+            // 5a. Masked Screen Surface Layer (clips wallpaper, gradient & glows cleanly to screen corners)
+            Item {
+              id: screenBackgroundLayer
               anchors.fill: parent
-              source: Util.fileUrl(root.currentBackgroundPath)
-              fillMode: Image.PreserveAspectCrop
-              sourceSize.width: 1024
-              sourceSize.height: 640
-              asynchronous: true
-              cache: true
-              smooth: true
-              opacity: 0.35
-            }
+              layer.enabled: true
+              layer.smooth: true
+              layer.effect: MultiEffect {
+                maskEnabled: true
+                maskSource: screenCornerMask
+                maskThresholdMin: 0.5
+                maskSpreadAtMin: 0.02
+              }
 
-            // 5b. Theme-Matched Glass Vignette & Depth Gradient
-            Rectangle {
-              anchors.fill: parent
-              gradient: Gradient {
-                GradientStop { position: 0.0; color: Util.alpha(root.background, 0.75) }
-                GradientStop { position: 0.50; color: Util.alpha(root.background, 0.88) }
-                GradientStop { position: 1.0; color: Util.alpha(root.background, 0.95) }
+              // Authentic Desktop Wallpaper from Omarchy Theme (hardware downscaled)
+              Image {
+                id: tabletWallpaper
+                anchors.fill: parent
+                source: Util.fileUrl(root.currentBackgroundPath)
+                fillMode: Image.PreserveAspectCrop
+                sourceSize.width: 1024
+                sourceSize.height: 640
+                asynchronous: true
+                cache: true
+                smooth: true
+                opacity: 0.35
+              }
+
+              // Theme-Matched Glass Vignette & Depth Gradient
+              Rectangle {
+                anchors.fill: parent
+                radius: tabletScreen.radius
+                gradient: Gradient {
+                  GradientStop { position: 0.0; color: Util.alpha(root.background, 0.75) }
+                  GradientStop { position: 0.50; color: Util.alpha(root.background, 0.88) }
+                  GradientStop { position: 1.0; color: Util.alpha(root.background, 0.95) }
+                }
+              }
+
+              // Theme Ambient Accent Glows (e.g. Warm Coral in Harbordark)
+              Rectangle {
+                width: Style.space(420)
+                height: Style.space(420)
+                radius: Style.space(210)
+                x: parent.width - Style.space(260)
+                y: -Style.space(160)
+                color: Util.alpha(root.selectedText, 0.08)
+              }
+
+              Rectangle {
+                width: Style.space(320)
+                height: Style.space(320)
+                radius: Style.space(160)
+                x: -Style.space(120)
+                y: parent.height - Style.space(200)
+                color: Util.alpha(root.selectedText, 0.04)
               }
             }
 
-            // 5c. Theme Ambient Accent Glows (e.g. Warm Coral in Harbordark)
-            Rectangle {
-              width: Style.space(420)
-              height: Style.space(420)
-              radius: Style.space(210)
-              x: parent.width - Style.space(260)
-              y: -Style.space(160)
-              color: Util.alpha(root.selectedText, 0.08)
-            }
+            // Screen Corner Precision Mask (Alpha stencil for MultiEffect)
+            Item {
+              id: screenCornerMask
+              anchors.fill: parent
+              visible: false
+              layer.enabled: true
+              layer.smooth: true
 
-            Rectangle {
-              width: Style.space(320)
-              height: Style.space(320)
-              radius: Style.space(160)
-              x: -Style.space(120)
-              y: parent.height - Style.space(200)
-              color: Util.alpha(root.selectedText, 0.04)
+              Rectangle {
+                anchors.fill: parent
+                radius: tabletScreen.radius
+                color: "#ffffff"
+              }
             }
 
             // Keyboard Catcher
@@ -2002,9 +2878,7 @@ Item {
                 }
 
                 if (event.key === Qt.Key_Escape) {
-                  if (root.dmenuActive) root.cancel()
-                  else if (root.filterText) root.setFilter("")
-                  else if (!root.goBack()) root.cancel()
+                  root.cancel()
                   event.accepted = true
                 } else if (event.key === Qt.Key_Tab && !root.filterText && !root.dmenuActive) {
                   if (root.activeMenu === "apps") root.setActiveMenu("root", false)
@@ -2104,6 +2978,10 @@ Item {
                   else if (displayModel.count > 0) root.activateIndex(0)
                   event.accepted = true
                 } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+                  if (!root.filterText && event.text === " ") {
+                    event.accepted = true
+                    return
+                  }
                   if (root.isMathMode && root.filterText && root.textCursorPos < root.filterText.length) {
                     var beforeText = root.filterText.slice(0, root.textCursorPos)
                     var afterText = root.filterText.slice(root.textCursorPos)
@@ -2144,79 +3022,212 @@ Item {
               anchors.margins: Style.space(12)
               spacing: Style.space(8)
 
-              // ---- tablet status bar
+              // ---- tablet / phone status bar
               Rectangle {
                 id: tabletStatusBar
                 width: parent.width
-                height: root.tabletBarHeight
-                radius: Style.space(8)
+                height: root.isPhoneMode ? Style.space(34) : root.tabletBarHeight
+                radius: root.isPhoneMode ? Style.space(12) : Style.space(8)
                 color: Util.alpha(root.background, 0.60)
                 border.color: Util.alpha(root.foreground, 0.10)
                 border.width: 1
 
-                Row {
-                  anchors.left: parent.left
-                  anchors.leftMargin: Style.space(12)
-                  anchors.verticalCenter: parent.verticalCenter
-                  spacing: Style.space(6)
+                // 1. Tablet Status Bar Elements
+                Item {
+                  id: tabletStatusRow
+                  visible: !root.isPhoneMode
+                  anchors.fill: parent
 
-                  Rectangle {
-                    width: Style.space(6)
-                    height: Style.space(6)
-                    radius: Style.space(3)
-                    color: root.selectedText
+                  Row {
+                    anchors.left: parent.left
+                    anchors.leftMargin: Style.space(12)
                     anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+
+                    Rectangle {
+                      width: Style.space(6)
+                      height: Style.space(6)
+                      radius: Style.space(3)
+                      color: root.selectedText
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Text {
+                      text: root.clockString
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.weight: Font.DemiBold
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
                   }
 
-                  Text {
-                    text: root.clockString
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    font.weight: Font.DemiBold
+                  Row {
+                    anchors.right: parent.right
+                    anchors.rightMargin: Style.space(12)
                     anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(12)
+
+                    Text {
+                      text: root.wifiText
+                      color: root.foreground
+                      opacity: 0.85
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Text {
+                      text: root.batteryText
+                      color: root.foreground
+                      opacity: 0.85
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Rectangle {
+                      width: 1
+                      height: Style.space(12)
+                      color: Util.alpha(root.foreground, 0.20)
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Text {
+                      text: "󰣇 Omarchy"
+                      color: root.selectedText
+                      opacity: 0.90
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.weight: Font.Medium
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
                   }
                 }
 
-                Row {
-                  anchors.right: parent.right
-                  anchors.rightMargin: Style.space(12)
-                  anchors.verticalCenter: parent.verticalCenter
-                  spacing: Style.space(12)
+                // 2. Phone Status Bar Elements (with Dynamic Island in Center)
+                Item {
+                  id: phoneStatusRow
+                  visible: root.isPhoneMode
+                  anchors.fill: parent
 
-                  Text {
-                    text: root.wifiText
-                    color: root.foreground
-                    opacity: 0.85
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
+                  // Time on Left
+                  Row {
+                    anchors.left: parent.left
+                    anchors.leftMargin: Style.space(14)
                     anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(5)
+
+                    Rectangle {
+                      width: Style.space(5)
+                      height: Style.space(5)
+                      radius: Style.space(2.5)
+                      color: root.selectedText
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Text {
+                      text: Qt.formatDateTime(new Date(), "HH:mm")
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.weight: Font.DemiBold
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
                   }
 
-                  Text {
-                    text: root.batteryText
-                    color: root.foreground
-                    opacity: 0.85
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    anchors.verticalCenter: parent.verticalCenter
+                  // Center Dynamic Island Pill
+                  Item {
+                    id: phoneDynamicIsland
+                    anchors.centerIn: parent
+                    width: Style.space(98)
+                    height: Style.space(22)
+
+                    Rectangle {
+                      anchors.fill: parent
+                      radius: Style.space(11)
+                      color: "#030406"
+                      border.color: Util.alpha(root.foreground, 0.28)
+                      border.width: 1.0
+
+                      Row {
+                        anchors.centerIn: parent
+                        spacing: Style.space(20)
+
+                        // Ambient sensor
+                        Rectangle {
+                          width: Style.space(3.6)
+                          height: Style.space(3.6)
+                          radius: Style.space(1.8)
+                          color: "#0c1322"
+                          anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        // Micro speaker receiver
+                        Rectangle {
+                          width: Style.space(12)
+                          height: Style.space(2.2)
+                          radius: Style.space(1.1)
+                          color: "#080c14"
+                          border.color: Util.alpha(root.foreground, 0.15)
+                          border.width: 0.5
+                          anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        // Front camera sensor
+                        Rectangle {
+                          width: Style.space(8)
+                          height: Style.space(8)
+                          radius: Style.space(4)
+                          color: "#09101d"
+                          border.color: Util.alpha(root.foreground, 0.25)
+                          border.width: 0.8
+                          anchors.verticalCenter: parent.verticalCenter
+
+                          Rectangle {
+                            anchors.centerIn: parent
+                            width: Style.space(4.2)
+                            height: Style.space(4.2)
+                            radius: Style.space(2.1)
+                            color: "#162842"
+
+                            Rectangle {
+                              x: 0.7; y: 0.7
+                              width: Style.space(1.4)
+                              height: Style.space(1.4)
+                              radius: 0.7
+                              color: Util.alpha(root.selectedText, 0.85)
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
 
-                  Rectangle {
-                    width: 1
-                    height: Style.space(12)
-                    color: Util.alpha(root.foreground, 0.20)
+                  // Wi-Fi + Battery on Right
+                  Row {
+                    anchors.right: parent.right
+                    anchors.rightMargin: Style.space(14)
                     anchors.verticalCenter: parent.verticalCenter
-                  }
+                    spacing: Style.space(8)
 
-                  Text {
-                    text: "󰣇 Omarchy"
-                    color: root.selectedText
-                    opacity: 0.90
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    font.weight: Font.Medium
-                    anchors.verticalCenter: parent.verticalCenter
+                    Text {
+                      text: "󰤨"
+                      color: root.foreground
+                      opacity: 0.85
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Text {
+                      text: root.batteryText
+                      color: root.foreground
+                      opacity: 0.85
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
                   }
                 }
               }
@@ -2224,7 +3235,7 @@ Item {
               // ---- tablet nav bar: segmented tabs (Apps vs Omarchy) or breadcrumb
               Item {
                 id: tabletNavBar
-                visible: !root.dmenuActive
+                visible: !root.isPhoneMode
                 width: parent.width
                 height: Style.space(32)
 
@@ -2240,9 +3251,10 @@ Item {
                     height: Style.space(28)
                     width: tabAppsContent.implicitWidth + Style.space(20)
                     radius: Style.space(14)
-                    color: root.activeMenu === "apps" ? Util.alpha(root.selectedText, 0.22) : Util.alpha(root.foreground, 0.05)
-                    border.color: root.activeMenu === "apps" ? root.selectedText : Util.alpha(root.foreground, 0.10)
+                    color: root.activeMenu === "apps" ? Util.alpha(root.selectedText, 0.22) : (tabAppsMa.containsMouse ? Util.alpha(root.foreground, 0.10) : Util.alpha(root.foreground, 0.05))
+                    border.color: root.activeMenu === "apps" ? root.selectedText : (tabAppsMa.containsMouse ? Util.alpha(root.foreground, 0.20) : Util.alpha(root.foreground, 0.10))
                     border.width: 1
+                    scale: (tabAppsMa.containsMouse && root.activeMenu !== "apps") ? 1.02 : 1.0
 
                     Row {
                       id: tabAppsContent
@@ -2267,7 +3279,9 @@ Item {
                     }
 
                     MouseArea {
+                      id: tabAppsMa
                       anchors.fill: parent
+                      hoverEnabled: true
                       cursorShape: Qt.PointingHandCursor
                       onClicked: root.setActiveMenu("apps", false)
                     }
@@ -2279,9 +3293,10 @@ Item {
                     height: Style.space(28)
                     width: tabMenusContent.implicitWidth + Style.space(20)
                     radius: Style.space(14)
-                    color: root.activeMenu === "root" ? Util.alpha(root.selectedText, 0.22) : Util.alpha(root.foreground, 0.05)
-                    border.color: root.activeMenu === "root" ? root.selectedText : Util.alpha(root.foreground, 0.10)
+                    color: root.activeMenu === "root" ? Util.alpha(root.selectedText, 0.22) : (tabMenusMa.containsMouse ? Util.alpha(root.foreground, 0.10) : Util.alpha(root.foreground, 0.05))
+                    border.color: root.activeMenu === "root" ? root.selectedText : (tabMenusMa.containsMouse ? Util.alpha(root.foreground, 0.20) : Util.alpha(root.foreground, 0.10))
                     border.width: 1
+                    scale: (tabMenusMa.containsMouse && root.activeMenu !== "root") ? 1.02 : 1.0
 
                     Row {
                       id: tabMenusContent
@@ -2306,7 +3321,9 @@ Item {
                     }
 
                     MouseArea {
+                      id: tabMenusMa
                       anchors.fill: parent
+                      hoverEnabled: true
                       cursorShape: Qt.PointingHandCursor
                       onClicked: root.setActiveMenu("root", false)
                     }
@@ -2364,6 +3381,116 @@ Item {
                     font.pixelSize: Style.font.body
                     font.weight: Font.Medium
                     anchors.verticalCenter: parent.verticalCenter
+                  }
+                }
+              }
+
+              // ---- phone nav bar: header with Back / Cancel, Section Title, and Esc
+              Item {
+                id: phoneNavBar
+                visible: root.isPhoneMode
+                width: parent.width
+                height: Style.space(32)
+
+                // Back / Cancel button on Left
+                Rectangle {
+                  id: phoneBackBtn
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  height: Style.space(26)
+                  width: phoneBackContent.implicitWidth + Style.space(16)
+                  radius: Style.space(13)
+                  color: phoneBackMa.containsMouse ? Util.alpha(root.foreground, 0.14) : Util.alpha(root.foreground, 0.08)
+                  border.color: phoneBackMa.containsMouse ? root.selectedText : Util.alpha(root.foreground, 0.16)
+                  border.width: 1
+                  scale: phoneBackMa.pressed ? 0.94 : (phoneBackMa.containsMouse ? 1.04 : 1.0)
+                  Behavior on scale { NumberAnimation { duration: 120 } }
+                  Behavior on color { ColorAnimation { duration: 120 } }
+
+                  Row {
+                    id: phoneBackContent
+                    anchors.centerIn: parent
+                    spacing: Style.space(4)
+
+                    Text {
+                      text: "‹"
+                      color: root.selectedText
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.heading
+                      font.weight: Font.Bold
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                      text: root.dmenuActive ? "Cancel" : (root.navStack.length > 0 ? "Back" : "Omarchy")
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.weight: Font.DemiBold
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+                  }
+
+                  MouseArea {
+                    id: phoneBackMa
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                      if (root.dmenuActive) root.cancel()
+                      else root.goBack()
+                    }
+                  }
+                }
+
+                // Section Title in Center
+                Text {
+                  anchors.centerIn: parent
+                  width: Math.min(implicitWidth, parent.width - Style.space(160))
+                  text: root.dmenuActive ? root.dmenuPrompt : (root.item(root.activeMenu) ? (root.item(root.activeMenu).label || root.item(root.activeMenu).title || "Section") : "Section")
+                  color: root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                  font.weight: Font.Bold
+                  elide: Text.ElideRight
+                  horizontalAlignment: Text.AlignHCenter
+                }
+
+                // Close Pill on Right
+                Rectangle {
+                  id: phoneCloseBtn
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  height: Style.space(24)
+                  width: phoneCloseContent.implicitWidth + Style.space(14)
+                  radius: Style.space(12)
+                  color: phoneCloseMa.containsMouse ? Util.alpha(root.selectedText, 0.22) : Util.alpha(root.foreground, 0.08)
+                  border.color: phoneCloseMa.containsMouse ? root.selectedText : Util.alpha(root.foreground, 0.16)
+                  border.width: 1
+                  scale: phoneCloseMa.pressed ? 0.94 : (phoneCloseMa.containsMouse ? 1.04 : 1.0)
+                  Behavior on scale { NumberAnimation { duration: 120 } }
+                  Behavior on color { ColorAnimation { duration: 120 } }
+
+                  Row {
+                    id: phoneCloseContent
+                    anchors.centerIn: parent
+                    spacing: Style.space(3)
+
+                    Text {
+                      text: "esc ✕"
+                      color: phoneCloseMa.containsMouse ? root.selectedText : root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.weight: Font.Medium
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+                  }
+
+                  MouseArea {
+                    id: phoneCloseMa
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.cancel()
                   }
                 }
               }
@@ -2429,10 +3556,14 @@ Item {
                   height: Style.font.heading + Style.space(4)
                   anchors.verticalCenter: parent.verticalCenter
                   color: root.selectedText
+                  opacity: 1.0
                   SequentialAnimation on opacity {
                     id: caretAnim
-                    running: root.opened && caret.visible
+                    running: root.opened && caret.visible && !openSlideAnim.running && !closeSlideAnim.running
                     loops: Animation.Infinite
+                    onRunningChanged: {
+                      if (!running) caret.opacity = 1.0
+                    }
                     NumberAnimation { to: 0; duration: 500 }
                     NumberAnimation { to: 1; duration: 500 }
                   }
@@ -2452,12 +3583,17 @@ Item {
                   anchors.right: parent.right
                   anchors.rightMargin: Style.space(12)
                   anchors.verticalCenter: parent.verticalCenter
-                  height: Style.space(22)
                   width: clearHintText.implicitWidth + Style.space(14)
+                  height: Style.space(22)
                   radius: Style.space(11)
+                  scale: clearHintMa.pressed ? 0.92 : (clearHintMa.containsMouse ? 1.05 : 1.0)
                   color: clearHintMa.containsMouse ? Util.alpha(root.selectedText, 0.22) : Util.alpha(root.foreground, 0.08)
                   border.color: clearHintMa.containsMouse ? root.selectedText : Util.alpha(root.foreground, 0.16)
                   border.width: 1
+
+                  Behavior on scale { NumberAnimation { duration: 130; easing.type: Easing.OutCubic } }
+                  Behavior on color { ColorAnimation { duration: 120 } }
+                  Behavior on border.color { ColorAnimation { duration: 120 } }
 
                   Text {
                     id: clearHintText
@@ -2496,13 +3632,13 @@ Item {
             Item {
               id: gridArea
               anchors.top: contentTopColumn.bottom
-              anchors.topMargin: Style.space(6)
+              anchors.topMargin: Style.space(4)
               anchors.left: parent.left
               anchors.leftMargin: Style.space(14)
               anchors.right: parent.right
               anchors.rightMargin: Style.space(14)
               anchors.bottom: tabletDock.visible ? tabletDock.top : homeBarArea.top
-              anchors.bottomMargin: Style.space(6)
+              anchors.bottomMargin: Style.space(10)
               visible: root.mode !== "input"
 
               readonly property int cellWidth: Math.max(1, Math.floor((width - (root.columns - 1) * root.tileGap) / root.columns))
@@ -2515,6 +3651,7 @@ Item {
                 contentHeight: root.gridContentHeight
                 boundsBehavior: Flickable.StopAtBounds
                 interactive: contentHeight > height
+                pixelAligned: true
 
                 Repeater {
                   model: dividerModel
@@ -2575,8 +3712,8 @@ Item {
                     readonly property bool hasIcon: tile.icon.length > 0 || tile.isApp
                     readonly property color textColor: hasCursor ? root.selectedText : root.foreground
 
-                    readonly property bool isVerticalAppTile: root.activeMenu === "apps" && !root.filterText.trim() && !root.dmenuActive
-                    readonly property bool isMenuCardTile: root.activeMenu === "root" && !root.filterText.trim() && !root.dmenuActive
+                    readonly property bool isVerticalAppTile: root.activeMenu === "apps" && !root.filterText.trim() && !root.isPhoneMode
+                    readonly property bool isMenuCardTile: root.activeMenu === "root" && !root.filterText.trim() && !root.isPhoneMode
 
                     x: tile.col * (gridArea.cellWidth + root.tileGap)
                     y: tile.cellY
@@ -2596,9 +3733,20 @@ Item {
                         width: Style.space(48)
                         height: Style.space(48)
                         radius: Style.space(13)
+                        scale: tile.hasCursor ? 1.05 : 1.0
                         color: tile.hasCursor ? Util.alpha(root.selectedText, 0.22) : Util.alpha(root.foreground, 0.06)
                         border.color: tile.hasCursor ? root.selectedText : Util.alpha(root.foreground, 0.10)
                         border.width: tile.hasCursor ? 1.5 : 1
+
+                        Behavior on scale {
+                          NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                        }
+                        Behavior on color {
+                          ColorAnimation { duration: 130 }
+                        }
+                        Behavior on border.color {
+                          ColorAnimation { duration: 130 }
+                        }
 
                         Image {
                           id: appIconImage
@@ -2607,11 +3755,11 @@ Item {
                           width: Style.space(32)
                           height: Style.space(32)
                           fillMode: Image.PreserveAspectFit
-                          sourceSize.width: width * Screen.devicePixelRatio
-                          sourceSize.height: height * Screen.devicePixelRatio
-                          source: tile.isApp ? (tile.appIcon.indexOf("://") >= 0 ? tile.appIcon : (root.appLibrary ? root.appLibrary.iconSource(tile.appIcon) : "")) : ""
+                          sourceSize.width: Style.space(32) * Screen.devicePixelRatio
+                          sourceSize.height: Style.space(32) * Screen.devicePixelRatio
+                          source: (verticalAppLayout.visible && tile.isApp) ? (tile.appIcon.indexOf("://") >= 0 ? tile.appIcon : (root.appLibrary ? root.appLibrary.iconSource(tile.appIcon) : "")) : ""
                           cache: true
-                          asynchronous: false
+                          asynchronous: true
                         }
 
                         Text {
@@ -2682,6 +3830,9 @@ Item {
                       color: tile.hasCursor ? Util.alpha(root.selectedText, 0.18) : Util.alpha(root.background, 0.70)
                       border.color: tile.hasCursor ? root.selectedText : Util.alpha(root.foreground, 0.10)
                       border.width: tile.hasCursor ? 1.5 : 1
+
+                      Behavior on color { ColorAnimation { duration: 130 } }
+                      Behavior on border.color { ColorAnimation { duration: 130 } }
 
                       // Left Accent Focus Bar when selected
                       Rectangle {
@@ -2769,6 +3920,9 @@ Item {
                       border.color: tile.hasCursor ? root.selectedText : Util.alpha(root.foreground, 0.10)
                       border.width: tile.hasCursor ? 1.5 : 1
 
+                      Behavior on color { ColorAnimation { duration: 130 } }
+                      Behavior on border.color { ColorAnimation { duration: 130 } }
+
                       // Left Accent Focus Bar when selected
                       Rectangle {
                         visible: tile.hasCursor
@@ -2801,11 +3955,11 @@ Item {
                           height: Style.space(30)
                           anchors.centerIn: parent
                           fillMode: Image.PreserveAspectFit
-                          sourceSize.width: width * Screen.devicePixelRatio
-                          sourceSize.height: height * Screen.devicePixelRatio
-                          source: tile.isApp ? (tile.appIcon.indexOf("://") >= 0 ? tile.appIcon : (root.appLibrary ? root.appLibrary.iconSource(tile.appIcon) : "")) : ""
+                          sourceSize.width: Style.space(32) * Screen.devicePixelRatio
+                          sourceSize.height: Style.space(32) * Screen.devicePixelRatio
+                          source: (standardListLayout.visible && tile.isApp) ? (tile.appIcon.indexOf("://") >= 0 ? tile.appIcon : (root.appLibrary ? root.appLibrary.iconSource(tile.appIcon) : "")) : ""
                           cache: true
-                          asynchronous: false
+                          asynchronous: true
                         }
 
                         Text {
@@ -2997,10 +4151,27 @@ Item {
               }
             }
 
+            // ---- bottom dock shelf gradient backing (smoothly dissolves scrolled tiles)
+            Rectangle {
+              id: bottomShelfBacking
+              visible: !root.isPhoneMode && !root.filterText.trim()
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.bottom: parent.bottom
+              height: Style.space(92)
+              radius: tabletScreen.radius
+              z: 8
+              gradient: Gradient {
+                GradientStop { position: 0.0; color: "transparent" }
+                GradientStop { position: 0.35; color: Util.alpha(root.background, 0.88) }
+                GradientStop { position: 1.0; color: Util.alpha(root.background, 0.98) }
+              }
+            }
+
             // ---- floating glass tablet dock
             Rectangle {
               id: tabletDock
-              visible: !root.dmenuActive && !root.filterText.trim()
+              visible: !root.isPhoneMode && !root.filterText.trim()
               anchors.bottom: homeBarArea.top
               anchors.bottomMargin: Style.space(6)
               anchors.horizontalCenter: parent.horizontalCenter
@@ -3010,6 +4181,7 @@ Item {
               color: Util.alpha(root.background, 0.75)
               border.color: Util.alpha(root.foreground, 0.15)
               border.width: 1
+              z: 10
 
               Row {
                 id: dockRow
@@ -3021,9 +4193,14 @@ Item {
                   width: Style.space(36)
                   height: Style.space(36)
                   radius: Style.space(11)
+                  scale: dockTermMa.pressed ? 0.90 : (dockTermMa.containsMouse ? 1.10 : 1.0)
                   color: dockTermMa.containsMouse ? Util.alpha(root.selectedText, 0.28) : Util.alpha(root.foreground, 0.08)
                   border.color: dockTermMa.containsMouse ? root.selectedText : Util.alpha(root.foreground, 0.14)
                   border.width: 1
+
+                  Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                  Behavior on color { ColorAnimation { duration: 130 } }
+                  Behavior on border.color { ColorAnimation { duration: 130 } }
 
                   Text {
                     anchors.centerIn: parent
@@ -3047,9 +4224,14 @@ Item {
                   width: Style.space(36)
                   height: Style.space(36)
                   radius: Style.space(11)
+                  scale: dockBrowserMa.pressed ? 0.90 : (dockBrowserMa.containsMouse ? 1.10 : 1.0)
                   color: dockBrowserMa.containsMouse ? Util.alpha(root.selectedText, 0.28) : Util.alpha(root.foreground, 0.08)
                   border.color: dockBrowserMa.containsMouse ? root.selectedText : Util.alpha(root.foreground, 0.14)
                   border.width: 1
+
+                  Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                  Behavior on color { ColorAnimation { duration: 130 } }
+                  Behavior on border.color { ColorAnimation { duration: 130 } }
 
                   Text {
                     anchors.centerIn: parent
@@ -3073,9 +4255,14 @@ Item {
                   width: Style.space(36)
                   height: Style.space(36)
                   radius: Style.space(11)
+                  scale: dockFilesMa.pressed ? 0.90 : (dockFilesMa.containsMouse ? 1.10 : 1.0)
                   color: dockFilesMa.containsMouse ? Util.alpha(root.selectedText, 0.28) : Util.alpha(root.foreground, 0.08)
                   border.color: dockFilesMa.containsMouse ? root.selectedText : Util.alpha(root.foreground, 0.14)
                   border.width: 1
+
+                  Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                  Behavior on color { ColorAnimation { duration: 130 } }
+                  Behavior on border.color { ColorAnimation { duration: 130 } }
 
                   Text {
                     anchors.centerIn: parent
@@ -3099,9 +4286,14 @@ Item {
                   width: Style.space(36)
                   height: Style.space(36)
                   radius: Style.space(11)
+                  scale: dockEditorMa.pressed ? 0.90 : (dockEditorMa.containsMouse ? 1.10 : 1.0)
                   color: dockEditorMa.containsMouse ? Util.alpha(root.selectedText, 0.28) : Util.alpha(root.foreground, 0.08)
                   border.color: dockEditorMa.containsMouse ? root.selectedText : Util.alpha(root.foreground, 0.14)
                   border.width: 1
+
+                  Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                  Behavior on color { ColorAnimation { duration: 130 } }
+                  Behavior on border.color { ColorAnimation { duration: 130 } }
 
                   Text {
                     anchors.centerIn: parent
@@ -3133,9 +4325,14 @@ Item {
                   width: Style.space(36)
                   height: Style.space(36)
                   radius: Style.space(11)
+                  scale: dockMenusMa.pressed ? 0.90 : (dockMenusMa.containsMouse ? 1.10 : 1.0)
                   color: (root.activeMenu === "root" || dockMenusMa.containsMouse) ? Util.alpha(root.selectedText, 0.28) : Util.alpha(root.foreground, 0.08)
                   border.color: (root.activeMenu === "root" || dockMenusMa.containsMouse) ? root.selectedText : Util.alpha(root.foreground, 0.14)
                   border.width: 1
+
+                  Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                  Behavior on color { ColorAnimation { duration: 130 } }
+                  Behavior on border.color { ColorAnimation { duration: 130 } }
 
                   Text {
                     anchors.centerIn: parent
@@ -3159,27 +4356,70 @@ Item {
               }
             }
 
-            // ---- tablet home indicator bar
+            // ---- tablet / phone home indicator bar
             Item {
               id: homeBarArea
               anchors.bottom: parent.bottom
               anchors.bottomMargin: Style.space(6)
               anchors.horizontalCenter: parent.horizontalCenter
-              width: Style.space(140)
-              height: Style.space(10)
+              width: root.isPhoneMode ? Style.space(220) : Style.space(140)
+              height: root.isPhoneMode ? Style.space(28) : Style.space(10)
+              z: 10
 
+              // Action Hint in Phone Mode
+              Text {
+                visible: root.isPhoneMode
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "↑↓ move  •  ⏎ select  •  esc back"
+                color: root.foreground
+                opacity: 0.50
+                font.family: root.fontFamily
+                font.pixelSize: Math.max(9, Style.font.caption - 2)
+              }
+
+              // Pill Home Bar
               Rectangle {
-                anchors.centerIn: parent
-                width: Style.space(130)
+                id: homeBarPill
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: root.isPhoneMode ? Style.space(2) : 0
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: root.isPhoneMode ? Style.space(118) : Style.space(130)
                 height: Style.space(4)
                 radius: Style.space(2)
-                color: Util.alpha(root.foreground, 0.40)
+                scale: homeBarMa.pressed ? 0.94 : (homeBarMa.containsMouse ? 1.04 : 1.0)
+                color: homeBarMa.containsMouse ? root.selectedText : Util.alpha(root.foreground, 0.40)
+                Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                Behavior on color { ColorAnimation { duration: 130 } }
               }
 
               MouseArea {
+                id: homeBarMa
                 anchors.fill: parent
+                hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.cancel()
+                onClicked: {
+                  if (root.dmenuActive) root.cancel()
+                  else if (root.isPhoneMode) root.goBack()
+                  else root.cancel()
+                }
+              }
+            }
+
+            // ---- subtle 3D glass specular sheen across display surface
+            Rectangle {
+              anchors.fill: parent
+              radius: Style.space(15)
+              enabled: false
+              z: 25
+              gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: "transparent" }
+                GradientStop { position: 0.18; color: Util.alpha(root.foreground, 0.02) }
+                GradientStop { position: 0.32; color: Util.alpha(root.foreground, 0.055) }
+                GradientStop { position: 0.46; color: Util.alpha(root.foreground, 0.02) }
+                GradientStop { position: 0.65; color: "transparent" }
+                GradientStop { position: 1.0; color: "transparent" }
               }
             }
           }

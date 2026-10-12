@@ -159,20 +159,14 @@
     "has_local_changes": false,
     "dirty_files": []
   },
-  "krall.switchboard": {
-    "remote": "https://github.com/krall12/omarchy-switchboard.git",
-    "commit": "fa9b45af82658306148dbd2240c970dafcb5d252",
-    "has_local_changes": true,
-    "dirty_files": [
-      "M Switchboard.qml",
-      "M scripts/enabled",
-      "M scripts/toggle",
-      "?? AppSearch.js",
-      "?? RaycastSearch.js",
-      "?? scripts/fmhy-search",
-      "?? scripts/fmhy-sync.py"
-    ],
-    "note": "Supercharged with Raycast-like intelligence engine (math calculations, currency conversions, quick links, timezone conversion, FMHY SQLite search), application fuzzy search, and text navigation"
+  "soham.tablet-switchboard": {
+    "author": "Soham",
+    "description": "Landscape tablet slate launcher for Omarchy with live search, 4-column app grid, Raycast intelligence engine, and Hyprland shortcut badges",
+    "entryPoints": {
+      "menu": "TabletSwitchboard.qml",
+      "barWidget": "BarWidget.qml"
+    },
+    "note": "Supercharged with Raycast-like intelligence engine (math calculations, currency conversions, quick links, timezone conversion, FMHY SQLite search), weighted application fuzzy search, and landscape tablet/touch optimization"
   },
   "mahmoodkhalil57.qrgen": {
     "remote": "https://github.com/MahmoodKhalil57/omarchy-qrgen.git",

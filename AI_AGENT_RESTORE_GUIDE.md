@@ -25,7 +25,7 @@ This repository contains the full snapshot of user customizations:
 1. **`shell.json`**:
    - Floating bar layout (`charlieras262.floating-bar`) at the top.
    - Configured sections:
-     - **Left**: `omarchy.workspaces`, `omarchy.agents`, `krall.switchboard`.
+     - **Left**: `omarchy.workspaces`, `omarchy.agents`, `soham.tablet-switchboard`.
      - **Center**: `omarchy.clock` (custom format `dddd HH:mm`), `omarchy.keyboard-layout`, `mryll.meteobar`, `io.github.diegopluna.argus`, `omarchy.system-update`.
      - **Right**: `omarchy.tray`, `io.github.ricky.whatsapp`, `omamail`, `io.github.nilszeilon.omarchy-sensei`, `io.github.elevate08.qs-bitwarden-cli` (with fingerprint unlock & 60s clipboard clear), `jkoestinger.vpn`, `io.github.r-witz.nothing-ear`, `omaconnect`, `omarchy.bluetooth`, `omarchy.network`, `omarchy.audio`, `omarchy.monitor`, `soham.power`.
    - Idle screen lock timers: screensaver at 150s, lock at 300s.
@@ -79,7 +79,7 @@ This repository contains the full snapshot of user customizations:
 
 ### E. Shell Plugins (`plugins/` -> `~/.config/omarchy/plugins/`)
 35 plugins included with complete source code:
-- **`krall.switchboard`**: Full-screen grid launcher replacement for default `omarchy.menu`. Supercharged with a Raycast-like intelligence engine (`RaycastSearch.js` with math/base/percentage calculations, currency conversions, timezone converter, FMHY SQLite FTS5 search, and 14 quick links in `~/.config/omarchy/quicklinks.json`), weighted application fuzzy search (`AppSearch.js`), token navigation, and custom scripts (`scripts/enabled`, `scripts/toggle`, `scripts/fmhy-search`, `scripts/fmhy-sync.py`).
+- **`soham.tablet-switchboard`**: Landscape tablet slate launcher replacement for default `omarchy.menu`, optimized for both desktop and touch/tablet screens. Supercharged with a Raycast-like intelligence engine (`RaycastSearch.js` with math/base/percentage calculations, currency conversions, timezone converter, FMHY SQLite FTS5 search, and 14 quick links in `~/.config/omarchy/quicklinks.json`), 4-column application grid, clean state reset, weighted application fuzzy search (`AppSearch.js`), token navigation, and custom scripts (`scripts/enabled`, `scripts/toggle`, `scripts/fmhy-search`, `scripts/fmhy-sync.py`, `scripts/tablet-status`).
 - **`io.github.i12bp8.fmhy-deck`**: FreeMediaHeckYeah Deck bar widget and category panel (14,500+ resources) with seamless Switchboard search integration.
 - **`akshit.island`**: Dynamic Island status widget for media playback, battery level, and active alerts.
 - **`io.github.enovara.teach-voxtype`**: Voxtype speech dictation helper and vocabulary learning panel.
